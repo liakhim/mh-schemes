@@ -2,6 +2,7 @@
 
 use App\Models\Scheme;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/scheme');
@@ -63,6 +64,12 @@ Route::patch('/api/schemes/{scheme}', function (Request $request, Scheme $scheme
         'incoming_scheme' => $scheme->incoming_scheme,
     ]);
 })->whereNumber('scheme')->name('schemes.update');
+
+Route::post('/api/proxy/integration', function (Request $request) {
+    $response = Http::post('https://my.mhtest.ru/api/landing', $request->all());
+    return response($response->body(), $response->status())
+        ->header('Content-Type', 'application/json');
+})->name('proxy.integration');
 
 Route::view('/selection', 'selection')->name('selection');
 Route::view('/scheme', 'spa', ['scheme' => null])->name('scheme');

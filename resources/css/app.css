@@ -428,6 +428,102 @@ body {
     cursor: not-allowed;
 }
 
+.selection-page {
+    font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+.selection-page section > div {
+    justify-content: center;
+}
+
+.selection-page input[type="checkbox"] {
+    accent-color: #e07020;
+}
+
+.selection-hide-json pre {
+    display: none;
+}
+
+.selection-page button:not([title="Удалить"]):not(.selection-option-button) {
+    border-color: #c85e18 !important;
+    background: #e07020 !important;
+    color: #fff !important;
+    transition: background 0.15s, border-color 0.15s !important;
+}
+
+.selection-page button:not([title="Удалить"]):not(.selection-option-button):hover {
+    background: #c85e18 !important;
+}
+
+/* Sticky header */
+.sel-header {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    margin: -24px -24px 28px;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    box-shadow: 0 2px 12px rgba(32, 39, 56, 0.06);
+}
+
+.sel-header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+/* Section h2 with orange accent */
+.selection-page h2 {
+    margin: 0 0 10px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    padding-left: 12px;
+    border-left: 3px solid #e07020;
+    line-height: 1.3;
+}
+
+/* Template cards */
+.sel-card {
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+
+.sel-card:hover {
+    border-color: #e07020 !important;
+    box-shadow: 0 6px 20px rgba(224, 112, 32, 0.12);
+    transform: translateY(-2px);
+}
+
+.sel-group-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+}
+
+.sel-card-title {
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--text);
+}
+
 @media (max-width: 800px) {
     .spa-navbar {
         padding: 0 12px;
