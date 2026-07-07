@@ -1,0 +1,111 @@
+# EXT / DI / Channel Rules
+
+Краткая версия правил EXT, DI и channel-линий. Полный источник: `JOURNAL.md`.
+
+## EXT Line
+
+- EXT доступна только для `pro` и `ecosmart`.
+- EXT-линия располагается справа от контроллера.
+- По вертикали линия находится в одном ряду с контроллером с выравниванием по нижнему краю.
+- У `ecosmart` EXT-линия смещена на `45 * indent` левее стандартной X-позиции.
+- У `ecosmart` каждый следующий слот EXT-линии расположен на `9 * indent` ниже предыдущего.
+- EXT-устройства: `bl2`, `rl6`, `rl6s`, `io4`, `di6`.
+- У `ecosmart` на EXT-линии дополнительно отображаются проводные термостаты `thermostat`; при `Show empty slots` доступен пустой слот термостата и отдельный пустой слот датчика пола справа от него.
+- У занятых EXT-термостатов `ecosmart` сверху отображается инфоблок с названием.
+- При подключении EXT-термостата `ecosmart` от контроллера или предыдущего EXT-устройства линии `12VDC-IN-V+`, `12VDC-IN-GND`, `EXT-IN-A`, `EXT-IN-B` идут горизонтально до точки `10 * indent` левее соответствующего порта, затем вертикально поднимаются на уровень порта и входят в порт горизонтально вправо.
+- Для первого EXT-термостата `ecosmart` от контроллера маршрут от controller-портов идёт сначала вверх, затем влево на `19 * indent`, затем вверх до уровня соответствующего порта термостата и сразу вправо в порт термостата.
+- Между двумя EXT-термостатами `ecosmart` линии идут от порта предыдущего термостата вертикально вниз до уровня соответствующего порта следующего термостата и сразу вправо в порт следующего термостата.
+- Для `pro`, если controller 1-wire линия не пустая, к расстоянию до первого EXT-модуля добавляется `8 * indent`.
+- `di6` получает дополнительный левый зазор `10 * indent`, если хотя бы один его `channel_devices`/`di_devices` слот занят.
+- Над занятыми DI-слотами `di6` отображается инфоблок с названием устройства.
+- Пустые DI-слоты `di6` отображают порядковый номер входа `1..6` в правом верхнем углу.
+- В левой линии `di6` слоты `1`, `2`, `3` расположены снизу вверх.
+
+## EXT Ports
+
+- Все EXT-модули используют порты:
+- `EXT-IN-A`, `EXT-IN-B`, `EXT-OUT-A`, `EXT-OUT-B`.
+
+## RL6 / RL6S Own Relay Lines
+
+- `rl6`: две собственные RELAY-линии, слева и справа сверху от модуля.
+- `rl6s`: две собственные RELAY-S-линии, аналогично `rl6`.
+- В каждой линии `3` слота, всего `6`.
+- Слоты вертикальные с зазором `4 * indent`.
+- Пустой слот: `8 * indent` на `8 * indent`.
+- Дополнительный правый отступ `rl6` для RELAY-линии: `20 * indent`.
+- `stupidBoiler`: `6 * indent` на `10 * indent`.
+- Порты grouped SVG разворачиваются в виртуальные `RELAY-1-B..RELAY-6-B` или `RELAY-S-1-B..RELAY-S-6-B`.
+- У `rl6` есть индикаторы `RELAY-INDICATOR-1..6`: занятый relay-слот отображается `#00DA00` с glow, свободный `#D2D2D2`.
+- У `rl6s` есть индикаторы `RELAY-S-INDICATOR-1..6`: занятый relay-s слот отображается `#00DA00` с glow, свободный `#D2D2D2`.
+
+## IO4 Channels
+
+- `010servo` из `wired_devices` с `connection_type='di'` всегда распределяется только на `io4.channel_devices`.
+- `010pump` из `wired_devices` с `connection_type='di'` всегда распределяется только на `io4.channel_devices`.
+- Если у `010servo.additions` есть `mixing-ntc-sensor` с `connection_type='ntc'`, servo и NTC sensor размещаются на одном `io4`.
+- Если у `010pump.additions` есть `mixing-ntc-sensor` с `connection_type='ntc'`, pump и NTC sensor размещаются на одном `io4`.
+- На `/selection` `010pump`/`010servo` с вложенным `mixing-ntc-sensor` считается как 2 `io4` channel-слота: один под устройство и один под NTC.
+- `010servo`/`010pump` занимает один канал, вложенный NTC sensor следующий канал.
+- Размещённый NTC sensor удаляется из `additions` servo в материализованной схеме.
+- SVG `010servo`: `resources/assets/servo/010servoLeftPorts.svg`.
+- Логические каналы `1..4` расположены сверху вниз, чтобы линии коммутации пересекались реже.
+- Вертикальный gap между channel-слотами `io4`: `8 * indent`, чтобы над занятыми слотами помещались инфоблоки без наложения на соседний слот.
+- Если `Show empty slots` выключен, занятые channel-слоты отрисовываются компактно ближе к модулю, сохраняя порядок каналов сверху вниз.
+- Если `Show empty slots` включён, все 4 channel-слота отображаются на штатных позициях по своим индексам.
+- Пустые channel-слоты `io4` показывают номер канала `1..4` в правом верхнем углу.
+- У занятых `io4.channel_devices` слотов на hover отображается кнопка удаления; удаление очищает конкретный channel-индекс без сдвига соседних устройств.
+- Над занятыми `io4.channel_devices` слотами для `discrete_pool`, `discrete_fire_alarm`, `discrete_signal`, `discrete_ventilation` отображается редактируемый инфоблок с названием устройства.
+
+## Pressure / Discrete
+
+- `pressure-sensor` с `connection_type='4-20'` распределяется на controller 4-20 или `io4.channel_devices`.
+- Controller 4-20 capacity есть у `pro` и `ecosmart`: первый 4-20 датчик попадает в `controller.devices_420`/`controller.devices420`, следующие уходят в `io4.channel_devices`.
+- Пустой controller 4-20 слот на `pro` и `ecosmart` отображается при `Show empty slots`, имеет размер `9 * indent` на `2 * indent`, порты находятся на левой грани друг над другом с расстоянием `1 * indent`, коммутируется двумя проводами от `4-20-OUT-V+` и `4-20-OUT-IN`, кликается через `+` и добавляет первый датчик в `controller.devices_420`/`controller.devices420`.
+- У `ecosmart` controller 4-20 слот расположен справа от контроллера с зазором `4 * indent`; верхняя грань слота на `9 * indent` ниже верхней грани контроллера.
+- Controller 4-20 слот `ecosmart` draggable; offset сохраняется отдельно и сбрасывается через `Reset positions`.
+- Discrete devices с `connection_type='di'` распределяются на controller DI, `io4.channel_devices`, `di6.channel_devices`.
+- У `pro` при наличии UPS controller DI-входы заняты UPS, поэтому DI-устройства должны распределяться в `di6`/`io4`; на `/selection` это создаёт потребность в `di6`, если нет свободных module DI/channel слотов.
+- Пустые controller DI-слоты `pro` при `Show empty slots` показывают кнопку `+`; через меню можно добавить `discrete_pool`, `discrete_fire_alarm`, `discrete_signal`, `discrete_ventilation`, `leak-sensor` в конкретный индекс `controller.di_devices[0..1]`.
+- Занятые controller DI-слоты `pro` на hover показывают кнопку удаления; удаление очищает конкретный индекс `controller.di_devices` без сдвига соседних устройств.
+- Если `leak-sensor` занимает controller DI-слот `pro`, используется изображение `resources/assets/sensors/leakSensorLeftPort.svg`.
+- У `smart2` controller DI использует свободные порты `DI-OUT-1..4`: UPS занимает 2 порта, каждый DI-модуль `rl2`/`rl2s` занимает 2 порта, оставшиеся порты доступны для отдельных DI-устройств в `controller.di_devices`.
+- Пустые отдельные controller DI-слоты `smart2` (не слоты `di_modules`) при `Show empty slots` показывают кнопку `+`; через меню можно добавить `discrete_pool`, `discrete_fire_alarm`, `discrete_signal`, `discrete_ventilation`, `leak-sensor`.
+- Занятые отдельные controller DI-слоты `smart2` на hover показывают кнопку удаления; удаление очищает конкретный индекс `controller.di_devices` без сдвига соседних устройств.
+- Слоты отдельных controller DI-устройств `smart2` отображаются отдельной вертикальной линией под RELAY-слотом контроллера и не являются линией `di_modules`.
+- DI-устройства `smart2` полноценно занимают `DI-OUT`: если свободной пары `DI-OUT` нет, добавление UPS или DI-модуля `rl2`/`rl2s` недоступно; если схема импортирована с конфликтом, лишние controller DI-устройства возвращаются в `wired_devices`.
+- Над занятыми controller DI-слотами `pro`, `smart2` и `ecosmart` отображается инфоблок с названием устройства и порядковым номером среди устройств этого типа.
+- `leak-sensor` с `connection_type='di'` является датчиком протечки и участвует в DI-балансировке для всех контроллеров.
+- Для `ecosmart` первый `leak-sensor` распределяется в собственную `controller.leak_sensor_devices[0]` (`leak_sensor_line`).
+- `controller.leak_sensor_devices` является внутренней render-линией `ecosmart`; в публичном `incomingScheme` датчик должен оставаться/сериализоваться в `sensors`, а не сохраняться в controller-line.
+- `ecosmart leak_sensor_line` подключается к портам controller `DI-IN-2-DI`, `DI-IN-2-V+`, `DI-IN-2-GND`.
+- Слот `ecosmart leak_sensor_line` расположен над контроллером: нижняя грань на `12 * indent` выше верхней грани контроллера, размер `7 * indent` на `7 * indent`.
+- Над занятым слотом отображается инфоблок `Датчик протечки N`, где `N` - порядковый номер датчика протечки в системе.
+- Линии от портов датчика протечки сначала выходят горизонтально в сторону до вертикали соответствующего порта controller, затем спускаются в порт controller.
+- Если порты controller правее слота, используется `resources/assets/sensors/leakSensorRightPort.svg`; если левее слота, используется `resources/assets/sensors/leakSensorLeftPort.svg`.
+- Под `ecosmart leak_sensor_line` расположен ещё один собственный DI-слот controller для `discrete_pool`, `discrete_fire_alarm`, `discrete_signal`, `discrete_ventilation`.
+- Этот `ecosmart` DI-слот имеет размер `7 * indent` на `2 * indent`, смещён на `1 * indent` левее базовой позиции, использует изображения с правыми портами и коммутируется одним проводом в controller port `DI-IN-1`.
+- Над занятым `ecosmart` DI-слотом отображается инфоблок с названием discrete-устройства и порядковым номером среди устройств этого типа.
+- Занятый `ecosmart` discrete DI-слот на hover показывает кнопку удаления; удаление очищает `controller.di_devices[0]`.
+- Discrete aliases: `random_signal` -> `discrete_signal`, `ventilation` -> `discrete_ventilation`.
+
+## Smart2 DI Modules
+
+- На DI-линии `smart2` модуль `rl2` требует дополнительный горизонтальный отступ `9 * indent` слева и `9 * indent` справа.
+- На DI-линии `smart2` модуль `rl2s` требует дополнительный горизонтальный отступ только справа `9 * indent`.
+- У `rl2` есть два relay-порта: `RELAY-1-A`, `RELAY-1-B`, `RELAY-2-A`, `RELAY-2-B`.
+- У `rl2` есть собственная RELAY-линия из двух слотов справа сверху от модуля.
+- Нижняя грань RELAY-линии `rl2` лежит на верхней грани модуля.
+- Слоты RELAY-линии `rl2` расположены вертикально друг над другом с зазором `4 * indent`.
+- Relay-устройства, распределённые в `rl2.relay_devices`, коммутируются в реальные порты `RELAY-N-A` и `RELAY-N-B`; `RELAY-N-A` используется как подвод `L`, `RELAY-N-B` идёт к устройству.
+- От порта занятого relay-слота `rl2` линия выходит сразу влево до вертикали соответствующего порта модуля и затем спускается/поднимается в порт модуля.
+- Над занятыми relay-слотами `rl2` отображаются инфоблоки с названием и порядковым номером оборудования.
+- Над занятыми relay-s слотами `rl2s` отображаются инфоблоки с названием и порядковым номером оборудования.
+- У `rl2s` есть grouped A-порт `RELAY-S-1-2-A` и B-порты `RELAY-S-1-B`/`RELAY-S-2-B`.
+- Если хотя бы один relay-s слот `rl2s` занят, из `RELAY-S-1-2-A` рисуется общий подвод `L`.
+- Занятые relay-s слоты `rl2s` коммутируются в `RELAY-S-1-B` и `RELAY-S-2-B`.
+- `220servo`/`valve` с `double_relay` на `rl2s` подключаются к устройству через `RELAY-IN-1` и `RELAY-IN-2`, а не через общий `RELAY-IN`.
+- Пустые собственные relay-s слоты `rl2s` при `Show empty slots` показывают кнопку `+`; через меню можно добавить `zoneServo` (`relay-s`), `220servo` (`double_relay`), `valve` (`double_relay`).
+- `220servo` и `valve` занимают два соседних relay-s слота `rl2s`; добавление выполняется только если выбранный слот и следующий слот свободны.
+- Инфоблоки собственных relay-s слотов `rl2s` компактные: ширина равна ширине слота, высота 12px, позиция над слотом как у relay-слотов EXT-модулей.
+- Собственная RELAY-S-линия `rl2s` состоит из двух слотов справа сверху от модуля с той же геометрией, что у RELAY-линии `rl2`.

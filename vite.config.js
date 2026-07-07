@@ -1,0 +1,24 @@
+import { defineConfig } from 'vite';
+import laravel from 'laravel-vite-plugin';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+    plugins: [
+        laravel({
+            input: ['resources/css/app.css', 'resources/js/spa.jsx', 'resources/js/admin.jsx', 'resources/js/selection.jsx'],
+            refresh: true,
+        }),
+        react(),
+    ],
+    server: {
+        origin: 'http://localhost:8099',
+        host: '0.0.0.0',
+        port: 5173,
+        hmr: {
+            path: '/@vite/hmr',
+        },
+        watch: {
+            ignored: ['**/storage/framework/views/**'],
+        },
+    },
+});

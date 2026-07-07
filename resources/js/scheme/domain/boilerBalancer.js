@@ -1,0 +1,121 @@
+import { canonicalDeviceType } from './deviceTypes';
+
+const RELAY_LINE_CAPACITY = 6;
+const BUS_LINE_CAPACITY = 1;
+
+const getControllerType = (scheme) => canonicalDeviceType(
+    typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type,
+);
+
+const getControllerBusCapacity = (controllerType) => (controllerType === 'ecosmart' ? 2 : 1);
+
+const getControllerRelayCapacity = (controllerType) => {
+    if (controllerType === 'pro') return 4;
+    if (controllerType === 'smart2') return 2;
+    if (controllerType === 'ecosmart') return 1;
+    if (controllerType === 'go' || controllerType === 'go+') return 1;
+    return 0;
+};
+
+const normalizeExtModule = (moduleItem, index) => {
+    const type = canonicalDeviceType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type);
+    if (!type) return null;
+    const base = moduleItem && typeof moduleItem === 'object' ? moduleItem : {};
+    return {
+        ...base,
+        id: base.id ?? `${type}-${index}`,
+        type,
+        connection_type: base.connection_type ?? 'EXT',
+        one_wire_devices: Array.isArray(base.one_wire_devices) ? base.one_wire_devices : [],
+        bus_devices: Array.isArray(base.bus_devices) ? base.bus_devices : [],
+        relay_devices: Array.isArray(base.relay_devices) ? base.relay_devices : [],
+        relay_s_devices: Array.isArray(base.relay_s_devices) ? base.relay_s_devices : [],
+        channel_devices: Array.isArray(base.channel_devices) ? base.channel_devices : [],
+        di_devices: Array.isArray(base.di_devices) ? base.di_devices : [],
+    };
+};
+
+const normalizeBoilerForRelay = (boiler, index) => ({
+    ...boiler,
+    id: boiler?.id ?? `relay-boiler-${index}`,
+    type: canonicalDeviceType(boiler?.type) === 'smart' ? 'smart' : 'stupid',
+    connection_type: 'relay',
+});
+
+const normalizeBoilerForBus = (boiler, index) => ({
+    ...boiler,
+    id: boiler?.id ?? `bus-boiler-${index}`,
+    type: 'smart',
+    connection_type: 'BUS',
+    reserve: false,
+});
+
+const getDeviceKey = (device, index) => (device?.id != null ? `id:${device.id}` : `index:${index}`);
+
+const isRelayBoiler = (boiler) => {
+    const type = canonicalDeviceType(boiler?.type);
+    const rawType = typeof boiler?.type === 'string' ? boiler.type.toLowerCase() : '';
+    return type === 'stupid' || rawType === 'stupidboiler' || rawType === 'stupid-boiler' || boiler?.reserve === true;
+};
+
+const isBusBoiler = (boiler) => canonicalDeviceType(boiler?.type) === 'smart' && boiler?.reserve !== true;
+
+const pushToLine = (line, device, capacity) => {
+    if (!Array.isArray(line) || line.length >= capacity) return false;
+    line.push(device);
+    return true;
+};
+
+export const balanceBoilers = (scheme) => {
+    const controllerType = getControllerType(scheme);
+    const controller = scheme?.controller && typeof scheme.controller === 'object'
+        ? { ...scheme.controller }
+        : { type: controllerType };
+    const extModules = (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [])
+        .map(normalizeExtModule)
+        .filter(Boolean);
+
+    controller.bus_devices = Array.isArray(controller.bus_devices) ? [...controller.bus_devices] : [];
+    controller.relay_devices = Array.isArray(controller.relay_devices) ? [...controller.relay_devices] : [];
+
+    const relayLines = [
+        { kind: 'controller', devices: controller.relay_devices, capacity: getControllerRelayCapacity(controllerType) },
+        ...extModules
+            .map((moduleItem, moduleIndex) => ({ moduleItem, moduleIndex }))
+            .filter(({ moduleItem }) => canonicalDeviceType(moduleItem?.type) === 'rl6')
+            .map(({ moduleItem, moduleIndex }) => ({ kind: 'ext', moduleIndex, devices: moduleItem.relay_devices, capacity: RELAY_LINE_CAPACITY })),
+    ].filter((line) => line.capacity > 0);
+
+    const busLines = [
+        { kind: 'controller', devices: controller.bus_devices, capacity: getControllerBusCapacity(controllerType) },
+        ...extModules
+            .map((moduleItem, moduleIndex) => ({ moduleItem, moduleIndex }))
+            .filter(({ moduleItem }) => canonicalDeviceType(moduleItem?.type) === 'bl2')
+            .map(({ moduleItem, moduleIndex }) => ({ kind: 'ext', moduleIndex, devices: moduleItem.bus_devices, capacity: BUS_LINE_CAPACITY })),
+    ].filter((line) => line.capacity > 0);
+
+    const placedKeys = new Set();
+    (Array.isArray(scheme?.boilers) ? scheme.boilers : []).forEach((boiler, index) => {
+        if (isRelayBoiler(boiler)) {
+            const device = normalizeBoilerForRelay(boiler, index);
+            const placed = relayLines.some((line) => pushToLine(line.devices, device, line.capacity));
+            if (placed) placedKeys.add(getDeviceKey(boiler, index));
+            return;
+        }
+
+        if (isBusBoiler(boiler)) {
+            const device = normalizeBoilerForBus(boiler, index);
+            const placed = busLines.some((line) => pushToLine(line.devices, device, line.capacity));
+            if (placed) placedKeys.add(getDeviceKey(boiler, index));
+        }
+    });
+
+    return {
+        ...scheme,
+        controller,
+        boilers: Array.isArray(scheme?.boilers)
+            ? scheme.boilers.filter((boiler, index) => !placedKeys.has(getDeviceKey(boiler, index)))
+            : scheme?.boilers,
+        ext_modules: extModules,
+    };
+};

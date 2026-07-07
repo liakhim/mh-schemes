@@ -1,0 +1,22 @@
+<svg width="72" height="73" viewBox="0 0 72 73" fill="none" xmlns="http://www.w3.org/2000/svg">
+<line x1="9.14565" y1="63.128" x2="21.8448" y2="50.3714" stroke="#D8DF00"/>
+<path d="M1 54.2241H18" stroke="#FF0000" stroke-linecap="round"/>
+<path d="M18 71.2241L18 54.2241" stroke="black" stroke-linecap="round"/>
+<path d="M54.2698 13.5095L66.7294 0.994859C67.1387 0.583761 68.3603 1.14436 69.4565 2.24542C70.5527 3.34648 71.1882 4.65121 70.7789 5.06231L58.3193 17.577" fill="#C2BFBE"/>
+<path d="M54.2698 13.5095L66.7294 0.994858C67.1387 0.583761 68.3603 1.14436 69.4565 2.24542C70.5527 3.34648 71.1882 4.65121 70.7789 5.0623L58.3193 17.577" stroke="black" stroke-width="0.5" stroke-miterlimit="10"/>
+<path d="M58.3193 17.5769L58.565 17.8237" stroke="black" stroke-width="0.5" stroke-miterlimit="10"/>
+<path d="M54.0205 13.259L54.2705 13.5101" stroke="black" stroke-width="0.5" stroke-miterlimit="10"/>
+<path d="M42.8229 24.5059L54.0201 13.2591L58.5641 17.8231L47.3668 29.0699" fill="#575756"/>
+<path d="M42.8229 24.5059L54.0201 13.2591L58.5641 17.8231L47.3668 29.0699" stroke="black" stroke-width="0.5" stroke-miterlimit="10"/>
+<path d="M58.3196 17.5772L54.2698 13.5095" stroke="black" stroke-width="0.5" stroke-miterlimit="10"/>
+<path d="M45.2705 29.8201L41.9944 26.5295" stroke="black" stroke-width="0.5" stroke-miterlimit="10"/>
+<path d="M47.3671 29.0702L45.2703 29.8204L41.9944 26.53L42.8229 24.506L47.3671 29.0702Z" fill="#575756" stroke="black" stroke-width="0.5" stroke-miterlimit="10"/>
+<path d="M32.6516 41.8646L30.0291 39.2305" stroke="black" stroke-width="0.5" stroke-miterlimit="10"/>
+<path d="M32.6513 41.8644L33.4994 41.643L45.2699 29.8205L41.9941 26.5303L30.2236 38.3528L30.029 39.2305L15.9707 53.3509L30.029 39.2305L32.6513 41.8644L18.593 55.9848L32.6513 41.8644Z" fill="#575756"/>
+<path d="M32.6513 41.8644L33.4994 41.643L45.2699 29.8205L41.9941 26.5303L30.2236 38.3528L30.029 39.2305L15.9707 53.3509L30.029 39.2305L32.6513 41.8644ZM32.6513 41.8644L18.593 55.9848" stroke="black" stroke-width="0.5" stroke-miterlimit="10"/>
+<path d="M30.1232 39.3256L32.651 41.8645L18.6447 55.9327L16.1169 53.3938" fill="#EBEBEB"/>
+<path d="M30.1232 39.3256L32.651 41.8645L18.6447 55.9327L16.1169 53.3938" stroke="black" stroke-width="0.25" stroke-miterlimit="10"/>
+<rect class="1-WIRE-V+" y="53.2241" width="2" height="2" rx="1" fill="#FF0000"/>
+<rect class="1-WIRE-DAT" x="8" y="62.2241" width="2" height="2" rx="1" fill="#D8DF00"/>
+<rect class="1-WIRE-GND" x="17" y="70.2241" width="2" height="2" rx="1" fill="black"/>
+</svg>
