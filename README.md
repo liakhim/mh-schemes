@@ -28,6 +28,7 @@ After startup:
 - Full rules journal: `JOURNAL.md`
 - Rule index: `docs/rules/INDEX.md`
 - Domain materialization pipeline: `resources/js/scheme/domain/oneWireMaterializer.js`
+- Beget deploy notes: `docs/deploy/beget.md`
 
 ## What gets created automatically
 
