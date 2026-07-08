@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 
 const controllerImagePaths = {
@@ -122,22 +122,44 @@ const CONTROLLER_LABELS = {
     ecosmart: 'ECOsmart',
 };
 
+const CONTROLLER_DESC_BOX_WIDTH = 260;
+const CONTROLLER_CONNECTOR_GAP = 20;
+const CONTROLLER_CONNECTOR_COLOR = '#c7ccd6';
+
+const CONTROLLER_DESCRIPTIONS = {
+    proEcosmart: 'Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore',
+};
+
+const controllerDescBoxStyle = {
+    position: 'absolute',
+    width: CONTROLLER_DESC_BOX_WIDTH,
+    border: '1px solid #d7dbe4',
+    borderRadius: 10,
+    background: '#f8fafc',
+    padding: '10px 14px',
+    fontSize: 12.5,
+    lineHeight: 1.45,
+    color: '#64748b',
+    textAlign: 'center',
+    boxSizing: 'border-box',
+};
+
 const CONTROLLER_KIT_TEMPERATURE_DEVICES = {
     pro: [
-        { label: 'Цифровой датчик температуры настенный', count: 1 },
-        { label: 'Цифровой датчик температуры в колбе', count: 2 },
+        { label: 'Цифровой датчик температуры настенный', count: 1, templateKey: 'wired-wall-digital' },
+        { label: 'Цифровой датчик температуры в колбе', count: 2, templateKey: 'wired-flask-digital' },
     ],
     smart2: [
-        { label: 'Датчик температуры настенный проводной', count: 1 },
+        { label: 'Датчик температуры настенный проводной', count: 1, templateKey: 'wired-wall-digital' },
     ],
     ecosmart: [
-        { label: 'NTC-датчик температуры', count: 3 },
+        { label: 'NTC-датчик температуры', count: 3, templateKey: 'wired-flask-ntc' },
     ],
     go: [
-        { label: 'Настенный цифровой датчик температуры', count: 1 },
+        { label: 'Настенный цифровой датчик температуры', count: 1, templateKey: 'wired-wall-digital' },
     ],
     'go+': [
-        { label: 'Беспроводной комнатный датчик температуры', count: 1 },
+        { label: 'Беспроводной комнатный датчик температуры', count: 1, templateKey: 'wireless-wall' },
     ],
 };
 
@@ -246,6 +268,32 @@ const countNtcOneWireModules = (scheme) => {
 };
 
 const getOneWireLineCount = (extModules) => 1 + (Array.isArray(extModules) ? extModules.filter(isExtOneWireLineModule).length : 0);
+
+// go/go+ имеют встроенный радиомодуль (у go он неактивированный, но модуль RDT2 ему всё равно не нужен),
+// ecosmart имеет собственный радиомодуль; pro и smart2 радиомодуля не имеют вовсе и требуют RDT2
+// для любого беспроводного устройства в схеме.
+const RDT2_REQUIRED_CONTROLLERS = new Set(['pro', 'smart2']);
+
+const isRdt2Module = (device) => canonicalType(typeof device === 'string' ? device : device?.type) === 'rdt2';
+
+const countRdt2Modules = (scheme) => {
+    const controllerDevices = Array.isArray(scheme?.controller?.one_wire_devices) ? scheme.controller.one_wire_devices : [];
+    const oneWireModules = Array.isArray(scheme?.one_wire_modules) ? scheme.one_wire_modules : [];
+    const extOneWireDevices = (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [])
+        .flatMap((moduleItem) => (Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : []));
+
+    return [...controllerDevices, ...oneWireModules, ...extOneWireDevices]
+        .filter(isRdt2Module)
+        .length;
+};
+
+const getRequiredRdt2ModuleCount = (scheme, controllerTypeOverride = null) => {
+    const controllerType = controllerTypeOverride || getControllerType(scheme);
+    if (!RDT2_REQUIRED_CONTROLLERS.has(controllerType)) return 0;
+    const wirelessDevices = Array.isArray(scheme?.wireless_devices) ? scheme.wireless_devices : [];
+    if (wirelessDevices.length === 0) return 0;
+    return countRdt2Modules(scheme) > 0 ? 0 : 1;
+};
 
 const STRATEGY_SENSOR_AUTO_SOURCE = 'smart-boilers-strategy';
 
@@ -407,7 +455,8 @@ const getCompatibilityStats = (scheme, controllerTypeOverride = null) => {
     const totalNtcModules = countNtcOneWireModules(scheme) + requiredNtcModules;
     const requiredNtcOneWireLines = Math.ceil(totalNtcModules / NTC_MODULES_PER_ONE_WIRE_LINE);
     const oneWireLines = getOneWireLineCount(scheme?.ext_modules);
-    const oneWire = oneWireFromWired + oneWireFromSensors + oneWireModules.length + requiredNtcModules;
+    const requiredRdt2Modules = getRequiredRdt2ModuleCount(scheme, controllerType);
+    const oneWire = oneWireFromWired + oneWireFromSensors + oneWireModules.length + requiredNtcModules + requiredRdt2Modules;
 
     const bus = boilers.filter((boiler) => canonicalType(boiler?.type) === 'smart' && hasConnectionType(boiler, 'bus')).length;
     const relayLimits = getModuleAdjustedLimits(scheme, controllerType) || CONTROLLER_LIMITS[controllerType] || { relay: 0 };
@@ -421,13 +470,11 @@ const getCompatibilityStats = (scheme, controllerTypeOverride = null) => {
     const analog420 = sensors.filter((sensor) => hasConnectionType(sensor, '4-20')).length;
     const ups = Array.isArray(scheme?.power_modules) && scheme.power_modules.includes('ups') ? 1 : 0;
 
-    return { oneWire, oneWireThermostats, bus, relay, relayS, di, io4Only, analog420, ups, requiredNtcModules, totalNtcModules, requiredNtcOneWireLines, oneWireLines };
+    return { oneWire, oneWireThermostats, bus, relay, relayS, di, io4Only, analog420, ups, requiredNtcModules, totalNtcModules, requiredNtcOneWireLines, oneWireLines, requiredRdt2Modules };
 };
 
 // идентификация ecosmart
 const isEcosmartIdentified = (scheme) => {
-    if (getControllerType(scheme) !== 'pro') return false;
-
     const controller = scheme?.controller && typeof scheme.controller === 'object' ? scheme.controller : {};
     const extModules = Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [];
     const controllerDevices = [
@@ -504,6 +551,20 @@ const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null)
 
     const stats = getCompatibilityStats(scheme, controllerType);
     const issues = [];
+
+    // У ecosmart relay-линия — не единый пул слотов, а фиксированные
+    // per-role пары пинов (смеситель, насос, клапан, ГВС и т.д.),
+    // поэтому общая числовая проверка relay/relay-S к ней неприменима.
+    if (controllerType === 'ecosmart') {
+        if (!isEcosmartIdentified(scheme)) {
+            issues.push('Состав оборудования не подходит под фиксированные relay-линии ECOsmart (смесительные узлы, насосы, клапан, ГВС и т.д. имеют ограниченное число выделенных слотов).');
+        }
+        if (stats.ups > 0 && !limits.power) {
+            issues.push('UPS требует контроллер с power-линией: smart2 или pro.');
+        }
+        return issues;
+    }
+
     const addCapacityIssue = (label, current, limit) => {
         if (current > limit) issues.push(`${label}: требуется ${current}, доступно ${limit}.`);
     };
@@ -553,6 +614,7 @@ const getControllerRecommendation = (scheme, controllerType) => {
     };
 
     addModules('ntc-1-wire', stats.requiredNtcModules);
+    addModules('rdt2', stats.requiredRdt2Modules);
 
     if (controllerType === 'smart2') {
         if (stats.ups > 0) limits.di = Math.max(0, limits.di - 2);
@@ -891,6 +953,14 @@ const withRequiredModules = (scheme) => {
         changed = true;
     }
 
+    if (stats.requiredRdt2Modules > 0) {
+        oneWireModules = [
+            ...oneWireModules,
+            ...Array.from({ length: stats.requiredRdt2Modules }, () => makeOneWireModule('rdt2')),
+        ];
+        changed = true;
+    }
+
     if (controllerType === 'smart2') {
         const baseRelayStats = getRelayStatsForLimits(scheme, limits);
         const relayDeficit = Math.max(0, baseRelayStats.relay - limits.relay);
@@ -1070,6 +1140,7 @@ const PRESSURE_TEMPLATES = [
 const LEAK_TEMPLATES = [
     {
         label: 'Датчик защиты от протечки',
+        description: 'Предназначен для фиксации протечки воды и передачи аварийного сигнала на контроллер.',
         target: 'sensors',
         data: { id: 1, device_type: 'sensor', type: 'leak-sensor', connection_type: 'di' },
     },
@@ -1084,11 +1155,6 @@ const THERMOSTAT_COLORS = [
     { value: 'black', label: 'Черный' },
     { value: 'white', label: 'Белый' },
     { value: 'gray', label: 'Серый' },
-];
-
-const THERMOSTAT_CONNECTIONS = [
-    { value: 'wired', label: 'Проводной' },
-    { value: 'wireless', label: 'Беспроводной' },
 ];
 
 const makeThermostatTemplate = ({ target, color, hasFloorSensor }) => ({
@@ -1116,7 +1182,7 @@ const makeSchemeName = () => {
 const TEMPERATURE_SENSOR_TEMPLATES = [
     {
         key: 'wireless-outdoor',
-        label: 'Беспроводной уличный датчик температуры',
+        label: 'Беспроводной Уличный датчик температуры',
         target: 'wireless_devices',
         data: {
             id: 3,
@@ -1127,7 +1193,7 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     },
     {
         key: 'wireless-wall',
-        label: 'Беспроводной настенный датчик температуры',
+        label: 'Беспроводной Настенный датчик температуры',
         target: 'wireless_devices',
         data: {
             id: 4,
@@ -1149,7 +1215,7 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     },
     {
         key: 'wired-flask-digital',
-        label: 'Проводной цифровой датчик в колбе',
+        label: 'Проводной Цифровой датчик в колбе',
         target: 'sensors',
         data: {
             id: 12,
@@ -1160,7 +1226,7 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     },
     {
         key: 'wired-flask-ntc',
-        label: 'Проводной NTC датчик в колбе',
+        label: 'Проводной NTC-датчик в колбе',
         target: 'sensors',
         data: {
             id: 3,
@@ -1171,8 +1237,9 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     },
     {
         key: 'wired-wall-ntc',
-        label: 'Проводной настенный NTC датчик',
+        label: 'Проводной Настенный NTC-датчик',
         target: 'sensors',
+        disabled: true,
         data: {
             id: 3,
             device_type: 'sensor',
@@ -1217,6 +1284,7 @@ const ZONE_TEMPLATES = [
 const PUMP_TEMPLATES = [
     {
         label: 'Насос 220V',
+        description: 'Циркуляционный насос с питанием 220 В предназначен для обеспечения стабильной циркуляции теплоносителя в системах отопления и горячего водоснабжения. Простое подключение и надежная работа делают его оптимальным решением для большинства стандартных систем.',
         wiredDevice: {
             id: 12,
             device_type: 'equipment',
@@ -1228,6 +1296,7 @@ const PUMP_TEMPLATES = [
     },
     {
         label: 'Насос 0-10V',
+        description: 'Циркуляционный насос с управлением 0–10 В обеспечивает плавное регулирование производительности по внешнему сигналу. Подходит для автоматизированных систем, где требуется точное поддержание заданных параметров и повышение энергоэффективности.',
         wiredDevice: {
             id: 13,
             device_type: 'equipment',
@@ -1242,6 +1311,7 @@ const PUMP_TEMPLATES = [
 const GVS_TEMPLATES = [
     {
         label: 'Бойлер ГВС',
+        description: 'Бойлер ГВС используется для приготовления горячей воды за счет теплоносителя системы отопления. Позволяет эффективно обеспечивать горячее водоснабжение при минимальных затратах энергии.',
         wiredDevice: {
             id: 14,
             device_type: 'equipment',
@@ -1258,6 +1328,7 @@ const GVS_TEMPLATES = [
 const MIXING_TEMPLATES = [
     {
         label: 'Сервопривод 220V с цифровым датчиком',
+        description: 'Обеспечивает автоматическое управление отоплением с высокой точностью измерения температуры.',
         wiredDevice: {
             id: 0,
             device_type: 'equipment',
@@ -1271,6 +1342,7 @@ const MIXING_TEMPLATES = [
     },
     {
         label: 'Сервопривод 220V с NTC-датчиком',
+        description: 'Предназначен для автоматического управления системой отопления по температуре.',
         wiredDevice: {
             id: 0,
             device_type: 'equipment',
@@ -1284,6 +1356,7 @@ const MIXING_TEMPLATES = [
     },
     {
         label: 'Сервопривод 0-10V с NTC-датчиком',
+        description: 'Предназначен для плавного управления исполнительным механизмом по аналоговому сигналу 0–10 В.',
         wiredDevice: {
             id: 13,
             device_type: 'equipment',
@@ -1425,6 +1498,174 @@ const AddedDevicesTitle = ({ children }) => (
     <h3 style={{ margin: '0 0 14px', fontSize: 18, fontWeight: 500 }}>{children}</h3>
 );
 
+const ThermostatCard = ({ template, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd }) => (
+    <div
+        className="sel-card"
+        style={{
+            flex: '1 1 320px',
+            minWidth: 260,
+            border: '1px solid #d7dbe4',
+            borderRadius: 14,
+            padding: 18,
+            background: '#fff',
+            display: 'flex',
+            flexDirection: 'column',
+        }}
+    >
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+            <div style={{ fontWeight: 700, marginBottom: 14, fontSize: 16 }}>{template.label}</div>
+
+            <div style={{ marginBottom: 14 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: '#475569' }}>Цвет</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {THERMOSTAT_COLORS.map((item) => (
+                        <button
+                            className="selection-option-button"
+                            key={item.value}
+                            type="button"
+                            onClick={() => onColorChange(item.value)}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '8px 12px',
+                                border: `1px solid ${color === item.value ? '#c85e18' : '#d7dbe4'}`,
+                                borderRadius: 8,
+                                background: color === item.value ? '#fff7ed' : '#fff',
+                                color: '#202738',
+                                cursor: 'pointer',
+                                fontSize: 13,
+                            }}
+                        >
+                            <span
+                                style={{
+                                    width: 14,
+                                    height: 14,
+                                    borderRadius: '50%',
+                                    border: '1px solid #cbd5e1',
+                                    background: item.value === 'black' ? '#111827' : item.value === 'gray' ? '#9ca3af' : '#fff',
+                                }}
+                            />
+                            {item.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 14, fontSize: 14 }}>
+                <input
+                    type="checkbox"
+                    checked={hasFloorSensor}
+                    onChange={(event) => onFloorSensorChange(event.target.checked)}
+                />
+                Добавить датчик пола
+            </label>
+
+            <pre
+                style={{
+                    background: '#f5f7fb',
+                    padding: 10,
+                    borderRadius: 6,
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    overflow: 'auto',
+                    margin: '0 0 12px',
+                }}
+            >
+{JSON.stringify(template.data, null, 4)}
+            </pre>
+            <button
+                onClick={onAdd}
+                style={{
+                    marginTop: 'auto',
+                    padding: '8px 16px',
+                    border: '1px solid #3498db',
+                    borderRadius: 8,
+                    background: '#3498db',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    fontWeight: 700,
+                }}
+            >
+                Добавить термостат
+            </button>
+        </div>
+    </div>
+);
+
+const TemperatureSensorCard = ({ options, selectedKey, onSelectKey, template, onAdd }) => (
+    <div
+        className="sel-card"
+        style={{
+            flex: '1 1 320px',
+            minWidth: 260,
+            border: '1px solid #d7dbe4',
+            borderRadius: 14,
+            padding: 18,
+            background: '#fff',
+        }}
+    >
+        <div style={{ fontWeight: 700, marginBottom: 14, fontSize: 16 }}>{template?.label}</div>
+
+        <div style={{ marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: '#475569' }}>Тип датчика</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {options.map((item) => (
+                    <button
+                        className="selection-option-button"
+                        key={item.key}
+                        type="button"
+                        disabled={item.disabled}
+                        onClick={() => !item.disabled && onSelectKey(item.key)}
+                        style={{
+                            padding: '8px 12px',
+                            border: `1px solid ${selectedKey === item.key ? '#c85e18' : '#d7dbe4'}`,
+                            borderRadius: 8,
+                            background: item.disabled ? '#f1f5f9' : (selectedKey === item.key ? '#fff7ed' : '#fff'),
+                            color: item.disabled ? '#94a3b8' : '#202738',
+                            cursor: item.disabled ? 'not-allowed' : 'pointer',
+                            opacity: item.disabled ? 0.6 : 1,
+                            fontSize: 13,
+                        }}
+                    >
+                        {item.label.replace(/^Беспроводной |^Проводной /, '')}
+                    </button>
+                ))}
+            </div>
+        </div>
+
+        <pre
+            style={{
+                background: '#f5f7fb',
+                padding: 10,
+                borderRadius: 6,
+                fontSize: 12,
+                lineHeight: 1.5,
+                overflow: 'auto',
+                margin: '0 0 12px',
+            }}
+        >
+{JSON.stringify(template?.data, null, 4)}
+        </pre>
+        <button
+            onClick={onAdd}
+            style={{
+                padding: '8px 16px',
+                border: '1px solid #3498db',
+                borderRadius: 8,
+                background: '#3498db',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: 700,
+            }}
+        >
+            Добавить датчик
+        </button>
+    </div>
+);
+
 const AddedDevicesBlock = ({ children }) => (
     <div
         style={{
@@ -1439,11 +1680,33 @@ const AddedDevicesBlock = ({ children }) => (
     </div>
 );
 
-const SectionDivider = () => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '10px 0 34px' }} aria-hidden="true">
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: ORANGE, boxShadow: '0 0 0 5px rgba(224, 112, 32, 0.12)' }} />
-        <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(249,115,22,0.45), rgba(148,163,184,0.35), rgba(148,163,184,0))' }} />
-    </div>
+const SEL_CHAPTERS = [
+    { id: 'chapter-controller', label: 'Контроллер' },
+    { id: 'chapter-boilers', label: 'Котлы' },
+    { id: 'chapter-hydraulics', label: 'Гидравлика' },
+    { id: 'chapter-climate', label: 'Климат' },
+    { id: 'chapter-other-equipment', label: 'Прочее оборудование' },
+    { id: 'chapter-sensors', label: 'Датчики и защита' },
+    { id: 'chapter-misc', label: 'Прочее' },
+    { id: 'chapter-power', label: 'Питание' },
+];
+
+const SelectionQuickNav = () => (
+    <nav className="sel-quick-nav" aria-label="Разделы подбора">
+        {SEL_CHAPTERS.map((item, index) => (
+            <a
+                key={item.id}
+                href={`#${item.id}`}
+                onClick={(event) => {
+                    event.preventDefault();
+                    document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+            >
+                <span>{index + 1}</span>
+                {item.label}
+            </a>
+        ))}
+    </nav>
 );
 
 const getTemplateLabelByType = (templates, type, fallback) => (
@@ -1454,9 +1717,13 @@ const getTemperatureSensorLabel = (device) => (
     device?.title || TEMPERATURE_SENSOR_TEMPLATES.find((template) => canonicalType(template.data.type) === canonicalType(device?.type))?.label || device?.type
 );
 
+const getTemperatureSensorTemplateKey = (device) => TEMPERATURE_SENSOR_TEMPLATES.find(
+    (template) => canonicalType(template.data.type) === canonicalType(device?.type),
+)?.key || null;
+
 const aggregateAddedItems = (items) => Object.values(items.reduce((acc, item) => {
     const key = item.label;
-    if (!acc[key]) acc[key] = { label: item.label, count: 0, removeKeys: [] };
+    if (!acc[key]) acc[key] = { label: item.label, count: 0, removeKeys: [], templateKey: item.templateKey || null };
     acc[key].count += 1;
     acc[key].removeKeys.push(item.removeKey);
     return acc;
@@ -1478,21 +1745,267 @@ const getGroupedUnitLabel = (uidVal, devices, sensors, templates) => {
     return getTemplateLabelByType(templates, devices[0]?.type, devices.map((device) => device.type).join(' + '));
 };
 
+const getGroupedDeviceRows = (scheme, group, templates) => {
+    const wiredDevices = Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [];
+    const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
+    const groups = {};
+    wiredDevices.forEach((device) => {
+        if (isGroupedDevice(device, group, templates)) {
+            if (!groups[device._uid]) groups[device._uid] = [];
+            groups[device._uid].push(device);
+        }
+    });
+    return aggregateAddedItems(Object.entries(groups).map(([uidVal, devices]) => ({
+        label: getGroupedUnitLabel(uidVal, devices, sensors, templates),
+        removeKey: uidVal,
+    })));
+};
+
+const getTemperatureSensorRows = (scheme, controllerType) => {
+    const wirelessTemperatureSensors = (Array.isArray(scheme?.wireless_devices) ? scheme.wireless_devices : [])
+        .filter(isTemperatureSensor)
+        .map((device) => ({ device, target: 'wireless_devices' }));
+    const wiredTemperatureSensors = (Array.isArray(scheme?.sensors) ? scheme.sensors : [])
+        .filter(isTemperatureSensor)
+        .map((device) => ({ device, target: 'sensors' }));
+    const temperatureSensors = [...wirelessTemperatureSensors, ...wiredTemperatureSensors];
+    const kitTemperatureDevices = CONTROLLER_KIT_TEMPERATURE_DEVICES[controllerType] || [];
+
+    const addedRows = aggregateAddedItems(temperatureSensors.map(({ device, target }) => ({
+        label: getTemperatureSensorLabel(device),
+        templateKey: getTemperatureSensorTemplateKey(device),
+        removeKey: { target, id: device.id },
+    })));
+    const mergedAddedLabels = new Set();
+    const kitRows = kitTemperatureDevices.map((device) => {
+        const matchedRow = device.templateKey
+            ? addedRows.find((row) => row.templateKey === device.templateKey)
+            : null;
+        if (!matchedRow) {
+            return { key: `kit:${device.label}`, label: device.label, count: device.count, badge: 'Комплектный', removeKey: null };
+        }
+        mergedAddedLabels.add(matchedRow.label);
+        return {
+            key: `kit:${device.label}`,
+            label: device.label,
+            count: device.count + matchedRow.count,
+            badge: 'Комплектный',
+            removeKey: matchedRow.removeKeys[0],
+        };
+    });
+    const remainingRows = addedRows
+        .filter((row) => !mergedAddedLabels.has(row.label))
+        .map((row) => ({ key: row.label, label: row.label, count: row.count, badge: null, removeKey: row.removeKeys[0] }));
+
+    return [...kitRows, ...remainingRows];
+};
+
+const getPressureSensorRows = (scheme) => {
+    const pressureSensors = (Array.isArray(scheme?.sensors) ? scheme.sensors : []).filter((sensor) => sensor.type === 'pressure-sensor');
+    return aggregateAddedItems(pressureSensors.map((sensor) => ({ label: 'Датчик давления', removeKey: sensor.id })));
+};
+
+const getThermostatRows = (scheme) => {
+    const wiredThermostats = (Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [])
+        .filter((device) => canonicalType(device?.type) === 'thermostat')
+        .map((device) => ({ device, target: 'wired_devices' }));
+    const wirelessThermostats = (Array.isArray(scheme?.wireless_devices) ? scheme.wireless_devices : [])
+        .filter((device) => canonicalType(device?.type) === 'thermostat')
+        .map((device) => ({ device, target: 'wireless_devices' }));
+    const thermostats = [...wiredThermostats, ...wirelessThermostats];
+    return aggregateAddedItems(thermostats.map(({ device, target }) => {
+        const colorLabel = THERMOSTAT_COLORS.find((item) => item.value === device.color)?.label || device.color || 'Без цвета';
+        const connectionLabel = target === 'wired_devices' ? 'Проводной' : 'Беспроводной';
+        const hasFloorSensor = Array.isArray(device.additions)
+            && device.additions.some((addition) => canonicalType(addition?.type) === 'flask-sensor-floor');
+        return {
+            label: `Термостат ${connectionLabel.toLowerCase()}, ${colorLabel.toLowerCase()}${hasFloorSensor ? ', с датчиком пола' : ''}`,
+            removeKey: { target, id: device.id },
+        };
+    }));
+};
+
+const getLeakProtectionRows = (scheme) => {
+    const leakItems = [
+        ...(Array.isArray(scheme?.sensors) ? scheme.sensors : [])
+            .filter((sensor) => sensor.type === 'leak-sensor')
+            .map((sensor) => ({ label: 'Датчик протечки', removeKey: { target: 'sensors', id: sensor.id } })),
+        ...(Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [])
+            .filter((device) => device.type === 'valve')
+            .map((device) => ({ label: 'Запорный клапан', removeKey: { target: 'wired_devices', id: device.id } })),
+    ];
+    return aggregateAddedItems(leakItems);
+};
+
+const MODULE_TYPE_LABELS = {
+    bl2: 'Модуль BUS BL2',
+    ecosmartbl2: 'Модуль ECOsmart BL2',
+    rl6: 'Модуль реле RL6',
+    rl6s: 'Модуль реле RL6S',
+    io4: 'Модуль IO4',
+    di6: 'Модуль DI6',
+    rl2: 'Модуль реле RL2',
+    rl2s: 'Модуль реле RL2S',
+    'ntc-1-wire': 'Модуль NTC 1-Wire',
+    rdt2: 'Радиомодуль RDT2',
+};
+
+const getExpansionModuleRows = (incomingSchemeValue) => {
+    const items = [
+        ...(Array.isArray(incomingSchemeValue?.ext_modules) ? incomingSchemeValue.ext_modules : []),
+        ...(Array.isArray(incomingSchemeValue?.di_modules) ? incomingSchemeValue.di_modules : []),
+        ...(Array.isArray(incomingSchemeValue?.one_wire_modules) ? incomingSchemeValue.one_wire_modules : []),
+        ...(Array.isArray(incomingSchemeValue?.ecosmart_bl2) ? incomingSchemeValue.ecosmart_bl2 : []),
+    ];
+    return aggregateAddedItems(items.map((item) => {
+        const type = canonicalType(typeof item === 'string' ? item : item?.type);
+        return { label: MODULE_TYPE_LABELS[type] || type };
+    }));
+};
+
+const getEquipmentOfferSections = (incomingSchemeValue, controllerType) => {
+    const sections = [];
+    const wiredDevices = Array.isArray(incomingSchemeValue?.wired_devices) ? incomingSchemeValue.wired_devices : [];
+
+    if (controllerType && CONTROLLER_LABELS[controllerType]) {
+        sections.push({ title: 'Контроллер', rows: [{ label: CONTROLLER_LABELS[controllerType], count: 1 }] });
+    }
+
+    const moduleRows = getExpansionModuleRows(incomingSchemeValue);
+    if (moduleRows.length > 0) sections.push({ title: 'Модули расширения', rows: moduleRows });
+
+    const boilers = Array.isArray(incomingSchemeValue?.boilers) ? incomingSchemeValue.boilers : [];
+    if (boilers.length > 0) {
+        sections.push({
+            title: 'Котлы',
+            rows: aggregateAddedItems(boilers.map((boiler) => ({ label: `${boiler.name} (${boiler.connection_type})` }))),
+        });
+    }
+
+    const groupedRows = (group, templates) => getGroupedDeviceRows(incomingSchemeValue, group, templates);
+
+    const mixingRows = groupedRows('mixing', MIXING_TEMPLATES);
+    if (mixingRows.length > 0) sections.push({ title: 'Смесительные узлы', rows: mixingRows });
+
+    const gvsRows = groupedRows('gvs', GVS_TEMPLATES);
+    if (gvsRows.length > 0) sections.push({ title: 'Бойлеры ГВС', rows: gvsRows });
+
+    const pumpRows = groupedRows('pump', PUMP_TEMPLATES);
+    if (pumpRows.length > 0) sections.push({ title: 'Насосы', rows: pumpRows });
+
+    const zoneRows = groupedRows('zone', ZONE_TEMPLATES);
+    if (zoneRows.length > 0) sections.push({ title: 'Зоны', rows: zoneRows });
+
+    const otherRows = groupedRows('other', OTHER_EQUIP_TEMPLATES);
+    if (otherRows.length > 0) sections.push({ title: 'Прочее оборудование', rows: otherRows });
+
+    const temperatureRows = getTemperatureSensorRows(incomingSchemeValue, controllerType);
+    if (temperatureRows.length > 0) {
+        sections.push({ title: 'Датчики температуры', rows: temperatureRows.map((row) => ({ label: row.label, count: row.count })) });
+    }
+
+    const pressureRows = getPressureSensorRows(incomingSchemeValue);
+    if (pressureRows.length > 0) sections.push({ title: 'Датчики давления', rows: pressureRows });
+
+    const thermostatRows = getThermostatRows(incomingSchemeValue);
+    if (thermostatRows.length > 0) sections.push({ title: 'Термостаты', rows: thermostatRows });
+
+    const leakRows = getLeakProtectionRows(incomingSchemeValue);
+    if (leakRows.length > 0) sections.push({ title: 'Контроль протечки воды', rows: leakRows });
+
+    const discreteDevices = wiredDevices.filter((device) => DISCRETE_TEMPLATES.some((template) => template.data.type === device.type));
+    if (discreteDevices.length > 0) {
+        sections.push({
+            title: 'Дискретные входы',
+            rows: aggregateAddedItems(discreteDevices.map((device) => ({
+                label: DISCRETE_TEMPLATES.find((template) => template.data.type === device.type)?.label || device.type,
+            }))),
+        });
+    }
+
+    const upsCount = (Array.isArray(incomingSchemeValue?.power_modules) ? incomingSchemeValue.power_modules : [])
+        .filter((moduleItem) => moduleItem === 'ups').length;
+    if (upsCount > 0) {
+        sections.push({ title: 'Питание', rows: [{ label: 'Источник бесперебойного питания (UPS)', count: upsCount }] });
+    }
+
+    return sections;
+};
+
+const EquipmentOfferModal = ({ sections, onClose }) => (
+    <div
+        onClick={onClose}
+        style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000,
+            padding: 24,
+        }}
+    >
+        <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+                background: '#fff',
+                borderRadius: 14,
+                padding: 24,
+                width: 'min(560px, 100%)',
+                maxHeight: '85vh',
+                overflowY: 'auto',
+                boxShadow: '0 24px 60px rgba(15, 23, 42, 0.35)',
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h2 style={{ margin: 0, fontSize: 20 }}>Коммерческое предложение</h2>
+                <button
+                    onClick={onClose}
+                    style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer', color: '#64748b', lineHeight: 1, padding: 4 }}
+                    aria-label="Закрыть"
+                >
+                    ×
+                </button>
+            </div>
+            {sections.length === 0 ? (
+                <div style={{ color: '#64748b', fontSize: 14 }}>Оборудование пока не выбрано.</div>
+            ) : (
+                sections.map((section) => (
+                    <div key={section.title} style={{ marginBottom: 18 }}>
+                        <h3 style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {section.title}
+                        </h3>
+                        {section.rows.map((row) => (
+                            <AddedDeviceLine key={row.label} label={row.label} count={row.count} />
+                        ))}
+                    </div>
+                ))
+            )}
+        </div>
+    </div>
+);
+
 const SelectionApp = () => {
     const [incomingScheme, setIncomingScheme] = useState({
         controller: { type: 'go', relay_devices: [], one_wire_devices: [], bus_devices: [] },
     });
     const [showJsonDetails, setShowJsonDetails] = useState(false);
-    const [thermostatTarget, setThermostatTarget] = useState('wired');
-    const [thermostatColor, setThermostatColor] = useState('black');
-    const [thermostatHasFloorSensor, setThermostatHasFloorSensor] = useState(false);
-    const [temperatureSensorGroup, setTemperatureSensorGroup] = useState('wireless');
-    const [temperatureSensorKey, setTemperatureSensorKey] = useState('wireless-outdoor');
+    const [wiredThermostatColor, setWiredThermostatColor] = useState('black');
+    const [wiredThermostatHasFloorSensor, setWiredThermostatHasFloorSensor] = useState(false);
+    const [wirelessThermostatColor, setWirelessThermostatColor] = useState('black');
+    const [wirelessThermostatHasFloorSensor, setWirelessThermostatHasFloorSensor] = useState(false);
+    const [wiredTemperatureSensorKey, setWiredTemperatureSensorKey] = useState('wired-wall-digital');
+    const [wirelessTemperatureSensorKey, setWirelessTemperatureSensorKey] = useState('wireless-outdoor');
     const [isBuildingScheme, setIsBuildingScheme] = useState(false);
     const [buildSchemeError, setBuildSchemeError] = useState('');
     const [boilerQuery, setBoilerQuery] = useState('');
     const [boilerResults, setBoilerResults] = useState([]);
     const [boilerSearchLoading, setBoilerSearchLoading] = useState(false);
+    const [controllerConnectorGeometry, setControllerConnectorGeometry] = useState(null);
+    const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+    const controllerWrapRef = useRef(null);
+    const controllerCardRefs = useRef([]);
     const controllerCompatibilityIssues = useMemo(
         () => getControllerCompatibilityIssues(incomingScheme),
         [incomingScheme],
@@ -1502,10 +2015,15 @@ const SelectionApp = () => {
         [incomingScheme],
     );
     const controllerType = getControllerType(incomingScheme);
+    const equipmentOfferSections = useMemo(
+        () => getEquipmentOfferSections(incomingScheme, controllerType),
+        [incomingScheme, controllerType],
+    );
     const proAndEcosmartOptions = useMemo(() => {
+        if (controllerType !== 'pro') return false;
         const optionTypes = new Set(compatibleControllerOptions.map((item) => item.type));
         return optionTypes.has('pro') && optionTypes.has('ecosmart');
-    }, [compatibleControllerOptions]);
+    }, [controllerType, compatibleControllerOptions]);
     const ecosmartAvailableForProScheme = useMemo(
         () => controllerType === 'pro' && isEcosmartIdentified(incomingScheme),
         [controllerType, incomingScheme],
@@ -1516,17 +2034,28 @@ const SelectionApp = () => {
         if (!controllerValue) return null;
         return withRequiredModules({ ...incomingScheme, controller: controllerValue });
     }, [ecosmartAvailableForProScheme, incomingScheme]);
-    const thermostatTemplate = useMemo(() => makeThermostatTemplate({
-        target: thermostatTarget,
-        color: thermostatColor,
-        hasFloorSensor: thermostatHasFloorSensor,
-    }), [thermostatColor, thermostatHasFloorSensor, thermostatTarget]);
-    const temperatureSensorOptions = useMemo(() => TEMPERATURE_SENSOR_TEMPLATES.filter(
-        (template) => getTemperatureSensorGroup(template) === temperatureSensorGroup,
-    ), [temperatureSensorGroup]);
-    const temperatureSensorTemplate = useMemo(() => (
-        temperatureSensorOptions.find((template) => template.key === temperatureSensorKey) || temperatureSensorOptions[0]
-    ), [temperatureSensorKey, temperatureSensorOptions]);
+    const wiredThermostatTemplate = useMemo(() => makeThermostatTemplate({
+        target: 'wired',
+        color: wiredThermostatColor,
+        hasFloorSensor: wiredThermostatHasFloorSensor,
+    }), [wiredThermostatColor, wiredThermostatHasFloorSensor]);
+    const wirelessThermostatTemplate = useMemo(() => makeThermostatTemplate({
+        target: 'wireless',
+        color: wirelessThermostatColor,
+        hasFloorSensor: wirelessThermostatHasFloorSensor,
+    }), [wirelessThermostatColor, wirelessThermostatHasFloorSensor]);
+    const wiredTemperatureSensorOptions = useMemo(() => TEMPERATURE_SENSOR_TEMPLATES.filter(
+        (template) => getTemperatureSensorGroup(template) === 'wired',
+    ), []);
+    const wirelessTemperatureSensorOptions = useMemo(() => TEMPERATURE_SENSOR_TEMPLATES.filter(
+        (template) => getTemperatureSensorGroup(template) === 'wireless',
+    ), []);
+    const wiredTemperatureSensorTemplate = useMemo(() => (
+        wiredTemperatureSensorOptions.find((template) => template.key === wiredTemperatureSensorKey) || wiredTemperatureSensorOptions[0]
+    ), [wiredTemperatureSensorKey, wiredTemperatureSensorOptions]);
+    const wirelessTemperatureSensorTemplate = useMemo(() => (
+        wirelessTemperatureSensorOptions.find((template) => template.key === wirelessTemperatureSensorKey) || wirelessTemperatureSensorOptions[0]
+    ), [wirelessTemperatureSensorKey, wirelessTemperatureSensorOptions]);
 
     useEffect(() => {
         const nextScheme = resolveControllerAndRequiredModules(incomingScheme);
@@ -1534,6 +2063,43 @@ const SelectionApp = () => {
             setIncomingScheme(nextScheme);
         }
     }, [incomingScheme]);
+
+    const measureControllerConnectors = useCallback(() => {
+        const wrap = controllerWrapRef.current;
+        const proEl = controllerCardRefs.current[3];
+        const ecosmartEl = controllerCardRefs.current[4];
+        if (!wrap || !proEl || !ecosmartEl) return;
+
+        const wrapRect = wrap.getBoundingClientRect();
+        const relRect = (el) => {
+            const r = el.getBoundingClientRect();
+            return {
+                left: r.left - wrapRect.left,
+                right: r.right - wrapRect.left,
+                top: r.top - wrapRect.top,
+                bottom: r.bottom - wrapRect.top,
+            };
+        };
+
+        const pro = relRect(proEl);
+        const ecosmart = relRect(ecosmartEl);
+
+        const proSideY = (pro.top + pro.bottom) / 2;
+        const proCenterX = (pro.right + ecosmart.left) / 2;
+        const proBoxTop = pro.bottom + CONTROLLER_CONNECTOR_GAP;
+
+        setControllerConnectorGeometry({
+            proBar: { left: pro.right, width: Math.max(0, ecosmart.left - pro.right), y: proSideY },
+            proStem: { x: proCenterX, top: proSideY, height: Math.max(0, proBoxTop - proSideY) },
+            proBoxTop,
+        });
+    }, []);
+
+    useLayoutEffect(() => {
+        measureControllerConnectors();
+        window.addEventListener('resize', measureControllerConnectors);
+        return () => window.removeEventListener('resize', measureControllerConnectors);
+    }, [measureControllerConnectors]);
 
     useEffect(() => {
         const query = boilerQuery.trim();
@@ -1657,11 +2223,6 @@ const SelectionApp = () => {
         });
     }, []);
 
-    const selectTemperatureSensorGroup = useCallback((group) => {
-        setTemperatureSensorGroup(group);
-        const firstOption = TEMPERATURE_SENSOR_TEMPLATES.find((template) => getTemperatureSensorGroup(template) === group);
-        if (firstOption) setTemperatureSensorKey(firstOption.key);
-    }, []);
 
     const removeTemperatureSensor = useCallback((target, id) => {
         setIncomingScheme((prev) => {
@@ -1753,6 +2314,15 @@ const SelectionApp = () => {
         setIsBuildingScheme(true);
         setBuildSchemeError('');
 
+        // Открываем вкладку синхронно в обработчике клика — иначе браузер
+        // не даст открыть полноценную вкладку после await и либо заблокирует
+        // её, либо схлопнет в маленький popup.
+        const newTab = window.open('', '_blank');
+        if (newTab) {
+            newTab.document.write('<!doctype html><title>Построение схемы…</title><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:14px system-ui, sans-serif;color:#64748b;background:#f8fafc">Строим схему…</body>');
+            newTab.document.close();
+        }
+
         try {
             const response = await fetch('/api/schemes', {
                 method: 'POST',
@@ -1774,8 +2344,14 @@ const SelectionApp = () => {
             }
 
             const schemeRecord = await response.json();
-            window.location.href = `/scheme/${schemeRecord.id}`;
+            if (newTab) {
+                newTab.location.href = `/scheme/${schemeRecord.id}`;
+            } else {
+                window.open(`/scheme/${schemeRecord.id}`, '_blank');
+            }
+            setIsBuildingScheme(false);
         } catch (error) {
+            if (newTab) newTab.close();
             setBuildSchemeError(error instanceof Error ? error.message : 'Не удалось сохранить схему');
             setIsBuildingScheme(false);
         }
@@ -1832,17 +2408,34 @@ const SelectionApp = () => {
                     </div>
                 </div>
             )}
+            <div className="sel-sticky-top">
             <div className="sel-header">
                 <h1>Подбор оборудования</h1>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: '#475569' }}>
+                    <label className="sel-json-toggle">
                         <input
                             type="checkbox"
                             checked={showJsonDetails}
                             onChange={(event) => setShowJsonDetails(event.target.checked)}
                         />
-                        Показать incomingScheme и JSON карточек
                     </label>
+                    <button
+                        type="button"
+                        className="selection-secondary-button"
+                        onClick={() => setIsOfferModalOpen(true)}
+                        style={{
+                            padding: '10px 16px',
+                            border: '1px solid #d7dbe4',
+                            borderRadius: 8,
+                            background: '#fff',
+                            color: '#202738',
+                            cursor: 'pointer',
+                            fontSize: 14,
+                            fontWeight: 700,
+                        }}
+                    >
+                        Коммерческое предложение
+                    </button>
                     <button
                         onClick={buildScheme}
                         disabled={isBuildingScheme}
@@ -1860,106 +2453,141 @@ const SelectionApp = () => {
                     >
                         {isBuildingScheme ? 'Сохраняем...' : 'Построить схему'}
                     </button>
+                    <button
+                        type="button"
+                        className="selection-danger-button"
+                        onClick={() => {
+                            if (window.confirm('Сбросить всю схему? Все добавленные устройства будут удалены.')) {
+                                clearScheme();
+                            }
+                        }}
+                        style={{
+                            padding: '10px 16px',
+                            border: '1px solid #dc2626',
+                            borderRadius: 8,
+                            background: '#dc2626',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontSize: 14,
+                            fontWeight: 700,
+                        }}
+                    >
+                        Сбросить схему
+                    </button>
                 </div>
+            </div>
+            <SelectionQuickNav />
             </div>
             {buildSchemeError && (
                 <div style={{ marginBottom: 20, padding: '12px 14px', border: '1px solid #fecaca', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 14 }}>
                     {buildSchemeError}
                 </div>
             )}
+            {isOfferModalOpen && (
+                <EquipmentOfferModal sections={equipmentOfferSections} onClose={() => setIsOfferModalOpen(false)} />
+            )}
 
+            <div className="sel-group-label" id="chapter-controller">Контроллер</div>
             <section style={{ marginBottom: 32 }}>
-                <h2>Контроллер</h2>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'nowrap', justifyContent: 'space-between', overflowX: 'auto', paddingBottom: 8 }}>
-                    {CONTROLLER_TEMPLATES.map((item, index) => {
-                        const isActive = incomingScheme.controller?.type === item.value.type;
-                        const controllerTypeValue = item.value.type;
-                        return (
-                            <div
-                                key={index}
-                                onClick={() => setController(item.value)}
-                                style={{
-                                    border: `2px solid ${isActive ? ORANGE : '#d7dbe4'}`,
-                                    borderRadius: 10,
-                                    padding: 12,
-                                    background: isActive ? '#fff7ed' : '#fff',
-                                    cursor: 'pointer',
-                                    fontWeight: isActive ? 700 : 400,
-                                    fontSize: 15,
-                                    textAlign: 'center',
-                                    width: 210,
-                                    transition: 'border-color 0.15s, background 0.15s',
-                                }}
-                            >
-                                <img
-                                    src={controllerImagePaths[controllerTypeValue]}
-                                    alt={item.label}
-                                    style={{ display: 'block', width: '100%', height: 132, objectFit: 'contain', marginBottom: 10 }}
-                                />
-                                <div>{item.label}</div>
-                            </div>
-                        );
-                    })}
-                </div>
-                {proAndEcosmartOptions && (
-                    <div
-                        style={{
-                            marginTop: 14,
-                            padding: '12px 14px',
-                            border: '1px solid #fed7aa',
-                            borderRadius: 10,
-                            background: '#fff7ed',
-                            color: '#9a3412',
-                            fontSize: 14,
-                            lineHeight: 1.45,
-                            textAlign: 'center',
-                        }}
-                    >
-                        Для этой конфигурации подходят два контроллера: <strong>PRO</strong> и <strong>ECOsmart</strong>.
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-                            <button
-                                className="selection-option-button"
-                                type="button"
-                                onClick={() => setController(getControllerTemplateValue('pro'))}
-                                style={{
-                                    padding: '7px 12px',
-                                    border: '1px solid #ea580c',
-                                    borderRadius: 8,
-                                    background: controllerType === 'pro' ? '#e07020' : '#fff',
-                                    color: controllerType === 'pro' ? '#fff' : '#9a3412',
-                                    cursor: 'pointer',
-                                    fontSize: 13,
-                                    fontWeight: 700,
-                                }}
-                            >
-                                Использовать PRO
-                            </button>
-                            <button
-                                className="selection-option-button"
-                                type="button"
-                                onClick={() => setController(getControllerTemplateValue('ecosmart'))}
-                                style={{
-                                    padding: '7px 12px',
-                                    border: '1px solid #ea580c',
-                                    borderRadius: 8,
-                                    background: controllerType === 'ecosmart' ? '#e07020' : '#fff',
-                                    color: controllerType === 'ecosmart' ? '#fff' : '#9a3412',
-                                    cursor: 'pointer',
-                                    fontSize: 13,
-                                    fontWeight: 700,
-                                }}
-                            >
-                                Использовать ECOsmart
-                            </button>
-                        </div>
+                <div ref={controllerWrapRef} style={{ position: 'relative', paddingBottom: 108 }}>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'nowrap', justifyContent: 'space-between', overflowX: 'auto', paddingBottom: 8 }}>
+                        {CONTROLLER_TEMPLATES.map((item, index) => {
+                            const isActive = incomingScheme.controller?.type === item.value.type;
+                            const controllerTypeValue = item.value.type;
+                            return (
+                                <div
+                                    key={index}
+                                    ref={(el) => { controllerCardRefs.current[index] = el; }}
+                                    onClick={() => setController(item.value)}
+                                    style={{
+                                        border: `2px solid ${isActive ? ORANGE : '#d7dbe4'}`,
+                                        borderRadius: 10,
+                                        padding: 12,
+                                        background: isActive ? '#fff7ed' : '#fff',
+                                        cursor: 'pointer',
+                                        fontWeight: isActive ? 700 : 400,
+                                        fontSize: 15,
+                                        textAlign: 'center',
+                                        width: 210,
+                                        transition: 'border-color 0.15s, background 0.15s',
+                                    }}
+                                >
+                                    <img
+                                        src={controllerImagePaths[controllerTypeValue]}
+                                        alt={item.label}
+                                        style={{ display: 'block', width: '100%', height: 132, objectFit: 'contain', marginBottom: 10 }}
+                                    />
+                                    <div>{item.label}</div>
+                                </div>
+                            );
+                        })}
                     </div>
-                )}
+
+                    {controllerConnectorGeometry && (
+                        <>
+                            <div style={{ position: 'absolute', left: controllerConnectorGeometry.proBar.left, top: controllerConnectorGeometry.proBar.y - 1, width: controllerConnectorGeometry.proBar.width, height: 2, background: CONTROLLER_CONNECTOR_COLOR }} />
+                            <div style={{ position: 'absolute', left: controllerConnectorGeometry.proStem.x - 1, top: controllerConnectorGeometry.proStem.top, width: 2, height: controllerConnectorGeometry.proStem.height, background: CONTROLLER_CONNECTOR_COLOR }} />
+                            <div
+                                style={{
+                                    ...controllerDescBoxStyle,
+                                    left: controllerConnectorGeometry.proStem.x - CONTROLLER_DESC_BOX_WIDTH / 2,
+                                    top: controllerConnectorGeometry.proBoxTop,
+                                    ...(proAndEcosmartOptions
+                                        ? { border: '1px solid #fed7aa', background: '#fff7ed', color: '#9a3412' }
+                                        : null),
+                                }}
+                            >
+                                {proAndEcosmartOptions ? (
+                                    <>
+                                        Для этой конфигурации подходят два контроллера: <strong>PRO</strong> и <strong>ECOsmart</strong>.
+                                        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                                            <button
+                                                className="selection-option-button"
+                                                type="button"
+                                                onClick={() => setController(getControllerTemplateValue('pro'))}
+                                                style={{
+                                                    padding: '7px 12px',
+                                                    border: '1px solid #ea580c',
+                                                    borderRadius: 8,
+                                                    background: controllerType === 'pro' ? '#e07020' : '#fff',
+                                                    color: controllerType === 'pro' ? '#fff' : '#9a3412',
+                                                    cursor: 'pointer',
+                                                    fontSize: 13,
+                                                    fontWeight: 700,
+                                                }}
+                                            >
+                                                Использовать PRO
+                                            </button>
+                                            <button
+                                                className="selection-option-button"
+                                                type="button"
+                                                onClick={() => setController(getControllerTemplateValue('ecosmart'))}
+                                                style={{
+                                                    padding: '7px 12px',
+                                                    border: '1px solid #ea580c',
+                                                    borderRadius: 8,
+                                                    background: controllerType === 'ecosmart' ? '#e07020' : '#fff',
+                                                    color: controllerType === 'ecosmart' ? '#fff' : '#9a3412',
+                                                    cursor: 'pointer',
+                                                    fontSize: 13,
+                                                    fontWeight: 700,
+                                                }}
+                                            >
+                                                Использовать ECOsmart
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    CONTROLLER_DESCRIPTIONS.proEcosmart
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
             </section>
 
-            <SectionDivider />
-
+            <div className="sel-group-label" id="chapter-boilers">Котлы</div>
             <section style={{ marginBottom: 32 }}>
-                <h2>Котлы</h2>
                 <SectionSubtitle>
                     Найдите котел по названию. Тип подключения определяется автоматически: котлы с цифровой шиной подключаются через BUS, остальные — через реле с датчиком подающей линии.
                 </SectionSubtitle>
@@ -2064,9 +2692,7 @@ const SelectionApp = () => {
                 )}
             </section>
 
-            <SectionDivider />
-
-            <div className="sel-group-label">Гидравлика</div>
+            <div className="sel-group-label" id="chapter-hydraulics">Гидравлика</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
 
             <section style={{ flex: '1 1 280px', minWidth: 0 }}>
@@ -2087,6 +2713,11 @@ const SelectionApp = () => {
                             }}
                         >
                             <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
+                            {item.description && (
+                                <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
+                                    {item.description}
+                                </p>
+                            )}
                             <pre
                                 style={{
                                     background: '#f5f7fb',
@@ -2119,26 +2750,6 @@ const SelectionApp = () => {
                     ))}
                 </div>
 
-                {Array.isArray(incomingScheme.wired_devices) && incomingScheme.wired_devices.some((d) => isGroupedDevice(d, 'mixing', MIXING_TEMPLATES)) && (
-                    <AddedDevicesBlock>
-                        <AddedDevicesTitle>Добавленные смесительные узлы</AddedDevicesTitle>
-                        {(() => {
-                            const groups = {};
-                            incomingScheme.wired_devices.forEach((d) => {
-                                if (isGroupedDevice(d, 'mixing', MIXING_TEMPLATES)) {
-                                    if (!groups[d._uid]) groups[d._uid] = [];
-                                    groups[d._uid].push(d);
-                                }
-                            });
-                            return aggregateAddedItems(Object.entries(groups).map(([uidVal, devices]) => ({
-                                label: getGroupedUnitLabel(uidVal, devices, incomingScheme.sensors, MIXING_TEMPLATES),
-                                removeKey: uidVal,
-                            }))).map((row) => (
-                                <AddedDeviceLine key={row.label} label={row.label} count={row.count} onRemove={() => removeMixingUnit(Number(row.removeKeys[0]))} />
-                            ));
-                        })()}
-                    </AddedDevicesBlock>
-                )}
             </section>
 
             <section style={{ flex: '1 1 280px', minWidth: 0 }}>
@@ -2159,6 +2770,11 @@ const SelectionApp = () => {
                             }}
                         >
                             <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
+                            {item.description && (
+                                <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
+                                    {item.description}
+                                </p>
+                            )}
                             <pre
                                 style={{
                                     background: '#f5f7fb',
@@ -2191,26 +2807,6 @@ const SelectionApp = () => {
                     ))}
                 </div>
 
-                {Array.isArray(incomingScheme.wired_devices) && incomingScheme.wired_devices.some((d) => isGroupedDevice(d, 'gvs', GVS_TEMPLATES)) && (
-                    <AddedDevicesBlock>
-                        <AddedDevicesTitle>Добавленные бойлеры ГВС</AddedDevicesTitle>
-                        {(() => {
-                            const groups = {};
-                            incomingScheme.wired_devices.forEach((d) => {
-                                if (isGroupedDevice(d, 'gvs', GVS_TEMPLATES)) {
-                                    if (!groups[d._uid]) groups[d._uid] = [];
-                                    groups[d._uid].push(d);
-                                }
-                            });
-                            return aggregateAddedItems(Object.entries(groups).map(([uidVal, devices]) => ({
-                                label: getGroupedUnitLabel(uidVal, devices, incomingScheme.sensors, GVS_TEMPLATES),
-                                removeKey: uidVal,
-                            }))).map((row) => (
-                                <AddedDeviceLine key={row.label} label={row.label} count={row.count} onRemove={() => removeMixingUnit(Number(row.removeKeys[0]))} />
-                            ));
-                        })()}
-                    </AddedDevicesBlock>
-                )}
             </section>
 
             <section style={{ flex: '1 1 280px', minWidth: 0 }}>
@@ -2231,6 +2827,11 @@ const SelectionApp = () => {
                             }}
                         >
                             <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
+                            {item.description && (
+                                <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
+                                    {item.description}
+                                </p>
+                            )}
                             <pre
                                 style={{
                                     background: '#f5f7fb',
@@ -2263,110 +2864,144 @@ const SelectionApp = () => {
                     ))}
                 </div>
 
-                {Array.isArray(incomingScheme.wired_devices) && incomingScheme.wired_devices.some((d) => isGroupedDevice(d, 'pump', PUMP_TEMPLATES)) && (
-                    <AddedDevicesBlock>
-                        <AddedDevicesTitle>Добавленные насосы</AddedDevicesTitle>
-                        {(() => {
-                            const groups = {};
-                            incomingScheme.wired_devices.forEach((d) => {
-                                if (isGroupedDevice(d, 'pump', PUMP_TEMPLATES)) {
-                                    if (!groups[d._uid]) groups[d._uid] = [];
-                                    groups[d._uid].push(d);
-                                }
-                            });
-                            return aggregateAddedItems(Object.entries(groups).map(([uidVal, devices]) => ({
-                                label: devices[0]?._label || devices.map((d) => getTemplateLabelByType(PUMP_TEMPLATES, d.type, d.type)).join(', '),
-                                removeKey: uidVal,
-                            }))).map((row) => (
-                                <AddedDeviceLine key={row.label} label={row.label} count={row.count} onRemove={() => removeMixingUnit(Number(row.removeKeys[0]))} />
-                            ));
-                        })()}
-                    </AddedDevicesBlock>
-                )}
             </section>
 
             </div>{/* /Гидравлика */}
 
-            <SectionDivider />
+            {(() => {
+                const hydraulicRows = [
+                    ...getGroupedDeviceRows(incomingScheme, 'mixing', MIXING_TEMPLATES).map((row) => ({ ...row, _group: 'mixing' })),
+                    ...getGroupedDeviceRows(incomingScheme, 'gvs', GVS_TEMPLATES).map((row) => ({ ...row, _group: 'gvs' })),
+                    ...getGroupedDeviceRows(incomingScheme, 'pump', PUMP_TEMPLATES).map((row) => ({ ...row, _group: 'pump' })),
+                ];
+                if (hydraulicRows.length === 0) return null;
 
-            <div className="sel-group-label">Управление климатом</div>
+                return (
+                    <AddedDevicesBlock>
+                        <AddedDevicesTitle>Добавленное гидравлическое оборудование</AddedDevicesTitle>
+                        {hydraulicRows.map((row) => (
+                            <AddedDeviceLine
+                                key={`${row._group}-${row.label}`}
+                                label={row.label}
+                                count={row.count}
+                                onRemove={() => removeMixingUnit(Number(row.removeKeys[0]))}
+                            />
+                        ))}
+                    </AddedDevicesBlock>
+                );
+            })()}
+
+            <div className="sel-group-label" id="chapter-climate">Климат</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
+
             <section style={{ flex: '1 1 360px', minWidth: 0 }}>
-                <h2>Зоны</h2>
-                <SectionSubtitle>Каким количеством зон будет управлять система с помощью двухходовых сервоприводов?</SectionSubtitle>
+                <h2>Термостаты</h2>
+                <SectionSubtitle>Укажите тип и количество термостатов</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    {ZONE_TEMPLATES.map((item, index) => (
-                        <div
-                            key={index}
-                            className="sel-card"
-                            style={{
-                                border: '1px solid #d7dbe4',
-                                borderRadius: 10,
-                                padding: 16,
-                                background: '#fff',
-                                flex: '1 1 260px',
-                                minWidth: 260,
-                            }}
-                        >
-                            <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
-                            <pre
-                                style={{
-                                    background: '#f5f7fb',
-                                    padding: 10,
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    overflow: 'auto',
-                                    margin: 0,
-                                }}
-                            >
-{JSON.stringify(item.wiredDevice, null, 4)}
-                            </pre>
-                            <button
-                                onClick={() => addMixingUnit(item, 'zone')}
-                                style={{
-                                    marginTop: 'auto',
-                                    padding: '6px 14px',
-                                    border: '1px solid #3498db',
-                                    borderRadius: 6,
-                                    background: '#3498db',
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    fontSize: 13,
-                                }}
-                            >
-                                Добавить
-                            </button>
-                        </div>
-                    ))}
+                    <ThermostatCard
+                        template={wiredThermostatTemplate}
+                        color={wiredThermostatColor}
+                        onColorChange={setWiredThermostatColor}
+                        hasFloorSensor={wiredThermostatHasFloorSensor}
+                        onFloorSensorChange={setWiredThermostatHasFloorSensor}
+                        onAdd={() => addThermostat(wiredThermostatTemplate)}
+                    />
+                    <ThermostatCard
+                        template={wirelessThermostatTemplate}
+                        color={wirelessThermostatColor}
+                        onColorChange={setWirelessThermostatColor}
+                        hasFloorSensor={wirelessThermostatHasFloorSensor}
+                        onFloorSensorChange={setWirelessThermostatHasFloorSensor}
+                        onAdd={() => addThermostat(wirelessThermostatTemplate)}
+                    />
                 </div>
 
-                {Array.isArray(incomingScheme.wired_devices) && incomingScheme.wired_devices.some((d) => isGroupedDevice(d, 'zone', ZONE_TEMPLATES)) && (
-                    <AddedDevicesBlock>
-                        <AddedDevicesTitle>Добавленные зоны</AddedDevicesTitle>
-                        {(() => {
-                            const groups = {};
-                            incomingScheme.wired_devices.forEach((d) => {
-                                if (isGroupedDevice(d, 'zone', ZONE_TEMPLATES)) {
-                                    if (!groups[d._uid]) groups[d._uid] = [];
-                                    groups[d._uid].push(d);
-                                }
-                            });
-                            return aggregateAddedItems(Object.entries(groups).map(([uidVal, devices]) => ({
-                                label: getGroupedUnitLabel(uidVal, devices, incomingScheme.sensors, ZONE_TEMPLATES),
-                                removeKey: uidVal,
-                            }))).map((row) => (
-                                <AddedDeviceLine key={row.label} label={row.label} count={row.count} onRemove={() => removeMixingUnit(Number(row.removeKeys[0]))} />
-                            ));
-                        })()}
-                    </AddedDevicesBlock>
-                )}
             </section>
 
+                <section style={{ flex: '1 1 360px', minWidth: 0 }}>
+                    <h2>Зоны</h2>
+                    <SectionSubtitle>Каким количеством зон будет управлять система с помощью двухходовых сервоприводов?</SectionSubtitle>
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                        {ZONE_TEMPLATES.map((item, index) => (
+                            <div
+                                key={index}
+                                className="sel-card"
+                                style={{
+                                    border: '1px solid #d7dbe4',
+                                    borderRadius: 10,
+                                    padding: 16,
+                                    background: '#fff',
+                                    flex: '1 1 260px',
+                                    minWidth: 260,
+                                }}
+                            >
+                                <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
+                                <pre
+                                    style={{
+                                        background: '#f5f7fb',
+                                        padding: 10,
+                                        borderRadius: 6,
+                                        fontSize: 12,
+                                        lineHeight: 1.5,
+                                        overflow: 'auto',
+                                        margin: 0,
+                                    }}
+                                >
+{JSON.stringify(item.wiredDevice, null, 4)}
+                            </pre>
+                                <button
+                                    onClick={() => addMixingUnit(item, 'zone')}
+                                    style={{
+                                        marginTop: 'auto',
+                                        padding: '6px 14px',
+                                        border: '1px solid #3498db',
+                                        borderRadius: 6,
+                                        background: '#3498db',
+                                        color: '#fff',
+                                        cursor: 'pointer',
+                                        fontSize: 13,
+                                    }}
+                                >
+                                    Добавить
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                </section>
+
+            </div>{/* /Управление климатом */}
+
+            {(() => {
+                const climateRows = [
+                    ...getThermostatRows(incomingScheme).map((row) => ({ ...row, _group: 'thermostat' })),
+                    ...getGroupedDeviceRows(incomingScheme, 'zone', ZONE_TEMPLATES).map((row) => ({ ...row, _group: 'zone' })),
+
+                ];
+                if (climateRows.length === 0) return null;
+
+                return (
+                    <AddedDevicesBlock>
+                        <AddedDevicesTitle>Добавленное оборудование управления климатом</AddedDevicesTitle>
+                        {climateRows.map((row) => (
+                            <AddedDeviceLine
+                                key={`${row._group}-${row.label}`}
+                                label={row.label}
+                                count={row.count}
+                                onRemove={() => (row._group === 'thermostat'
+                                    ? removeThermostat(row.removeKeys[0].target, row.removeKeys[0].id)
+                                    : removeMixingUnit(Number(row.removeKeys[0])))}
+                            />
+                        ))}
+                    </AddedDevicesBlock>
+                );
+            })()}
+
+            <div className="sel-group-label" id="chapter-other-equipment">Прочее оборудование</div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
             <section style={{ flex: '1 1 360px', minWidth: 0 }}>
-                <h2>Прочее оборудование</h2>
                 <SectionSubtitle>Какое кол-во прочего оборудования (сирены и т.д.) будет управляться с помощью контроллера?</SectionSubtitle>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
                     {OTHER_EQUIP_TEMPLATES.map((item, index) => (
                         <div
                             key={index}
@@ -2378,6 +3013,7 @@ const SelectionApp = () => {
                                 background: '#fff',
                                 flex: '1 1 260px',
                                 minWidth: 260,
+                                maxWidth: 'calc(50% - 8px)',
                             }}
                         >
                             <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
@@ -2413,177 +3049,56 @@ const SelectionApp = () => {
                     ))}
                 </div>
 
-                {Array.isArray(incomingScheme.wired_devices) && incomingScheme.wired_devices.some((d) => isGroupedDevice(d, 'other', OTHER_EQUIP_TEMPLATES)) && (
-                    <AddedDevicesBlock>
-                        <AddedDevicesTitle>Добавленное оборудование</AddedDevicesTitle>
-                        {(() => {
-                            const groups = {};
-                            incomingScheme.wired_devices.forEach((d) => {
-                                if (isGroupedDevice(d, 'other', OTHER_EQUIP_TEMPLATES)) {
-                                    if (!groups[d._uid]) groups[d._uid] = [];
-                                    groups[d._uid].push(d);
-                                }
-                            });
-                            return aggregateAddedItems(Object.entries(groups).map(([uidVal, devices]) => ({
-                                label: getGroupedUnitLabel(uidVal, devices, incomingScheme.sensors, OTHER_EQUIP_TEMPLATES),
-                                removeKey: uidVal,
-                            }))).map((row) => (
-                                <AddedDeviceLine key={row.label} label={row.label} count={row.count} onRemove={() => removeMixingUnit(Number(row.removeKeys[0]))} />
-                            ));
-                        })()}
-                    </AddedDevicesBlock>
-                )}
+                {(() => {
+                    const otherRows = getGroupedDeviceRows(incomingScheme, 'other', OTHER_EQUIP_TEMPLATES);
+                    if (otherRows.length === 0) return null;
+
+                    return (
+                        <AddedDevicesBlock>
+                            <AddedDevicesTitle>Добавленное оборудование</AddedDevicesTitle>
+                            {otherRows.map((row) => (
+                                <AddedDeviceLine
+                                    key={row.label}
+                                    label={row.label}
+                                    count={row.count}
+                                    onRemove={() => removeMixingUnit(Number(row.removeKeys[0]))}
+                                />
+                            ))}
+                        </AddedDevicesBlock>
+                    );
+                })()}
             </section>
-            </div>{/* /Управление климатом */}
+            </div>{/* /Прочее оборудование */}
 
-            <SectionDivider />
-
-            <div className="sel-group-label">Датчики и защита</div>
+            <div className="sel-group-label" id="chapter-sensors">Датчики и защита</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
             <div style={{ flex: '1 1 500px', minWidth: 0 }}>
             <section style={{ marginBottom: 32 }}>
                 <h2>Датчики температуры</h2>
                 <SectionSubtitle>Укажите тип и количество датчиков температуры</SectionSubtitle>
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    <div
-                        className="sel-card"
-                        style={{
-                            width: '100%',
-                            border: '1px solid #d7dbe4',
-                            borderRadius: 14,
-                            padding: 18,
-                            background: '#fff',
-                        }}
-                    >
-                        <div style={{ fontWeight: 700, marginBottom: 14, fontSize: 16 }}>{temperatureSensorTemplate?.label}</div>
-
-                        <div style={{ marginBottom: 14 }}>
-                            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: '#475569' }}>Подключение</div>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                {[
-                                    { value: 'wireless', label: 'Беспроводной' },
-                                    { value: 'wired', label: 'Проводной' },
-                                ].map((item) => (
-                                    <button
-                                        className="selection-option-button"
-                                        key={item.value}
-                                        type="button"
-                                        onClick={() => selectTemperatureSensorGroup(item.value)}
-                                        style={{
-                                            padding: '8px 12px',
-                                            border: `1px solid ${temperatureSensorGroup === item.value ? '#c85e18' : '#d7dbe4'}`,
-                                            borderRadius: 8,
-                                            background: temperatureSensorGroup === item.value ? '#e07020' : '#fff',
-                                            color: temperatureSensorGroup === item.value ? '#fff' : '#202738',
-                                            cursor: 'pointer',
-                                            fontSize: 13,
-                                        }}
-                                    >
-                                        {item.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: 14 }}>
-                            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: '#475569' }}>Тип датчика</div>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                {temperatureSensorOptions.map((item) => (
-                                    <button
-                                        className="selection-option-button"
-                                        key={item.key}
-                                        type="button"
-                                        onClick={() => setTemperatureSensorKey(item.key)}
-                                        style={{
-                                            padding: '8px 12px',
-                                            border: `1px solid ${temperatureSensorTemplate?.key === item.key ? '#c85e18' : '#d7dbe4'}`,
-                                            borderRadius: 8,
-                                            background: temperatureSensorTemplate?.key === item.key ? '#fff7ed' : '#fff',
-                                            color: '#202738',
-                                            cursor: 'pointer',
-                                            fontSize: 13,
-                                        }}
-                                    >
-                                        {item.label.replace(/^Беспроводной |^Проводной /, '')}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <pre
-                            style={{
-                                background: '#f5f7fb',
-                                padding: 10,
-                                borderRadius: 6,
-                                fontSize: 12,
-                                lineHeight: 1.5,
-                                overflow: 'auto',
-                                margin: '0 0 12px',
-                            }}
-                        >
-{JSON.stringify(temperatureSensorTemplate?.data, null, 4)}
-                        </pre>
-                        <button
-                            onClick={() => addTemperatureSensor(temperatureSensorTemplate)}
-                            style={{
-                                padding: '8px 16px',
-                                border: '1px solid #3498db',
-                                borderRadius: 8,
-                                background: '#3498db',
-                                color: '#fff',
-                                cursor: 'pointer',
-                                fontSize: 14,
-                                fontWeight: 700,
-                            }}
-                        >
-                            Добавить датчик
-                        </button>
-                    </div>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <TemperatureSensorCard
+                        options={wiredTemperatureSensorOptions}
+                        selectedKey={wiredTemperatureSensorKey}
+                        onSelectKey={setWiredTemperatureSensorKey}
+                        template={wiredTemperatureSensorTemplate}
+                        onAdd={() => addTemperatureSensor(wiredTemperatureSensorTemplate)}
+                    />
+                    <TemperatureSensorCard
+                        options={wirelessTemperatureSensorOptions}
+                        selectedKey={wirelessTemperatureSensorKey}
+                        onSelectKey={setWirelessTemperatureSensorKey}
+                        template={wirelessTemperatureSensorTemplate}
+                        onAdd={() => addTemperatureSensor(wirelessTemperatureSensorTemplate)}
+                    />
                 </div>
 
-                {(() => {
-                    const wirelessTemperatureSensors = (Array.isArray(incomingScheme.wireless_devices) ? incomingScheme.wireless_devices : [])
-                        .filter(isTemperatureSensor);
-                    const wiredTemperatureSensors = (Array.isArray(incomingScheme.sensors) ? incomingScheme.sensors : [])
-                        .filter(isTemperatureSensor);
-                    const temperatureSensors = [
-                        ...wirelessTemperatureSensors.map((device) => ({ device, target: 'wireless_devices' })),
-                        ...wiredTemperatureSensors.map((device) => ({ device, target: 'sensors' })),
-                    ];
-                    const kitTemperatureDevices = CONTROLLER_KIT_TEMPERATURE_DEVICES[controllerType] || [];
-                    if (temperatureSensors.length === 0 && kitTemperatureDevices.length === 0) return null;
-
-                    return (
-                    <AddedDevicesBlock>
-                        <AddedDevicesTitle>Добавленные датчики температуры</AddedDevicesTitle>
-                        {kitTemperatureDevices.map((device) => (
-                            <AddedDeviceLine
-                                key={`kit:${device.label}`}
-                                label={device.label}
-                                count={device.count}
-                                badge="Комплектный"
-                            />
-                        ))}
-                        {aggregateAddedItems(temperatureSensors.map(({ device, target }) => ({
-                            label: getTemperatureSensorLabel(device),
-                            removeKey: { target, id: device.id },
-                        }))).map((row) => (
-                            <AddedDeviceLine
-                                key={row.label}
-                                label={row.label}
-                                count={row.count}
-                                onRemove={() => removeTemperatureSensor(row.removeKeys[0].target, row.removeKeys[0].id)}
-                            />
-                        ))}
-                    </AddedDevicesBlock>
-                    );
-                })()}
             </section>
 
             <section>
                 <h2>Токовый датчик давления</h2>
                 <SectionSubtitle>Укажите количество токовых датчиков давления в системе</SectionSubtitle>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
                     {PRESSURE_TEMPLATES.map((item, index) => (
                         <div
                             key={index}
@@ -2595,9 +3110,13 @@ const SelectionApp = () => {
                                 background: '#fff',
                                 flex: '1 1 260px',
                                 minWidth: 260,
+                                maxWidth: 'calc(50% - 8px)',
                             }}
                         >
                             <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
+                            <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
+                                Предназначен для измерения давления теплоносителя/воды в автоматизированных системах отопления и водоснабжения.
+                            </p>
                             <pre
                                 style={{
                                     background: '#f5f7fb',
@@ -2630,183 +3149,9 @@ const SelectionApp = () => {
                     ))}
                 </div>
 
-                {Array.isArray(incomingScheme.sensors) && incomingScheme.sensors.some((s) => s.type === 'pressure-sensor') && (
-                    <AddedDevicesBlock>
-                        <AddedDevicesTitle>Добавленные датчики давления</AddedDevicesTitle>
-                        {aggregateAddedItems(incomingScheme.sensors.filter((s) => s.type === 'pressure-sensor').map((s) => ({
-                            label: 'Датчик давления',
-                            removeKey: s.id,
-                        }))).map((row) => (
-                            <AddedDeviceLine
-                                key={row.label}
-                                label={row.label}
-                                count={row.count}
-                                onRemove={() => setIncomingScheme((prev) => ({ ...prev, sensors: (prev.sensors || []).filter((x) => x.id !== row.removeKeys[0]) }))}
-                            />
-                        ))}
-                    </AddedDevicesBlock>
-                )}
             </section>
             </div>
 
-            <section style={{ flex: '1 1 500px', minWidth: 0 }}>
-                <h2>Термостаты</h2>
-                <SectionSubtitle>Укажите тип и количество термостатов</SectionSubtitle>
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    <div
-                        className="sel-card"
-                        style={{
-                            width: '100%',
-                            border: '1px solid #d7dbe4',
-                            borderRadius: 14,
-                            padding: 18,
-                            background: '#fff',
-                            display: 'flex',
-                            flexDirection: 'column',
-                        }}
-                    >
-                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                            <div style={{ fontWeight: 700, marginBottom: 14, fontSize: 16 }}>{thermostatTemplate.label}</div>
-
-                            <div style={{ marginBottom: 14 }}>
-                                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: '#475569' }}>Подключение</div>
-                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                    {THERMOSTAT_CONNECTIONS.map((item) => (
-                                        <button
-                                            className="selection-option-button"
-                                            key={item.value}
-                                            type="button"
-                                            onClick={() => setThermostatTarget(item.value)}
-                                            style={{
-                                                padding: '8px 12px',
-                                                border: `1px solid ${thermostatTarget === item.value ? '#c85e18' : '#d7dbe4'}`,
-                                                borderRadius: 8,
-                                                background: thermostatTarget === item.value ? '#e07020' : '#fff',
-                                                color: thermostatTarget === item.value ? '#fff' : '#202738',
-                                                cursor: 'pointer',
-                                                fontSize: 13,
-                                            }}
-                                        >
-                                            {item.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div style={{ marginBottom: 14 }}>
-                                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: '#475569' }}>Цвет</div>
-                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                    {THERMOSTAT_COLORS.map((item) => (
-                                        <button
-                                            className="selection-option-button"
-                                            key={item.value}
-                                            type="button"
-                                            onClick={() => setThermostatColor(item.value)}
-                                            style={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: 8,
-                                                padding: '8px 12px',
-                                                border: `1px solid ${thermostatColor === item.value ? '#c85e18' : '#d7dbe4'}`,
-                                                borderRadius: 8,
-                                                background: thermostatColor === item.value ? '#fff7ed' : '#fff',
-                                                color: '#202738',
-                                                cursor: 'pointer',
-                                                fontSize: 13,
-                                            }}
-                                        >
-                                            <span
-                                                style={{
-                                                    width: 14,
-                                                    height: 14,
-                                                    borderRadius: '50%',
-                                                    border: '1px solid #cbd5e1',
-                                                    background: item.value === 'black' ? '#111827' : item.value === 'gray' ? '#9ca3af' : '#fff',
-                                                }}
-                                            />
-                                            {item.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 14, fontSize: 14 }}>
-                                <input
-                                    type="checkbox"
-                                    checked={thermostatHasFloorSensor}
-                                    onChange={(event) => setThermostatHasFloorSensor(event.target.checked)}
-                                />
-                                Добавить датчик пола
-                            </label>
-
-                            <pre
-                                style={{
-                                    background: '#f5f7fb',
-                                    padding: 10,
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    overflow: 'auto',
-                                    margin: '0 0 12px',
-                                }}
-                            >
-{JSON.stringify(thermostatTemplate.data, null, 4)}
-                            </pre>
-                            <button
-                                onClick={() => addThermostat(thermostatTemplate)}
-                                style={{
-                                    marginTop: 'auto',
-                                    padding: '8px 16px',
-                                    border: '1px solid #3498db',
-                                    borderRadius: 8,
-                                    background: '#3498db',
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    fontSize: 14,
-                                    fontWeight: 700,
-                                }}
-                            >
-                                Добавить термостат
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {(() => {
-                    const wiredThermostats = (Array.isArray(incomingScheme.wired_devices) ? incomingScheme.wired_devices : [])
-                        .filter((device) => canonicalType(device?.type) === 'thermostat')
-                        .map((device) => ({ device, target: 'wired_devices' }));
-                    const wirelessThermostats = (Array.isArray(incomingScheme.wireless_devices) ? incomingScheme.wireless_devices : [])
-                        .filter((device) => canonicalType(device?.type) === 'thermostat')
-                        .map((device) => ({ device, target: 'wireless_devices' }));
-                    const thermostats = [...wiredThermostats, ...wirelessThermostats];
-                    if (thermostats.length === 0) return null;
-
-                    return (
-                        <AddedDevicesBlock>
-                            <AddedDevicesTitle>Добавленные термостаты</AddedDevicesTitle>
-                            {aggregateAddedItems(thermostats.map(({ device, target }) => {
-                                const colorLabel = THERMOSTAT_COLORS.find((item) => item.value === device.color)?.label || device.color || 'Без цвета';
-                                const connectionLabel = target === 'wired_devices' ? 'Проводной' : 'Беспроводной';
-                                const hasFloorSensor = Array.isArray(device.additions)
-                                    && device.additions.some((addition) => canonicalType(addition?.type) === 'flask-sensor-floor');
-
-                                return {
-                                    label: `Термостат ${connectionLabel.toLowerCase()}, ${colorLabel.toLowerCase()}${hasFloorSensor ? ', с датчиком пола' : ''}`,
-                                    removeKey: { target, id: device.id },
-                                };
-                            })).map((row) => (
-                                <AddedDeviceLine
-                                    key={row.label}
-                                    label={row.label}
-                                    count={row.count}
-                                    onRemove={() => removeThermostat(row.removeKeys[0].target, row.removeKeys[0].id)}
-                                />
-                            ))}
-                        </AddedDevicesBlock>
-                    );
-                })()}
-            </section>
             </div>{/* /Датчики и защита flex */}
 
             <section style={{ marginBottom: 32 }}>
@@ -2826,6 +3171,11 @@ const SelectionApp = () => {
                             }}
                         >
                             <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
+                            {item.description && (
+                                <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
+                                    {item.description}
+                                </p>
+                            )}
                             <pre
                                 style={{
                                     background: '#f5f7fb',
@@ -2858,44 +3208,55 @@ const SelectionApp = () => {
                     ))}
                 </div>
 
-                {(() => {
-                    const leakItems = [
-                        ...(Array.isArray(incomingScheme.sensors) ? incomingScheme.sensors : [])
-                            .filter((sensor) => sensor.type === 'leak-sensor')
-                            .map((sensor) => ({ label: 'Датчик протечки', removeKey: { target: 'sensors', id: sensor.id } })),
-                        ...(Array.isArray(incomingScheme.wired_devices) ? incomingScheme.wired_devices : [])
-                            .filter((device) => device.type === 'valve')
-                            .map((device) => ({ label: 'Запорный клапан', removeKey: { target: 'wired_devices', id: device.id } })),
-                    ];
-                    if (leakItems.length === 0) return null;
-
-                    return (
-                        <AddedDevicesBlock>
-                            <AddedDevicesTitle>Добавленные устройства контроля протечки</AddedDevicesTitle>
-                            {aggregateAddedItems(leakItems).map((row) => (
-                                <AddedDeviceLine
-                                    key={row.label}
-                                    label={row.label}
-                                    count={row.count}
-                                    onRemove={() => setIncomingScheme((prev) => ({
-                                        ...prev,
-                                        [row.removeKeys[0].target]: (prev[row.removeKeys[0].target] || []).filter((item) => item.id !== row.removeKeys[0].id),
-                                    }))}
-                                />
-                            ))}
-                        </AddedDevicesBlock>
-                    );
-                })()}
             </section>
 
-            <SectionDivider />
+            {(() => {
+                const temperatureRows = getTemperatureSensorRows(incomingScheme, controllerType);
+                const pressureRows = getPressureSensorRows(incomingScheme);
+                const leakRows = getLeakProtectionRows(incomingScheme);
+                if (temperatureRows.length === 0 && pressureRows.length === 0 && leakRows.length === 0) return null;
 
-            <div className="sel-group-label">Прочее</div>
+                return (
+                    <AddedDevicesBlock>
+                        <AddedDevicesTitle>Добавленные датчики и защита</AddedDevicesTitle>
+                        {temperatureRows.map((row) => (
+                            <AddedDeviceLine
+                                key={`temp-${row.key}`}
+                                label={row.label}
+                                count={row.count}
+                                badge={row.badge}
+                                onRemove={row.removeKey ? () => removeTemperatureSensor(row.removeKey.target, row.removeKey.id) : undefined}
+                            />
+                        ))}
+                        {pressureRows.map((row) => (
+                            <AddedDeviceLine
+                                key={`pressure-${row.label}`}
+                                label={row.label}
+                                count={row.count}
+                                onRemove={() => setIncomingScheme((prev) => ({ ...prev, sensors: (prev.sensors || []).filter((x) => x.id !== row.removeKeys[0]) }))}
+                            />
+                        ))}
+                        {leakRows.map((row) => (
+                            <AddedDeviceLine
+                                key={`leak-${row.label}`}
+                                label={row.label}
+                                count={row.count}
+                                onRemove={() => setIncomingScheme((prev) => ({
+                                    ...prev,
+                                    [row.removeKeys[0].target]: (prev[row.removeKeys[0].target] || []).filter((item) => item.id !== row.removeKeys[0].id),
+                                }))}
+                            />
+                        ))}
+                    </AddedDevicesBlock>
+                );
+            })()}
+
+            <div className="sel-group-label" id="chapter-misc">Прочее</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
             <section style={{ flex: '1 1 400px', minWidth: 0 }}>
                 <h2>Дискретные входы</h2>
                 <SectionSubtitle>Укажите какое количество и как будут использоваться дискретные входы</SectionSubtitle>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'nowrap' }}>
                     {DISCRETE_TEMPLATES.map((item, index) => (
                         <div
                             key={index}
@@ -2905,8 +3266,8 @@ const SelectionApp = () => {
                                 borderRadius: 10,
                                 padding: 16,
                                 background: '#fff',
-                                flex: '1 1 260px',
-                                minWidth: 260,
+                                flex: '1 1 0',
+                                minWidth: 180,
                             }}
                         >
                             <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
@@ -2960,10 +3321,14 @@ const SelectionApp = () => {
                 )}
             </section>
 
+            </div>{/* /Прочее */}
+
+            <div className="sel-group-label" id="chapter-power">Питание</div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
             <section style={{ flex: '1 1 400px', minWidth: 0 }}>
                 <h2>Источник бесперебойного питания</h2>
                 <SectionSubtitle>Требуется ли установка источника бесперебойного питания</SectionSubtitle>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
                     {UPS_TEMPLATES.map((item, index) => (
                         <div
                             key={index}
@@ -2975,6 +3340,7 @@ const SelectionApp = () => {
                                 background: '#fff',
                                 flex: '1 1 260px',
                                 minWidth: 260,
+                                maxWidth: 'calc(50% - 8px)',
                             }}
                         >
                             <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
@@ -3027,7 +3393,7 @@ const SelectionApp = () => {
                     </AddedDevicesBlock>
                 )}
             </section>
-            </div>{/* /Прочее */}
+            </div>{/* /Питание */}
 
             {showJsonDetails && (
                 <div

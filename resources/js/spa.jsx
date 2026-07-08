@@ -88,6 +88,17 @@ const getContainSize = (image, maxWidth, maxHeight) => {
     };
 };
 
+const getFullWidthSize = (image, width, fallbackHeight) => {
+    if (!image?.width || !image?.height) {
+        return { width, height: fallbackHeight };
+    }
+
+    return {
+        width,
+        height: image.height * (width / image.width),
+    };
+};
+
 const createGridPatternImage = (step) => {
     const size = Math.max(1, Math.round(step));
     const canvas = document.createElement('canvas');
@@ -453,6 +464,8 @@ const IO4_ONLY_WIRED_DEVICE_TYPES = ['010pump', '010servo'];
 const BUS_SLOT_SIZE = 80;
 const RELAY_SLOT_SIZE = 60;
 const SERVO_SLOT_SIZE = 70;
+const VALVE_SLOT_WIDTH = 70;
+const VALVE_SLOT_HEIGHT = 40;
 const normalizePowerModuleType = (type) => {
     const normalized = canonicalDeviceType(type);
     if (normalized === 'circuitbreaker') return 'circuit-breaker';
@@ -898,7 +911,7 @@ const App = () => {
     const getNtcChannelBySlot = (ntcSlotIndex, lineKey = 'ntc1_devices') => {
         if (!Number.isInteger(ntcSlotIndex) || ntcSlotIndex < 0) return -1;
         if (lineKey === 'ntc2_devices') return 4 + ntcSlotIndex;
-        return NTC_LINE_SLOTS_COUNT - ntcSlotIndex;
+        return ntcSlotIndex + 1;
     };
 
     const getNtcSensorAbsoluteIndex = (ntcSlotIndex, lineKey = 'ntc1_devices') => {
@@ -2266,6 +2279,15 @@ const App = () => {
 
             if (relayMenuPos.moduleGroup === 'di' && Number.isInteger(relayMenuPos.moduleIndex) && relayMenuPos.lineKey) {
                 const nextScheme = patchDiModuleLine(s, relayMenuPos.moduleIndex, relayMenuPos.lineKey, (currentLine) => {
+                    if (isDoubleRelayPayload) {
+                        const occupancy = buildRelaySlotOccupancyPreserveIndexes(
+                            currentLine,
+                            2,
+                            (relayDevice) => (String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1),
+                        );
+                        if (occupancy[0] || occupancy[1]) return currentLine;
+                        return upsertRelayDeviceAtSlot(currentLine, 0, payload, 2);
+                    }
                     return upsertRelayDeviceAtSlot(currentLine, relayMenuPos.relaySlotIndex, payload, 2);
                 });
                 return withStupidBoilerSensor(nextScheme, type);
@@ -2289,6 +2311,12 @@ const App = () => {
 
             if (Number.isInteger(relayMenuPos.slotIndex)) {
                 const controllerLineKey = relayMenuPos.lineKey || 'relay_devices';
+                if (getControllerType(s) === 'smart2' && controllerLineKey === 'relay_devices' && type === 'valve') {
+                    return s;
+                }
+                if (getControllerType(s) === 'ecosmart' && controllerLineKey === 'relay_devices' && relayMenuPos.slotIndex === 0 && type !== 'stupid') {
+                    return s;
+                }
                 const nextScheme = patchControllerLine(s, controllerLineKey, (currentLine) => {
                     if (isDoubleRelayPayload) {
                         const slotCount = controllerLineKey === 'relay_s_devices' ? 4 : 6;
@@ -2319,11 +2347,21 @@ const App = () => {
         setRelayMenuPos(null);
     };
 
+    const canAddDoubleRelayToDiModule = (moduleItem, lineKey) => {
+        const devices = Array.isArray(moduleItem?.[lineKey]) ? moduleItem[lineKey] : [];
+        const occupancy = buildRelaySlotOccupancyPreserveIndexes(
+            devices,
+            2,
+            (relayDevice) => (String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1),
+        );
+        return !occupancy[0] && !occupancy[1];
+    };
+
     const addRl2sRelayDeviceFromMenu = (type) => {
         if (!rl2sRelayMenuPos) return;
         setScheme((s) => {
             const nextScheme = patchDiModuleLine(s, rl2sRelayMenuPos.moduleIndex, 'relay_s_devices', (currentLine) => {
-            const isDoubleRelayPayload = type === '220servo';
+            const isDoubleRelayPayload = type === '220servo' || type === 'valve';
             const slotIndex = rl2sRelayMenuPos.relaySlotIndex;
             const occupancy = buildRelaySlotOccupancyPreserveIndexes(
                 currentLine,
@@ -2580,6 +2618,9 @@ const App = () => {
                     const di6OccupiedLeftGap = hasOccupiedDi6Slot(rightDevice)
                         ? 10 * indentValue
                         : 0;
+                    const di6OccupiedRightGap = hasOccupiedDi6Slot(leftDevice)
+                        ? 7 * indentValue
+                        : 0;
                     const leftType = canonicalDeviceType(leftDevice?.type);
                     const rl6RightExtraGap = leftType === 'rl6'
                         ? 20 * indentValue
@@ -2589,7 +2630,7 @@ const App = () => {
                         : 0;
                     const rl6LeftExtraGap = getRl6LeftExtraGap(rightDevice, leftIndex + 1);
                     const rl6sLeftExtraGap = getRl6sLeftExtraGap(rightDevice);
-                    return minGap + extraGap + oneWireExtraGap + io4ExtraGap + di6ExtraGapLeft + di6ExtraGapRight + di6OccupiedLeftGap + rl6RightExtraGap + rl6sRightExtraGap + rl6LeftExtraGap + rl6sLeftExtraGap;
+                    return minGap + extraGap + oneWireExtraGap + io4ExtraGap + di6ExtraGapLeft + di6ExtraGapRight + di6OccupiedLeftGap + di6OccupiedRightGap + rl6RightExtraGap + rl6sRightExtraGap + rl6LeftExtraGap + rl6sLeftExtraGap;
                 };
                 let x = baseX;
                 for (let i = 0; i < slotIndex; i += 1) {
@@ -3674,13 +3715,13 @@ const App = () => {
                                     const controllerPortCenterX = (leakPorts.gnd.x + leakPorts.di.x + leakPorts.vplus.x) / 3;
                                     const controllerPortCenterY = (leakPorts.gnd.y + leakPorts.di.y + leakPorts.vplus.y) / 3;
                                     const slotWidth = 7 * indentSize;
-                                    const slotHeight = 7 * indentSize;
+                                    const slotHeight = 4 * indentSize;
                                     const slotX = controllerPortCenterX - slotWidth - 2 * indentSize;
                                     const slotY = -slotHeight - 12 * indentSize;
                                     const imageKey = controllerPortCenterX > slotX + slotWidth / 2 ? 'leak-sensor-right-port' : 'leak-sensor';
                                     const image = wirelessImages[imageKey] || null;
                                     const leakSensorPorts = wirelessPortsByType[imageKey] || [];
-                                    const renderSize = image ? getContainSize(image, slotWidth, slotHeight) : { width: slotWidth, height: slotHeight };
+                                    const renderSize = { width: slotWidth, height: slotHeight };
                                     const renderX = slotX + (slotWidth - renderSize.width) / 2;
                                     const renderY = slotY + (slotHeight - renderSize.height) / 2;
                                     const getLeakSensorPort = (name, fallbackY) => {
@@ -4088,10 +4129,11 @@ const App = () => {
                                     if (controllerType !== 'ecosmart') return null;
                                     const controller420SlotWidth = 9 * indentSize;
                                     const controller420SlotHeight = 2 * indentSize;
-                                    const controller420SlotX = controllerImage.width + 4 * indentSize + controller420SlotOffset.x;
-                                    const controller420SlotY = 9 * indentSize + controller420SlotOffset.y;
-                                    const relayDevice = getRelayDevicesForController(scheme)[0] || null;
-                                    const relayType = canonicalDeviceType(relayDevice?.type);
+                                     const controller420SlotX = controllerImage.width + 4 * indentSize + controller420SlotOffset.x;
+                                     const controller420SlotY = 9 * indentSize + controller420SlotOffset.y;
+                                     const relayDevice = getRelayDevicesForController(scheme)[0] || null;
+                                     if (!relayDevice && !showEmptySlots) return null;
+                                     const relayType = canonicalDeviceType(relayDevice?.type);
                                     const relayVisualDevice = relayDevice
                                         ? {
                                             ...relayDevice,
@@ -4225,8 +4267,8 @@ const App = () => {
                                                         verticalAlign="middle" device={relayDevice} title={relayInfoTitle} />
                                                 </>
                                             )}
-                                            {relayDevice && isRelayBoilerType(relayType) && boilerBusAPort && boilerBusBPort && (
-                                                <>
+                                             {relayDevice && isRelayBoilerType(relayType) && boilerBusAPort && boilerBusBPort && (
+                                                 <>
                                                     <Line
                                                         points={getOrthogonalLinkPoints(
                                                             relayAPort.x,
@@ -4261,10 +4303,48 @@ const App = () => {
                                                             <Circle x={relayBPort.x} y={relayBPort.y} radius={2.5} fill="red" listening={false} />
                                                         </>
                                                     )}
-                                                </>
-                                            )}
-                                            {!relayDevice && (
-                                                <>
+                                                 </>
+                                             )}
+                                             {!relayDevice && showEmptySlots && controllerRelayAPort && controllerRelayBPort && (
+                                                 <>
+                                                     <Line
+                                                         points={getOrthogonalLinkPoints(
+                                                             relayAPort.x,
+                                                             relayAPort.y,
+                                                             relaySlotY + relaySlotHeight + indentSize,
+                                                             relaySlotX + indentSize,
+                                                             relaySlotY + relaySlotHeight,
+                                                         )}
+                                                         stroke="#9e9e9e"
+                                                         strokeWidth={1}
+                                                         lineCap="round"
+                                                         lineJoin="round"
+                                                         listening={false}
+                                                     />
+                                                     <Line
+                                                         points={getOrthogonalLinkPoints(
+                                                             relayBPort.x,
+                                                             relayBPort.y,
+                                                             relaySlotY + relaySlotHeight + 2 * indentSize,
+                                                             relaySlotX + 2 * indentSize,
+                                                             relaySlotY + relaySlotHeight,
+                                                         )}
+                                                         stroke="#9e9e9e"
+                                                         strokeWidth={1}
+                                                         lineCap="round"
+                                                         lineJoin="round"
+                                                         listening={false}
+                                                     />
+                                                     {showPorts && (
+                                                         <>
+                                                             <Circle x={relayAPort.x} y={relayAPort.y} radius={2.5} fill="red" listening={false} />
+                                                             <Circle x={relayBPort.x} y={relayBPort.y} radius={2.5} fill="red" listening={false} />
+                                                         </>
+                                                     )}
+                                                 </>
+                                             )}
+                                             {!relayDevice && (
+                                                 <>
                                                     <Circle
                                                         x={relaySlotX + relaySlotWidth / 2}
                                                         y={relaySlotY + relaySlotHeight / 2}
@@ -4487,7 +4567,7 @@ const App = () => {
                                         : 7 * indentSize;
                                     const slotX = -slotWidth + 4 * indentSize;
                                     const slotY = controllerImage.height - slotHeight - 8 * indentSize;
-                                    const renderSize = image ? getContainSize(image, slotWidth, slotHeight) : { width: slotWidth, height: slotHeight };
+                                    const renderSize = { width: slotWidth, height: slotHeight };
                                     const renderX = slotX + (slotWidth - renderSize.width) / 2;
                                     const renderY = slotY + (slotHeight - renderSize.height) / 2;
                                     const getServoPortPos = (name, fallbackY) => {
@@ -4583,7 +4663,7 @@ const App = () => {
                                         : 8 * indentSize;
                                     const slotX = -slotWidth + 4 * indentSize;
                                     const slotY = controllerImage.height - 4 * indentSize;
-                                    const renderSize = image ? getContainSize(image, slotWidth, slotHeight) : { width: slotWidth, height: slotHeight };
+                                    const renderSize = { width: slotWidth, height: slotHeight };
                                     const renderX = slotX + (slotWidth - renderSize.width) / 2;
                                     const renderY = slotY + (slotHeight - renderSize.height) / 2;
                                     const getPumpPortPos = (name, fallbackY) => {
@@ -4871,17 +4951,23 @@ const App = () => {
                                     const imageKey = 'valve-left-port';
                                     const image = wirelessImages[imageKey] || null;
                                     const valvePorts = wirelessPortsByType[imageKey] || [];
-                                    const slotWidth = image?.width || 6 * indentSize;
-                                    const slotHeight = image?.height || 8 * indentSize;
+                                    const slotWidth = 80;
+                                    const slotHeight = 50;
                                     const slotX = controllerImage.width;
                                     const slotY = controllerImage.height - slotHeight - 6 * indentSize;
-                                    const renderSize = image ? getContainSize(image, slotWidth, slotHeight) : { width: slotWidth, height: slotHeight };
+                                    const renderSize = { width: slotWidth, height: slotHeight };
+                                    const valveImageCrop = image
+                                        ? { x: 0, y: 27, width: image.width || 71, height: Math.max(1, (image.height || 75) - 27) }
+                                        : null;
                                     const renderX = slotX + (slotWidth - renderSize.width) / 2;
                                     const renderY = slotY + (slotHeight - renderSize.height) / 2;
                                     const getValvePort = (name, fallbackY) => {
                                         const port = valvePorts.find((item) => item.name === name) || null;
                                         return port
-                                            ? { x: renderX + port.x * renderSize.width, y: renderY + port.y * renderSize.height }
+                                            ? {
+                                                x: renderX + (((port.x * (image?.width || 71)) - (valveImageCrop?.x || 0)) / (valveImageCrop?.width || (image?.width || 71))) * renderSize.width,
+                                                y: renderY + (((port.y * (image?.height || 75)) - (valveImageCrop?.y || 0)) / (valveImageCrop?.height || (image?.height || 75))) * renderSize.height,
+                                            }
                                             : { x: slotX, y: fallbackY };
                                     };
                                     const targetPorts = {
@@ -4947,7 +5033,7 @@ const App = () => {
                                                      />
                                                  </>
                                              )}
-                                             {valveDevice && image && <Image image={image} x={renderX} y={renderY} width={renderSize.width} height={renderSize.height} listening={false} />}
+                                             {valveDevice && image && <Image image={image} x={renderX} y={renderY} width={renderSize.width} height={renderSize.height} crop={valveImageCrop} listening={false} />}
                                              {valveDevice && isHovered && (
                                                  <>
                                                      <Circle
@@ -5017,7 +5103,7 @@ const App = () => {
                                     const pumpPortA = pumpPorts.find((port) => port.name === 'RELAY-IN A') || null;
                                     const pumpPortB = pumpPorts.find((port) => port.name === 'RELAY-IN B') || null;
                                     const pumpPortGnd = pumpPorts.find((port) => port.name === 'RELAY-IN-GND') || null;
-                                    const getPumpPortPos = (port, fallbackY) => (port
+                                    const getPumpPortPos = (port, fallbackY) => (pumpDevice && port
                                         ? { x: renderX + port.x * renderSize.width, y: renderY + port.y * renderSize.height }
                                         : { x: slotX, y: fallbackY });
                                     const targetPorts = {
@@ -5116,7 +5202,7 @@ const App = () => {
                                     const pumpPortA = pumpPorts.find((port) => port.name === 'RELAY-IN A') || null;
                                     const pumpPortB = pumpPorts.find((port) => port.name === 'RELAY-IN B') || null;
                                     const pumpPortGnd = pumpPorts.find((port) => port.name === 'RELAY-IN-GND') || null;
-                                    const getPumpPortPos = (port, fallbackY) => (port
+                                    const getPumpPortPos = (port, fallbackY) => (pumpDevice && port
                                         ? { x: renderX + port.x * renderSize.width, y: renderY + port.y * renderSize.height }
                                         : { x: slotX, y: fallbackY });
                                     const targetPorts = {
@@ -5143,7 +5229,7 @@ const App = () => {
                                              onMouseEnter={() => setHoveredNtcSlotKey(hoverKey)}
                                              onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === hoverKey ? null : prev))}
                                          >
-                                            {pumpDevice && (
+                                            {(pumpDevice || showEmptySlots) && (
                                                 <>
                                                     <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x - indentSize, targetPorts.a.y, controllerPumpPorts.a.x, targetPorts.a.y, controllerPumpPorts.a.x, controllerPumpPorts.a.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                     <Line points={[targetPorts.b.x, targetPorts.b.y, targetPorts.b.x - indentSize, targetPorts.b.y, controllerPumpPorts.b.x, targetPorts.b.y, controllerPumpPorts.b.x, controllerPumpPorts.b.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
@@ -5235,7 +5321,7 @@ const App = () => {
                                                 moduleDevice: batteryModule,
                                                 index: placements.length,
                                                 x: upsPlacement.x + (upsPlacement.width - batterySize.width) / 2,
-                                                y: upsPlacement.y + upsPlacement.height + 10 * indentSize,
+                                                y: upsPlacement.y + upsPlacement.height + 11 * indentSize,
                                                 width: batterySize.width,
                                                 height: batterySize.height,
                                             });
@@ -5534,10 +5620,10 @@ const App = () => {
                                                     },
                                                 ];
                                                 const lowerEdge = Math.max(upsModule.y + upsModule.height, controllerImage.height);
-                                                if (isSmart2Controller && hasDiModules) return null;
 
                                                 return links.map((link) => {
                                                     const isPowerLink = link.from === '12VDC-IN-V+' || link.from === '12VDC-IN-GND';
+                                                    if (isSmart2Controller && hasDiModules && isPowerLink) return null;
                                                     let fromPort = null;
                                                     let fromX;
                                                     let fromY;
@@ -5645,6 +5731,7 @@ const App = () => {
                                                 const isSmart2Controller = controllerType === 'smart2';
                                                 const diModules = isSmart2Controller ? getDiModules(scheme) : [];
                                                 const hasDiModules = diModules.length > 0;
+                                                if (isSmart2Controller && hasDiModules) return null;
                                                 const puKey = getWirelessDeviceImageKey(powerUnit.moduleDevice);
                                                 const puPorts = puKey ? (wirelessPortsByType[puKey] || []) : [];
                                                 const getDiModuleSize = (device) => {
@@ -5822,10 +5909,17 @@ const App = () => {
                                                 const isRelaySOccupied = !!slotState;
                                                 const isCoveredRelaySSlot = !!slotState?.covered;
                                                 if (!showEmptySlots && !isRelaySOccupied) return null;
-                                                const relaySDevice = slotState?.device || null;
-                                                const isDoubleRelayDevice = String(relaySDevice?.connection_type || '').toLowerCase() === 'double_relay';
-                                                const slotPos = getRelaySSlotPosition(slotIndex);
-                                                const slotSpan = Math.max(1, slotState?.span || 1);
+                                                 const relaySDevice = slotState?.device || null;
+                                                 const isDoubleRelayDevice = String(relaySDevice?.connection_type || '').toLowerCase() === 'double_relay';
+                                                 const relaySTypeForInfo = canonicalDeviceType(relaySDevice?.type);
+                                                 const slotSpan = Math.max(1, slotState?.span || 1);
+                                                 const relaySVisualSlotWidth = isDoubleRelayDevice
+                                                     ? (relaySTypeForInfo === 'valve' ? VALVE_SLOT_WIDTH : SERVO_SLOT_SIZE)
+                                                     : (RELAY_SLOT_SIZE * slotSpan + relaySSlotGap * (slotSpan - 1));
+                                                 const relaySVisualSlotHeight = isDoubleRelayDevice
+                                                     ? (relaySTypeForInfo === 'valve' ? VALVE_SLOT_HEIGHT : SERVO_SLOT_SIZE)
+                                                     : RELAY_SLOT_SIZE;
+                                                 const slotPos = getRelaySSlotPosition(slotIndex);
                                                 let slotX = slotPos.x;
                                                 let slotY = slotPos.y;
                                                 if (isDoubleRelayDevice && !isCoveredRelaySSlot && slotSpan > 1) {
@@ -5834,8 +5928,8 @@ const App = () => {
                                                         const centerX = (slotPos.x + nextPos.x + RELAY_SLOT_SIZE) / 2;
                                                         const bottomY = Math.max(slotPos.y, nextPos.y);
                                                         const centerY = bottomY + RELAY_SLOT_SIZE / 2;
-                                                        slotX = centerX - SERVO_SLOT_SIZE / 2;
-                                                        slotY = centerY - SERVO_SLOT_SIZE / 2;
+                                                        slotX = centerX - relaySVisualSlotWidth / 2;
+                                                        slotY = centerY - relaySVisualSlotHeight / 2;
                                                     }
                                                 }
                                                 const bPort = ports.find((port) => port.name === relayLine.bPortName);
@@ -5873,7 +5967,6 @@ const App = () => {
                                                 })();
                                                 const relaySVisualImage = relaySVisualImageKey ? wirelessImages[relaySVisualImageKey] : null;
                                                 const relaySPorts = relaySVisualImageKey ? (wirelessPortsByType[relaySVisualImageKey] || []) : [];
-                                                const relaySTypeForInfo = canonicalDeviceType(relaySDevice?.type);
                                                 const relaySDoubleRelayDevicesByType = relaySTypeForInfo
                                                     ? doubleRelayDevicesInSystem.filter((item) => canonicalDeviceType(item?.type) === relaySTypeForInfo)
                                                     : [];
@@ -5916,12 +6009,10 @@ const App = () => {
                                                 const relaySSingleTitle = getDeviceStoredTitle(relaySDevice) || (relaySSingleDeviceIndex > 0
                                                     ? `${relaySSingleBaseTitle} ${relaySSingleDeviceIndex}`
                                                     : relaySSingleBaseTitle);
-                                                const relaySVisualSlotWidth = isDoubleRelayDevice
-                                                    ? SERVO_SLOT_SIZE
-                                                    : (RELAY_SLOT_SIZE * slotSpan + relaySSlotGap * (slotSpan - 1));
-                                                const relaySVisualSlotHeight = isDoubleRelayDevice ? SERVO_SLOT_SIZE : RELAY_SLOT_SIZE;
                                                 const relaySImageSize = relaySVisualImage
-                                                    ? getContainSize(relaySVisualImage, relaySVisualSlotWidth, relaySVisualSlotHeight)
+                                                    ? (relaySTypeForInfo === 'valve'
+                                                        ? getFullWidthSize(relaySVisualImage, relaySVisualSlotWidth, relaySVisualSlotHeight)
+                                                        : getContainSize(relaySVisualImage, relaySVisualSlotWidth, relaySVisualSlotHeight))
                                                     : { width: relaySVisualSlotWidth, height: relaySVisualSlotHeight };
                                                 const relaySImageX = slotX + (relaySVisualSlotWidth - relaySImageSize.width) / 2;
                                                 const relaySImageY = slotY + (relaySVisualSlotHeight - relaySImageSize.height) / 2;
@@ -6337,7 +6428,7 @@ const App = () => {
                                                     moduleDevice: batteryModule,
                                                     index: placements.length,
                                                     x: upsPlacement.x + (upsPlacement.width - batterySize.width) / 2,
-                                                    y: upsPlacement.y + upsPlacement.height + 10 * indentSize,
+                                                    y: upsPlacement.y + upsPlacement.height + 11 * indentSize,
                                                     width: batterySize.width,
                                                     height: batterySize.height,
                                                 });
@@ -6377,13 +6468,13 @@ const App = () => {
                                             : null;
                                         const relayVisualImageKey = relayVisualDevice ? getWirelessDeviceImageKey(relayVisualDevice) : null;
                                         const relayVisualImage = relayVisualImageKey ? wirelessImages[relayVisualImageKey] : null;
-                                        const relayVisualSlotWidth = isDoubleRelayRelayDevice
-                                            ? SERVO_SLOT_SIZE
+                                         const relayVisualSlotWidth = isDoubleRelayRelayDevice
+                                            ? (relayType === 'valve' ? VALVE_SLOT_WIDTH : SERVO_SLOT_SIZE)
                                             : (isRelayBoilerType(relayType)
                                             ? (relayVisualImage?.width || BUS_SLOT_SIZE)
                                             : RELAY_SLOT_SIZE);
-                                        const relayVisualSlotHeight = isDoubleRelayRelayDevice
-                                            ? SERVO_SLOT_SIZE
+                                         const relayVisualSlotHeight = isDoubleRelayRelayDevice
+                                            ? (relayType === 'valve' ? VALVE_SLOT_HEIGHT : SERVO_SLOT_SIZE)
                                             : (isRelayBoilerType(relayType)
                                             ? (relayVisualImage?.height || BUS_SLOT_SIZE)
                                             : RELAY_SLOT_SIZE);
@@ -6456,13 +6547,13 @@ const App = () => {
                                                 const relayType = canonicalDeviceType(relayDevice?.type);
                                                 const isDualRelayOccupancyDevice = isRelayBoilerType(relayType);
                                                 const isDoubleRelayRelayDevice = String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay';
-                                                const relayVisualSlotWidth = isDoubleRelayRelayDevice
-                                                    ? SERVO_SLOT_SIZE
+                                                 const relayVisualSlotWidth = isDoubleRelayRelayDevice
+                                                    ? (relayType === 'valve' ? VALVE_SLOT_WIDTH : SERVO_SLOT_SIZE)
                                                     : (isRelayBoilerType(relayType)
                                                     ? (relayVisualImage?.width || BUS_SLOT_SIZE)
                                                     : RELAY_SLOT_SIZE);
-                                                const relayVisualSlotHeight = isDoubleRelayRelayDevice
-                                                    ? SERVO_SLOT_SIZE
+                                                 const relayVisualSlotHeight = isDoubleRelayRelayDevice
+                                                    ? (relayType === 'valve' ? VALVE_SLOT_HEIGHT : SERVO_SLOT_SIZE)
                                                     : (isRelayBoilerType(relayType)
                                                     ? (relayVisualImage?.height || BUS_SLOT_SIZE)
                                                     : RELAY_SLOT_SIZE);
@@ -6480,7 +6571,9 @@ const App = () => {
                                                 relaySlotX += relayOffset.x;
                                                 const relaySlotRenderYOffset = relaySlotRenderY + relayOffset.y;
                                                 const relayImageSize = relayVisualImage
-                                                    ? getContainSize(relayVisualImage, relayVisualSlotWidth, relayVisualSlotHeight)
+                                                    ? (relayType === 'valve'
+                                                        ? getFullWidthSize(relayVisualImage, relayVisualSlotWidth, relayVisualSlotHeight)
+                                                        : getContainSize(relayVisualImage, relayVisualSlotWidth, relayVisualSlotHeight))
                                                     : { width: relayVisualSlotWidth, height: relayVisualSlotHeight };
                                                 const relayImageX = relaySlotX + (relayVisualSlotWidth - relayImageSize.width) / 2;
                                                 const relayImageY = relaySlotRenderYOffset + (relayVisualSlotHeight - relayImageSize.height) / 2;
@@ -6711,7 +6804,11 @@ const App = () => {
                                                                     controllerImage.height + 3 * indentSize,
                                                                     relaySlotRenderYOffset + relayVisualSlotHeight + slotBasedOffset + 3 * indentSize,
                                                                 );
-                                                                const routeLiftY = relayLine.index === 2 && nextRelayLine?.index === 3
+                                                                const shouldLiftValveOnFirstProRelays = controllerType === 'pro'
+                                                                    && relayType === 'valve'
+                                                                    && relayLine.index === 1
+                                                                    && nextRelayLine?.index === 2;
+                                                                const routeLiftY = (relayLine.index === 2 && nextRelayLine?.index === 3) || shouldLiftValveOnFirstProRelays
                                                                     ? 3 * indentSize
                                                                     : 0;
                                                                 const relay1RouteY = Math.max(from2Y + 4 * indentSize, minRouteY) - routeLiftY;
@@ -7004,7 +7101,7 @@ const App = () => {
                                                 moduleDevice: batteryModule,
                                                 index: placements.length,
                                                 x: upsPlacement.x + (upsPlacement.width - batterySize.width) / 2,
-                                                y: upsPlacement.y + upsPlacement.height + 10 * indentSize,
+                                                y: upsPlacement.y + upsPlacement.height + 11 * indentSize,
                                                 width: batterySize.width,
                                                 height: batterySize.height,
                                             });
@@ -7039,9 +7136,11 @@ const App = () => {
                                             {visibleSlots.map(({ portIndex, device }, slotIndex) => {
                                                 const controllerPort = ports.find((port) => port.name === `DI-OUT-${portIndex}`) || null;
                                                 if (!controllerPort) return null;
-                                                const slotYOffset = slotIndex === 0
+                                                const slotYOffset = portIndex === 1
                                                     ? indentSize
-                                                    : (slotIndex === 1 ? 3 * indentSize : 0);
+                                                    : (portIndex === 2
+                                                        ? 3 * indentSize
+                                                        : (portIndex === 3 ? 5 * indentSize : (portIndex === 4 ? 6 * indentSize : 0)));
                                                 const slotY = firstDiSlotY + slotIndex * (diSlotHeight + diSlotGap) + slotYOffset;
                                                 const slotTargetX = diSlotX;
                                                 const slotTargetY = slotY + diSlotHeight / 2;
@@ -7172,7 +7271,7 @@ const App = () => {
                                                         return { x: Math.min(alignedX, maxAllowedX), y: controllerImage.height - slotHeight };
                                                     }
                                                     if (controllerType === 'smart2') {
-                                                        return { x: getAlignedXByBusA(0), y: controllerImage.height + 1.5 * moduleHeightValue };
+                                                        return { x: getAlignedXByBusA(0), y: controllerImage.height + 1.5 * moduleHeightValue + 7 * indentSize };
                                                     }
                                                     if (controllerType === 'pro') {
                                                         const relaySAssignedDevices = getRelaySAssignedDevices(scheme, getRelaySLineConfig('pro', ports).length || 4);
@@ -7545,172 +7644,6 @@ const App = () => {
                                                     />
                                                 );
                                             })()}
-                                            {diModules.map((moduleDevice, slotIndex) => {
-                                                if (slotIndex === 0) return null;
-                                                const previousDevice = diModules[slotIndex - 1];
-                                                if (!previousDevice) return null;
-                                                const previousPos = getDiSlotPosition(slotIndex - 1);
-                                                const previousSize = getDiModuleSize(previousDevice);
-                                                const previousPorts = getDiPorts(previousDevice);
-                                                const currentPos = getDiSlotPosition(slotIndex);
-                                                const currentSize = getDiModuleSize(moduleDevice);
-                                                const currentPorts = getDiPorts(moduleDevice);
-                                                const previousBasePos = (() => {
-                                                    const baseX = getDiSlotX(slotIndex - 1);
-                                                    const baseY = controllerImage.height - previousSize.height;
-                                                    return { x: snapToGrid(baseX, indentSize), y: snapToGrid(baseY, indentSize) };
-                                                })();
-                                                const currentBasePos = (() => {
-                                                    const baseX = getDiSlotX(slotIndex);
-                                                    const baseY = controllerImage.height - currentSize.height;
-                                                    return { x: snapToGrid(baseX, indentSize), y: snapToGrid(baseY, indentSize) };
-                                                })();
-                                                const links = [
-                                                    { from: '12VDC-IN-V+', to: '12VDC-OUT-V+', color: '#d32f2f', offset: 2 * indentSize },
-                                                    { from: '12VDC-IN-GND', to: '12VDC-OUT-GND', color: '#212121', offset: 1 * indentSize },
-                                                ];
-                                                return links.map((link) => {
-                                                    const fromPort = previousPorts.find((port) => port.name === link.from);
-                                                    const toPort = currentPorts.find((port) => port.name === link.to);
-                                                    if (!fromPort || !toPort) return null;
-                                                    const fromX = previousPos.x + fromPort.x * previousSize.width;
-                                                    const fromY = previousPos.y + fromPort.y * previousSize.height;
-                                                    const toX = currentPos.x + toPort.x * currentSize.width;
-                                                    const toY = currentPos.y + toPort.y * currentSize.height;
-                                                    const lowerEdge = Math.max(
-                                                        previousPos.y + previousSize.height,
-                                                        currentPos.y + currentSize.height,
-                                                    );
-                                                    const bendY = lowerEdge + link.offset;
-                                                    const baseFromY = previousBasePos.y + fromPort.y * previousSize.height;
-                                                    const baseToY = currentBasePos.y + toPort.y * currentSize.height;
-                                                    const baseLowerEdge = Math.max(
-                                                        previousBasePos.y + previousSize.height,
-                                                        currentBasePos.y + currentSize.height,
-                                                    );
-                                                    const baseBendY = Math.max(baseFromY, baseToY, baseLowerEdge) + link.offset;
-                                                    const clampedBendY = Math.max(bendY, baseBendY);
-                                                    return <Line key={`di-link-${slotIndex}-${link.from}-${link.to}`} points={getOrthogonalLinkPoints(fromX, fromY, clampedBendY, toX, toY)} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />;
-                                                });
-                                            })}
-                                            {diModules.length > 0 && (() => {
-                                                const firstDevice = diModules[0];
-                                                const firstPos = getDiSlotPosition(0);
-                                                const firstSize = getDiModuleSize(firstDevice);
-                                                const firstPorts = getDiPorts(firstDevice);
-                                                const firstBasePos = (() => {
-                                                    const baseX = getDiSlotX(0);
-                                                    const baseY = controllerImage.height - firstSize.height;
-                                                    return { x: snapToGrid(baseX, indentSize), y: snapToGrid(baseY, indentSize) };
-                                                })();
-                                                const links = [
-                                                    {
-                                                        fromController: '12VDC-IN-V+',
-                                                        toModule: '12VDC-OUT-V+',
-                                                        color: '#d32f2f',
-                                                        controllerBendMultiplier: 2,
-                                                    },
-                                                    {
-                                                        fromController: '12VDC-IN-GND',
-                                                        toModule: '12VDC-OUT-GND',
-                                                        color: '#212121',
-                                                        controllerBendMultiplier: 1,
-                                                    },
-                                                ];
-                                                return links.map((link) => {
-                                                    const fromPort = ports.find((port) => port.name === link.fromController);
-                                                    const toPort = firstPorts.find((port) => port.name === link.toModule);
-                                                    if (!fromPort || !toPort) return null;
-                                                    const fromX = fromPort.x * controllerImage.width;
-                                                    const fromY = fromPort.y * controllerImage.height;
-                                                    const toX = firstPos.x + toPort.x * firstSize.width;
-                                                    const toY = firstPos.y + toPort.y * firstSize.height;
-                                                    const bendY = controllerImage.height + link.controllerBendMultiplier * indentSize;
-                                                    const targetHopBendY = firstPos.y + firstSize.height + link.controllerBendMultiplier * indentSize;
-                                                    const dynamicBendY = Math.max(bendY, targetHopBendY);
-                                                    const baseToY = firstBasePos.y + toPort.y * firstSize.height;
-                                                    const baseTargetHopBendY = firstBasePos.y + firstSize.height + link.controllerBendMultiplier * indentSize;
-                                                    const baseBendY = Math.max(
-                                                        Math.max(fromY, baseToY, controllerImage.height) + link.controllerBendMultiplier * indentSize,
-                                                        baseTargetHopBendY,
-                                                    );
-                                                    const clampedBendY = Math.max(dynamicBendY, baseBendY);
-                                                    return <Line key={`di-first-power-${link.fromController}-${link.toModule}`} points={getOrthogonalLinkPoints(fromX, fromY, clampedBendY, toX, toY)} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />;
-                                                });
-                                            })()}
-                                            {diModules.map((moduleDevice, slotIndex) => {
-                                                const modulePos = getDiSlotPosition(slotIndex);
-                                                const moduleSize = getDiModuleSize(moduleDevice);
-                                                const modulePorts = getDiPorts(moduleDevice);
-                                                const moduleBasePos = (() => {
-                                                    const baseX = getDiSlotX(slotIndex);
-                                                    const baseY = controllerImage.height - moduleSize.height;
-                                                    return { x: snapToGrid(baseX, indentSize), y: snapToGrid(baseY, indentSize) };
-                                                })();
-                                                const hasUpsInPower = Array.isArray(scheme.power_modules)
-                                                    && scheme.power_modules
-                                                        .map((item) => normalizePowerModuleType(typeof item === 'string' ? item : item?.type))
-                                                        .includes('ups');
-                                                const controllerPairOrder = hasUpsInPower
-                                                    ? [[3, 4], [1, 2]]
-                                                    : [[1, 2], [3, 4]];
-                                                const selectedPair = controllerPairOrder[Math.min(slotIndex, controllerPairOrder.length - 1)];
-                                                const controllerDiFirst = selectedPair[0];
-                                                const controllerDiSecond = selectedPair[1];
-                                                const signalLinks = [
-                                                    {
-                                                        controllerPorts: [`DI-OUT-${controllerDiFirst}`],
-                                                        modulePorts: ['DI-IN-1'],
-                                                        color: '#1565c0',
-                                                        controllerBendMultiplier: controllerDiFirst === 1 ? 3 : 5,
-                                                        controllerBendMultiplierSingleDi: 3,
-                                                        fallbackDiInIndex: 0,
-                                                    },
-                                                    {
-                                                        controllerPorts: [`DI-OUT-${controllerDiSecond}`],
-                                                        modulePorts: ['DI-IN-2'],
-                                                        color: '#1565c0',
-                                                        controllerBendMultiplier: controllerDiSecond === 2 ? 4 : 6,
-                                                        controllerBendMultiplierSingleDi: 4,
-                                                        fallbackDiInIndex: 1,
-                                                    },
-                                                ];
-                                                const findFirstPort = (portsList, names) => names
-                                                    .map((name) => portsList.find((port) => port.name === name))
-                                                    .find(Boolean);
-                                                const findDiInputPort = (portsList, preferredNames, fallbackIndex = 0) => {
-                                                    const exactMatch = findFirstPort(portsList, preferredNames);
-                                                    if (exactMatch) return exactMatch;
-                                                    const byToken = getPortsByClassToken(portsList, 'DI-IN') || [];
-                                                    if (byToken.length === 0) return null;
-                                                    return byToken[Math.min(Math.max(0, fallbackIndex), byToken.length - 1)] || byToken[0];
-                                                };
-                                                return signalLinks.map((link, linkIndex) => {
-                                                    const fromPort = findFirstPort(ports, link.controllerPorts);
-                                                    const toPort = findDiInputPort(modulePorts, link.modulePorts, link.fallbackDiInIndex);
-                                                    if (!fromPort || !toPort) return null;
-                                                    const fromX = fromPort.x * controllerImage.width;
-                                                    const fromY = fromPort.y * controllerImage.height;
-                                                    const toX = modulePos.x + toPort.x * moduleSize.width;
-                                                    const toY = modulePos.y + toPort.y * moduleSize.height;
-                                                    const controllerBottomY = controllerImage.height;
-                                                    const diCount = diModules.length;
-                                                    const bendMultiplier = diCount === 1
-                                                        ? (link.controllerBendMultiplierSingleDi || link.controllerBendMultiplier)
-                                                        : link.controllerBendMultiplier;
-                                                    const bendY = controllerBottomY + bendMultiplier * indentSize;
-                                                    const targetHopBendY = modulePos.y + moduleSize.height + bendMultiplier * indentSize;
-                                                    const dynamicBendY = Math.max(bendY, targetHopBendY);
-                                                    const baseToY = moduleBasePos.y + toPort.y * moduleSize.height;
-                                                    const baseTargetHopBendY = moduleBasePos.y + moduleSize.height + bendMultiplier * indentSize;
-                                                    const baseBendY = Math.max(
-                                                        Math.max(fromY, baseToY, controllerBottomY) + bendMultiplier * indentSize,
-                                                        baseTargetHopBendY,
-                                                    );
-                                                    const clampedBendY = Math.max(dynamicBendY, baseBendY);
-                                                    return <Line key={`di-controller-link-${slotIndex}-${linkIndex}`} points={getOrthogonalLinkPoints(fromX, fromY, clampedBendY, toX, toY)} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />;
-                                                });
-                                            })}
                                             {Array.from({ length: diSlotsCount }).map((_, slotIndex) => {
                                                 const device = diModules[slotIndex] || null;
                                                 const isOccupied = !!device;
@@ -7826,73 +7759,106 @@ const App = () => {
                                                               const modulePorts = diPorts;
                                                               const modulePos = { x: slotX, y: slotY };
                                                               const moduleSize = size;
-                                                               const moduleBasePos = (() => {
-                                                                   const baseX = getDiSlotX(slotIndex);
-                                                                   const baseY = controllerImage.height - moduleSize.height;
-                                                                   return { x: snapToGrid(baseX, indentSize), y: snapToGrid(baseY, indentSize) };
-                                                               })();
-                                                               const overlayLines = [];
+                                                                const moduleBasePos = (() => {
+                                                                    const baseX = getDiSlotX(slotIndex);
+                                                                    const baseY = controllerImage.height - moduleSize.height;
+                                                                    return { x: snapToGrid(baseX, indentSize), y: snapToGrid(baseY, indentSize) };
+                                                                })();
+                                                                const overlayLines = [];
+                                                               const hasUpsInPowerLine = Array.isArray(scheme.power_modules)
+                                                                   && scheme.power_modules
+                                                                       .map((item) => normalizePowerModuleType(typeof item === 'string' ? item : item?.type))
+                                                                       .includes('ups');
 
                                                                if (slotIndex === diModules.length - 1) {
-                                                                   const hasUpsInPowerLine = Array.isArray(scheme.power_modules)
-                                                                       && scheme.power_modules
-                                                                           .map((item) => normalizePowerModuleType(typeof item === 'string' ? item : item?.type))
-                                                                           .includes('ups');
-
-                                                                   if (!hasUpsInPowerLine) {
-                                                                       const minGap = 4 * indentSize;
-                                                                       const powerUnitDevice = { id: 'required-power-unit', type: 'power-unit' };
-                                                                       const powerUnitKey = getWirelessDeviceImageKey(powerUnitDevice);
-                                                                       const powerUnitImage = powerUnitKey ? wirelessImages[powerUnitKey] : null;
-                                                                       const powerUnit = {
-                                                                           x: -minGap - (powerUnitImage?.width || 80),
-                                                                           y: controllerImage.height - (powerUnitImage?.height || 80),
-                                                                           width: powerUnitImage?.width || 80,
-                                                                           height: powerUnitImage?.height || 80,
+                                                                    if (hasUpsInPowerLine) {
+                                                                        const minGap = 4 * indentSize;
+                                                                        const upsDevice = { id: 'required-ups', type: 'ups' };
+                                                                        const upsKey = getWirelessDeviceImageKey(upsDevice);
+                                                                        const upsImage = upsKey ? wirelessImages[upsKey] : null;
+                                                                       const upsModule = {
+                                                                            x: -minGap - (upsImage?.width || 80),
+                                                                            y: controllerImage.height - (upsImage?.height || 80),
+                                                                            width: upsImage?.width || 80,
+                                                                            height: upsImage?.height || 80,
                                                                        };
-                                                                       const powerUnitPorts = powerUnitKey ? (wirelessPortsByType[powerUnitKey] || []) : [];
+                                                                       const upsPorts = upsKey ? (wirelessPortsByType[upsKey] || []) : [];
+                                                                        const singleDiModuleRouteOffset = diModules.length === 1 ? -2 * indentSize : 0;
                                                                        [
-                                                                           {
-                                                                               puPort: '12VDC-OUT-V+',
-                                                                               modulePort: '12VDC-IN-V+',
-                                                                               upOffset: 2 * indentSize,
-                                                                               sideOffset: 2 * indentSize,
-                                                                               underOffsetWithDi: 7 * indentSize,
-                                                                               underOffsetWithSingleDi: 5 * indentSize,
-                                                                               color: '#d32f2f',
-                                                                           },
-                                                                           {
-                                                                               puPort: '12VDC-OUT-GND',
-                                                                               modulePort: '12VDC-IN-GND',
-                                                                               upOffset: 1 * indentSize,
-                                                                               sideOffset: 1 * indentSize,
-                                                                               underOffsetWithDi: 8 * indentSize,
-                                                                               underOffsetWithSingleDi: 6 * indentSize,
-                                                                               color: '#212121',
-                                                                           },
+                                                                            { upsPort: '12VDC-OUT-V+', modulePort: '12VDC-IN-V+', color: '#d32f2f', offset: 7 * indentSize + singleDiModuleRouteOffset },
+                                                                            { upsPort: '12VDC-OUT-GND', modulePort: '12VDC-IN-GND', color: '#212121', offset: 8 * indentSize + singleDiModuleRouteOffset },
                                                                        ].forEach((link) => {
-                                                                           const fromPort = powerUnitPorts.find((port) => port.name === link.puPort);
-                                                                           const toPort = modulePorts.find((port) => port.name === link.modulePort);
-                                                                           if (!fromPort || !toPort) return;
-                                                                           const fromX = powerUnit.x + fromPort.x * powerUnit.width;
-                                                                           const fromY = powerUnit.y + fromPort.y * powerUnit.height;
-                                                                           const toX = modulePos.x + toPort.x * moduleSize.width;
-                                                                           const toY = modulePos.y + toPort.y * moduleSize.height;
-                                                                           const upY = powerUnit.y - link.upOffset;
-                                                                           const rightX = powerUnit.x + powerUnit.width + link.sideOffset;
-                                                                           const underOffsetForDi = diModules.length === 1
-                                                                               ? (link.underOffsetWithSingleDi || link.underOffsetWithDi)
-                                                                               : link.underOffsetWithDi;
-                                                                           const staticDownY = controllerImage.height + underOffsetForDi;
-                                                                           const dynamicDownY = modulePos.y + moduleSize.height + underOffsetForDi;
-                                                                           const baseDownY = moduleBasePos.y + moduleSize.height + underOffsetForDi;
-                                                                           const downY = Math.max(staticDownY, dynamicDownY, baseDownY);
-                                                                           overlayLines.push(
-                                                                               <Line key={`di-overlay-pu-power-${slotIndex}-${link.puPort}-${link.modulePort}`} points={[fromX, fromY, fromX, upY, rightX, upY, rightX, downY, toX, downY, toX, toY]} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
-                                                                           );
+                                                                            const fromPort = upsPorts.find((port) => port.name === link.upsPort);
+                                                                            const toPort = modulePorts.find((port) => port.name === link.modulePort)
+                                                                                || (getPortsByClassToken(modulePorts, link.modulePort) || [])[0]
+                                                                                || null;
+                                                                            if (!fromPort || !toPort) return;
+                                                                            const fromX = upsModule.x + fromPort.x * upsModule.width;
+                                                                            const fromY = upsModule.y + fromPort.y * upsModule.height;
+                                                                            const toX = modulePos.x + toPort.x * moduleSize.width;
+                                                                            const toY = modulePos.y + toPort.y * moduleSize.height;
+                                                                            const staticDownY = controllerImage.height + link.offset;
+                                                                            const dynamicDownY = modulePos.y + moduleSize.height + link.offset;
+                                                                            const baseDownY = moduleBasePos.y + moduleSize.height + link.offset;
+                                                                            const downY = Math.max(staticDownY, dynamicDownY, baseDownY);
+                                                                            overlayLines.push(
+                                                                                <Line key={`di-overlay-ups-${slotIndex}-${link.upsPort}-${link.modulePort}`} points={getOrthogonalLinkPoints(fromX, fromY, downY, toX, toY)} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
+                                                                            );
+                                                                        });
+                                                                    } else {
+                                                                        const minGap = 4 * indentSize;
+                                                                        const powerUnitDevice = { id: 'required-power-unit', type: 'power-unit' };
+                                                                        const powerUnitKey = getWirelessDeviceImageKey(powerUnitDevice);
+                                                                        const powerUnitImage = powerUnitKey ? wirelessImages[powerUnitKey] : null;
+                                                                        const powerUnit = {
+                                                                            x: -minGap - (powerUnitImage?.width || 80),
+                                                                            y: controllerImage.height - (powerUnitImage?.height || 80),
+                                                                            width: powerUnitImage?.width || 80,
+                                                                            height: powerUnitImage?.height || 80,
+                                                                        };
+                                                                        const powerUnitPorts = powerUnitKey ? (wirelessPortsByType[powerUnitKey] || []) : [];
+                                                                        [
+                                                                            {
+                                                                                puPort: '12VDC-OUT-V+',
+                                                                                modulePort: '12VDC-IN-V+',
+                                                                                upOffset: 2 * indentSize,
+                                                                                sideOffset: 2 * indentSize,
+                                                                                underOffsetWithDi: 7 * indentSize,
+                                                                                underOffsetWithSingleDi: 5 * indentSize,
+                                                                                color: '#d32f2f',
+                                                                            },
+                                                                            {
+                                                                                puPort: '12VDC-OUT-GND',
+                                                                                modulePort: '12VDC-IN-GND',
+                                                                                upOffset: 1 * indentSize,
+                                                                                sideOffset: 1 * indentSize,
+                                                                                underOffsetWithDi: 8 * indentSize,
+                                                                                underOffsetWithSingleDi: 6 * indentSize,
+                                                                                color: '#212121',
+                                                                            },
+                                                                       ].forEach((link) => {
+                                                                            const fromPort = powerUnitPorts.find((port) => port.name === link.puPort);
+                                                                            const toPort = modulePorts.find((port) => port.name === link.modulePort);
+                                                                            if (!fromPort || !toPort) return;
+                                                                            const fromX = powerUnit.x + fromPort.x * powerUnit.width;
+                                                                            const fromY = powerUnit.y + fromPort.y * powerUnit.height;
+                                                                            const toX = modulePos.x + toPort.x * moduleSize.width;
+                                                                            const toY = modulePos.y + toPort.y * moduleSize.height;
+                                                                            const upY = powerUnit.y - link.upOffset;
+                                                                            const rightX = powerUnit.x + powerUnit.width + link.sideOffset;
+                                                                            const underOffsetForDi = diModules.length === 1
+                                                                                ? (link.underOffsetWithSingleDi || link.underOffsetWithDi)
+                                                                                : link.underOffsetWithDi;
+                                                                            const staticDownY = controllerImage.height + underOffsetForDi;
+                                                                            const dynamicDownY = modulePos.y + moduleSize.height + underOffsetForDi;
+                                                                            const baseDownY = moduleBasePos.y + moduleSize.height + underOffsetForDi;
+                                                                            const downY = Math.max(staticDownY, dynamicDownY, baseDownY);
+                                                                            overlayLines.push(
+                                                                                <Line key={`di-overlay-pu-power-${slotIndex}-${link.puPort}-${link.modulePort}`} points={[fromX, fromY, fromX, upY, rightX, upY, rightX, downY, toX, downY, toX, toY]} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />,
+                                                                            );
                                                                        });
                                                                    }
-                                                               }
+                                                                }
 
                                                                if (slotIndex > 0) {
                                                                   const previousDevice = diModules[slotIndex - 1];
@@ -7951,11 +7917,7 @@ const App = () => {
                                                                   });
                                                               }
 
-                                                              const hasUpsInPower = Array.isArray(scheme.power_modules)
-                                                                  && scheme.power_modules
-                                                                      .map((item) => normalizePowerModuleType(typeof item === 'string' ? item : item?.type))
-                                                                      .includes('ups');
-                                                              const controllerPairOrder = hasUpsInPower ? [[3, 4], [1, 2]] : [[1, 2], [3, 4]];
+                                                               const controllerPairOrder = hasUpsInPowerLine ? [[3, 4], [1, 2]] : [[1, 2], [3, 4]];
                                                               const selectedPair = controllerPairOrder[Math.min(slotIndex, controllerPairOrder.length - 1)];
                                                               const findFirstPort = (portsList, names) => names.map((name) => portsList.find((port) => port.name === name)).find(Boolean);
                                                               const findDiInputPort = (portsList, preferredNames, fallbackIndex = 0) => {
@@ -8015,13 +7977,25 @@ const App = () => {
                                                                   const shouldRenderRelayDevice = relayDevice && !slotState?.covered;
                                                                   const aPort = diPorts.find((port) => port.name === `RELAY-${relayIndex}-A`) || null;
                                                                  const bPort = diPorts.find((port) => port.name === `RELAY-${relayIndex}-B`) || null;
-                                                                 const visualDevice = relayDevice ? { ...relayDevice, port_side: 'left' } : null;
-                                                                 const relayImageKey = visualDevice ? getWirelessDeviceImageKey(visualDevice) : null;
-                                                                 const relayImage = relayImageKey ? wirelessImages[relayImageKey] : null;
-                                                                 const relayImageSize = relayImage ? getContainSize(relayImage, relaySlotSize, relaySlotSize) : { width: relaySlotSize, height: relaySlotSize };
-                                                                 const relayImageX = relaySlotX + (relaySlotSize - relayImageSize.width) / 2;
-                                                                  const relayImageY = sourceRelaySlotY + (relaySlotSize - relayImageSize.height) / 2;
-                                                                  const relayPorts = relayImageKey ? (wirelessPortsByType[relayImageKey] || []) : [];
+                                                                  const visualDevice = relayDevice ? { ...relayDevice, port_side: 'left' } : null;
+                                                                  const relayImageKey = visualDevice ? getWirelessDeviceImageKey(visualDevice) : null;
+                                                                  const relayImage = relayImageKey ? wirelessImages[relayImageKey] : null;
+                                                                  const relayType = canonicalDeviceType(relayDevice?.type);
+                                                                  const relayVisualSlotWidth = relayType === 'valve' ? 70 : relaySlotSize;
+                                                                  const relayVisualSlotHeight = relayType === 'valve' ? 50 : relaySlotSize;
+                                                                  const relayImageCrop = relayType === 'valve' && relayImage
+                                                                      ? { x: 0, y: 45, width: relayImage.width, height: Math.max(1, relayImage.height - 45) }
+                                                                      : undefined;
+                                                                  const relayImageSize = relayImage
+                                                                      ? (relayType === 'valve'
+                                                                          ? { width: relayVisualSlotWidth, height: relayVisualSlotHeight }
+                                                                          : getContainSize(relayImage, relayVisualSlotWidth, relayVisualSlotHeight))
+                                                                      : { width: relayVisualSlotWidth, height: relayVisualSlotHeight };
+                                                                  const relayImageX = relaySlotX + (relayVisualSlotWidth - relayImageSize.width) / 2;
+                                                                   const relayImageY = sourceRelaySlotY + (relayVisualSlotHeight - relayImageSize.height) / 2;
+                                                                   const relayPorts = relayImageKey ? (wirelessPortsByType[relayImageKey] || []) : [];
+                                                                   const boilerBusAPort = relayPorts.find((port) => port.name === 'BUS-A') || null;
+                                                                   const boilerBusBPort = relayPorts.find((port) => port.name === 'BUS-B') || null;
                                                                   const isDoubleRelayDevice = String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay';
                                                                   const relayInPort = isDoubleRelayDevice
                                                                       ? (relayPorts.find((port) => port.name === `RELAY-IN-${relayIndex}`)
@@ -8034,9 +8008,19 @@ const App = () => {
                                                                  const moduleAPortY = aPort ? slotY + aPort.y * size.height : null;
                                                                  const moduleBPortX = bPort ? slotX + bPort.x * size.width : null;
                                                                  const moduleBPortY = bPort ? slotY + bPort.y * size.height : null;
-                                                                 const relayInPortX = relayInPort ? relayImageX + relayInPort.x * relayImageSize.width : relaySlotX;
-                                                                 const relayInPortY = relayInPort ? relayImageY + relayInPort.y * relayImageSize.height : relaySlotY + relaySlotSize / 2;
-                                                                 const relayType = canonicalDeviceType(relayDevice?.type);
+                                                                  const getRelayImagePortPoint = (port) => {
+                                                                      if (!port || !relayImage) return null;
+                                                                      const imageWidth = relayImage.width || relayImageSize.width;
+                                                                      const imageHeight = relayImage.height || relayImageSize.height;
+                                                                      const crop = relayImageCrop || { x: 0, y: 0, width: imageWidth, height: imageHeight };
+                                                                      return {
+                                                                          x: relayImageX + (((port.x * imageWidth) - crop.x) / crop.width) * relayImageSize.width,
+                                                                          y: relayImageY + (((port.y * imageHeight) - crop.y) / crop.height) * relayImageSize.height,
+                                                                      };
+                                                                  };
+                                                                  const relayInPortPoint = getRelayImagePortPoint(relayInPort);
+                                                                  const relayInPortX = relayInPortPoint ? relayInPortPoint.x : relaySlotX;
+                                                                  const relayInPortY = relayInPortPoint ? relayInPortPoint.y : relaySlotY + relayVisualSlotHeight / 2;
                                                                  const relayTypeDevices = [
                                                                      ...getRelayDevicesForController(scheme),
                                                                      ...getRelaySPreferredDevices(scheme),
@@ -8064,9 +8048,9 @@ const App = () => {
                                                                                      : (relayType === 'zoneServo' ? 'Сервопривод зоны' : 'Прочее оборудование')))));
                                                                   const relayInfoIndex = relaySystemIndex > 0 ? relaySystemIndex : relaySlotIndex + 1;
                                                                     const relayInfoTitle = getDeviceStoredTitle(relayDevice) || `${relayBaseTitle} ${relayInfoIndex}`;
-                                                                   const infoBlockWidth = relaySlotSize;
+                                                                   const infoBlockWidth = relayVisualSlotWidth;
                                                                     const infoBlockHeight = INFO_BLOCK_HEIGHT;
-                                                                    const infoBlockX = relaySlotX + relaySlotSize / 2 - infoBlockWidth / 2;
+                                                                    const infoBlockX = relaySlotX + relayVisualSlotWidth / 2 - infoBlockWidth / 2;
                                                                      const infoBlockY = sourceRelaySlotY - infoBlockHeight - 8;
                                                                   const relayHoverKey = `rl2:${slotIndex}:${relaySlotIndex}`;
                                                                   const isRelayHovered = hoveredRelaySlotIndex === relayHoverKey;
@@ -8077,15 +8061,29 @@ const App = () => {
                                                                           onMouseEnter={() => setHoveredRelaySlotIndex(relayHoverKey)}
                                                                           onMouseLeave={() => setHoveredRelaySlotIndex((prev) => (prev === relayHoverKey ? null : prev))}
                                                                       >
-                                                                          {shouldRenderRelayDevice && aPort && (
-                                                                             <>
-                                                                                 <Line points={[moduleAPortX, moduleAPortY, moduleAPortX, slotY - 3 * indentSize]} stroke="#212121" strokeWidth={1} lineCap="round" listening={false} />
-                                                                                 <Text x={moduleAPortX - 8} y={slotY - 3 * indentSize - 14} width={16} text="L" fontSize={10} align="center" fill="#212121" listening={false} />
-                                                                             </>
-                                                                         )}
-                                                                          {relayDevice && bPort && relayInPort && (
-                                                                              <Line points={[relayInPortX, relayInPortY, moduleBPortX, relayInPortY, moduleBPortX, moduleBPortY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                                          )}
+                                                                           {shouldRenderRelayDevice && !isStupidBoilerType(relayType) && aPort && (() => {
+                                                                               const lRouteY = slotY - 3 * indentSize;
+                                                                               const nextAPort = relayType === 'valve' && sourceRelaySlotIndex === 0
+                                                                                   ? diPorts.find((port) => port.name === `RELAY-${relayIndex + 1}-A`) || null
+                                                                                   : null;
+                                                                               const nextModuleAPortX = nextAPort ? slotX + nextAPort.x * size.width : null;
+                                                                               const nextModuleAPortY = nextAPort ? slotY + nextAPort.y * size.height : null;
+                                                                               return (
+                                                                                   <>
+                                                                                       <Line points={[moduleAPortX, moduleAPortY, moduleAPortX, lRouteY]} stroke="#212121" strokeWidth={1} lineCap="round" listening={false} />
+                                                                                       {nextAPort && <Line points={[nextModuleAPortX, nextModuleAPortY, nextModuleAPortX, lRouteY]} stroke="#212121" strokeWidth={1} lineCap="round" listening={false} />}
+                                                                                       <Text x={moduleAPortX - 8} y={lRouteY - 14} width={16} text="L" fontSize={10} align="center" fill="#212121" listening={false} />
+                                                                                   </>
+                                                                               );
+                                                                           })()}
+                                                                            {relayDevice && relayType !== 'valve' && !isStupidBoilerType(relayType) && bPort && relayInPort && (() => {
+                                                                               const routeY = isDoubleRelayDevice && relayType === 'valve' && sourceRelaySlotIndex === 0
+                                                                                  ? relayInPortY - 3 * indentSize
+                                                                                  : relayInPortY;
+                                                                              return (
+                                                                                  <Line points={[relayInPortX, relayInPortY, relayInPortX, routeY, moduleBPortX, routeY, moduleBPortX, moduleBPortY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                              );
+                                                                          })()}
                                                                           {!relayDevice && bPort && moduleBPortX !== null && moduleBPortY !== null && (
                                                                               <Line
                                                                                   points={[relaySlotX + relaySlotSize, relaySlotY + relaySlotSize / 2, moduleBPortX, relaySlotY + relaySlotSize / 2, moduleBPortX, moduleBPortY]}
@@ -8100,17 +8098,59 @@ const App = () => {
                                                                                <Rect
                                                                                    x={relaySlotX}
                                                                                    y={relaySlotY}
-                                                                                   width={relaySlotSize}
-                                                                                   height={relaySlotSize}
+                                                                                    width={relayVisualSlotWidth}
+                                                                                    height={relayVisualSlotHeight}
                                                                                    cornerRadius={10}
                                                                                    fill={relayDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'}
                                                                                    stroke={relayDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                                    strokeWidth={1.5}
                                                                                />
                                                                            )}
-                                                                           {shouldRenderRelayDevice && relayImage && (
-                                                                               <Image image={relayImage} x={relayImageX} y={relayImageY} width={relayImageSize.width} height={relayImageSize.height} listening={false} />
+                                                                            {shouldRenderRelayDevice && relayImage && (
+                                                                               <Image image={relayImage} x={relayImageX} y={relayImageY} width={relayImageSize.width} height={relayImageSize.height} crop={relayImageCrop} listening={false} />
                                                                            )}
+                                                                           {shouldRenderRelayDevice && relayType === 'valve' && bPort && (() => {
+                                                                               const nextBPort = sourceRelaySlotIndex === 0
+                                                                                   ? diPorts.find((port) => port.name === `RELAY-${relayIndex + 1}-B`) || null
+                                                                                   : null;
+                                                                               const relay1Port = relayPorts.find((port) => port.name === 'RELAY-IN-1')
+                                                                                   || (getPortsByClassToken(relayPorts, 'RELAY-IN-1') || [])[0]
+                                                                                   || null;
+                                                                               const relay2Port = relayPorts.find((port) => port.name === 'RELAY-IN-2')
+                                                                                   || (getPortsByClassToken(relayPorts, 'RELAY-IN-2') || [])[0]
+                                                                                   || null;
+                                                                               if (!nextBPort || !relay1Port || !relay2Port) return null;
+                                                                               const relay1Point = getRelayImagePortPoint(relay1Port);
+                                                                               const relay2Point = getRelayImagePortPoint(relay2Port);
+                                                                               if (!relay1Point || !relay2Point) return null;
+                                                                               const from1X = relay1Point.x;
+                                                                               const from1Y = relay1Point.y;
+                                                                               const from2X = relay2Point.x;
+                                                                               const from2Y = relay2Point.y;
+                                                                               const to2X = slotX + nextBPort.x * size.width;
+                                                                               const to2Y = slotY + nextBPort.y * size.height;
+                                                                               return (
+                                                                                   <>
+                                                                                       <Line points={[from1X, from1Y, moduleBPortX, from1Y, moduleBPortX, moduleBPortY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                       <Line points={[from2X, from2Y, to2X, from2Y, to2X, to2Y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                   </>
+                                                                               );
+                                                                           })()}
+                                                                           {shouldRenderRelayDevice && isStupidBoilerType(relayType) && aPort && bPort && boilerBusAPort && boilerBusBPort && (() => {
+                                                                               const aFromX = relayImageX + boilerBusAPort.x * relayImageSize.width;
+                                                                               const aFromY = relayImageY + boilerBusAPort.y * relayImageSize.height;
+                                                                               const bFromX = relayImageX + boilerBusBPort.x * relayImageSize.width;
+                                                                               const bFromY = relayImageY + boilerBusBPort.y * relayImageSize.height;
+                                                                               const imageBottomY = relayImageY + relayImageSize.height;
+                                                                               const aRouteY = imageBottomY + 0.5 * indentSize;
+                                                                               const bRouteY = imageBottomY + indentSize;
+                                                                               return (
+                                                                                   <>
+                                                                                       <Line points={[aFromX, aFromY, aFromX, aRouteY, moduleAPortX, aRouteY, moduleAPortX, moduleAPortY]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                       <Line points={[bFromX, bFromY, bFromX, bRouteY, moduleBPortX, bRouteY, moduleBPortX, moduleBPortY]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                   </>
+                                                                               );
+                                                                           })()}
                                                                           {!relayDevice && showEmptySlots && (
                                                                               <>
                                                                                   <Circle
@@ -8202,11 +8242,15 @@ const App = () => {
                                                              const firstRelaySlotY = slotY - relayLineHeight;
                                                              const groupedAPort = diPorts.find((port) => port.name === 'RELAY-S-1-2-A') || null;
                                                              const groupedBPort = diPorts.find((port) => port.name === 'RELAY-S-1-2-B') || null;
-                                                             const hasOccupiedRelaySlot = relayOccupancy.some((slotState) => !!slotState?.device);
+                                                              const hasOccupiedRelaySlot = relayOccupancy.some((slotState) => !!slotState?.device);
+                                                              const hasOccupiedNonBoilerRelaySlot = relayOccupancy.some((slotState) => {
+                                                                  const slotDevice = slotState?.device || null;
+                                                                  return slotDevice && !isStupidBoilerType(slotDevice?.type);
+                                                              });
 
                                                              return (
                                                                  <>
-                                                                     {hasOccupiedRelaySlot && groupedAPort && (() => {
+                                                                      {hasOccupiedNonBoilerRelaySlot && groupedAPort && (() => {
                                                                          const moduleAPortX = slotX + groupedAPort.x * size.width;
                                                                          const moduleAPortY = slotY + groupedAPort.y * size.height;
                                                                          return (
@@ -8229,11 +8273,23 @@ const App = () => {
                                                                   const visualDevice = relayDevice ? { ...relayDevice, port_side: 'left' } : null;
                                                                   const relayImageKey = visualDevice ? getWirelessDeviceImageKey(visualDevice) : null;
                                                                   const relayImage = relayImageKey ? wirelessImages[relayImageKey] : null;
-                                                                  const relayImageSize = relayImage ? getContainSize(relayImage, relaySlotSize, relaySlotSize) : { width: relaySlotSize, height: relaySlotSize };
-                                                                  const relayImageX = relaySlotX + (relaySlotSize - relayImageSize.width) / 2;
-                                                                  const relayImageY = sourceRelaySlotY + (relaySlotSize - relayImageSize.height) / 2;
-                                                                  const relayPorts = relayImageKey ? (wirelessPortsByType[relayImageKey] || []) : [];
-                                                                  const isDoubleRelayDevice = String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay';
+                                                                  const relayType = canonicalDeviceType(relayDevice?.type);
+                                                                  const relayVisualSlotWidth = relayType === 'valve' ? 70 : relaySlotSize;
+                                                                  const relayVisualSlotHeight = relayType === 'valve' ? 50 : relaySlotSize;
+                                                                  const relayImageCrop = relayType === 'valve' && relayImage
+                                                                      ? { x: 0, y: 45, width: relayImage.width, height: Math.max(1, relayImage.height - 45) }
+                                                                      : undefined;
+                                                                  const relayImageSize = relayImage
+                                                                      ? (relayType === 'valve'
+                                                                          ? { width: relayVisualSlotWidth, height: relayVisualSlotHeight }
+                                                                          : getContainSize(relayImage, relayVisualSlotWidth, relayVisualSlotHeight))
+                                                                      : { width: relayVisualSlotWidth, height: relayVisualSlotHeight };
+                                                                  const relayImageX = relaySlotX + (relayVisualSlotWidth - relayImageSize.width) / 2;
+                                                                   const relayImageY = sourceRelaySlotY + (relayVisualSlotHeight - relayImageSize.height) / 2;
+                                                                   const relayPorts = relayImageKey ? (wirelessPortsByType[relayImageKey] || []) : [];
+                                                                   const boilerBusAPort = relayPorts.find((port) => port.name === 'BUS-A') || null;
+                                                                   const boilerBusBPort = relayPorts.find((port) => port.name === 'BUS-B') || null;
+                                                                   const isDoubleRelayDevice = String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay';
                                                                   const relayInPort = isDoubleRelayDevice
                                                                       ? (relayPorts.find((port) => port.name === `RELAY-IN-${relayIndex}`)
                                                                           || (getPortsByClassToken(relayPorts, `RELAY-IN-${relayIndex}`) || [])[0]
@@ -8243,9 +8299,19 @@ const App = () => {
                                                                       : (relayPorts.find((port) => port.name === 'RELAY-IN') || (getPortsByClassToken(relayPorts, 'RELAY-IN') || [])[0] || null);
                                                                   const moduleBPortX = bPort ? slotX + bPort.x * size.width : null;
                                                                   const moduleBPortY = bPort ? slotY + bPort.y * size.height : null;
-                                                                  const relayInPortX = relayInPort ? relayImageX + relayInPort.x * relayImageSize.width : relaySlotX;
-                                                                  const relayInPortY = relayInPort ? relayImageY + relayInPort.y * relayImageSize.height : relaySlotY + relaySlotSize / 2;
-                                                                  const relayType = canonicalDeviceType(relayDevice?.type);
+                                                                  const getRelayImagePortPoint = (port) => {
+                                                                      if (!port || !relayImage) return null;
+                                                                      const imageWidth = relayImage.width || relayImageSize.width;
+                                                                      const imageHeight = relayImage.height || relayImageSize.height;
+                                                                      const crop = relayImageCrop || { x: 0, y: 0, width: imageWidth, height: imageHeight };
+                                                                      return {
+                                                                          x: relayImageX + (((port.x * imageWidth) - crop.x) / crop.width) * relayImageSize.width,
+                                                                          y: relayImageY + (((port.y * imageHeight) - crop.y) / crop.height) * relayImageSize.height,
+                                                                      };
+                                                                  };
+                                                                  const relayInPortPoint = getRelayImagePortPoint(relayInPort);
+                                                                  const relayInPortX = relayInPortPoint ? relayInPortPoint.x : relaySlotX;
+                                                                  const relayInPortY = relayInPortPoint ? relayInPortPoint.y : relaySlotY + relayVisualSlotHeight / 2;
                                                                   const relayTypeDevices = [
                                                                       ...getRelayDevicesForController(scheme),
                                                                       ...getRelaySPreferredDevices(scheme),
@@ -8286,9 +8352,9 @@ const App = () => {
                                                                            onMouseEnter={() => setHoveredRelaySlotIndex(relayHoverKey)}
                                                                            onMouseLeave={() => setHoveredRelaySlotIndex((prev) => (prev === relayHoverKey ? null : prev))}
                                                                        >
-                                                                          {relayDevice && bPort && relayInPort && (
-                                                                              <Line points={[relayInPortX, relayInPortY, moduleBPortX, relayInPortY, moduleBPortX, moduleBPortY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                                          )}
+                                                                           {relayDevice && !isStupidBoilerType(relayType) && bPort && relayInPort && (
+                                                                               <Line points={[relayInPortX, relayInPortY, moduleBPortX, relayInPortY, moduleBPortX, moduleBPortY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                           )}
                                                                           {!relayDevice && bPort && moduleBPortX !== null && moduleBPortY !== null && (
                                                                               <Line
                                                                                   points={[relaySlotX, relaySlotY + relaySlotSize / 2, moduleBPortX, relaySlotY + relaySlotSize / 2, moduleBPortX, moduleBPortY]}
@@ -8337,9 +8403,29 @@ const App = () => {
                                                                                   />
                                                                               </>
                                                                           )}
-                                                                            {shouldRenderRelayDevice && relayImage && (
-                                                                                 <Image image={relayImage} x={relayImageX} y={relayImageY} width={relayImageSize.width} height={relayImageSize.height} listening={false} />
-                                                                            )}
+                                                                             {shouldRenderRelayDevice && relayImage && (
+                                                                                  <Image image={relayImage} x={relayImageX} y={relayImageY} width={relayImageSize.width} height={relayImageSize.height} crop={relayImageCrop} listening={false} />
+                                                                             )}
+                                                                            {shouldRenderRelayDevice && isStupidBoilerType(relayType) && groupedAPort && bPort && boilerBusAPort && boilerBusBPort && (() => {
+                                                                                const groupedModulePortX = slotX + groupedAPort.x * size.width;
+                                                                                const groupedModulePortY = slotY + groupedAPort.y * size.height;
+                                                                                const boilerBusAPoint = getRelayImagePortPoint(boilerBusAPort);
+                                                                                const boilerBusBPoint = getRelayImagePortPoint(boilerBusBPort);
+                                                                                if (!boilerBusAPoint || !boilerBusBPoint) return null;
+                                                                                const aFromX = boilerBusAPoint.x;
+                                                                                const aFromY = boilerBusAPoint.y;
+                                                                                const bFromX = boilerBusBPoint.x;
+                                                                                const bFromY = boilerBusBPoint.y;
+                                                                                const imageBottomY = relayImageY + relayImageSize.height;
+                                                                                const aRouteY = imageBottomY + 0.5 * indentSize;
+                                                                                const bRouteY = imageBottomY + indentSize;
+                                                                                return (
+                                                                                    <>
+                                                                                        <Line points={[aFromX, aFromY, aFromX, aRouteY, moduleBPortX, aRouteY, moduleBPortX, moduleBPortY]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                        <Line points={[bFromX, bFromY, bFromX, bRouteY, groupedModulePortX, bRouteY, groupedModulePortX, groupedModulePortY]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                    </>
+                                                                                );
+                                                                            })()}
                                                                            {shouldRenderRelayDevice && (
                                                                                <>
                                                                                    <Rect
@@ -8514,10 +8600,17 @@ const App = () => {
                                             ? 20 * indentSize
                                             : 0
                                     );
-                                    const getExtModuleLayoutWidth = (moduleDevice) => getExtModuleSize(moduleDevice).width
-                                        + (hasExtThermostatFloorSensor(moduleDevice) ? 7 * indentSize : 0);
-                                    const getRl6sLeftExtraGap = (moduleDevice) => (canonicalDeviceType(moduleDevice?.type) === 'rl6s' ? 9 * indentSize : 0);
-                                    const getExtSlotX = (slotIndex) => {
+                                     const getExtModuleLayoutWidth = (moduleDevice) => getExtModuleSize(moduleDevice).width
+                                         + (hasExtThermostatFloorSensor(moduleDevice) ? 7 * indentSize : 0);
+                                     const getRl6sLeftExtraGap = (moduleDevice) => (canonicalDeviceType(moduleDevice?.type) === 'rl6s' ? 9 * indentSize : 0);
+                                     const hasOccupiedDi6Slot = (moduleDevice) => (
+                                         canonicalDeviceType(moduleDevice?.type) === 'di6'
+                                         && (
+                                             (Array.isArray(moduleDevice?.channel_devices) && moduleDevice.channel_devices.some(Boolean))
+                                             || (Array.isArray(moduleDevice?.di_devices) && moduleDevice.di_devices.some(Boolean))
+                                         )
+                                     );
+                                     const getExtSlotX = (slotIndex) => {
                                          const minGap = EXT_SLOT_MIN_GAP_MULTIPLIER * indentSize;
                                          const controllerExtraGap = hasNonEmptyControllerOneWireLine ? 8 * indentSize : 0;
                                          const ecosmartExtLineLeftOffset = controllerType === 'ecosmart' ? 45 * indentSize : 0;
@@ -8530,13 +8623,6 @@ const App = () => {
                                                         ? Array.isArray(memoBalancedOneWire.extDevicesByModuleIndex[moduleIndex])
                                                             && memoBalancedOneWire.extDevicesByModuleIndex[moduleIndex].some(Boolean)
                                                         : (Array.isArray(moduleDevice?.one_wire_devices) && moduleDevice.one_wire_devices.some(Boolean))
-                                            )
-                                        );
-                                        const hasOccupiedDi6Slot = (moduleDevice) => (
-                                            canonicalDeviceType(moduleDevice?.type) === 'di6'
-                                            && (
-                                                (Array.isArray(moduleDevice?.channel_devices) && moduleDevice.channel_devices.some(Boolean))
-                                                || (Array.isArray(moduleDevice?.di_devices) && moduleDevice.di_devices.some(Boolean))
                                             )
                                         );
                                         const getRl6RelayDevices = (moduleIndex) => {
@@ -8585,6 +8671,9 @@ const App = () => {
                                             const di6OccupiedLeftGap = hasOccupiedDi6Slot(rightDevice)
                                                 ? 10 * indentSize
                                                 : 0;
+                                            const di6OccupiedRightGap = hasOccupiedDi6Slot(leftDevice)
+                                                ? 7 * indentSize
+                                                : 0;
                                             const leftType = canonicalDeviceType(leftDevice?.type);
                                             const rl6RightExtraGap = leftType === 'rl6'
                                                 ? 20 * indentSize
@@ -8594,7 +8683,7 @@ const App = () => {
                                                 : 0;
                                             const rl6LeftExtraGap = getRl6LeftExtraGap(rightDevice, leftIndex + 1);
                                             const rl6sLeftExtraGap = getRl6sLeftExtraGap(rightDevice);
-                                            return minGap + extraGap + oneWireExtraGap + io4ExtraGap + di6ExtraGapLeft + di6ExtraGapRight + di6OccupiedLeftGap + rl6RightExtraGap + rl6sRightExtraGap + rl6LeftExtraGap + rl6sLeftExtraGap;
+                                            return minGap + extraGap + oneWireExtraGap + io4ExtraGap + di6ExtraGapLeft + di6ExtraGapRight + di6OccupiedLeftGap + di6OccupiedRightGap + rl6RightExtraGap + rl6sRightExtraGap + rl6LeftExtraGap + rl6sLeftExtraGap;
                                         };
                                         let x = baseX;
                                         for (let i = 0; i < slotIndex; i += 1) {
@@ -8645,7 +8734,9 @@ const App = () => {
                                             const lastDevice = extModules[lastIndex];
                                             const lastSize = getExtModuleSize(lastDevice);
                                             const lastType = canonicalDeviceType(lastDevice?.type);
-                                            const lastRightExtraGap = getRl6RightExtraGap(lastDevice, lastIndex) + (lastType === 'rl6s' ? 9 * indentSize : 0);
+                                            const lastRightExtraGap = getRl6RightExtraGap(lastDevice, lastIndex)
+                                                + (lastType === 'rl6s' ? 9 * indentSize : 0)
+                                                + (hasOccupiedDi6Slot(lastDevice) ? 7 * indentSize : 0);
                                             const lastLayoutWidth = getExtModuleLayoutWidth(lastDevice) + lastRightExtraGap;
                                             const lastPos = getExtOccupiedSlotPosition(lastIndex);
                                              return {
@@ -9527,15 +9618,36 @@ const App = () => {
                                                                                  />
                                                                              );
                                                                          })()}
-                                                                        {relayDevice && bPort && aPort && isRelayBoilerType(relayType) && boilerBusAPort && boilerBusBPort && (() => {
+                                                                        {relayDevice && bPort && (aPort || relayType === 'stupid') && isRelayBoilerType(relayType) && boilerBusAPort && boilerBusBPort && (() => {
+                                                                            const stupidSecondPort = relayType === 'stupid'
+                                                                                ? extPorts.find((port) => port.name === `${relayPortPrefix}-${relayIndex + 1}-B`)
+                                                                                : null;
+                                                                            const firstModulePort = relayType === 'stupid' ? bPort : aPort;
+                                                                            const secondModulePort = relayType === 'stupid' ? stupidSecondPort : bPort;
+                                                                            if (!firstModulePort || !secondModulePort) return null;
+                                                                            const firstModulePortX = slotX + firstModulePort.x * slotWidth;
+                                                                            const firstModulePortY = slotY + firstModulePort.y * slotHeight;
+                                                                            const secondModulePortX = slotX + secondModulePort.x * slotWidth;
+                                                                            const secondModulePortY = slotY + secondModulePort.y * slotHeight;
                                                                             const aFromX = imageRelayX + boilerBusAPort.x * imageSizeRelay.width;
                                                                             const aFromY = imageRelayY + boilerBusAPort.y * imageSizeRelay.height;
                                                                             const bFromX = imageRelayX + boilerBusBPort.x * imageSizeRelay.width;
                                                                             const bFromY = imageRelayY + boilerBusBPort.y * imageSizeRelay.height;
+                                                                            if (relayType === 'stupid') {
+                                                                                const imageBottomY = imageRelayY + imageSizeRelay.height;
+                                                                                const aRouteY = imageBottomY + 0.5 * indentSize;
+                                                                                const bRouteY = imageBottomY + indentSize;
+                                                                                return (
+                                                                                    <>
+                                                                                        <Line points={[aFromX, aFromY, aFromX, aRouteY, firstModulePortX, aRouteY, firstModulePortX, firstModulePortY]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                        <Line points={[bFromX, bFromY, bFromX, bRouteY, secondModulePortX, bRouteY, secondModulePortX, secondModulePortY]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                    </>
+                                                                                );
+                                                                            }
                                                                             return (
                                                                                 <>
-                                                                                    <Line points={[aFromX, aFromY, moduleAPortX, aFromY, moduleAPortX, moduleAPortY]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                                                    <Line points={[bFromX, bFromY, moduleBPortX, bFromY, moduleBPortX, moduleBPortY]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                    <Line points={[aFromX, aFromY, firstModulePortX, aFromY, firstModulePortX, firstModulePortY]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                    <Line points={[bFromX, bFromY, secondModulePortX, bFromY, secondModulePortX, secondModulePortY]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                                                 </>
                                                                             );
                                                                         })()}
@@ -10464,7 +10576,7 @@ const App = () => {
                                                                             const sensor = getNtcSensorFromDeviceLine(owDevice, scheme, ntcIndex, 'ntc1_devices');
                                                                             if (!sensor && !showEmptySlots) return null;
                                                                             const slotX = lineX;
-                                                                            const slotY = lineY + ntcIndex * (ntcSlotHeight + ntcSlotGap);
+                                                                            const slotY = lineY + (NTC_LINE_SLOTS_COUNT - 1 - ntcIndex) * (ntcSlotHeight + ntcSlotGap);
                                                                             const ntcHoverKey = `ext:${slotIndex}:${extOneWireIndex}:${ntcIndex}`;
                                                                             const isNtcHovered = hoveredNtcSlotKey === ntcHoverKey;
                                                                             const ntcChannel = getNtcChannelBySlot(ntcIndex, 'ntc1_devices');
@@ -11440,7 +11552,7 @@ const App = () => {
                                                                         const sensor = getNtcSensorFromDeviceLine(device, scheme, ntcIndex, 'ntc1_devices');
                                                                         if (!sensor && !showEmptySlots) return null;
                                                                         const slotX = lineX;
-                                                                        const slotY = lineY + ntcIndex * (ntcSlotHeight + ntcSlotGap);
+                                                                        const slotY = lineY + (NTC_LINE_SLOTS_COUNT - 1 - ntcIndex) * (ntcSlotHeight + ntcSlotGap);
                                                                         const ntcHoverKey = `main:${slotIndex}:${ntcIndex}`;
                                                                         const isNtcHovered = hoveredNtcSlotKey === ntcHoverKey;
                                                                         const ntcChannel = getNtcChannelBySlot(ntcIndex, 'ntc1_devices');
@@ -12401,68 +12513,95 @@ const App = () => {
                         style={{ left: relayMenuPos.x, top: relayMenuPos.y }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {relayMenuPos.lineKey !== 'relay_s_devices' && (
-                            <>
-                                <div
-                                    className="ctx-menu-item"
-                                    onClick={() => addRelayDeviceFromMenu('otherEquipment')}
-                                >
-                                    Прочее оборудование
-                                </div>
-                                <div
-                                    className="ctx-menu-item"
-                                    onClick={() => addRelayDeviceFromMenu('valve')}
-                                >
-                                    Запорный клапан
-                                </div>
-                            </>
-                        )}
+                        {(() => {
+                            const isEcosmartRelayBoilerSlot = getControllerType(scheme) === 'ecosmart'
+                                && !relayMenuPos.lineKey
+                                && relayMenuPos.slotIndex === 0;
+                            if (isEcosmartRelayBoilerSlot) return null;
+                            return relayMenuPos.lineKey !== 'relay_s_devices' && (
+                                <>
+                                    <div
+                                        className="ctx-menu-item"
+                                        onClick={() => addRelayDeviceFromMenu('otherEquipment')}
+                                    >
+                                        Прочее оборудование
+                                    </div>
+                                    {(() => {
+                                        if (
+                                            getControllerType(scheme) === 'smart2'
+                                            && relayMenuPos.moduleGroup !== 'di'
+                                            && (relayMenuPos.lineKey || 'relay_devices') === 'relay_devices'
+                                        ) return false;
+                                        if (relayMenuPos.moduleGroup !== 'di') return true;
+                                        const moduleItem = Array.isArray(scheme?.di_modules) ? scheme.di_modules[relayMenuPos.moduleIndex] : null;
+                                        return canAddDoubleRelayToDiModule(moduleItem, 'relay_devices');
+                                    })() && (
+                                        <div
+                                            className="ctx-menu-item"
+                                            onClick={() => addRelayDeviceFromMenu('valve')}
+                                        >
+                                            Запорный клапан
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
                         <div
                             className="ctx-menu-item"
                             onClick={() => addRelayDeviceFromMenu('stupid')}
                         >
                             Тупой котёл
                         </div>
-                        <div
-                            className="ctx-menu-item"
-                            onClick={() => addRelayDeviceFromMenu('boiler-pump')}
-                        >
-                            Насос бойлера
-                        </div>
-                        <div
-                            className="ctx-menu-item"
-                            onClick={() => addRelayDeviceFromMenu('pump-220v')}
-                        >
-                            Насос 220V
-                        </div>
-                        <div
-                            className="ctx-menu-item"
-                            onClick={() => addRelayDeviceFromMenu('zoneServo')}
-                        >
-                            Сервопривод зоны
-                        </div>
-                        {relayMenuPos.lineKey === 'relay_s_devices' && (() => {
-                            if (Number.isInteger(relayMenuPos.moduleIndex)) return true;
-                            const slotIndex = relayMenuPos.slotIndex;
-                            if (!Number.isInteger(slotIndex) || slotIndex % 2 !== 0) return false;
-                            const controllerDevices = getControllerLineDevices(scheme, 'relay_s_devices', getRelaySPreferredDevices(scheme));
-                            const occupancy = buildRelaySlotOccupancyPreserveIndexes(
-                                controllerDevices,
-                                4,
-                                (relayDevice) => (String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1),
+                        {(() => {
+                            const isEcosmartRelayBoilerSlot = getControllerType(scheme) === 'ecosmart'
+                                && !relayMenuPos.lineKey
+                                && relayMenuPos.slotIndex === 0;
+                            if (isEcosmartRelayBoilerSlot) return null;
+                            return (
+                                <>
+                                    <div
+                                        className="ctx-menu-item"
+                                        onClick={() => addRelayDeviceFromMenu('boiler-pump')}
+                                    >
+                                        Насос бойлера
+                                    </div>
+                                    <div
+                                        className="ctx-menu-item"
+                                        onClick={() => addRelayDeviceFromMenu('pump-220v')}
+                                    >
+                                        Насос 220V
+                                    </div>
+                                    <div
+                                        className="ctx-menu-item"
+                                        onClick={() => addRelayDeviceFromMenu('zoneServo')}
+                                    >
+                                        Сервопривод зоны
+                                    </div>
+                                    {relayMenuPos.lineKey === 'relay_s_devices' && (() => {
+                                        if (Number.isInteger(relayMenuPos.moduleIndex)) return true;
+                                        const slotIndex = relayMenuPos.slotIndex;
+                                        if (!Number.isInteger(slotIndex) || slotIndex % 2 !== 0) return false;
+                                        const controllerDevices = getControllerLineDevices(scheme, 'relay_s_devices', getRelaySPreferredDevices(scheme));
+                                        const occupancy = buildRelaySlotOccupancyPreserveIndexes(
+                                            controllerDevices,
+                                            4,
+                                            (relayDevice) => (String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1),
+                                        );
+                                        return slotIndex < 3 && !occupancy[slotIndex] && !occupancy[slotIndex + 1];
+                                    })() && (
+                                        <>
+                                            <div className="ctx-menu-sep" />
+                                            <div
+                                                className="ctx-menu-item"
+                                                onClick={() => addRelayDeviceFromMenu('220servo')}
+                                            >
+                                                Сервопривод 220
+                                            </div>
+                                        </>
+                                    )}
+                                </>
                             );
-                            return slotIndex < 3 && !occupancy[slotIndex] && !occupancy[slotIndex + 1];
-                        })() && (
-                            <>
-                                <div className="ctx-menu-sep" />
-                                <div
-                                    className="ctx-menu-item"
-                                    onClick={() => addRelayDeviceFromMenu('220servo')}
-                                >
-                                    Сервопривод 220
-                                </div>
-                            </>
-                        )}
+                        })()}
                         <div className="ctx-menu-sep" />
                         <div className="ctx-menu-item" onClick={() => setRelayMenuPos(null)}>Cancel</div>
                     </div>
@@ -12481,16 +12620,11 @@ const App = () => {
                         <div className="ctx-menu-item" onClick={() => addRl2sRelayDeviceFromMenu('zoneServo')}>Сервопривод зоны</div>
                         {(() => {
                             const moduleItem = Array.isArray(scheme?.di_modules) ? scheme.di_modules[rl2sRelayMenuPos.moduleIndex] : null;
-                            const relaySDevices = Array.isArray(moduleItem?.relay_s_devices) ? moduleItem.relay_s_devices : [];
-                            const occupancy = buildRelaySlotOccupancyPreserveIndexes(
-                                relaySDevices,
-                                2,
-                                (relayDevice) => (String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1),
-                            );
-                            return !occupancy[0] && !occupancy[1];
+                            return canAddDoubleRelayToDiModule(moduleItem, 'relay_s_devices');
                         })() && (
                             <>
                                 <div className="ctx-menu-item" onClick={() => addRl2sRelayDeviceFromMenu('220servo')}>Сервопривод 220</div>
+                                <div className="ctx-menu-item" onClick={() => addRl2sRelayDeviceFromMenu('valve')}>Запорный клапан</div>
                             </>
                         )}
                         <div className="ctx-menu-sep" />

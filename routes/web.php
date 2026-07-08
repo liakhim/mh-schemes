@@ -5,7 +5,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/scheme');
+Route::redirect('/', '/selection');
 Route::view('/admin', 'admin', ['data' => 'test'])->name('admin');
 
 Route::get('/schemes', function () {

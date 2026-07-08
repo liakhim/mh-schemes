@@ -2,6 +2,23 @@ import { canonicalDeviceType } from './deviceTypes';
 import { getAllOneWireDevicesForBalancing } from './initialState';
 
 const LINE_CAPACITY = 6;
+const EXT_LINE_CAPACITY = 12;
+
+const getControllerType = (scheme) => canonicalDeviceType(
+    typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type,
+);
+
+const isThermostatFloorSensor = (device) => {
+    const type = canonicalDeviceType(device?.type);
+    return type === 'floor-sensor' || type === 'flask-sensor-floor';
+};
+
+const getControllerExtThermostatCount = (scheme) => {
+    const extDevices = scheme?.controller && typeof scheme.controller === 'object' && Array.isArray(scheme.controller.ext_devices)
+        ? scheme.controller.ext_devices
+        : [];
+    return extDevices.filter((device) => canonicalDeviceType(device?.type) === 'thermostat').length;
+};
 
 const getPotentialOneWireLines = (scheme, extModules) => {
     const lines = [{ kind: 'controller', moduleIndex: null }];
@@ -82,6 +99,30 @@ const tryPlaceGroupPreferController = (lineBuckets, group, cursorRef) => {
     return false;
 };
 
+const getThermostatGroupFloorSensors = (group) => (Array.isArray(group) ? group.filter(isThermostatFloorSensor) : []);
+
+const isThermostatGroupWithFloorSensor = (group) => (
+    Array.isArray(group)
+    && canonicalDeviceType(group[0]?.type) === 'thermostat'
+    && getThermostatGroupFloorSensors(group).length > 0
+);
+
+const makeExtThermostatFromGroup = (group) => {
+    const thermostat = group[0];
+    const existingAdditions = Array.isArray(thermostat?.additions) ? thermostat.additions : [];
+    const floorAdditions = getThermostatGroupFloorSensors(group).map((sensor) => ({
+        ...sensor,
+        connection_type: '1-wire',
+    }));
+
+    return {
+        ...thermostat,
+        type: 'thermostat',
+        connection_type: 'EXT',
+        additions: [...existingAdditions, ...floorAdditions],
+    };
+};
+
 export const balanceOneWireDevices = (scheme, extModules) => {
     const lines = getPotentialOneWireLines(scheme, extModules);
     if (lines.length === 0) return { controllerDevices: [], extDevicesByModuleIndex: {}, extThermostatDevices: [] };
@@ -118,6 +159,10 @@ export const balanceOneWireDevices = (scheme, extModules) => {
     });
 
     const lineBuckets = lines.map(() => []);
+    const extThermostatDevices = [];
+    const proExtThermostatSlotsFree = getControllerType(scheme) === 'pro'
+        ? Math.max(0, EXT_LINE_CAPACITY - (Array.isArray(extModules) ? extModules.length : 0) - getControllerExtThermostatCount(scheme))
+        : 0;
     const cursorRef = { value: 1 };
     const ntcRoundRobinRef = { value: 0 };
     rdtModules.forEach((device) => {
@@ -129,6 +174,10 @@ export const balanceOneWireDevices = (scheme, extModules) => {
     });
 
     thermostatGroups.forEach((group) => {
+        if (extThermostatDevices.length < proExtThermostatSlotsFree && isThermostatGroupWithFloorSensor(group)) {
+            extThermostatDevices.push(makeExtThermostatFromGroup(group));
+            return;
+        }
         if (tryPlaceGroupPreferController(lineBuckets, group, cursorRef)) return;
         placeGroupPreferController(lineBuckets, group, cursorRef);
     });
@@ -156,6 +205,6 @@ export const balanceOneWireDevices = (scheme, extModules) => {
     return {
         controllerDevices: lineBuckets[0] || [],
         extDevicesByModuleIndex,
-        extThermostatDevices: [],
+        extThermostatDevices,
     };
 };
