@@ -15,6 +15,17 @@ const thermostatImagePaths = {
     gray: new URL('../assets/thermostats/gray/thermostat_gray.svg', import.meta.url).href,
 };
 
+const MYHEAT_LOGO_PATH = new URL('../assets/logo/logo.svg', import.meta.url).href;
+
+const MyHeatBadge = () => (
+    <img
+        src={MYHEAT_LOGO_PATH}
+        alt="MyHeat"
+        title="Оборудование MyHeat"
+        style={{ height: 16, width: 'auto', flexShrink: 0, alignSelf: 'center' }}
+    />
+);
+
 const ORANGE = '#e07020';
 
 const CONTROLLER_TEMPLATES = [
@@ -1450,7 +1461,7 @@ const SectionSubtitle = ({ children }) => (
     </p>
 );
 
-const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null }) => (
+const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, myheat = false }) => (
     <div
         style={{
             display: 'flex',
@@ -1463,6 +1474,7 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null }) => (
             boxSizing: 'border-box',
         }}
     >
+        {myheat && <MyHeatBadge />}
         {badge && (
             <span
                 style={{
@@ -1932,6 +1944,16 @@ const getEquipmentOfferSections = (incomingSchemeValue, controllerType) => {
     return sections;
 };
 
+const MYHEAT_OFFER_SECTIONS = new Set([
+    'Контроллер',
+    'Модули расширения',
+    'Термостаты',
+    'Датчики температуры',
+    'Датчики давления',
+    'Смесительные узлы',
+    'Питание',
+]);
+
 const EquipmentOfferModal = ({ sections, onClose }) => (
     <div
         onClick={onClose}
@@ -1977,7 +1999,12 @@ const EquipmentOfferModal = ({ sections, onClose }) => (
                             {section.title}
                         </h3>
                         {section.rows.map((row) => (
-                            <AddedDeviceLine key={row.label} label={row.label} count={row.count} />
+                            <AddedDeviceLine
+                                key={row.label}
+                                label={row.label}
+                                count={row.count}
+                                myheat={MYHEAT_OFFER_SECTIONS.has(section.title) || row.label === 'Датчик протечки'}
+                            />
                         ))}
                     </div>
                 ))
@@ -2884,6 +2911,7 @@ const SelectionApp = () => {
                                 key={`${row._group}-${row.label}`}
                                 label={row.label}
                                 count={row.count}
+                                myheat={row._group === 'mixing'}
                                 onRemove={() => removeMixingUnit(Number(row.removeKeys[0]))}
                             />
                         ))}
@@ -2988,6 +3016,7 @@ const SelectionApp = () => {
                                 key={`${row._group}-${row.label}`}
                                 label={row.label}
                                 count={row.count}
+                                myheat={row._group === 'thermostat'}
                                 onRemove={() => (row._group === 'thermostat'
                                     ? removeThermostat(row.removeKeys[0].target, row.removeKeys[0].id)
                                     : removeMixingUnit(Number(row.removeKeys[0])))}
@@ -3225,6 +3254,7 @@ const SelectionApp = () => {
                                 label={row.label}
                                 count={row.count}
                                 badge={row.badge}
+                                myheat
                                 onRemove={row.removeKey ? () => removeTemperatureSensor(row.removeKey.target, row.removeKey.id) : undefined}
                             />
                         ))}
@@ -3233,6 +3263,7 @@ const SelectionApp = () => {
                                 key={`pressure-${row.label}`}
                                 label={row.label}
                                 count={row.count}
+                                myheat
                                 onRemove={() => setIncomingScheme((prev) => ({ ...prev, sensors: (prev.sensors || []).filter((x) => x.id !== row.removeKeys[0]) }))}
                             />
                         ))}
@@ -3241,6 +3272,7 @@ const SelectionApp = () => {
                                 key={`leak-${row.label}`}
                                 label={row.label}
                                 count={row.count}
+                                myheat={row.label === 'Датчик протечки'}
                                 onRemove={() => setIncomingScheme((prev) => ({
                                     ...prev,
                                     [row.removeKeys[0].target]: (prev[row.removeKeys[0].target] || []).filter((item) => item.id !== row.removeKeys[0].id),
@@ -3387,6 +3419,7 @@ const SelectionApp = () => {
                                 key={row.label}
                                 label={row.label}
                                 count={row.count}
+                                myheat
                                 onRemove={() => removePowerModule(row.removeKeys[0])}
                             />
                         ))}
