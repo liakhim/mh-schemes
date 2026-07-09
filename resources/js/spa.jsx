@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { createRoot } from 'react-dom/client';
 import Konva from 'konva';
 import { Circle as KonvaCircle, Group, Image, Layer, Rect, Stage, Text } from 'react-konva';
-import { incomingScheme, indent, module_height } from './constants';
+import { din, incomingScheme, indent, module_height } from './constants';
 import { canonicalDeviceType } from './scheme/domain/deviceTypes';
 import { getWirelessDeviceTitle, getOneWireDeviceTitle } from './scheme/domain/deviceTitles';
 import { getInitialWirelessDevices, getOneWireDevicesFromScheme } from './scheme/domain/initialState';
@@ -16,6 +16,7 @@ import { getOneWirePortByRole, getPortPosition } from './scheme/layout/ports';
 import { Line, snapPixel } from './scheme/rendering/SharpLine';
 import commentIconPath from '../assets/icons/comment-icon.svg';
 import commentAddIconPath from '../assets/icons/comment-add-icon.svg';
+import logoPath from '../assets/logo/logo.svg';
 
 Konva.pixelRatio = Math.max(2, window.devicePixelRatio || 1);
 
@@ -30,6 +31,7 @@ const COMMENT_ICON_NODE_NAME = 'comment-icon-export-hidden';
 const GRID_MIN = -4000;
 const GRID_MAX = 4000;
 const GRID_STROKE = 'rgba(154, 160, 166, 0.22)';
+const HELP_MODAL_STORAGE_KEY = 'mh-schemes-help-seen';
 
 const isPortDotCircle = ({ fill, radius, listening }) => (
     fill === 'red'
@@ -460,6 +462,58 @@ const DI_DEVICE_TITLES = {
 const shouldShowDiDeviceInfoBlock = (device) => Boolean(device);
 const isDiscreteDiDeviceType = (type) => DISCRETE_DI_DEVICE_TYPES.includes(canonicalDeviceType(type));
 const getDeviceStoredTitle = (device) => device?.title || device?.titile || null;
+const INSTALLATION_DEVICE_TYPE_TITLES = {
+    'boiler-pump': 'Насос бойлера',
+    'pump-220v': 'Насос 220V',
+    '010pump': 'Насос 0-10V',
+    '010servo': 'Сервопривод 0-10V',
+    'zoneServo': 'Сервопривод зоны',
+    '220servo': 'Сервопривод 220',
+    valve: 'Запорный клапан',
+    stupid: 'Тупой котел',
+    smart: 'Умный котел',
+    thermostat: 'Термостат',
+    'flask-sensor': 'Датчик температуры',
+    'ntc-sensor': 'NTC датчик',
+    'leak-sensor': 'Датчик протечки',
+    pressure: 'Датчик давления',
+    'pressure-sensor': 'Датчик давления',
+    rdt2: 'RDT2',
+    'ntc-1-wire': 'NTC-1-wire',
+    io4: 'IO4',
+    rl6: 'RL6',
+    rl6s: 'RL6S',
+    di6: 'DI6',
+    'circuit-breaker': 'Авто.выключатель',
+    'power-unit': 'Блок питания',
+    ups: 'ИБП',
+    pro: 'PRO',
+    smart2: 'SMART2',
+    discrete_pool: 'Дискретный бассейн',
+    discrete_fire_alarm: 'Дискретная пожарка',
+    discrete_signal: 'Дискретный сигнал',
+    discrete_ventilation: 'Дискретная вентиляция',
+};
+const getInstallationDeviceLabel = (device, fallback = 'Подключение') => {
+    if (!device || typeof device !== 'object') return fallback;
+    const storedTitle = getDeviceStoredTitle(device);
+    if (storedTitle) return storedTitle;
+    if (typeof device.name === 'string' && device.name.trim()) return device.name.trim();
+    const type = canonicalDeviceType(device.type);
+    return INSTALLATION_DEVICE_TYPE_TITLES[type] || DI_DEVICE_TITLES[type] || type || fallback;
+};
+const getInstallationItemLabel = (item) => {
+    if (!item) return null;
+    const type = canonicalDeviceType(item.type);
+    if (item.key === 'controller') return INSTALLATION_DEVICE_TYPE_TITLES[type] || String(item.type || 'Контроллер').toUpperCase();
+    return getInstallationDeviceLabel(item.data, INSTALLATION_DEVICE_TYPE_TITLES[type] || type || 'Модуль');
+};
+const POWER_UNIT_LABEL = 'Блок питания';
+const getInstallationMarkerText = (label) => {
+    const value = String(label || '').trim();
+    if (value.length <= 24) return value;
+    return `${value.slice(0, 23)}.`;
+};
 const IO4_ONLY_WIRED_DEVICE_TYPES = ['010pump', '010servo'];
 const BUS_SLOT_SIZE = 80;
 const RELAY_SLOT_SIZE = 60;
@@ -522,6 +576,179 @@ const getOneWirePortColor = (name) => {
     if (name === '1-WIRE-V+') return '#d32f2f';
     if (name === '1-WIRE-DAT') return '#fbc02d';
     return '#212121';
+};
+
+const getInstallationPortLineColor = (name) => {
+    const normalized = String(name || '').toUpperCase();
+    if (normalized.includes('V+') || normalized.includes('12V') || normalized.includes('VDC')) return '#d32f2f';
+    if (normalized.includes('DAT') || normalized.includes('-DI') || normalized.endsWith('DI') || normalized.includes('DI-IN')) return '#DEDC00';
+    if (normalized.includes('GND') || normalized.includes('COM')) return '#212121';
+    if (normalized.includes('4-20')) return '#f57c00';
+    if (normalized.includes('RELAY') || normalized.includes('AI') || normalized.includes('A-') || normalized.includes('B-')) return '#1565c0';
+    if (normalized.includes('BUS') || normalized.includes('EXT')) return '#2e7d32';
+    return '#212121';
+};
+
+// Разбирает имя порта на «линию» и индекс слота по стандартным соглашениям
+// именования (RELAY-N-A/B, DI-OUT-N и т.д.), чтобы сверить его с массивами
+// устройств схемы и понять, подключено ли туда реальное оборудование.
+// Экзотические/составные имена (ecosmart-оверлеи, силовые L/N и т.п.) не
+// распознаются и намеренно считаются «занятыми», чтобы не терять хвостики
+// в кейсах, которые эта эвристика не покрывает.
+const parseInstallationPortSlot = (name) => {
+    const normalized = String(name || '').toUpperCase().trim();
+    let match;
+    if ((match = /^RELAY-S-(\d+)(?:-(\d+))?(?:-(\d+))?-[AB]$/.exec(normalized))) {
+        const indexes = [match[1], match[2], match[3]].filter(Boolean).map((value) => Number(value) - 1);
+        return indexes.length > 1 ? { line: 'relaySRange', indexes } : { line: 'relayS', index: indexes[0] };
+    }
+    if ((match = /^RELAY-(\d+)(?:-(\d+))?(?:-(\d+))?-[AB]$/.exec(normalized))) {
+        const indexes = [match[1], match[2], match[3]].filter(Boolean).map((value) => Number(value) - 1);
+        return indexes.length > 1 ? { line: 'relayRange', indexes } : { line: 'relay', index: indexes[0] };
+    }
+    if (normalized === 'BUS-A' || normalized === 'BUS-B') return { line: 'bus', index: 0 };
+    if ((match = /^DI-(?:IN-)?(\d+)(?:-(\d+))?(?:-(\d+))?-COM$/.exec(normalized))) {
+        return {
+            line: 'diRange',
+            indexes: [match[1], match[2], match[3]].filter(Boolean).map((value) => Number(value) - 1),
+        };
+    }
+    if ((match = /^CHANNEL-IN-(\d+)$/.exec(normalized))) return { line: 'channel', index: Number(match[1]) - 1 };
+    if ((match = /^CHANNEL-(\d+)(?:-(\d+))?-(?:V\+|GND|COM)$/.exec(normalized))) {
+        const start = Number(match[1]) - 1;
+        const end = match[2] ? Number(match[2]) - 1 : start;
+        return {
+            line: 'channelRange',
+            indexes: Array.from({ length: Math.max(0, end - start + 1) }, (_, index) => start + index),
+        };
+    }
+    if ((match = /^DI-(?:OUT|IN)-(\d+)$/.exec(normalized))) return { line: 'di', index: Number(match[1]) - 1 };
+    if ((match = /^DI-(\d+)$/.exec(normalized))) return { line: 'di', index: Number(match[1]) - 1 };
+    if ((match = /^AI(?:-IN)?-?(\d+)?/.exec(normalized))) return { line: 'ai', index: match[1] ? Number(match[1]) - 1 : 0 };
+    if ((match = /^4-20(?:-IN|-OUT)?-?(\d+)?/.exec(normalized))) return { line: '420', index: match[1] ? Number(match[1]) - 1 : 0 };
+    if (normalized === 'MODBUS-A' || normalized === 'MODBUS-B') return { line: 'modbus', index: 0 };
+    if ((match = /^NTC-(\d+)-[AB]$/.exec(normalized))) return { line: 'ntcChannel', index: Number(match[1]) };
+    if (normalized.startsWith('1-WIRE-')) return { line: 'oneWire', index: null };
+    return null;
+};
+
+const isInstallationPortOccupied = (item, port) => {
+    const slot = parseInstallationPortSlot(port?.name);
+    if (!slot) return true;
+    const data = item?.data;
+    if (!data || typeof data !== 'object') return true;
+    const hasAtIndex = (lineArray, index) => Array.isArray(lineArray)
+        && (index == null ? lineArray.some(Boolean) : Boolean(lineArray[index]));
+
+    if (slot.line === 'relay') return hasAtIndex(data.relay_devices, slot.index);
+    if (slot.line === 'relayRange') return slot.indexes.some((index) => hasAtIndex(data.relay_devices, index));
+    if (slot.line === 'relayS') return hasAtIndex(data.relay_s_devices, slot.index);
+    if (slot.line === 'relaySRange') return slot.indexes.some((index) => hasAtIndex(data.relay_s_devices, index));
+    if (slot.line === 'bus') return hasAtIndex(data.bus_devices, slot.index);
+    if (slot.line === 'diRange') return slot.indexes.some((index) => hasAtIndex(data.di_devices, index) || hasAtIndex(data.channel_devices, index));
+    if (slot.line === 'di') return hasAtIndex(data.di_devices, slot.index) || hasAtIndex(data.channel_devices, slot.index);
+    if (slot.line === 'channel') return hasAtIndex(data.channel_devices, slot.index) || hasAtIndex(data.devices_420, slot.index) || hasAtIndex(data.ai_devices, slot.index);
+    if (slot.line === 'channelRange') return slot.indexes.some((index) => hasAtIndex(data.channel_devices, index) || hasAtIndex(data.devices_420, index) || hasAtIndex(data.ai_devices, index));
+    if (slot.line === '420') return hasAtIndex(data.devices_420, slot.index);
+    if (slot.line === 'ai') return hasAtIndex(data.ai_devices, slot.index);
+    if (slot.line === 'modbus') return hasAtIndex(data.modbus_devices, null);
+    if (slot.line === 'ntcChannel') {
+        // Каналы 1-3 живут в ntc1_devices, 4-6 - в ntc2_devices (см. getNtcChannelBySlot).
+        if (slot.index <= 3) return hasAtIndex(data.ntc1_devices, slot.index - 1);
+        return hasAtIndex(data.ntc2_devices, slot.index - 4);
+    }
+    if (slot.line === 'oneWire') {
+        // Модули без своего массива one_wire_devices (ntc-1-wire, rdt2 и т.п.)
+        // не раздают 1-wire дальше — их 1-WIRE-порт это входное подключение
+        // самого модуля к шине, оно есть всегда, пока модуль в схеме.
+        if (!Array.isArray(data.one_wire_devices)) return true;
+        return hasAtIndex(data.one_wire_devices, null);
+    }
+    return true;
+};
+
+// Контроллеры, для которых доступен режим инсталляции.
+const INSTALLATION_CONTROLLERS = new Set(['go', 'go+', 'smart2', 'pro', 'ecosmart']);
+// Контроллеры, которые физически НЕ ставятся на DIN-рейку щитка (не модульного
+// «реечного» форм-фактора): в режиме инсталляции они отрисовываются отдельным
+// блоком слева от щитка, а не в ряду рейки.
+const INSTALLATION_LEFT_CONTROLLERS = new Set(['go', 'go+', 'ecosmart']);
+
+const getInstallationPortConnectionLabel = (item, port, options = {}) => {
+    const slot = parseInstallationPortSlot(port?.name);
+    const data = item?.data;
+    const normalizedPortName = String(port?.name || '').toUpperCase();
+    if (!slot) {
+        if (normalizedPortName.includes('12VDC-OUT') || normalizedPortName.includes('VDC-OUT')) return options.powerNextLabel || null;
+        if (normalizedPortName.includes('12VDC-IN') || normalizedPortName.includes('VDC-IN')) return options.powerPreviousLabel || null;
+        if (normalizedPortName.includes('EXT-OUT')) return options.nextLabel || null;
+        if (normalizedPortName.includes('EXT-IN')) return options.previousLabel || null;
+        return null;
+    }
+    if (!data || typeof data !== 'object') return null;
+    const getAtIndex = (lineArray, index) => {
+        if (!Array.isArray(lineArray)) return null;
+        if (index == null) return lineArray.find(Boolean) || null;
+        return lineArray[index] || null;
+    };
+    const getLabel = (device, fallback) => (device ? getInstallationDeviceLabel(device, fallback) : null);
+
+    if (slot.line === 'relay') return getLabel(getAtIndex(data.relay_devices, slot.index), `Реле ${slot.index + 1}`);
+    if (slot.line === 'relayRange') {
+        const device = slot.indexes
+            .map((index) => getAtIndex(data.relay_devices, index))
+            .find(Boolean);
+        return getLabel(device, 'Реле');
+    }
+    if (slot.line === 'relayS') return getLabel(getAtIndex(data.relay_s_devices, slot.index), `Реле S ${slot.index + 1}`);
+    if (slot.line === 'relaySRange') {
+        const device = slot.indexes
+            .map((index) => getAtIndex(data.relay_s_devices, index))
+            .find(Boolean);
+        return getLabel(device, 'Реле S');
+    }
+    if (slot.line === 'bus') return getLabel(getAtIndex(data.bus_devices, slot.index), 'BUS');
+    if (slot.line === 'diRange') {
+        const device = slot.indexes
+            .map((index) => getAtIndex(data.di_devices, index) || getAtIndex(data.channel_devices, index))
+            .find(Boolean);
+        return getLabel(device, 'DI COM');
+    }
+    if (slot.line === 'di') {
+        return getLabel(getAtIndex(data.di_devices, slot.index), `DI ${slot.index + 1}`)
+            || getLabel(getAtIndex(data.channel_devices, slot.index), `DI ${slot.index + 1}`);
+    }
+    if (slot.line === 'channel') {
+        return getLabel(getAtIndex(data.channel_devices, slot.index), 'Канал')
+            || getLabel(getAtIndex(data.devices_420, slot.index), '4-20 mA')
+            || getLabel(getAtIndex(data.ai_devices, slot.index), 'AI');
+    }
+    if (slot.line === 'channelRange') {
+        const device = slot.indexes
+            .map((index) => getAtIndex(data.channel_devices, index) || getAtIndex(data.devices_420, index) || getAtIndex(data.ai_devices, index))
+            .find(Boolean);
+        return getLabel(device, 'Канал');
+    }
+    if (slot.line === '420') return getLabel(getAtIndex(data.devices_420, slot.index), '4-20 mA');
+    if (slot.line === 'ai') return getLabel(getAtIndex(data.ai_devices, slot.index), `AI ${slot.index + 1}`);
+    if (slot.line === 'modbus') return getLabel(getAtIndex(data.modbus_devices, null), 'Modbus');
+    if (slot.line === 'ntcChannel') {
+        const device = slot.index <= 3
+            ? getAtIndex(data.ntc1_devices, slot.index - 1)
+            : getAtIndex(data.ntc2_devices, slot.index - 4);
+        return getLabel(device, `NTC ${slot.index}`);
+    }
+    if (slot.line === 'oneWire') {
+        if (!Array.isArray(data.one_wire_devices)) {
+            if (normalizedPortName.includes(' OUT')) return options.nextLabel || 'Шина 1-wire';
+            if (normalizedPortName.includes(' IN')) return options.previousLabel || 'Шина 1-wire';
+            return port?.x >= 0.5
+                ? (options.nextLabel || 'Шина 1-wire')
+                : (options.previousLabel || 'Шина 1-wire');
+        }
+        return getLabel(getAtIndex(data.one_wire_devices, null), '1-wire');
+    }
+    return null;
 };
 
 const getOrthogonalLinkPoints = (fromX, fromY, bendY, toX, toY) => [fromX, fromY, fromX, bendY, toX, bendY, toX, toY];
@@ -629,6 +856,12 @@ const App = () => {
     const [showEmptySlots, setShowEmptySlots] = useState(false);
     const [showGrid, setShowGrid] = useState(true);
     const [showLineFrames, setShowLineFrames] = useState(false);
+    const [showIncomingScheme, setShowIncomingScheme] = useState(false);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [showHelpModal, setShowHelpModal] = useState(() => window.localStorage?.getItem(HELP_MODAL_STORAGE_KEY) !== '1');
+    const [installationMode, setInstallationMode] = useState(true);
+    const [installationPanelSize, setInstallationPanelSize] = useState(null);
+    const [installationItemOffsets, setInstallationItemOffsets] = useState({});
     const [slotMenuPos, setSlotMenuPos] = useState(null);
     const [oneWireMenuPos, setOneWireMenuPos] = useState(null);
     const [extMenuPos, setExtMenuPos] = useState(null);
@@ -670,6 +903,7 @@ const App = () => {
     const extOneWireDragStartOffsetsRef = useRef({});
     const indentSize = parseInt(indent, 10) || 8;
     const moduleHeightValue = parseInt(module_height, 10) || 200;
+    const dinSize = parseInt(din, 10) || 40;
     const gridPatternImage = useMemo(() => createGridPatternImage(indentSize), [indentSize]);
     const routeSchemeId = getRouteSchemeId();
     const initialSchemeRecord = getInitialSchemeRecord();
@@ -677,6 +911,7 @@ const App = () => {
     const [schemeLoadState, setSchemeLoadState] = useState(routeSchemeId ? (initialSchemeRecord ? 'loaded' : 'loading') : 'hardcoded');
     const [schemeLoadError, setSchemeLoadError] = useState(null);
     const [schemeSaveState, setSchemeSaveState] = useState('idle');
+    const [schemeCreateState, setSchemeCreateState] = useState('idle');
     const [scheme, setScheme] = useState(() => buildSchemeFromIncoming(initialSchemeRecord?.incoming_scheme || incomingScheme));
     const [schemeJsonText, setSchemeJsonText] = useState(() => JSON.stringify(initialSchemeRecord?.incoming_scheme || incomingScheme, null, 2));
     const [schemeJsonDirty, setSchemeJsonDirty] = useState(false);
@@ -685,6 +920,7 @@ const App = () => {
     const [commentEditor, setCommentEditor] = useState(null);
     const [commentViewer, setCommentViewer] = useState(null);
     const controllerType = getControllerType(scheme);
+    const canUseInstallationMode = INSTALLATION_CONTROLLERS.has(controllerType);
     const isPanningRef = useRef(false);
     const panStartPointerRef = useRef({ x: 0, y: 0 });
     const panStartStageRef = useRef({ x: 0, y: 0 });
@@ -833,6 +1069,24 @@ const App = () => {
         setSchemeJsonText(JSON.stringify(getPublicIncomingScheme(scheme), null, 2));
     }, [scheme, schemeJsonDirty]);
 
+    const closeHelpModal = () => {
+        window.localStorage?.setItem(HELP_MODAL_STORAGE_KEY, '1');
+        setShowHelpModal(false);
+    };
+
+    const setInstallationModeEnabled = (enabled) => {
+        if (enabled && !canUseInstallationMode) return;
+        setInstallationMode(enabled);
+        if (!enabled) return;
+        setShowSettingsModal(false);
+        const stage = stageRef.current;
+        if (stage) {
+            stage.position({ x: 0, y: 0 });
+            stage.scale({ x: 1, y: 1 });
+            stage.batchDraw();
+        }
+    };
+
     const handleRenderSchemeJson = () => {
         try {
             const parsed = JSON.parse(schemeJsonText);
@@ -893,6 +1147,47 @@ const App = () => {
             })
             .catch(() => {
                 setSchemeSaveState('error');
+            });
+    };
+
+    const handleSaveAsNewScheme = () => {
+        if (schemeCreateState === 'saving') return;
+
+        const name = window.prompt('Название новой схемы', `${schemeName} копия`);
+        if (!name?.trim()) return;
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        setSchemeCreateState('saving');
+
+        fetch('/api/schemes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify({
+                name: name.trim(),
+                description: `Копия схемы: ${schemeName}`,
+                incoming_scheme: getPublicIncomingScheme(scheme),
+            }),
+        })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error('Create failed');
+                }
+                return response.json();
+            })
+            .then((payload) => {
+                if (payload?.id) {
+                    window.location.href = `/scheme/${payload.id}`;
+                    return;
+                }
+                setSchemeCreateState('saved');
+                window.setTimeout(() => setSchemeCreateState('idle'), 1800);
+            })
+            .catch(() => {
+                setSchemeCreateState('error');
             });
     };
 
@@ -2762,52 +3057,299 @@ const App = () => {
         [memoWirelessDevices],
     );
 
+    const installationItems = useMemo(() => {
+        const powerModuleTypes = new Set(['circuit-breaker', 'power-unit', 'ups']);
+        const expansionModuleTypes = new Set([...EXT_MODULE_TYPES, ...DI_MODULE_TYPES, 'ntc-1-wire', 'rdt2', 'ecosmartbl2']);
+        const getItemType = (item) => canonicalDeviceType(typeof item === 'string' ? item : item?.type);
+        const getItemKey = (item, fallback) => {
+            if (item?.id != null) return `${fallback}:${item.id}`;
+            return `${fallback}:${JSON.stringify(item)}`;
+        };
+        const addUnique = (items, seen, item, source, extra = {}) => {
+            const type = getItemType(item);
+            if (!type || !expansionModuleTypes.has(type)) return;
+            const key = getItemKey(item, `${source}:${type}`);
+            if (seen.has(key)) return;
+            seen.add(key);
+            items.push({ key, type, data: item, ...extra });
+        };
+
+        const items = [];
+        const seen = new Set();
+        const rawPowerModules = Array.isArray(scheme?.power_modules) ? scheme.power_modules : [];
+        const diModuleItems = Array.isArray(scheme?.di_modules) ? scheme.di_modules : [];
+        const poweredModuleChain = [...memoExtModules, ...diModuleItems];
+        const controllerTypeForInstallation = getControllerType(scheme);
+        const isSmart2Installation = controllerTypeForInstallation === 'smart2';
+        const controllerInstallationLabel = getInstallationItemLabel({ key: 'controller', type: controllerTypeForInstallation, data: scheme?.controller });
+        const hasUpsPowerModule = rawPowerModules
+            .map((item) => normalizePowerModuleType(typeof item === 'string' ? item : item?.type))
+            .includes('ups');
+        const lastPoweredModule = poweredModuleChain[poweredModuleChain.length - 1] || null;
+        const smart2PowerSourceLabel = hasUpsPowerModule ? 'ИБП' : POWER_UNIT_LABEL;
+        const getPowerLabelsForModule = (moduleItem) => {
+            const chainIndex = poweredModuleChain.findIndex((candidate) => candidate === moduleItem || (candidate?.id != null && candidate.id === moduleItem?.id));
+            if (chainIndex < 0) return {};
+            if (isSmart2Installation) {
+                return {
+                    powerPreviousLabel: chainIndex === poweredModuleChain.length - 1
+                        ? smart2PowerSourceLabel
+                        : getInstallationDeviceLabel(poweredModuleChain[chainIndex + 1]),
+                    powerNextLabel: chainIndex > 0
+                        ? getInstallationDeviceLabel(poweredModuleChain[chainIndex - 1])
+                        : controllerInstallationLabel,
+                };
+            }
+            return {
+                powerPreviousLabel: chainIndex === 0
+                    ? controllerInstallationLabel
+                    : getInstallationDeviceLabel(poweredModuleChain[chainIndex - 1]),
+                powerNextLabel: poweredModuleChain[chainIndex + 1]
+                    ? getInstallationDeviceLabel(poweredModuleChain[chainIndex + 1])
+                    : null,
+            };
+        };
+        const normalizedPowerModuleTypes = rawPowerModules
+            .map((item) => normalizePowerModuleType(typeof item === 'string' ? item : item?.type));
+        const powerModules = [
+            ...rawPowerModules,
+            ...(['smart2', 'pro'].includes(controllerTypeForInstallation)
+                ? [
+                    ...(normalizedPowerModuleTypes.includes('power-unit') ? [] : ['power-unit']),
+                    ...(normalizedPowerModuleTypes.includes('circuit-breaker') ? [] : ['circuit-breaker']),
+                ]
+                : []),
+        ];
+
+        powerModules
+            .map((item, index) => ({ item, index, type: normalizePowerModuleType(typeof item === 'string' ? item : item?.type) }))
+            .filter(({ type }) => powerModuleTypes.has(type))
+            .forEach(({ item, index, type }) => {
+                const key = getItemKey(item, `power:${type}:${index}`);
+                if (seen.has(key)) return;
+                seen.add(key);
+                items.push({
+                    key,
+                    type,
+                    data: item,
+                    powerPreviousLabel: type === 'ups' ? POWER_UNIT_LABEL : null,
+                    powerNextLabel: type === 'power-unit'
+                        ? (hasUpsPowerModule ? 'ИБП' : (isSmart2Installation && lastPoweredModule ? getInstallationDeviceLabel(lastPoweredModule) : controllerInstallationLabel))
+                        : (type === 'ups' ? (isSmart2Installation && lastPoweredModule ? getInstallationDeviceLabel(lastPoweredModule) : controllerInstallationLabel) : null),
+                });
+            });
+
+        memoExtModules.forEach((item, index) => addUnique(items, seen, item, `ext:${index}`, {
+            modulePreviousLabel: index === 0
+                ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
+                : getInstallationDeviceLabel(memoExtModules[index - 1]),
+            moduleNextLabel: memoExtModules[index + 1]
+                ? getInstallationDeviceLabel(memoExtModules[index + 1])
+                : null,
+            ...getPowerLabelsForModule(item),
+        }));
+        diModuleItems.forEach((item, index, modules) => addUnique(items, seen, item, `di:${index}`, {
+            modulePreviousLabel: index === 0
+                ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
+                : getInstallationDeviceLabel(modules[index - 1]),
+            moduleNextLabel: modules[index + 1]
+                ? getInstallationDeviceLabel(modules[index + 1])
+                : null,
+            ...getPowerLabelsForModule(item),
+        }));
+        const standaloneOneWireModules = Array.isArray(scheme?.one_wire_modules) ? scheme.one_wire_modules : [];
+        standaloneOneWireModules.forEach((item, index) => addUnique(items, seen, item, `onewire:${index}`, {
+            oneWirePreviousLabel: index === 0
+                ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
+                : getInstallationDeviceLabel(standaloneOneWireModules[index - 1]),
+            oneWireNextLabel: standaloneOneWireModules[index + 1]
+                ? getInstallationDeviceLabel(standaloneOneWireModules[index + 1])
+                : null,
+        }));
+        const controllerOneWireDevices = Array.isArray(scheme?.controller?.one_wire_devices) ? scheme.controller.one_wire_devices : [];
+        controllerOneWireDevices.forEach((item, index) => addUnique(items, seen, item, `controller-onewire:${index}`, {
+            oneWirePreviousLabel: index === 0
+                ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
+                : getInstallationDeviceLabel(controllerOneWireDevices[index - 1]),
+            oneWireNextLabel: controllerOneWireDevices[index + 1]
+                ? getInstallationDeviceLabel(controllerOneWireDevices[index + 1])
+                : null,
+        }));
+        (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [])
+            .flatMap((moduleItem, moduleIndex) => (Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : []).map((item, itemIndex, lineItems) => ({
+                item,
+                moduleItem,
+                moduleIndex,
+                itemIndex,
+                lineItems,
+            })))
+            .forEach(({ item, moduleItem, moduleIndex, itemIndex, lineItems }) => addUnique(items, seen, item, `ext-onewire:${moduleIndex}:${itemIndex}`, {
+                oneWirePreviousLabel: itemIndex === 0
+                    ? getInstallationDeviceLabel(moduleItem)
+                    : getInstallationDeviceLabel(lineItems[itemIndex - 1]),
+                oneWireNextLabel: lineItems[itemIndex + 1]
+                    ? getInstallationDeviceLabel(lineItems[itemIndex + 1])
+                    : null,
+            }));
+
+        return items;
+    }, [scheme, memoExtModules]);
+
     return (
         <main className="spa-page">
             <nav className="spa-navbar">
-                <strong>{schemeName}</strong>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={showPorts} onChange={(e) => setShowPorts(e.target.checked)} />
-                        Show ports
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={showEmptySlots} onChange={(e) => setShowEmptySlots(e.target.checked)} />
-                        Show empty slots
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />
-                        Show grid
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={showLineFrames} onChange={(e) => setShowLineFrames(e.target.checked)} />
-                        Show line frames
-                    </label>
-                    <button type="button" onClick={handleDownloadPdf}>
-                        Download PDF
+                <div className="spa-navbar-brand">
+                    <img src={logoPath} alt="MyHeat" className="spa-navbar-logo" />
+                    <div className="spa-alpha-notice">
+                        <span>Приложение находится <u>в стадии альфа-тестирования</u>, все вопросы к разработчику:</span>
+                        <a href="https://t.me/mmingareev" target="_blank" rel="noreferrer">Telegram</a>
+                    </div>
+                </div>
+                <div className="spa-navbar-actions">
+                    <button type="button" className="spa-reset-button" onClick={handleResetPositions}>
+                        Сброс позиций
                     </button>
-                    <button type="button" onClick={handleResetPositions}>
-                        Reset positions
+                    <button type="button" onClick={() => setShowHelpModal(true)}>
+                        Помощь
                     </button>
-                    <button
-                        type="button"
-                        onClick={handleSaveScheme}
-                        disabled={!routeSchemeId || schemeLoadState === 'loading' || schemeSaveState === 'saving'}
-                        style={{
-                            background: schemeSaveState === 'error' ? '#c62828' : '#2e7d32',
-                            color: '#fff',
-                            borderColor: schemeSaveState === 'error' ? '#c62828' : '#2e7d32',
-                        }}
-                        title={routeSchemeId ? undefined : 'Сохранение доступно только для схемы из базы'}
-                    >
-                        {schemeSaveState === 'saving'
-                            ? 'Сохраняем...'
-                            : (schemeSaveState === 'saved'
-                                ? 'Сохранено'
-                                : (schemeSaveState === 'error' ? 'Ошибка сохранения' : 'Сохранить изменения'))}
+                    <button type="button" onClick={() => (installationMode ? setInstallationModeEnabled(false) : setShowSettingsModal(true))}>
+                        {installationMode ? 'Выключить режим инсталляции' : 'Настройки'}
                     </button>
                 </div>
             </nav>
+            {showHelpModal && (
+                <div className="scheme-help-backdrop" onMouseDown={closeHelpModal}>
+                    <div className="scheme-help-modal" onMouseDown={(event) => event.stopPropagation()}>
+                        <div className="scheme-help-header">
+                            <strong>МАЙХИТ «Схемы подключения»</strong>
+                            <button type="button" className="scheme-settings-close" onClick={closeHelpModal}>×</button>
+                        </div>
+                        <div className="scheme-help-content">
+                            <section className="scheme-help-block">
+                                <p>Для зумирования/масштабирования используйте:</p>
+                                <strong>SHIFT + ролик мыши;</strong>
+                            </section>
+                            <section className="scheme-help-block">
+                                <p>Для расширения существующей схемы:</p>
+                                <strong>Настройки → Отобразить доступные слоты</strong>
+                            </section>
+                            <section className="scheme-help-block">
+                                <p>Для скачивания схемы:</p>
+                                <strong>Настройки → Скачать PDF</strong>
+                            </section>
+                            <section className="scheme-help-block">
+                                <p>Для контроллеров GO, GO+, Smart2, PRO и ECOsmart доступен Режим инсталляции:</p>
+                                <strong>Настройки → Режим инсталляции</strong>
+                            </section>
+                            <p className="scheme-help-note">Если вы находитесь на этой странице, значит Ваша схема уже сохранена, ссылкой можно делиться или зайти позже.</p>
+                            <p>
+                                Приложение находится в стадии альфа-тестирования, все вопросы к разработчику:{' '}
+                                <a href="https://t.me/mmingareev" target="_blank" rel="noreferrer">Telegram</a>
+                            </p>
+                        </div>
+                        <button type="button" className="scheme-help-primary" onClick={closeHelpModal}>
+                            Понятно
+                        </button>
+                    </div>
+                </div>
+            )}
+            {showSettingsModal && (
+                <div className="scheme-settings-backdrop" onMouseDown={() => setShowSettingsModal(false)}>
+                    <aside className="scheme-settings-sidebar" onMouseDown={(event) => event.stopPropagation()}>
+                        <div className="scheme-settings-header">
+                            <strong>Настройки схемы</strong>
+                            <button type="button" className="scheme-settings-close" onClick={() => setShowSettingsModal(false)}>×</button>
+                        </div>
+                        <div className="scheme-settings-options">
+                            <label className="scheme-settings-switch-row">
+                                <span>Отобразить порты входа линий</span>
+                                <input type="checkbox" checked={showPorts} onChange={(e) => setShowPorts(e.target.checked)} />
+                                <span className="scheme-settings-switch" aria-hidden="true" />
+                            </label>
+                            <label className="scheme-settings-switch-row">
+                                <span>Отобразить доступные слоты</span>
+                                <input type="checkbox" checked={showEmptySlots} onChange={(e) => setShowEmptySlots(e.target.checked)} />
+                                <span className="scheme-settings-switch" aria-hidden="true" />
+                            </label>
+                            <label className="scheme-settings-switch-row">
+                                <span>Отображать сетку</span>
+                                <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />
+                                <span className="scheme-settings-switch" aria-hidden="true" />
+                            </label>
+                            <label className="scheme-settings-switch-row">
+                                <span>Отображать области линий подключения</span>
+                                <input type="checkbox" checked={showLineFrames} onChange={(e) => setShowLineFrames(e.target.checked)} />
+                                <span className="scheme-settings-switch" aria-hidden="true" />
+                            </label>
+                            <label className="scheme-settings-switch-row">
+                                <span>Отображать отладочную панель</span>
+                                <input type="checkbox" checked={showIncomingScheme} onChange={(e) => setShowIncomingScheme(e.target.checked)} />
+                                <span className="scheme-settings-switch" aria-hidden="true" />
+                            </label>
+                            <label className="scheme-settings-switch-row">
+                                <span>Режим инсталляции</span>
+                                <input
+                                    type="checkbox"
+                                    checked={installationMode}
+                                    disabled={!canUseInstallationMode}
+                                    onChange={(e) => setInstallationModeEnabled(e.target.checked)}
+                                />
+                                <span className="scheme-settings-switch" aria-hidden="true" />
+                            </label>
+                            {!canUseInstallationMode && (
+                                <div className="scheme-settings-hint">
+                                    Режим инсталляции доступен для GO, GO+, Smart2, PRO и ECOsmart.
+                                </div>
+                            )}
+                        </div>
+                        <div className="scheme-settings-actions">
+                            <button type="button" className="scheme-settings-pdf-button" onClick={handleDownloadPdf}>
+                                Скачать PDF
+                            </button>
+                            <div className="scheme-settings-note">
+                                Схему также можно сохранить как простое изображение, нажав правую кнопку в произвольном месте и выбрав соответствующий пункт
+                            </div>
+                            <button
+                                type="button"
+                                className="scheme-settings-save-button"
+                                onClick={handleSaveAsNewScheme}
+                                disabled={schemeCreateState === 'saving'}
+                                style={{
+                                    background: schemeCreateState === 'error' ? '#c62828' : undefined,
+                                    borderColor: schemeCreateState === 'error' ? '#c62828' : undefined,
+                                }}
+                            >
+                                {schemeCreateState === 'saving'
+                                    ? 'Сохраняем...'
+                                    : (schemeCreateState === 'saved'
+                                        ? 'Сохранено'
+                                        : (schemeCreateState === 'error' ? 'Ошибка сохранения' : 'Сохранить как новую схему'))}
+                            </button>
+                            <button
+                                type="button"
+                                className="scheme-settings-save-button"
+                                onClick={handleSaveScheme}
+                                disabled={!routeSchemeId || schemeLoadState === 'loading' || schemeSaveState === 'saving'}
+                                style={{
+                                    background: schemeSaveState === 'error' ? '#c62828' : undefined,
+                                    borderColor: schemeSaveState === 'error' ? '#c62828' : undefined,
+                                }}
+                                title={routeSchemeId ? undefined : 'Сохранение доступно только для схемы из базы'}
+                            >
+                                {schemeSaveState === 'saving'
+                                    ? 'Сохраняем...'
+                                    : (schemeSaveState === 'saved'
+                                        ? 'Сохранено'
+                                        : (schemeSaveState === 'error' ? 'Ошибка сохранения' : 'Сохранить изменения'))}
+                            </button>
+                        </div>
+                    </aside>
+                </div>
+            )}
+            <div className="spa-scheme-title spa-fixed-scheme-title" title={schemeName}>
+                <span className="spa-scheme-title-label">Схема</span>
+                <strong>{schemeName}</strong>
+            </div>
             {schemeLoadError && (
                 <div style={{ position: 'fixed', top: 72, right: 16, zIndex: 60, color: '#d32f2f', background: '#fff', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>
                     {schemeLoadError}
@@ -2918,62 +3460,64 @@ const App = () => {
                     </div>
                 </div>
             )}
-            <div
-                style={{
-                    width: 380,
-                    height: 600,
-                    position: 'fixed',
-                    left: 10,
-                    top: 90,
-                    background: '#fff',
-                    zIndex: 50,
-                    border: '1px solid #d7dbe4',
-                    borderRadius: 8,
-                    padding: 10,
-                    overflow: 'auto',
-                }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <strong style={{ fontSize: 14 }}>incomingScheme</strong>
-                    {schemeJsonDirty && <span style={{ color: '#b26a00', fontSize: 12 }}>изменено</span>}
-                </div>
-                <textarea
-                    value={schemeJsonText}
-                    onChange={(event) => {
-                        setSchemeJsonText(event.target.value);
-                        setSchemeJsonDirty(true);
-                        setSchemeJsonError(null);
-                    }}
-                    spellCheck={false}
+            {showIncomingScheme && (
+                <div
                     style={{
-                        width: '100%',
-                        height: 500,
-                        resize: 'vertical',
+                        width: 380,
+                        height: 600,
+                        position: 'fixed',
+                        left: 10,
+                        top: 136,
+                        background: '#fff',
+                        zIndex: 50,
                         border: '1px solid #d7dbe4',
-                        borderRadius: 6,
-                        padding: 8,
-                        fontFamily: 'Consolas, "Courier New", monospace',
-                        fontSize: 11,
-                        lineHeight: 1.45,
-                        color: '#202738',
-                        background: '#f8fafc',
+                        borderRadius: 8,
+                        padding: 10,
+                        overflow: 'auto',
                     }}
-                />
-                {schemeJsonError && (
-                    <div style={{ marginTop: 6, color: '#c62828', fontSize: 12 }}>
-                        {schemeJsonError}
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <strong style={{ fontSize: 14 }}>incomingScheme</strong>
+                        {schemeJsonDirty && <span style={{ color: '#b26a00', fontSize: 12 }}>изменено</span>}
                     </div>
-                )}
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                    <button type="button" onClick={handleRenderSchemeJson} style={{ padding: '7px 12px' }}>
-                        Рендер
-                    </button>
-                    <button type="button" onClick={handleFormatSchemeJson} style={{ padding: '7px 12px' }}>
-                        Форматировать
-                    </button>
+                    <textarea
+                        value={schemeJsonText}
+                        onChange={(event) => {
+                            setSchemeJsonText(event.target.value);
+                            setSchemeJsonDirty(true);
+                            setSchemeJsonError(null);
+                        }}
+                        spellCheck={false}
+                        style={{
+                            width: '100%',
+                            height: 500,
+                            resize: 'vertical',
+                            border: '1px solid #d7dbe4',
+                            borderRadius: 6,
+                            padding: 8,
+                            fontFamily: 'Consolas, "Courier New", monospace',
+                            fontSize: 11,
+                            lineHeight: 1.45,
+                            color: '#202738',
+                            background: '#f8fafc',
+                        }}
+                    />
+                    {schemeJsonError && (
+                        <div style={{ marginTop: 6, color: '#c62828', fontSize: 12 }}>
+                            {schemeJsonError}
+                        </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <button type="button" onClick={handleRenderSchemeJson} style={{ padding: '7px 12px' }}>
+                            Рендер
+                        </button>
+                        <button type="button" onClick={handleFormatSchemeJson} style={{ padding: '7px 12px' }}>
+                            Форматировать
+                        </button>
+                    </div>
                 </div>
-            </div>
-            <section className="canvas-area">
+            )}
+            <section className={installationMode ? 'canvas-area canvas-area-installation' : 'canvas-area'}>
                 <Stage
                     ref={stageRef}
                     width={canvasSize.width}
@@ -2982,7 +3526,9 @@ const App = () => {
                     onMouseDown={(event) => {
                         if (event.evt.button !== 0) return;
                         const stage = stageRef.current;
-                        if (!stage || event.target !== stage) return;
+                        if (installationMode && event.target !== stage && event.target?.getClassName?.() !== 'Rect') return;
+                        if (installationMode && event.target?.name?.() === 'installation-panel-resize') return;
+                        if (!stage || (!installationMode && event.target !== stage)) return;
                         const pointer = stage.getPointerPosition();
                         if (!pointer) return;
                         isPanningRef.current = true;
@@ -3025,7 +3571,7 @@ const App = () => {
                         stage.batchDraw();
                     }}
                 >
-                    {showGrid && gridPatternImage && (
+                    {showGrid && !installationMode && gridPatternImage && (
                         <Layer ref={gridLayerRef} listening={false}>
                             <Rect
                                 x={GRID_MIN}
@@ -3038,6 +3584,7 @@ const App = () => {
                             />
                         </Layer>
                     )}
+                    {!installationMode && (
                     <Layer>
                         {controllerImage && (
                             (() => {
@@ -12395,6 +12942,508 @@ const App = () => {
                             })()
                         )}
                     </Layer>
+                    )}
+                    {installationMode && (
+                        <Layer>
+                            <Rect
+                                x={GRID_MIN}
+                                y={GRID_MIN}
+                                width={GRID_MAX - GRID_MIN}
+                                height={GRID_MAX - GRID_MIN}
+                                fillLinearGradientStartPoint={{ x: 0, y: GRID_MIN }}
+                                fillLinearGradientEndPoint={{ x: 0, y: GRID_MAX }}
+                                fillLinearGradientColorStops={[0, '#eef1f5', 1, '#e3e7ed']}
+                                listening
+                            />
+                            {(() => {
+                                const powerTypes = new Set(['circuit-breaker', 'power-unit', 'ups']);
+                                const installationModuleItems = installationItems.map((item) => ({
+                                    ...item,
+                                    image: wirelessImages[item.type] || null,
+                                }));
+                                const hasInstallationUps = installationModuleItems.some((item) => item.type === 'ups');
+                                const poweredInstallationModules = installationModuleItems.filter((item) => !powerTypes.has(item.type));
+                                const firstPoweredModule = poweredInstallationModules[0] || null;
+                                const isSmart2Installation = controllerType === 'smart2';
+                                const items = [
+                                    ...installationModuleItems.filter((item) => powerTypes.has(item.type)),
+                                    controllerImage ? {
+                                        key: 'controller',
+                                        type: controllerType,
+                                        image: controllerImage,
+                                        data: scheme?.controller,
+                                        powerPreviousLabel: isSmart2Installation && firstPoweredModule
+                                            ? getInstallationItemLabel(firstPoweredModule)
+                                            : (hasInstallationUps ? 'ИБП' : POWER_UNIT_LABEL),
+                                        powerNextLabel: !isSmart2Installation && firstPoweredModule ? getInstallationItemLabel(firstPoweredModule) : null,
+                                    } : null,
+                                    ...poweredInstallationModules,
+                                ].filter((item) => item?.image?.width && item?.image?.height);
+                                if (items.length === 0) return null;
+
+                                // Контроллеры go/go+/ecosmart не встают на DIN-рейку — их выносим
+                                // отдельным блоком слева от щитка, поэтому исключаем из реечной
+                                // раскладки (ширина панели, курсор рядов, коллизии).
+                                const controllerRendersLeft = INSTALLATION_LEFT_CONTROLLERS.has(controllerType);
+                                const isLeftControllerItem = (item) => controllerRendersLeft && item.key === 'controller';
+
+                                const gap = 0;
+                                const rowSlotHeight = moduleHeightValue;
+                                const rowGap = 17 * indentSize;
+                                const rowStep = rowSlotHeight + rowGap;
+                                const innerPanelInset = 16;
+                                const panelPaddingX = innerPanelInset;
+                                const panelPaddingY = 8 * indentSize;
+                                const getInstallationItemWidth = (item) => Math.max(dinSize, Math.round(item.image.width / dinSize) * dinSize);
+
+                                // Панель — независимый холст фиксированного размера. Пока пользователь ни
+                                // разу не менял размер вручную, он подгоняется под текущий набор
+                                // оборудования в один ряд (чтобы сразу было куда всё поместить). После
+                                // первого ручного resize размер полностью в руках пользователя и больше не
+                                // пересчитывается от состава/расположения оборудования — раньше перенос
+                                // устройства в другой ряд или добавление модуля сам двигал границы щита,
+                                // что выглядело как "щит сам подстраивается". Сначала меняют размер
+                                // руками, потом внутри него располагают оборудование.
+                                const defaultContentWidth = items.reduce((sum, item) => sum + (isLeftControllerItem(item) ? 0 : getInstallationItemWidth(item)), 0) + gap * Math.max(0, items.length - 1);
+                                const defaultPanelWidth = defaultContentWidth + panelPaddingX * 2;
+                                const defaultPanelHeight = rowSlotHeight + panelPaddingY * 2;
+                                const panelWidth = installationPanelSize?.width ?? defaultPanelWidth;
+                                const panelHeight = installationPanelSize?.height ?? defaultPanelHeight;
+
+                                const panelX = Math.round(Math.max(2 * indentSize - panelPaddingX, canvasSize.width / 2 - panelWidth / 2) / indentSize) * indentSize;
+                                const panelY = Math.round(Math.max(2 * indentSize - panelPaddingY, canvasSize.height / 2 - panelHeight / 2) / indentSize) * indentSize;
+                                const startX = panelX + panelPaddingX;
+                                const startY = panelY + panelPaddingY;
+                                // Позиция вынесенного слева контроллера: вплотную слева от щитка,
+                                // выровнен по вертикальному центру панели.
+                                const leftControllerItem = controllerRendersLeft ? items.find(isLeftControllerItem) : null;
+                                const leftControllerWidth = leftControllerItem ? getInstallationItemWidth(leftControllerItem) : 0;
+                                const leftControllerBaseX = panelX - 4 * indentSize - leftControllerWidth;
+                                const leftControllerBaseY = leftControllerItem ? panelY + panelHeight / 2 - leftControllerItem.image.height / 2 : 0;
+                                const rowCount = Math.max(1, Math.floor((Math.max(0, panelHeight - panelPaddingY * 2) + rowGap) / rowStep));
+                                const railHeight = 24;
+                                const railY = startY + rowSlotHeight * 0.45 - railHeight / 2;
+                                const railX = panelX + innerPanelInset;
+                                const railWidth = panelWidth - innerPanelInset * 2;
+                                const resizeHandleSize = 18;
+
+                                // Минимальный размер щита задаётся по занятым DIN-позициям: ширина не
+                                // режет модули справа, высота не убирает ряды, на которых есть модули.
+                                let minPanelWidth = dinSize * 2;
+                                let occupiedRowCount = 1;
+                                const itemBoxesByKey = {};
+                                {
+                                    let boundsCursorX = startX;
+                                    items.forEach((item) => {
+                                        if (isLeftControllerItem(item)) return; // вынесен слева, не на рейке
+                                        const itemBaseX = boundsCursorX;
+                                        const itemOffset = installationItemOffsets[item.key] || { x: 0, y: 0 };
+                                        const itemRow = rowStep ? Math.max(0, Math.round(itemOffset.y / rowStep)) : 0;
+                                        const itemWidth = getInstallationItemWidth(item);
+                                        const left = itemBaseX + itemOffset.x;
+                                        const right = left + itemWidth;
+                                        occupiedRowCount = Math.max(occupiedRowCount, itemRow + 1);
+                                        itemBoxesByKey[item.key] = { row: itemRow, left, right };
+                                        minPanelWidth = Math.max(minPanelWidth, right - panelX + panelPaddingX);
+                                        boundsCursorX += itemWidth + gap;
+                                    });
+                                }
+                                const minInnerWidth = Math.max(0, minPanelWidth - panelPaddingX * 2);
+
+                                const resolveInstallationRowX = (itemKey, itemWidth, row, candidateAbsX, minAbsX, maxAbsX) => {
+                                    const maxGridIndex = Math.max(0, Math.floor((maxAbsX - minAbsX) / dinSize));
+                                    const candidateGridIndex = Math.max(0, Math.min(maxGridIndex, Math.round((candidateAbsX - minAbsX) / dinSize)));
+                                    const neighbors = Object.entries(itemBoxesByKey)
+                                        .filter(([key, box]) => key !== itemKey && box.row === row)
+                                        .map(([, box]) => box)
+                                        .sort((a, b) => a.left - b.left);
+                                    const slots = [];
+                                    let cursor = minAbsX;
+
+                                    neighbors.forEach((box) => {
+                                        if (box.left - cursor >= itemWidth) slots.push({ start: cursor, end: box.left - itemWidth });
+                                        cursor = Math.max(cursor, box.right);
+                                    });
+                                    if (maxAbsX - cursor >= 0) slots.push({ start: cursor, end: maxAbsX });
+
+                                    let best = null;
+                                    slots.forEach((slot) => {
+                                        const slotStartGridIndex = Math.max(0, Math.ceil((slot.start - minAbsX) / dinSize));
+                                        const slotEndGridIndex = Math.min(maxGridIndex, Math.floor((slot.end - minAbsX) / dinSize));
+                                        if (slotEndGridIndex < slotStartGridIndex) return;
+                                        const gridIndex = Math.max(slotStartGridIndex, Math.min(slotEndGridIndex, candidateGridIndex));
+                                        const distance = Math.abs(gridIndex - candidateGridIndex);
+                                        if (!best || distance < best.distance) best = { gridIndex, distance };
+                                    });
+
+                                    return best ? minAbsX + best.gridIndex * dinSize : null;
+                                };
+
+                                let currentX = startX;
+                                const getInstallationPorts = (item) => {
+                                    const sourcePorts = item.key === 'controller' ? ports : (wirelessPortsByType[item.type] || []);
+                                    return sourcePorts.filter((port) => {
+                                        const name = String(port?.name || '').toUpperCase();
+                                        if (!name) return false;
+                                        return !name.includes('ANCHOR')
+                                            && !name.includes('INDICATOR')
+                                            && !name.includes('AERIAL')
+                                            && !name.includes('SEARCH')
+                                            && !name.includes('LOGO')
+                                            && !name.includes('QR');
+                                    });
+                                };
+                                const getInstallationAllPorts = (item) => (item.key === 'controller' ? ports : (wirelessPortsByType[item.type] || []));
+                                const getInstallationIndicatorActive = (item, port) => {
+                                    const name = String(port?.name || '').toUpperCase();
+                                    const data = item?.data && typeof item.data === 'object' ? item.data : {};
+                                    if (name === 'POWER-INDICATOR' || name === 'NETWORK-INDICATOR' || name === 'WI-FI-INDICATOR') return true;
+                                    if (name === 'BUS-INDICATOR') return Array.isArray(data.bus_devices) && data.bus_devices.some(Boolean);
+                                    if (name === 'ALERT-INDICATOR') return false;
+
+                                    let match = /^RELAY-INDICATOR-(\d+)$/.exec(name);
+                                    if (match) {
+                                        const relayDevices = Array.isArray(data.relay_devices) ? data.relay_devices : [];
+                                        const occupancy = buildRelaySlotOccupancyPreserveIndexes(
+                                            relayDevices,
+                                            6,
+                                            (device) => (String(device?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1),
+                                        );
+                                        return Boolean(occupancy[Number(match[1]) - 1]);
+                                    }
+
+                                    match = /^RELAY-S-INDICATOR-(\d+)$/.exec(name);
+                                    if (match) {
+                                        const relaySDevices = Array.isArray(data.relay_s_devices) ? data.relay_s_devices : [];
+                                        const occupancy = buildRelaySlotOccupancyPreserveIndexes(
+                                            relaySDevices,
+                                            6,
+                                            (device) => (String(device?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1),
+                                        );
+                                        return Boolean(occupancy[Number(match[1]) - 1]);
+                                    }
+
+                                    return false;
+                                };
+
+                                return (
+                                    <>
+                                        <Rect
+                                            x={panelX}
+                                            y={panelY}
+                                            width={panelWidth}
+                                            height={panelHeight}
+                                            cornerRadius={12}
+                                            fillLinearGradientStartPoint={{ x: 0, y: panelY }}
+                                            fillLinearGradientEndPoint={{ x: 0, y: panelY + panelHeight }}
+                                            fillLinearGradientColorStops={[0, '#fbfcfd', 0.5, '#f2f4f7', 1, '#e6e9ee']}
+                                            stroke="#c3c9d1"
+                                            strokeWidth={1}
+                                            shadowColor="rgba(15, 23, 42, 0.32)"
+                                            shadowBlur={18}
+                                            shadowOffsetY={10}
+                                            shadowForStrokeEnabled={false}
+                                            perfectDrawEnabled={false}
+                                            listening={false}
+                                        />
+                                        {[
+                                            { x: panelX + 14, y: panelY + 14 },
+                                            { x: panelX + panelWidth - 14, y: panelY + 14 },
+                                            { x: panelX + 14, y: panelY + panelHeight - 14 },
+                                            { x: panelX + panelWidth - 14, y: panelY + panelHeight - 14 },
+                                        ].map((corner, cornerIndex) => (
+                                            <KonvaCircle
+                                                key={`installation-panel-screw-${cornerIndex}`}
+                                                x={corner.x}
+                                                y={corner.y}
+                                                radius={4}
+                                                fillRadialGradientStartPoint={{ x: -1.5, y: -1.5 }}
+                                                fillRadialGradientStartRadius={0}
+                                                fillRadialGradientEndPoint={{ x: 0, y: 0 }}
+                                                fillRadialGradientEndRadius={4}
+                                                fillRadialGradientColorStops={[0, '#ffffff', 0.5, '#c7ccd3', 1, '#8b929c']}
+                                                stroke="#767d87"
+                                                strokeWidth={0.5}
+                                                perfectDrawEnabled={false}
+                                                listening={false}
+                                            />
+                                        ))}
+                                        <Rect
+                                            x={panelX + innerPanelInset}
+                                            y={panelY + innerPanelInset}
+                                            width={panelWidth - innerPanelInset * 2}
+                                            height={panelHeight - innerPanelInset * 2}
+                                            cornerRadius={6}
+                                            fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+                                            fillLinearGradientEndPoint={{ x: 0, y: panelHeight - 32 }}
+                                            fillLinearGradientColorStops={[0, '#e9edf2', 0.06, '#ffffff', 0.2, '#ffffff', 1, '#eef2f6']}
+                                            stroke="#a9b0ba"
+                                            strokeWidth={1}
+                                            perfectDrawEnabled={false}
+                                            listening={false}
+                                        />
+                                        {Array.from({ length: rowCount }, (_, rowIndex) => {
+                                            const currentRailY = railY + rowIndex * rowStep;
+                                            return (
+                                                <React.Fragment key={`installation-rail-row-${rowIndex}`}>
+                                                    <Rect
+                                                        x={railX}
+                                                        y={currentRailY}
+                                                        width={railWidth}
+                                                        height={railHeight}
+                                                        cornerRadius={2}
+                                                        fillLinearGradientStartPoint={{ x: 0, y: currentRailY }}
+                                                        fillLinearGradientEndPoint={{ x: 0, y: currentRailY + railHeight }}
+                                                        fillLinearGradientColorStops={[0, '#b7bcc3', 0.12, '#e9ecef', 0.5, '#fbfcfd', 0.88, '#e2e5e9', 1, '#a9afb7']}
+                                                        stroke="#9198a1"
+                                                        strokeWidth={0.8}
+                                                        perfectDrawEnabled={false}
+                                                        listening={false}
+                                                    />
+                                                    {Array.from({ length: Math.max(0, Math.floor(railWidth / 42)) }, (_, index) => (
+                                                        <Rect
+                                                            key={`installation-rail-slot-${rowIndex}-${index}`}
+                                                            x={railX + 26 + index * 42}
+                                                            y={currentRailY + railHeight / 2 - 3}
+                                                            width={18}
+                                                            height={6}
+                                                            cornerRadius={3}
+                                                            fill="#ffffff"
+                                                            opacity={0.9}
+                                                            listening={false}
+                                                        />
+                                                    ))}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                        {items.map((item, itemIndex) => {
+                                            const previousItem = items[itemIndex - 1] || null;
+                                            const nextItem = items[itemIndex + 1] || null;
+                                            const previousInstallationLabel = item.oneWirePreviousLabel || item.modulePreviousLabel || getInstallationItemLabel(previousItem);
+                                            const nextInstallationLabel = item.oneWireNextLabel || item.moduleNextLabel || getInstallationItemLabel(nextItem);
+                                            const itemWidth = getInstallationItemWidth(item);
+                                            const isLeftController = isLeftControllerItem(item);
+                                            const baseX = isLeftController ? leftControllerBaseX : currentX;
+                                            const baseY = isLeftController
+                                                ? leftControllerBaseY
+                                                : startY + (rowSlotHeight - item.image.height) / 2;
+                                            const offset = isLeftController ? { x: 0, y: 0 } : (installationItemOffsets[item.key] || { x: 0, y: 0 });
+                                            const x = baseX + offset.x;
+                                            const y = baseY + offset.y;
+                                            if (!isLeftController) currentX += itemWidth + gap;
+                                            return (
+                                                <Group
+                                                    key={`installation-${item.key}`}
+                                                    x={x}
+                                                    y={y}
+                                                    draggable={!isLeftController}
+                                                    onDragEnd={(event) => {
+                                                        const node = event.target;
+                                                        const minAbsX = panelX + panelPaddingX;
+                                                        const maxAbsX = panelX + panelWidth - panelPaddingX - itemWidth;
+                                                        const currentRow = Math.max(0, Math.min(rowCount - 1, Math.round((node.y() - baseY) / rowStep)));
+                                                        const snappedAbsX = resolveInstallationRowX(item.key, itemWidth, currentRow, node.x(), minAbsX, maxAbsX);
+                                                        if (snappedAbsX == null) {
+                                                            node.position({ x, y });
+                                                            node.getLayer()?.batchDraw();
+                                                            return;
+                                                        }
+                                                        const snappedX = snappedAbsX - baseX;
+                                                        const snappedY = currentRow * rowStep;
+                                                        setInstallationItemOffsets((prev) => ({
+                                                            ...prev,
+                                                            [item.key]: { x: snappedX, y: snappedY },
+                                                        }));
+                                                        node.position({ x: baseX + snappedX, y: baseY + snappedY });
+                                                        node.getLayer()?.batchDraw();
+                                                    }}
+                                                >
+                                                    <Image
+                                                        image={item.image}
+                                                        width={itemWidth}
+                                                        height={item.image.height}
+                                                    />
+                                                    {aerialImage && (item.key === 'controller' ? ['smart2', 'pro'].includes(controllerType) : canonicalDeviceType(item.type) === 'rdt2') && (() => {
+                                                        const aerialPorts = getPortsByClassToken(getInstallationAllPorts(item), 'AERIAL');
+                                                        if (!aerialPorts?.length) return null;
+                                                        const aerialWidth = aerialImage.width || AERIAL_WIDTH;
+                                                        const aerialHeight = aerialImage.height || AERIAL_HEIGHT;
+                                                        return aerialPorts.map((aerialPort, aerialIndex) => {
+                                                            const portX = aerialPort.x * itemWidth;
+                                                            const portCenterY = aerialPort.y * item.image.height;
+                                                            const portHeight = (aerialPort.height || 0) * item.image.height;
+                                                            const portTopY = portCenterY - portHeight / 2;
+                                                            return (
+                                                                <Image
+                                                                    key={`installation-aerial-${item.key}-${aerialIndex}`}
+                                                                    image={aerialImage}
+                                                                    x={portX - aerialWidth / 2}
+                                                                    y={portTopY - aerialHeight}
+                                                                    width={aerialWidth}
+                                                                    height={aerialHeight}
+                                                                    listening={false}
+                                                                />
+                                                            );
+                                                        });
+                                                    })()}
+                                                    {getInstallationAllPorts(item)
+                                                        .filter((port) => String(port?.name || '').toUpperCase().includes('INDICATOR'))
+                                                        .map((indicatorPort, indicatorIndex) => {
+                                                            const active = getInstallationIndicatorActive(item, indicatorPort);
+                                                            const indicatorWidth = Math.max(1, (indicatorPort.width || 0) * itemWidth);
+                                                            const indicatorHeight = Math.max(1, (indicatorPort.height || 0) * item.image.height);
+                                                            const indicatorRadius = Math.min(indicatorWidth, indicatorHeight) / 2;
+                                                            return (
+                                                                <Rect
+                                                                    key={`installation-indicator-${item.key}-${indicatorPort.name}-${indicatorIndex}`}
+                                                                    x={indicatorPort.x * itemWidth - indicatorWidth / 2}
+                                                                    y={indicatorPort.y * item.image.height - indicatorHeight / 2}
+                                                                    width={indicatorWidth}
+                                                                    height={indicatorHeight}
+                                                                    cornerRadius={indicatorRadius}
+                                                                    fill={active ? ACTIVE_INDICATOR_COLOR : '#D2D2D2'}
+                                                                    shadowColor={active ? ACTIVE_INDICATOR_COLOR : undefined}
+                                                                    shadowBlur={active ? ACTIVE_INDICATOR_SHADOW_BLUR : 0}
+                                                                    perfectDrawEnabled={false}
+                                                                    listening={false}
+                                                                />
+                                                            );
+                                                        })}
+                                                    {getInstallationPorts(item)
+                                                        .filter((port) => isInstallationPortOccupied(item, port))
+                                                        .map((port, portIndex) => {
+                                                            const isTopPort = port.y < 0.5;
+                                                            const portX = port.x * itemWidth;
+                                                            const portY = port.y * item.image.height;
+                                                            const edgeY = isTopPort ? 0 : item.image.height;
+                                                            const bendY = isTopPort ? -indentSize * 0.5 : item.image.height + indentSize * 0.5;
+                                                            const midY = isTopPort ? bendY + indentSize * 0.2 : bendY - indentSize * 0.2;
+                                                            const labelText = getInstallationMarkerText(getInstallationPortConnectionLabel(item, port, {
+                                                                previousLabel: previousInstallationLabel,
+                                                                nextLabel: nextInstallationLabel,
+                                                                powerPreviousLabel: item.powerPreviousLabel,
+                                                                powerNextLabel: item.powerNextLabel,
+                                                            }));
+                                                            const labelFontSize = 4;
+                                                            const labelWidth = labelText ? 10 : 0;
+                                                            const labelHeight = labelText
+                                                                ? Math.min(8 * indentSize, Math.max(24, labelText.length * 2.8 + 8))
+                                                                : 0;
+                                                            const labelX = portX + indentSize * 0.5 - labelWidth / 2;
+                                                            const labelY = isTopPort ? bendY - labelHeight - 2 : bendY + 2;
+                                                            return (
+                                                                <React.Fragment key={`installation-port-tail-${item.key}-${port.name}-${portIndex}`}>
+                                                                    <Line
+                                                                        points={[portX, portY, portX, midY, portX + indentSize * 0.25, bendY, portX + indentSize * 0.5, edgeY]}
+                                                                        stroke={getInstallationPortLineColor(port.name)}
+                                                                        strokeWidth={1.25}
+                                                                        tension={0.65}
+                                                                        lineCap="round"
+                                                                        lineJoin="round"
+                                                                        opacity={0.95}
+                                                                        listening={false}
+                                                                    />
+                                                                    {labelText && (
+                                                                        <>
+                                                                            <Rect
+                                                                                x={labelX}
+                                                                                y={labelY}
+                                                                                width={labelWidth}
+                                                                                height={labelHeight}
+                                                                                cornerRadius={2}
+                                                                                fill="#fff7d6"
+                                                                                stroke="#d6a900"
+                                                                                strokeWidth={0.5}
+                                                                                opacity={0.96}
+                                                                                perfectDrawEnabled={false}
+                                                                                listening={false}
+                                                                            />
+                                                                            <Text
+                                                                                x={labelX + 2}
+                                                                                y={labelY + labelHeight - 3}
+                                                                                width={labelHeight - 6}
+                                                                                height={labelWidth - 4}
+                                                                                text={labelText}
+                                                                                fontSize={labelFontSize}
+                                                                                fill="#5f4700"
+                                                                                rotation={-90}
+                                                                                align="center"
+                                                                                perfectDrawEnabled={false}
+                                                                                listening={false}
+                                                                            />
+                                                                        </>
+                                                                    )}
+                                                                    <KonvaCircle
+                                                                        x={portX}
+                                                                        y={portY}
+                                                                        radius={2.2}
+                                                                        fill={getInstallationPortLineColor(port.name)}
+                                                                        opacity={0.95}
+                                                                        listening={false}
+                                                                    />
+                                                                </React.Fragment>
+                                                            );
+                                                        })}
+                                                </Group>
+                                            );
+                                        })}
+                                        <Rect
+                                            name="installation-panel-resize"
+                                            x={panelX + panelWidth - resizeHandleSize / 2}
+                                            y={panelY + panelHeight - resizeHandleSize / 2}
+                                            width={resizeHandleSize}
+                                            height={resizeHandleSize}
+                                            cornerRadius={5}
+                                            fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+                                            fillLinearGradientEndPoint={{ x: resizeHandleSize, y: resizeHandleSize }}
+                                            fillLinearGradientColorStops={[0, '#f7943e', 1, '#c85e18']}
+                                            stroke="#a4491a"
+                                            strokeWidth={1}
+                                            shadowColor="rgba(15, 23, 42, 0.32)"
+                                            shadowBlur={4}
+                                            shadowOffsetY={2}
+                                            shadowForStrokeEnabled={false}
+                                            perfectDrawEnabled={false}
+                                            draggable
+                                            onDragMove={(event) => {
+                                                const node = event.target;
+                                                // Ширина/высота теперь абсолютный размер панели (от её левого верхнего
+                                                // угла до хендла), а не добавка к автоматически считаемому размеру —
+                                                // так пользователь двигает саму панель, а не "довесок" к ней. Ниже
+                                                // границы не уйти — уменьшать дальше, чем позволяют уже размещённые
+                                                // устройства, нельзя, иначе они окажутся обрезаны панелью.
+                                                const extraWidth = Math.max(0, node.x() + resizeHandleSize / 2 - panelX - panelPaddingX * 2 - minInnerWidth);
+                                                const nextInnerWidth = minInnerWidth + Math.round(extraWidth / dinSize) * dinSize;
+                                                const nextWidth = Math.max(minPanelWidth, panelPaddingX * 2 + Math.max(dinSize, nextInnerWidth));
+                                                const nextRows = Math.max(1, Math.round((Math.max(0, node.y() + resizeHandleSize / 2 - panelY - panelPaddingY * 2) + rowGap) / rowStep));
+                                                const minRows = occupiedRowCount;
+                                                const nextHeight = panelPaddingY * 2 + Math.max(nextRows, minRows) * rowSlotHeight + (Math.max(nextRows, minRows) - 1) * rowGap;
+                                                setInstallationPanelSize({ width: nextWidth, height: nextHeight });
+                                                node.position({
+                                                    x: panelX + nextWidth - resizeHandleSize / 2,
+                                                    y: panelY + nextHeight - resizeHandleSize / 2,
+                                                });
+                                            }}
+                                        />
+                                        {[0, 1, 2].map((lineIndex) => {
+                                            const inset = 4 + lineIndex * 3.4;
+                                            const hx = panelX + panelWidth - resizeHandleSize / 2;
+                                            const hy = panelY + panelHeight - resizeHandleSize / 2;
+                                            return (
+                                                <Line
+                                                    key={`installation-resize-grip-${lineIndex}`}
+                                                    points={[hx + inset, hy + resizeHandleSize - 2, hx + resizeHandleSize - 2, hy + inset]}
+                                                    stroke="rgba(255, 255, 255, 0.75)"
+                                                    strokeWidth={1}
+                                                    listening={false}
+                                                />
+                                            );
+                                        })}
+                                    </>
+                                );
+                            })()}
+                        </Layer>
+                    )}
                 </Stage>
             </section>
             {slotMenuPos && (

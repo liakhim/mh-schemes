@@ -1,0 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+Pro:wght@400;600&display=swap');
+
+.old-shell {
+    font-family: 'Source Sans Pro', sans-serif;
+    background: #fff;
+}
+
+.old-shell h1,
+.old-shell h2,
+.old-shell h3 {
+    font-family: 'Montserrat', sans-serif;
+    letter-spacing: 0.2px;
+}
+
+.old-shell-nav {
+    background: #1b1b1b;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.old-shell-logo-badge {
+    background: #fff;
+    border-radius: 999px;
+    padding: 6px 14px;
+    display: inline-flex;
+    align-items: center;
+    line-height: 0;
+}
+
+.old-shell-logo-badge img {
+    height: 20px;
+    width: auto;
+    display: block;
+}
+
+.old-shell-nav-title {
+    color: #fff;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.old-shell-hero {
+    background: #1b1b1b;
+    padding: 28px 24px 56px;
+}
+
+.old-shell-breadcrumb {
+    max-width: 1120px;
+    margin: 0 auto 20px;
+    font-size: 13px;
+    color: #9a9a9a;
+}
+
+.old-shell-breadcrumb a {
+    color: #9a9a9a;
+    text-decoration: none;
+}
+
+.old-shell-breadcrumb a:hover {
+    color: #fe8128;
+}
+
+.old-shell-breadcrumb span {
+    color: #fff;
+}
+
+.old-shell-hero-inner {
+    max-width: 1120px;
+    margin: 0 auto;
+}
+
+.old-shell-hero h1 {
+    color: #fff;
+    font-size: 34px;
+    font-weight: 700;
+    margin: 0 0 14px;
+}
+
+.old-shell-hero p {
+    color: #b7b7b7;
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 0;
+    max-width: 640px;
+}
+
+.old-shell-main {
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    margin-top: -28px;
+    position: relative;
+    z-index: 1;
+    padding-top: 8px;
+}
+
+.old-shell-footer {
+    background: #1b1b1b;
+    color: #9a9a9a;
+    text-align: center;
+    font-size: 13px;
+    padding: 20px 24px;
+    margin-top: 40px;
+}

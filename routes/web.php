@@ -72,6 +72,7 @@ Route::post('/api/proxy/integration', function (Request $request) {
 })->name('proxy.integration');
 
 Route::view('/selection', 'selection')->name('selection');
+Route::view('/selection-old', 'selection-old')->name('selection-old');
 Route::view('/scheme', 'spa', ['scheme' => null])->name('scheme');
 Route::get('/scheme/{scheme}', function (Scheme $scheme) {
     return view('spa', ['scheme' => $scheme]);
