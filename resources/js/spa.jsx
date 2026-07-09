@@ -596,17 +596,22 @@ const getInstallationPortLineColor = (name) => {
 // распознаются и намеренно считаются «занятыми», чтобы не терять хвостики
 // в кейсах, которые эта эвристика не покрывает.
 const parseInstallationPortSlot = (name) => {
-    const normalized = String(name || '').toUpperCase().trim();
+    // Имя класса порта может нести семантические теги через пробел
+    // (напр. «RELAY-2-A 220PUMP», «NTC-1-A CASCADE», «RELAY-S-1-A VALVE» у ecosmart).
+    // Идентичность порта задаёт только первый токен — по нему и определяем слот.
+    const normalized = String(name || '').toUpperCase().trim().split(/\s+/)[0];
     let match;
     if ((match = /^RELAY-S-(\d+)(?:-(\d+))?(?:-(\d+))?-[AB]$/.exec(normalized))) {
         const indexes = [match[1], match[2], match[3]].filter(Boolean).map((value) => Number(value) - 1);
         return indexes.length > 1 ? { line: 'relaySRange', indexes } : { line: 'relayS', index: indexes[0] };
     }
-    if ((match = /^RELAY-(\d+)(?:-(\d+))?(?:-(\d+))?-[AB]$/.exec(normalized))) {
+    // -COM/-NO/-NC — терминалы реле у go/go+ (RELAY-1-COM, RELAY-1-NO); у остальных
+    // контроллеров реле именуются -A/-B. Все они относятся к одному слоту реле.
+    if ((match = /^RELAY-(\d+)(?:-(\d+))?(?:-(\d+))?-(?:[AB]|COM|NO|NC)$/.exec(normalized))) {
         const indexes = [match[1], match[2], match[3]].filter(Boolean).map((value) => Number(value) - 1);
         return indexes.length > 1 ? { line: 'relayRange', indexes } : { line: 'relay', index: indexes[0] };
     }
-    if (normalized === 'BUS-A' || normalized === 'BUS-B') return { line: 'bus', index: 0 };
+    if ((match = /^BUS(?:-(\d+))?-[AB]$/.exec(normalized))) return { line: 'bus', index: match[1] ? Number(match[1]) - 1 : 0 };
     if ((match = /^DI-(?:IN-)?(\d+)(?:-(\d+))?(?:-(\d+))?-COM$/.exec(normalized))) {
         return {
             line: 'diRange',
@@ -623,6 +628,9 @@ const parseInstallationPortSlot = (name) => {
         };
     }
     if ((match = /^DI-(?:OUT|IN)-(\d+)$/.exec(normalized))) return { line: 'di', index: Number(match[1]) - 1 };
+    // 3-контактный вход DI (ecosmart): сигнальный терминал DI-IN-N-DI задаёт слот;
+    // GND/V+ остаются вспомогательными и лычку не рисуют.
+    if ((match = /^DI-(?:OUT|IN)-(\d+)-DI$/.exec(normalized))) return { line: 'di', index: Number(match[1]) - 1 };
     if ((match = /^DI-(\d+)$/.exec(normalized))) return { line: 'di', index: Number(match[1]) - 1 };
     if ((match = /^AI(?:-IN)?-?(\d+)?/.exec(normalized))) return { line: 'ai', index: match[1] ? Number(match[1]) - 1 : 0 };
     if ((match = /^4-20(?:-IN|-OUT)?-?(\d+)?/.exec(normalized))) return { line: '420', index: match[1] ? Number(match[1]) - 1 : 0 };
@@ -634,7 +642,13 @@ const parseInstallationPortSlot = (name) => {
 
 const isInstallationPortOccupied = (item, port) => {
     const slot = parseInstallationPortSlot(port?.name);
-    if (!slot) return true;
+    if (!slot) {
+        // Нераспознанные порты бывают двух видов: реальные соединения цепочки/питания
+        // (EXT-IN/OUT, 12VDC-IN/OUT) — их оставляем; и вспомогательные терминалы
+        // (RELAY-N-GND, RELAY-N-V+, DI-IN-2-* у ecosmart и т.п.), которые не являются
+        // самостоятельным подключением — на них не должно быть ни хвостов, ни лычек.
+        return /(?:EXT|VDC)-(?:IN|OUT)/.test(String(port?.name || '').toUpperCase());
+    }
     const data = item?.data;
     if (!data || typeof data !== 'object') return true;
     const hasAtIndex = (lineArray, index) => Array.isArray(lineArray)
@@ -12952,7 +12966,7 @@ const App = () => {
                                 height={GRID_MAX - GRID_MIN}
                                 fillLinearGradientStartPoint={{ x: 0, y: GRID_MIN }}
                                 fillLinearGradientEndPoint={{ x: 0, y: GRID_MAX }}
-                                fillLinearGradientColorStops={[0, '#eef1f5', 1, '#e3e7ed']}
+                                fillLinearGradientColorStops={[0, '#ffffff', 1, '#ffffff']}
                                 listening
                             />
                             {(() => {
@@ -13018,8 +13032,18 @@ const App = () => {
                                 // выровнен по вертикальному центру панели.
                                 const leftControllerItem = controllerRendersLeft ? items.find(isLeftControllerItem) : null;
                                 const leftControllerWidth = leftControllerItem ? getInstallationItemWidth(leftControllerItem) : 0;
-                                const leftControllerBaseX = panelX - 4 * indentSize - leftControllerWidth;
-                                const leftControllerBaseY = leftControllerItem ? panelY + panelHeight / 2 - leftControllerItem.image.height / 2 : 0;
+                                // Щиток нужен только под оборудование на DIN-рейке. Если на рейке
+                                // ничего нет (например, только вынесенный слева контроллер go/go+/ecosmart),
+                                // пустую панель не рисуем, а контроллер центрируем на холсте.
+                                const showPanel = items.some((item) => !isLeftControllerItem(item));
+                                const leftControllerBaseX = showPanel
+                                    ? panelX - 4 * indentSize - leftControllerWidth
+                                    : Math.round((canvasSize.width / 2 - leftControllerWidth / 2) / indentSize) * indentSize;
+                                const leftControllerBaseY = leftControllerItem
+                                    ? (showPanel
+                                        ? panelY + panelHeight / 2 - leftControllerItem.image.height / 2
+                                        : canvasSize.height / 2 - leftControllerItem.image.height / 2)
+                                    : 0;
                                 const rowCount = Math.max(1, Math.floor((Math.max(0, panelHeight - panelPaddingY * 2) + rowGap) / rowStep));
                                 const railHeight = 24;
                                 const railY = startY + rowSlotHeight * 0.45 - railHeight / 2;
@@ -13082,7 +13106,7 @@ const App = () => {
                                 let currentX = startX;
                                 const getInstallationPorts = (item) => {
                                     const sourcePorts = item.key === 'controller' ? ports : (wirelessPortsByType[item.type] || []);
-                                    return sourcePorts.filter((port) => {
+                                    const filtered = sourcePorts.filter((port) => {
                                         const name = String(port?.name || '').toUpperCase();
                                         if (!name) return false;
                                         return !name.includes('ANCHOR')
@@ -13092,6 +13116,19 @@ const App = () => {
                                             && !name.includes('LOGO')
                                             && !name.includes('QR');
                                     });
+                                    // Иногда один терминал задан двумя элементами: «RELAY-1-A» и
+                                    // «RELAY-1-A BOILER-GVS» (второй — семантическая зона). Оставляем по
+                                    // одному порту на первый токен имени, предпочитая короткое (сам
+                                    // терминал), чтобы не рисовать две одинаковые лычки.
+                                    const byToken = new Map();
+                                    filtered.forEach((port) => {
+                                        const token = String(port?.name || '').toUpperCase().trim().split(/\s+/)[0];
+                                        const existing = byToken.get(token);
+                                        if (!existing || String(port.name).length < String(existing.name).length) {
+                                            byToken.set(token, port);
+                                        }
+                                    });
+                                    return Array.from(byToken.values());
                                 };
                                 const getInstallationAllPorts = (item) => (item.key === 'controller' ? ports : (wirelessPortsByType[item.type] || []));
                                 const getInstallationIndicatorActive = (item, port) => {
@@ -13128,6 +13165,7 @@ const App = () => {
 
                                 return (
                                     <>
+                                        {showPanel && (<>
                                         <Rect
                                             x={panelX}
                                             y={panelY}
@@ -13216,6 +13254,7 @@ const App = () => {
                                                 </React.Fragment>
                                             );
                                         })}
+                                        </>)}
                                         {items.map((item, itemIndex) => {
                                             const previousItem = items[itemIndex - 1] || null;
                                             const nextItem = items[itemIndex + 1] || null;
@@ -13262,7 +13301,27 @@ const App = () => {
                                                         image={item.image}
                                                         width={itemWidth}
                                                         height={item.image.height}
+                                                        {...(isLeftController ? {
+                                                            shadowColor: 'rgba(15, 23, 42, 0.32)',
+                                                            shadowBlur: 18,
+                                                            shadowOffsetY: 10,
+                                                            perfectDrawEnabled: false,
+                                                        } : {})}
                                                     />
+                                                    {goAerialImage && item.key === 'controller' && ['go', 'go+'].includes(controllerType) && (() => {
+                                                        const aerialWidth = goAerialImage.width || AERIAL_WIDTH;
+                                                        const aerialHeight = goAerialImage.height || AERIAL_HEIGHT;
+                                                        return (
+                                                            <Image
+                                                                image={goAerialImage}
+                                                                x={itemWidth - 5 * indentSize - aerialWidth}
+                                                                y={-aerialHeight}
+                                                                width={aerialWidth}
+                                                                height={aerialHeight}
+                                                                listening={false}
+                                                            />
+                                                        );
+                                                    })()}
                                                     {aerialImage && (item.key === 'controller' ? ['smart2', 'pro'].includes(controllerType) : canonicalDeviceType(item.type) === 'rdt2') && (() => {
                                                         const aerialPorts = getPortsByClassToken(getInstallationAllPorts(item), 'AERIAL');
                                                         if (!aerialPorts?.length) return null;
@@ -13311,6 +13370,17 @@ const App = () => {
                                                         })}
                                                     {getInstallationPorts(item)
                                                         .filter((port) => isInstallationPortOccupied(item, port))
+                                                        .filter((port) => {
+                                                            // Исходящие порты цепочки (справа): EXT-OUT ведёт к следующему
+                                                            // модулю расширения, «1-WIRE … OUT» — к следующему устройству
+                                                            // на шине 1-wire. Если следующего в цепочке нет, не рисуем ни
+                                                            // изогнутый хвост, ни лычку на этих портах.
+                                                            const portName = String(port?.name || '').toUpperCase();
+                                                            if (portName.includes('EXT-OUT')) return Boolean(item.moduleNextLabel);
+                                                            if (portName.includes('VDC-OUT')) return Boolean(item.powerNextLabel);
+                                                            if (portName.includes('1-WIRE') && portName.includes('OUT')) return Boolean(item.oneWireNextLabel);
+                                                            return true;
+                                                        })
                                                         .map((port, portIndex) => {
                                                             const isTopPort = port.y < 0.5;
                                                             const portX = port.x * itemWidth;
@@ -13387,6 +13457,7 @@ const App = () => {
                                                 </Group>
                                             );
                                         })}
+                                        {showPanel && (<>
                                         <Rect
                                             name="installation-panel-resize"
                                             x={panelX + panelWidth - resizeHandleSize / 2}
@@ -13439,6 +13510,7 @@ const App = () => {
                                                 />
                                             );
                                         })}
+                                        </>)}
                                     </>
                                 );
                             })()}
