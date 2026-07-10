@@ -146,6 +146,58 @@ body {
     background: #c62828;
 }
 
+.spa-installation-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.spa-installation-switch input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.spa-installation-switch input:checked + .scheme-settings-switch {
+    background: #2e7d32;
+}
+
+.spa-installation-switch input:checked + .scheme-settings-switch::after {
+    transform: translateX(20px);
+}
+
+.spa-installation-switch input:focus-visible + .scheme-settings-switch {
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.18);
+}
+
+.spa-installation-switch:has(input:disabled) {
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
+.spa-installation-switch input:disabled + .scheme-settings-switch {
+    background: #e5e7eb;
+    cursor: not-allowed;
+}
+
+.spa-navbar > .spa-navbar-actions button.spa-help-button {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 50%;
+    place-items: center;
+    font-size: 17px;
+    line-height: 1;
+}
+
 .scheme-settings-backdrop {
     position: fixed;
     inset: 0;
@@ -186,6 +238,114 @@ body {
     border-radius: 14px;
     background: #fff;
     box-shadow: 0 24px 70px rgba(17, 24, 39, 0.24);
+}
+
+.scheme-offer-modal {
+    width: min(560px, calc(100vw - 32px));
+    max-height: 85vh;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+    overflow: hidden;
+}
+
+.scheme-offer-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 24px 24px 16px;
+}
+
+.scheme-offer-header h2 {
+    margin: 0;
+    color: #1f2937;
+    font-size: 20px;
+}
+
+.scheme-offer-header span {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.scheme-offer-content {
+    max-height: min(62vh, 600px);
+    padding: 0 24px 8px;
+    overflow-y: auto;
+}
+
+.scheme-offer-section {
+    margin: 14px 0;
+}
+
+.scheme-offer-section h3 {
+    margin: 0 0 6px;
+    color: #475569;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.scheme-offer-row {
+    display: grid;
+    grid-template-columns: auto minmax(16px, 1fr) auto auto;
+    align-items: baseline;
+    gap: 8px;
+    padding: 7px 0;
+    color: #334155;
+    font-size: 15px;
+}
+
+.scheme-offer-item {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+}
+
+.scheme-offer-item img {
+    width: auto;
+    height: 14px;
+    flex: 0 0 auto;
+}
+
+.scheme-offer-leader {
+    min-width: 16px;
+    border-bottom: 1px dotted #6b7f95;
+    transform: translateY(-3px);
+}
+
+.scheme-offer-row strong,
+.scheme-offer-total {
+    color: #1f2937;
+    white-space: nowrap;
+}
+
+.scheme-offer-total {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 24px 24px;
+    margin-top: 6px;
+    border-top: 2px solid #e2e8f0;
+    background: #fff;
+    font-size: 16px;
+    font-weight: 800;
+}
+
+@media (max-width: 560px) {
+    .scheme-offer-header,
+    .scheme-offer-content,
+    .scheme-offer-total {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .scheme-offer-row {
+        font-size: 13px;
+    }
 }
 
 .scheme-help-header {
@@ -402,6 +562,8 @@ body {
 .canvas-area {
     height: calc(100dvh - var(--nav-height));
     overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
 }
 
 .canvas-area-installation {
@@ -996,8 +1158,201 @@ body {
     color: var(--text);
 }
 
+/* ===== Схема: мобильная адаптация шапки =====
+   Высота шапки задаёт высоту канваса (100dvh - --nav-height), поэтому на
+   мобильных переопределяем переменную и раскладываем шапку в две строки:
+   логотип + альфа-плашка сверху, действия — снизу с горизонтальным свайпом. */
 @media (max-width: 800px) {
+    :root {
+        --nav-height: 96px;
+    }
+
     .spa-navbar {
-        padding: 0 12px;
+        flex-wrap: wrap;
+        align-content: center;
+        row-gap: 4px;
+        padding: 6px 12px;
+        box-sizing: border-box;
+    }
+
+    .spa-navbar-brand {
+        width: 100%;
+        gap: 10px;
+    }
+
+    .spa-navbar-logo {
+        height: 22px;
+    }
+
+    .spa-alpha-notice {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: none;
+        padding: 4px 8px;
+        font-size: 11px;
+        gap: 8px;
+    }
+
+    .spa-alpha-notice a {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+
+    .spa-navbar-actions {
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 8px;
+        padding-bottom: 2px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .spa-navbar-actions::-webkit-scrollbar {
+        display: none;
+    }
+
+    .spa-navbar > .spa-navbar-actions button {
+        flex: 0 0 auto;
+        padding: 7px 11px;
+        font-size: 12px;
+    }
+
+    .spa-installation-switch {
+        flex: 0 0 auto;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    /* Фикс-панель названия схемы позиционируется под шапкой. */
+    .spa-fixed-scheme-title {
+        top: calc(var(--nav-height) + 10px);
+    }
+
+    .spa-scheme-title {
+        max-width: calc(100vw - 20px);
+    }
+}
+
+/* ===== Selection: мобильная адаптация ===== */
+
+/* Инлайновый width: min(1120px, 100%) + padding: 24 без border-box давал бы
+   горизонтальный скролл на узких экранах. */
+.selection-page {
+    box-sizing: border-box;
+}
+
+@media (max-width: 760px) {
+    .selection-page {
+        padding: 12px !important;
+    }
+
+    .sel-sticky-top {
+        margin: -12px -12px 20px;
+        padding: 10px 12px;
+        border-radius: 0 0 14px 14px;
+    }
+
+    .sel-header {
+        gap: 10px;
+        padding-bottom: 10px;
+    }
+
+    .sel-header h1 {
+        font-size: 17px;
+    }
+
+    .sel-header > div {
+        width: 100%;
+        justify-content: flex-start !important;
+        gap: 8px !important;
+    }
+
+    .sel-header button {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+    }
+
+    /* Навигация по разделам — одна строка с горизонтальной прокруткой,
+       чтобы липкая шапка не съедала пол-экрана. */
+    .sel-quick-nav {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-top: 10px;
+        padding-bottom: 2px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .sel-quick-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .sel-quick-nav a {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        font-size: 12px;
+    }
+
+    .selection-page h2 {
+        font-size: 16px;
+    }
+
+    /* Карточки шаблонов — в один столбец на всю ширину
+       (перебивает инлайновые minWidth/maxWidth). */
+    .selection-page .sel-card {
+        flex: 1 1 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
+    /* Ряды карточек, свёрстанные без переноса (дискретные входы),
+       на телефоне переносим — иначе страница уезжает вбок. */
+    .selection-page section > div {
+        flex-wrap: wrap !important;
+    }
+
+    .sel-group-label {
+        margin-bottom: 14px;
+        padding-bottom: 8px;
+    }
+
+    /* Липкая панель «Подобранный контроллер» — компактная по высоте:
+       карточки в одну строку со свайпом, картинки и подписи ужаты. */
+    .sel-stuck-controllers-title {
+        padding-top: 6px !important;
+        font-size: 11px !important;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .sel-stuck-controllers {
+        padding-top: 6px !important;
+        gap: 6px !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .sel-stuck-controllers::-webkit-scrollbar {
+        display: none;
+    }
+
+    .sel-stuck-controller-card {
+        gap: 6px !important;
+        padding: 2px 8px 2px 4px !important;
+        font-size: 12px !important;
+        border-radius: 6px !important;
+    }
+
+    .sel-stuck-controller-card img {
+        width: 32px !important;
+        height: 24px !important;
+    }
+
+    .sel-stuck-controllers-note {
+        margin-top: 6px !important;
+        padding: 5px 8px !important;
+        font-size: 12px !important;
+        gap: 6px !important;
     }
 }

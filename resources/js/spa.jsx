@@ -461,7 +461,13 @@ const DI_DEVICE_TITLES = {
 };
 const shouldShowDiDeviceInfoBlock = (device) => Boolean(device);
 const isDiscreteDiDeviceType = (type) => DISCRETE_DI_DEVICE_TYPES.includes(canonicalDeviceType(type));
-const getDeviceStoredTitle = (device) => device?.title || device?.titile || null;
+const getDeviceStoredTitle = (device) => {
+    const type = canonicalDeviceType(device?.type);
+    if ((type === 'smart' || type === 'stupid') && typeof device?.name === 'string' && device.name.trim()) {
+        return device.name.trim();
+    }
+    return device?.title || device?.titile || null;
+};
 const INSTALLATION_DEVICE_TYPE_TITLES = {
     'boiler-pump': 'Насос бойлера',
     'pump-220v': 'Насос 220V',
@@ -481,12 +487,15 @@ const INSTALLATION_DEVICE_TYPE_TITLES = {
     rdt2: 'RDT2',
     'ntc-1-wire': 'NTC-1-wire',
     io4: 'IO4',
+    bl2: 'BL2',
+    rl2: 'RL2',
+    rl2s: 'RL2S',
     rl6: 'RL6',
     rl6s: 'RL6S',
     di6: 'DI6',
     'circuit-breaker': 'Авто.выключатель',
     'power-unit': 'Блок питания',
-    ups: 'ИБП',
+    ups: 'UPS',
     pro: 'PRO',
     smart2: 'SMART2',
     discrete_pool: 'Дискретный бассейн',
@@ -509,10 +518,12 @@ const getInstallationItemLabel = (item) => {
     return getInstallationDeviceLabel(item.data, INSTALLATION_DEVICE_TYPE_TITLES[type] || type || 'Модуль');
 };
 const POWER_UNIT_LABEL = 'Блок питания';
+const uppercaseInstallationModuleTokens = (label) => String(label || '')
+    .replace(/\b(rl2s|rl2|rl6s|rl6|di6|io4|bl2|rdt2|rdt)\b/gi, (match) => match.toUpperCase());
 const getInstallationMarkerText = (label) => {
-    const value = String(label || '').trim();
+    const value = uppercaseInstallationModuleTokens(label).trim();
     if (value.length <= 24) return value;
-    return `${value.slice(0, 23)}.`;
+    return `${value.slice(0, 23)}...`;
 };
 const IO4_ONLY_WIRED_DEVICE_TYPES = ['010pump', '010servo'];
 const BUS_SLOT_SIZE = 80;
@@ -598,8 +609,26 @@ const getInstallationPortLineColor = (name) => {
 const parseInstallationPortSlot = (name) => {
     // Имя класса порта может нести семантические теги через пробел
     // (напр. «RELAY-2-A 220PUMP», «NTC-1-A CASCADE», «RELAY-S-1-A VALVE» у ecosmart).
-    // Идентичность порта задаёт только первый токен — по нему и определяем слот.
-    const normalized = String(name || '').toUpperCase().trim().split(/\s+/)[0];
+    const tokens = String(name || '').toUpperCase().trim().split(/\s+/);
+    const normalized = tokens[0];
+    const tag = tokens.slice(1).join(' ');
+    // Тегированные порты ecosmart — фиксированные per-role линии контроллера.
+    // Подключением считаются только терминалы A/B; GND/V+ — вспомогательные.
+    if (tag && /-[AB]$/.test(normalized)) {
+        if (tag === 'BOILER-GVS') return { line: 'ecosmartRole', key: 'relay_boiler_gvs_devices', index: 0, fallback: 'Насос бойлера ГВС' };
+        if (tag === '220PUMP') {
+            if (normalized.startsWith('RELAY-2-')) return { line: 'ecosmartRole', key: 'relay_220pump_devices', index: 0, fallback: 'Насос 220V' };
+            if (normalized.startsWith('RELAY-5-')) return { line: 'ecosmartRole', key: 'relay_220pump5_devices', index: 0, fallback: 'Насос 220V' };
+            if (normalized.startsWith('RELAY-3-')) return { line: 'ecosmartRole', key: 'relay_220pump3_devices', index: 0, fallback: 'Насос 220V' };
+        }
+        if (tag === 'VALVE') return { line: 'ecosmartRole', key: 'relay_s_valve_devices', index: 0, fallback: 'Запорный клапан' };
+        if (tag === 'CASCADE') return { line: 'ecosmartRole', key: 'strategy_sensor_devices', index: 0, fallback: 'Датчик стратегии' };
+        if (tag === 'BOILER' && normalized.startsWith('NTC-')) return { line: 'ecosmartRole', key: 'boiler_sensor_devices', index: 0, fallback: 'Датчик бойлера' };
+        if (tag === 'MIXING') {
+            if (normalized.startsWith('NTC-3-')) return { line: 'ecosmartRole', key: 'mixing_ntc_devices', index: 0, fallback: 'NTC смесителя' };
+            if (normalized.startsWith('NTC-4-')) return { line: 'ecosmartRole', key: 'mixing_ntc_devices', index: 1, fallback: 'NTC смесителя' };
+        }
+    }
     let match;
     if ((match = /^RELAY-S-(\d+)(?:-(\d+))?(?:-(\d+))?-[AB]$/.exec(normalized))) {
         const indexes = [match[1], match[2], match[3]].filter(Boolean).map((value) => Number(value) - 1);
@@ -642,28 +671,49 @@ const parseInstallationPortSlot = (name) => {
 
 const isInstallationPortOccupied = (item, port) => {
     const slot = parseInstallationPortSlot(port?.name);
+    // DI-линии коммутации ИБП с контроллером подключены всегда.
+    if (slot && slot.line === 'di' && canonicalDeviceType(item?.type) === 'ups') return true;
     if (!slot) {
+        const itemType = canonicalDeviceType(item?.type);
+        const normalizedPortName = String(port?.name || '').toUpperCase();
+        // Клеммы аккумулятора ИБП: батарея всегда подключена к ним.
+        if (normalizedPortName.startsWith('ACID-BAT')) return true;
+        if (itemType === 'power-unit') return normalizedPortName === 'L-IN' || /(?:EXT|VDC)-(?:IN|OUT)/.test(normalizedPortName);
+        if (itemType === 'circuit-breaker') return normalizedPortName === 'L-IN' || normalizedPortName === 'L-OUT';
         // Нераспознанные порты бывают двух видов: реальные соединения цепочки/питания
         // (EXT-IN/OUT, 12VDC-IN/OUT) — их оставляем; и вспомогательные терминалы
         // (RELAY-N-GND, RELAY-N-V+, DI-IN-2-* у ecosmart и т.п.), которые не являются
         // самостоятельным подключением — на них не должно быть ни хвостов, ни лычек.
-        return /(?:EXT|VDC)-(?:IN|OUT)/.test(String(port?.name || '').toUpperCase());
+        return /(?:EXT|VDC)-(?:IN|OUT)/.test(normalizedPortName);
     }
     const data = item?.data;
     if (!data || typeof data !== 'object') return true;
     const hasAtIndex = (lineArray, index) => Array.isArray(lineArray)
         && (index == null ? lineArray.some(Boolean) : Boolean(lineArray[index]));
+    const isEcosmartData = canonicalDeviceType(data?.type) === 'ecosmart';
 
-    if (slot.line === 'relay') return hasAtIndex(data.relay_devices, slot.index);
+    if (slot.line === 'ecosmartRole') return hasAtIndex(data[slot.key], slot.index);
+    if (slot.line === 'relay') {
+        // На ecosmart нетегированные RELAY-6/RELAY-4 — слоты сервоприводов смесителей.
+        if (isEcosmartData && slot.index === 5) return hasAtIndex(data['220_servo_devices'], 0);
+        if (isEcosmartData && slot.index === 3) return hasAtIndex(data['220_servo_devices'], 1);
+        return hasAtIndex(data.relay_devices, slot.index);
+    }
     if (slot.line === 'relayRange') return slot.indexes.some((index) => hasAtIndex(data.relay_devices, index));
     if (slot.line === 'relayS') return hasAtIndex(data.relay_s_devices, slot.index);
     if (slot.line === 'relaySRange') return slot.indexes.some((index) => hasAtIndex(data.relay_s_devices, index));
     if (slot.line === 'bus') return hasAtIndex(data.bus_devices, slot.index);
     if (slot.line === 'diRange') return slot.indexes.some((index) => hasAtIndex(data.di_devices, index) || hasAtIndex(data.channel_devices, index));
-    if (slot.line === 'di') return hasAtIndex(data.di_devices, slot.index) || hasAtIndex(data.channel_devices, slot.index);
+    if (slot.line === 'di') {
+        // DI-IN-2 у ecosmart — вход датчика протечки (leak_sensor_devices).
+        if (isEcosmartData && slot.index === 1) return hasAtIndex(data.leak_sensor_devices, 0);
+        if (hasAtIndex(data.di_devices, slot.index) || hasAtIndex(data.channel_devices, slot.index)) return true;
+        // DI-входы контроллера, занятые линиями коммутации ИБП.
+        return Array.isArray(item?.upsDiPortIndexes) && item.upsDiPortIndexes.includes(slot.index);
+    }
     if (slot.line === 'channel') return hasAtIndex(data.channel_devices, slot.index) || hasAtIndex(data.devices_420, slot.index) || hasAtIndex(data.ai_devices, slot.index);
     if (slot.line === 'channelRange') return slot.indexes.some((index) => hasAtIndex(data.channel_devices, index) || hasAtIndex(data.devices_420, index) || hasAtIndex(data.ai_devices, index));
-    if (slot.line === '420') return hasAtIndex(data.devices_420, slot.index);
+    if (slot.line === '420') return hasAtIndex(data.devices_420, slot.index) || hasAtIndex(data.devices420, slot.index);
     if (slot.line === 'ai') return hasAtIndex(data.ai_devices, slot.index);
     if (slot.line === 'modbus') return hasAtIndex(data.modbus_devices, null);
     if (slot.line === 'ntcChannel') {
@@ -692,10 +742,24 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
     const slot = parseInstallationPortSlot(port?.name);
     const data = item?.data;
     const normalizedPortName = String(port?.name || '').toUpperCase();
+    // DI-линии коммутации ИБП идут на DI-входы контроллера.
+    if (slot && slot.line === 'di' && canonicalDeviceType(item?.type) === 'ups') {
+        return options.upsDiTargetLabel || 'DI контроллера';
+    }
     if (!slot) {
+        const itemType = canonicalDeviceType(item?.type);
+        if (normalizedPortName.startsWith('ACID-BAT')) return 'Батарея';
+        if (itemType === 'power-unit' && normalizedPortName === 'L-IN') return 'Авто.выключатель';
+        if (itemType === 'circuit-breaker' && normalizedPortName === 'L-IN') return 'Линия';
+        if (itemType === 'circuit-breaker' && normalizedPortName === 'L-OUT') return POWER_UNIT_LABEL;
         if (normalizedPortName.includes('12VDC-OUT') || normalizedPortName.includes('VDC-OUT')) return options.powerNextLabel || null;
         if (normalizedPortName.includes('12VDC-IN') || normalizedPortName.includes('VDC-IN')) return options.powerPreviousLabel || null;
-        if (normalizedPortName.includes('EXT-OUT')) return options.nextLabel || null;
+        if (normalizedPortName.includes('EXT-OUT')) {
+            if (options.nextLabel) return options.nextLabel;
+            const extDevices = Array.isArray(data?.ext_devices) ? data.ext_devices.filter(Boolean) : [];
+            if (extDevices.length > 0) return getInstallationDeviceLabel(extDevices[0], 'Термостат EXT');
+            return null;
+        }
         if (normalizedPortName.includes('EXT-IN')) return options.previousLabel || null;
         return null;
     }
@@ -706,8 +770,14 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
         return lineArray[index] || null;
     };
     const getLabel = (device, fallback) => (device ? getInstallationDeviceLabel(device, fallback) : null);
+    const isEcosmartData = canonicalDeviceType(data?.type) === 'ecosmart';
 
-    if (slot.line === 'relay') return getLabel(getAtIndex(data.relay_devices, slot.index), `Реле ${slot.index + 1}`);
+    if (slot.line === 'ecosmartRole') return getLabel(getAtIndex(data[slot.key], slot.index), slot.fallback);
+    if (slot.line === 'relay') {
+        if (isEcosmartData && slot.index === 5) return getLabel(getAtIndex(data['220_servo_devices'], 0), 'Сервопривод смесителя');
+        if (isEcosmartData && slot.index === 3) return getLabel(getAtIndex(data['220_servo_devices'], 1), 'Сервопривод смесителя');
+        return getLabel(getAtIndex(data.relay_devices, slot.index), `Реле ${slot.index + 1}`);
+    }
     if (slot.line === 'relayRange') {
         const device = slot.indexes
             .map((index) => getAtIndex(data.relay_devices, index))
@@ -729,8 +799,10 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
         return getLabel(device, 'DI COM');
     }
     if (slot.line === 'di') {
+        if (isEcosmartData && slot.index === 1) return getLabel(getAtIndex(data.leak_sensor_devices, 0), 'Датчик протечки');
         return getLabel(getAtIndex(data.di_devices, slot.index), `DI ${slot.index + 1}`)
-            || getLabel(getAtIndex(data.channel_devices, slot.index), `DI ${slot.index + 1}`);
+            || getLabel(getAtIndex(data.channel_devices, slot.index), `DI ${slot.index + 1}`)
+            || (Array.isArray(item?.upsDiPortIndexes) && item.upsDiPortIndexes.includes(slot.index) ? 'UPS' : null);
     }
     if (slot.line === 'channel') {
         return getLabel(getAtIndex(data.channel_devices, slot.index), 'Канал')
@@ -743,7 +815,10 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
             .find(Boolean);
         return getLabel(device, 'Канал');
     }
-    if (slot.line === '420') return getLabel(getAtIndex(data.devices_420, slot.index), '4-20 mA');
+    if (slot.line === '420') {
+        return getLabel(getAtIndex(data.devices_420, slot.index), '4-20 mA')
+            || getLabel(getAtIndex(data.devices420, slot.index), '4-20 mA');
+    }
     if (slot.line === 'ai') return getLabel(getAtIndex(data.ai_devices, slot.index), `AI ${slot.index + 1}`);
     if (slot.line === 'modbus') return getLabel(getAtIndex(data.modbus_devices, null), 'Modbus');
     if (slot.line === 'ntcChannel') {
@@ -854,6 +929,90 @@ const getRelaySLineConfig = (controllerType, portsList) => {
         .sort((a, b) => a.index - b.index);
 };
 
+const isDoubleRelaySignalPort = (port) => {
+    const name = String(port?.name || '').toUpperCase();
+    return name === 'RELAY-IN-1'
+        || name === 'RELAY-IN-2'
+        || name === 'RELAY-1'
+        || name === 'RELAY-2';
+};
+
+const OFFER_PRICES = {
+    controllers: { go: 16990, 'go+': 22490, smart2: 18990, pro: 44990, ecosmart: 46990 },
+    modules: { rl2: 3890, rl2s: 3890, rl6: 8990, rl6s: 9990, rdt2: 4990, di6: 7990, io4: 7990, 'ntc-1-wire': 4190, bl2: 6990, ecosmartbl2: 6990 },
+    thermostat: 9490,
+    pressure: 5990,
+    leak: 2990,
+    ups: 9990,
+    'wireless-outdoor': 5890,
+    'wireless-wall': 4190,
+    'wired-wall-digital': 1650,
+    'wired-flask-digital': 1450,
+    'wired-flask-ntc': 3190,
+};
+
+const OFFER_MODULE_LABELS = {
+    rl2: 'Модуль реле RL2', rl2s: 'Модуль реле RL2S', rl6: 'Модуль реле RL6', rl6s: 'Модуль реле RL6S',
+    rdt2: 'Радиомодуль RDT2', di6: 'Модуль DI6', io4: 'Модуль IO4', 'ntc-1-wire': 'Модуль NTC 1-Wire',
+    bl2: 'Модуль BUS BL2', ecosmartbl2: 'Модуль ECOsmart BL2',
+};
+
+const getSchemeOfferSections = (scheme) => {
+    const rowsBySection = { controller: [], modules: [], equipment: [] };
+    const counts = new Map();
+    const add = (section, key, label, price) => {
+        const countKey = `${section}:${key}`;
+        const row = counts.get(countKey) || { label, count: 0, price };
+        row.count += 1;
+        counts.set(countKey, row);
+    };
+    const controllerType = canonicalDeviceType(typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type);
+    if (OFFER_PRICES.controllers[controllerType] != null) {
+        add('controller', controllerType, String(controllerType).toUpperCase(), OFFER_PRICES.controllers[controllerType]);
+    }
+
+    const seen = new Set();
+    const visit = (value) => {
+        if (!value || typeof value !== 'object') return;
+        if (Array.isArray(value)) {
+            value.forEach(visit);
+            return;
+        }
+        const type = canonicalDeviceType(value.type);
+        const identity = value.id != null ? `${type}:${value.id}` : null;
+        if (identity && seen.has(identity)) return;
+        if (identity) seen.add(identity);
+        if (OFFER_PRICES.modules[type] != null) add('modules', type, OFFER_MODULE_LABELS[type], OFFER_PRICES.modules[type]);
+        const equipment = {
+            thermostat: ['Термостат MyHeat', OFFER_PRICES.thermostat],
+            'pressure-sensor': ['Датчик давления', OFFER_PRICES.pressure],
+            'leak-sensor': ['Датчик протечки', OFFER_PRICES.leak],
+            'outdoor-temperature-sensor': ['Радиодатчик температуры уличный', OFFER_PRICES['wireless-outdoor']],
+            'wall-temperature-sensor': ['Радиодатчик температуры и влажности комнатный', OFFER_PRICES['wireless-wall']],
+            'wall-digital-sensor': ['Датчик температуры настенный проводной', OFFER_PRICES['wired-wall-digital']],
+            'ntc-sensor': ['Датчик температуры в колбе NTC 10K', OFFER_PRICES['wired-flask-ntc']],
+            'mixing-ntc-sensor': ['Датчик температуры в колбе NTC 10K', OFFER_PRICES['wired-flask-ntc']],
+        }[type];
+        if (equipment) add('equipment', type, equipment[0], equipment[1]);
+        if (String(type || '').startsWith('flask-sensor') && type !== 'flask-sensor-floor') {
+            add('equipment', 'wired-flask-digital', 'Датчик температуры в колбе проводной', OFFER_PRICES['wired-flask-digital']);
+        }
+        Object.values(value).forEach(visit);
+    };
+    visit(scheme);
+    (Array.isArray(scheme?.power_modules) ? scheme.power_modules : []).forEach((item) => {
+        if (canonicalDeviceType(typeof item === 'string' ? item : item?.type) === 'ups') {
+            add('equipment', 'ups', 'Источник бесперебойного питания (UPS)', OFFER_PRICES.ups);
+        }
+    });
+    counts.forEach((row, key) => rowsBySection[key.split(':')[0]].push(row));
+    return [
+        ['Контроллер', rowsBySection.controller],
+        ['Модули расширения', rowsBySection.modules],
+        ['Оборудование MyHeat', rowsBySection.equipment],
+    ].filter(([, rows]) => rows.length > 0);
+};
+
 const App = () => {
     const stageRef = useRef(null);
     const gridLayerRef = useRef(null);
@@ -873,6 +1032,7 @@ const App = () => {
     const [showIncomingScheme, setShowIncomingScheme] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(() => window.localStorage?.getItem(HELP_MODAL_STORAGE_KEY) !== '1');
+    const [showOfferModal, setShowOfferModal] = useState(false);
     const [installationMode, setInstallationMode] = useState(true);
     const [installationPanelSize, setInstallationPanelSize] = useState(null);
     const [installationItemOffsets, setInstallationItemOffsets] = useState({});
@@ -938,6 +1098,8 @@ const App = () => {
     const isPanningRef = useRef(false);
     const panStartPointerRef = useRef({ x: 0, y: 0 });
     const panStartStageRef = useRef({ x: 0, y: 0 });
+    const zoomFrameRef = useRef(null);
+    const zoomPendingRef = useRef(null);
 
     useEffect(() => {
         const handleResize = () => setCanvasSize(getCanvasSize());
@@ -2572,6 +2734,11 @@ const App = () => {
 
     const addRelayDeviceFromMenu = (type) => {
         if (!relayMenuPos) return;
+        // Тупой котёл не может садиться на RELAY-S порты.
+        if (type === 'stupid' && relayMenuPos.lineKey === 'relay_s_devices') {
+            setRelayMenuPos(null);
+            return;
+        }
         setScheme((s) => {
             const isRelaySLine = relayMenuPos.lineKey === 'relay_s_devices';
             const isDoubleRelayPayload = (isRelaySLine && type === '220servo') || (!isRelaySLine && type === 'valve');
@@ -2668,6 +2835,11 @@ const App = () => {
 
     const addRl2sRelayDeviceFromMenu = (type) => {
         if (!rl2sRelayMenuPos) return;
+        // Тупой котёл не может садиться на RELAY-S порты (rl2s — relay-s линия).
+        if (type === 'stupid') {
+            setRl2sRelayMenuPos(null);
+            return;
+        }
         setScheme((s) => {
             const nextScheme = patchDiModuleLine(s, rl2sRelayMenuPos.moduleIndex, 'relay_s_devices', (currentLine) => {
             const isDoubleRelayPayload = type === '220servo' || type === 'valve';
@@ -3029,7 +3201,35 @@ const App = () => {
         return allRects.some((rect) => rect.id !== targetId && rectsOverlap(targetRect, rect));
     };
 
+    const startStagePan = (event) => {
+        if (event?.evt?.type?.startsWith('mouse') && event.evt.button !== 0) return;
+        const stage = stageRef.current;
+        if (installationMode && event.target !== stage && event.target?.getClassName?.() !== 'Rect') return;
+        if (installationMode && event.target?.name?.() === 'installation-panel-resize') return;
+        if (!stage || (!installationMode && event.target !== stage)) return;
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
+        event.evt?.preventDefault?.();
+        isPanningRef.current = true;
+        panStartPointerRef.current = pointer;
+        panStartStageRef.current = { x: stage.x(), y: stage.y() };
+    };
+
+    const moveStagePan = (event) => {
+        if (!isPanningRef.current) return;
+        const stage = stageRef.current;
+        const pointer = stage?.getPointerPosition();
+        if (!stage || !pointer) return;
+        event.evt?.preventDefault?.();
+        stage.position({
+            x: snapPixel(panStartStageRef.current.x + (pointer.x - panStartPointerRef.current.x)),
+            y: snapPixel(panStartStageRef.current.y + (pointer.y - panStartPointerRef.current.y)),
+        });
+        stage.batchDraw();
+    };
+
     const memoExtModules = useMemo(() => getExtModules(scheme), [scheme]);
+    const schemeOfferSections = useMemo(() => getSchemeOfferSections(scheme), [scheme]);
     const memoControllerExtDevices = useMemo(() => getControllerExtDevices(scheme), [scheme]);
     const memoRawOneWireDevices = useMemo(() => getOneWireDevicesFromScheme(scheme), [scheme]);
     const memoBalancedOneWire = useMemo(
@@ -3100,7 +3300,7 @@ const App = () => {
             .map((item) => normalizePowerModuleType(typeof item === 'string' ? item : item?.type))
             .includes('ups');
         const lastPoweredModule = poweredModuleChain[poweredModuleChain.length - 1] || null;
-        const smart2PowerSourceLabel = hasUpsPowerModule ? 'ИБП' : POWER_UNIT_LABEL;
+        const smart2PowerSourceLabel = hasUpsPowerModule ? 'UPS' : POWER_UNIT_LABEL;
         const getPowerLabelsForModule = (moduleItem) => {
             const chainIndex = poweredModuleChain.findIndex((candidate) => candidate === moduleItem || (candidate?.id != null && candidate.id === moduleItem?.id));
             if (chainIndex < 0) return {};
@@ -3148,8 +3348,9 @@ const App = () => {
                     data: item,
                     powerPreviousLabel: type === 'ups' ? POWER_UNIT_LABEL : null,
                     powerNextLabel: type === 'power-unit'
-                        ? (hasUpsPowerModule ? 'ИБП' : (isSmart2Installation && lastPoweredModule ? getInstallationDeviceLabel(lastPoweredModule) : controllerInstallationLabel))
+                        ? (hasUpsPowerModule ? 'UPS' : (isSmart2Installation && lastPoweredModule ? getInstallationDeviceLabel(lastPoweredModule) : controllerInstallationLabel))
                         : (type === 'ups' ? (isSmart2Installation && lastPoweredModule ? getInstallationDeviceLabel(lastPoweredModule) : controllerInstallationLabel) : null),
+                    ...(type === 'ups' ? { upsDiTargetLabel: controllerInstallationLabel } : {}),
                 });
             });
 
@@ -3157,9 +3358,13 @@ const App = () => {
             modulePreviousLabel: index === 0
                 ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
                 : getInstallationDeviceLabel(memoExtModules[index - 1]),
+            // После последнего EXT-модуля цепочка может продолжаться EXT-термостатами:
+            // их подключение выходит из EXT-OUT этого модуля.
             moduleNextLabel: memoExtModules[index + 1]
                 ? getInstallationDeviceLabel(memoExtModules[index + 1])
-                : null,
+                : (memoExtLineThermostatDevices[0]
+                    ? getInstallationDeviceLabel(memoExtLineThermostatDevices[0], 'Термостат')
+                    : null),
             ...getPowerLabelsForModule(item),
         }));
         diModuleItems.forEach((item, index, modules) => addUnique(items, seen, item, `di:${index}`, {
@@ -3207,7 +3412,7 @@ const App = () => {
             }));
 
         return items;
-    }, [scheme, memoExtModules]);
+    }, [scheme, memoExtModules, memoExtLineThermostatDevices]);
 
     return (
         <main className="spa-page">
@@ -3223,11 +3428,24 @@ const App = () => {
                     <button type="button" className="spa-reset-button" onClick={handleResetPositions}>
                         Сброс позиций
                     </button>
-                    <button type="button" onClick={() => setShowHelpModal(true)}>
-                        Помощь
+                    <label className="spa-installation-switch" title={canUseInstallationMode ? 'Режим инсталляции' : 'Режим инсталляции доступен для GO, GO+, Smart2, PRO и ECOsmart'}>
+                        <span>Инсталляция</span>
+                        <input
+                            type="checkbox"
+                            checked={installationMode}
+                            disabled={!canUseInstallationMode}
+                            onChange={(event) => setInstallationModeEnabled(event.target.checked)}
+                        />
+                        <span className="scheme-settings-switch" aria-hidden="true" />
+                    </label>
+                    <button type="button" onClick={() => setShowOfferModal(true)}>
+                        КП
                     </button>
-                    <button type="button" onClick={() => (installationMode ? setInstallationModeEnabled(false) : setShowSettingsModal(true))}>
-                        {installationMode ? 'Выключить режим инсталляции' : 'Настройки'}
+                    <button type="button" onClick={() => setShowSettingsModal(true)}>
+                        Настройки
+                    </button>
+                    <button type="button" className="spa-help-button" onClick={() => setShowHelpModal(true)} aria-label="Помощь" title="Помощь">
+                        ?
                     </button>
                 </div>
             </nav>
@@ -3251,10 +3469,6 @@ const App = () => {
                                 <p>Для скачивания схемы:</p>
                                 <strong>Настройки → Скачать PDF</strong>
                             </section>
-                            <section className="scheme-help-block">
-                                <p>Для контроллеров GO, GO+, Smart2, PRO и ECOsmart доступен Режим инсталляции:</p>
-                                <strong>Настройки → Режим инсталляции</strong>
-                            </section>
                             <p className="scheme-help-note">Если вы находитесь на этой странице, значит Ваша схема уже сохранена, ссылкой можно делиться или зайти позже.</p>
                             <p>
                                 Приложение находится в стадии альфа-тестирования, все вопросы к разработчику:{' '}
@@ -3267,6 +3481,46 @@ const App = () => {
                     </div>
                 </div>
             )}
+            {showOfferModal && (() => {
+                const total = schemeOfferSections.flatMap(([, rows]) => rows)
+                    .reduce((sum, row) => sum + row.count * row.price, 0);
+                return (
+                    <div className="scheme-help-backdrop" onMouseDown={() => setShowOfferModal(false)}>
+                        <div className="scheme-offer-modal" onMouseDown={(event) => event.stopPropagation()}>
+                            <div className="scheme-offer-header">
+                                <div>
+                                    <h2>Коммерческое предложение</h2>
+                                    <span>Оборудование MyHeat в текущей схеме</span>
+                                </div>
+                                <button type="button" className="scheme-settings-close" onClick={() => setShowOfferModal(false)}>×</button>
+                            </div>
+                            <div className="scheme-offer-content">
+                                {schemeOfferSections.length === 0 ? (
+                                    <p>Оборудование MyHeat пока не выбрано.</p>
+                                ) : schemeOfferSections.map(([title, rows]) => (
+                                    <section key={title} className="scheme-offer-section">
+                                        <h3>{title}</h3>
+                                        {rows.map((row) => (
+                                            <div key={row.label} className="scheme-offer-row">
+                                                <span className="scheme-offer-item">
+                                                    <img src={logoPath} alt="MyHeat" />
+                                                    <span>{row.label}</span>
+                                                </span>
+                                                <span className="scheme-offer-leader" />
+                                                <span>{row.count} шт</span>
+                                                <strong>{(row.count * row.price).toLocaleString('ru-RU')} ₽</strong>
+                                            </div>
+                                        ))}
+                                    </section>
+                                ))}
+                            </div>
+                            {schemeOfferSections.length > 0 && (
+                                <div className="scheme-offer-total">Итого: {total.toLocaleString('ru-RU')} ₽</div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
             {showSettingsModal && (
                 <div className="scheme-settings-backdrop" onMouseDown={() => setShowSettingsModal(false)}>
                     <aside className="scheme-settings-sidebar" onMouseDown={(event) => event.stopPropagation()}>
@@ -3300,21 +3554,6 @@ const App = () => {
                                 <input type="checkbox" checked={showIncomingScheme} onChange={(e) => setShowIncomingScheme(e.target.checked)} />
                                 <span className="scheme-settings-switch" aria-hidden="true" />
                             </label>
-                            <label className="scheme-settings-switch-row">
-                                <span>Режим инсталляции</span>
-                                <input
-                                    type="checkbox"
-                                    checked={installationMode}
-                                    disabled={!canUseInstallationMode}
-                                    onChange={(e) => setInstallationModeEnabled(e.target.checked)}
-                                />
-                                <span className="scheme-settings-switch" aria-hidden="true" />
-                            </label>
-                            {!canUseInstallationMode && (
-                                <div className="scheme-settings-hint">
-                                    Режим инсталляции доступен для GO, GO+, Smart2, PRO и ECOsmart.
-                                </div>
-                            )}
                         </div>
                         <div className="scheme-settings-actions">
                             <button type="button" className="scheme-settings-pdf-button" onClick={handleDownloadPdf}>
@@ -3537,52 +3776,53 @@ const App = () => {
                     width={canvasSize.width}
                     height={canvasSize.height}
                     style={{ cursor: 'grab' }}
-                    onMouseDown={(event) => {
-                        if (event.evt.button !== 0) return;
-                        const stage = stageRef.current;
-                        if (installationMode && event.target !== stage && event.target?.getClassName?.() !== 'Rect') return;
-                        if (installationMode && event.target?.name?.() === 'installation-panel-resize') return;
-                        if (!stage || (!installationMode && event.target !== stage)) return;
-                        const pointer = stage.getPointerPosition();
-                        if (!pointer) return;
-                        isPanningRef.current = true;
-                        panStartPointerRef.current = pointer;
-                        panStartStageRef.current = { x: stage.x(), y: stage.y() };
-                    }}
-                    onMouseMove={() => {
-                        if (!isPanningRef.current) return;
-                        const stage = stageRef.current;
-                        const pointer = stage?.getPointerPosition();
-                        if (!stage || !pointer) return;
-                        stage.position({
-                            x: snapPixel(panStartStageRef.current.x + (pointer.x - panStartPointerRef.current.x)),
-                            y: snapPixel(panStartStageRef.current.y + (pointer.y - panStartPointerRef.current.y)),
-                        });
-                        stage.batchDraw();
-                    }}
+                    onMouseDown={startStagePan}
+                    onMouseMove={moveStagePan}
                     onMouseUp={() => { isPanningRef.current = false; }}
                     onMouseLeave={() => { isPanningRef.current = false; }}
-                    onWheel={(event) => {
-                        event.evt.preventDefault();
-                        if (!event.evt.shiftKey) return;
-                        const stage = stageRef.current;
-                        const pointer = stage?.getPointerPosition();
-                        if (!stage || !pointer) return;
-                        const scaleBy = 1.08;
-                        const oldScale = stage.scaleX();
-                        const zoomDirection = event.evt.deltaY > 0 ? 1 : -1;
-                        const nextScale = zoomDirection > 0 ? oldScale / scaleBy : oldScale * scaleBy;
-                        const clampedScale = Math.max(0.4, Math.min(nextScale, 3));
-                        const cursorPoint = {
-                            x: (pointer.x - stage.x()) / oldScale,
-                            y: (pointer.y - stage.y()) / oldScale,
-                        };
-                        stage.position({
-                            x: snapPixel(pointer.x - cursorPoint.x * clampedScale),
-                            y: snapPixel(pointer.y - cursorPoint.y * clampedScale),
+                    onTouchStart={startStagePan}
+                    onTouchMove={moveStagePan}
+                    onTouchEnd={() => { isPanningRef.current = false; }}
+                    onTouchCancel={() => { isPanningRef.current = false; }}
+                     onWheel={(event) => {
+                         event.evt.preventDefault();
+                         const stage = stageRef.current;
+                         if (!stage) return;
+                         const shouldZoom = event.evt.shiftKey || event.evt.ctrlKey || event.evt.metaKey;
+                         if (!shouldZoom) {
+                             stage.position({
+                                 x: snapPixel(stage.x() - event.evt.deltaX),
+                                 y: snapPixel(stage.y() - event.evt.deltaY),
+                             });
+                             stage.batchDraw();
+                             return;
+                         }
+                         const pointer = stage.getPointerPosition();
+                         if (!pointer) return;
+                        const pending = zoomPendingRef.current || { deltaY: 0, pointer };
+                        pending.deltaY += event.evt.deltaY;
+                        pending.pointer = pointer;
+                        zoomPendingRef.current = pending;
+                        if (zoomFrameRef.current) return;
+                        zoomFrameRef.current = window.requestAnimationFrame(() => {
+                            zoomFrameRef.current = null;
+                            const next = zoomPendingRef.current;
+                            zoomPendingRef.current = null;
+                            if (!next) return;
+                            const oldScale = stage.scaleX();
+                            const nextScale = oldScale * Math.exp(-next.deltaY * 0.0008);
+                            const clampedScale = Math.max(0.4, Math.min(nextScale, 3));
+                            const cursorPoint = {
+                                x: (next.pointer.x - stage.x()) / oldScale,
+                                y: (next.pointer.y - stage.y()) / oldScale,
+                            };
+                            stage.position({
+                                x: snapPixel(next.pointer.x - cursorPoint.x * clampedScale),
+                                y: snapPixel(next.pointer.y - cursorPoint.y * clampedScale),
+                            });
+                            stage.scale({ x: clampedScale, y: clampedScale });
+                            stage.batchDraw();
                         });
-                        stage.scale({ x: clampedScale, y: clampedScale });
-                        stage.batchDraw();
                     }}
                 >
                     {showGrid && !installationMode && gridPatternImage && (
@@ -4115,7 +4355,7 @@ const App = () => {
                                                               height={diSlotHeight}
                                                               cornerRadius={6}
                                                               fill="rgba(0,0,0,0)"
-                                                              stroke={isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)'}
+                                                              stroke="rgba(0,0,0,0)"
                                                               strokeWidth={1.2}
                                                               onMouseEnter={() => setHoveredNtcSlotKey(hoverKey)}
                                                               onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === hoverKey ? null : prev))}
@@ -4187,7 +4427,7 @@ const App = () => {
                                                               height={diSlotHeight}
                                                               cornerRadius={6}
                                                               fill="rgba(0,0,0,0)"
-                                                              stroke={isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)'}
+                                                              stroke="rgba(0,0,0,0)"
                                                               strokeWidth={1.2}
                                                               onMouseEnter={() => setHoveredNtcSlotKey(hoverKey)}
                                                               onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === hoverKey ? null : prev))}
@@ -4304,7 +4544,10 @@ const App = () => {
                                         : 'Датчик протечки');
 
                                     return (
-                                        <Group>
+                                        <Group
+                                            onMouseEnter={() => setHoveredNtcSlotKey(hoverKey)}
+                                            onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === hoverKey ? null : prev))}
+                                        >
                                             {(leakSensor || showEmptySlots) && (
                                                 <>
                                                     <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, leakPorts.gnd.x, targetPorts.gnd.y, leakPorts.gnd.x, leakPorts.gnd.y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
@@ -4318,11 +4561,9 @@ const App = () => {
                                                 width={slotWidth}
                                                 height={slotHeight}
                                                 cornerRadius={6}
-                                                fill={leakSensor ? (isHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                stroke={leakSensor ? (isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                fill={leakSensor ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                stroke={leakSensor ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                 strokeWidth={1.2}
-                                                onMouseEnter={() => setHoveredNtcSlotKey(hoverKey)}
-                                                onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === hoverKey ? null : prev))}
                                                 onClick={!leakSensor ? addControllerLeakSensorAtSlot : undefined}
                                                 onTap={!leakSensor ? addControllerLeakSensorAtSlot : undefined}
                                             />
@@ -4401,7 +4642,10 @@ const App = () => {
                                      };
 
                                      return (
-                                         <Group>
+                                         <Group
+                                             onMouseEnter={() => setHoveredNtcSlotKey(hoverKey)}
+                                             onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === hoverKey ? null : prev))}
+                                         >
                                              {diDevice && (
                                                  <Line
                                                      points={[targetX, targetY, diPort.x, targetY, diPort.x, diPort.y]}
@@ -4428,11 +4672,9 @@ const App = () => {
                                                  width={slotWidth}
                                                  height={slotHeight}
                                                 cornerRadius={6}
-                                                fill={diDevice ? (isHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                stroke={diDevice ? (isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                fill={diDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                stroke={diDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                  strokeWidth={1.2}
-                                                 onMouseEnter={() => setHoveredNtcSlotKey(hoverKey)}
-                                                 onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === hoverKey ? null : prev))}
                                                  onClick={!diDevice ? openControllerDiMenu : undefined}
                                                  onTap={!diDevice ? openControllerDiMenu : undefined}
                                              />
@@ -4759,9 +5001,28 @@ const App = () => {
                                     const relayInfoTitle = getDeviceStoredTitle(relayDevice) || (relaySystemIndex > 0
                                         ? `${relayBaseTitle} ${relaySystemIndex}`
                                         : relayBaseTitle);
+                                    const relayHoverKey = 'ecosmart-relay-boiler';
+                                    const isRelayHovered = hoveredNtcSlotKey === relayHoverKey;
+                                    const removeEcosmartRelayDevice = () => {
+                                        setScheme((s) => {
+                                            const targetId = relayDevice?.id;
+                                            if (targetId == null) return s;
+                                            const nextScheme = patchControllerLine(s, 'relay_devices', (currentLine) => currentLine.filter((item) => item?.id !== targetId)) || s;
+                                            const currentBoilers = Array.isArray(nextScheme.boilers) ? nextScheme.boilers : [];
+                                            const currentWired = Array.isArray(nextScheme.wired_devices) ? nextScheme.wired_devices : [];
+                                            return {
+                                                ...nextScheme,
+                                                boilers: currentBoilers.filter((item) => item?.id !== targetId),
+                                                wired_devices: currentWired.filter((item) => item?.id !== targetId),
+                                            };
+                                        });
+                                        setHoveredNtcSlotKey((prev) => (prev === relayHoverKey ? null : prev));
+                                    };
 
                                     return (
                                         <Group
+                                            onMouseEnter={() => setHoveredNtcSlotKey(relayHoverKey)}
+                                            onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === relayHoverKey ? null : prev))}
                                             draggable={!!relayDevice}
                                             onDragStart={() => {
                                                 if (!relayDevice) return;
@@ -4826,6 +5087,13 @@ const App = () => {
                                                         height={INFO_BLOCK_HEIGHT}
                                                         align="center"
                                                         verticalAlign="middle" device={relayDevice} title={relayInfoTitle} />
+                                                </>
+                                            )}
+                                            {relayDevice && isRelayHovered && (
+                                                <>
+                                                    <Circle x={relaySlotX + relaySlotWidth - 2.5} y={relaySlotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={removeEcosmartRelayDevice} onTap={removeEcosmartRelayDevice} />
+                                                    <Line points={[relaySlotX + relaySlotWidth - 5, relaySlotY - 1, relaySlotX + relaySlotWidth, relaySlotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
+                                                    <Line points={[relaySlotX + relaySlotWidth, relaySlotY - 1, relaySlotX + relaySlotWidth - 5, relaySlotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
                                                 </>
                                             )}
                                              {relayDevice && isRelayBoilerType(relayType) && boilerBusAPort && boilerBusBPort && (
@@ -5008,7 +5276,11 @@ const App = () => {
                                             : sensorPortAPos;
 
                                         return (
-                                            <Group key={`ecosmart-ntc-line-${slot.key}`}>
+                                            <Group
+                                                key={`ecosmart-ntc-line-${slot.key}`}
+                                                onMouseEnter={() => setHoveredNtcSlotKey(hoverKey)}
+                                                onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === hoverKey ? null : prev))}
+                                            >
                                                 {(sensor || showEmptySlots) && controllerPortA && controllerPortB && (
                                                     <>
                                                         <Line
@@ -5035,11 +5307,9 @@ const App = () => {
                                                     width={slotWidth}
                                                     height={slotHeight}
                                                     cornerRadius={6}
-                                                    fill={sensor ? (isHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                    stroke={sensor ? (isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                    fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                    stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                     strokeWidth={1.2}
-                                                    onMouseEnter={() => setHoveredNtcSlotKey(hoverKey)}
-                                                    onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === hoverKey ? null : prev))}
                                                     onClick={!sensor ? () => addControllerNtcLineSensorAtSlot(slot.lineKey, slot.lineIndex, slot.type) : undefined}
                                                     onTap={!sensor ? () => addControllerNtcLineSensorAtSlot(slot.lineKey, slot.lineIndex, slot.type) : undefined}
                                                 />
@@ -5517,17 +5787,14 @@ const App = () => {
                                     const slotX = controllerImage.width;
                                     const slotY = controllerImage.height - slotHeight - 6 * indentSize;
                                     const renderSize = { width: slotWidth, height: slotHeight };
-                                    const valveImageCrop = image
-                                        ? { x: 0, y: 27, width: image.width || 71, height: Math.max(1, (image.height || 75) - 27) }
-                                        : null;
                                     const renderX = slotX + (slotWidth - renderSize.width) / 2;
                                     const renderY = slotY + (slotHeight - renderSize.height) / 2;
                                     const getValvePort = (name, fallbackY) => {
                                         const port = valvePorts.find((item) => item.name === name) || null;
                                         return port
                                             ? {
-                                                x: renderX + (((port.x * (image?.width || 71)) - (valveImageCrop?.x || 0)) / (valveImageCrop?.width || (image?.width || 71))) * renderSize.width,
-                                                y: renderY + (((port.y * (image?.height || 75)) - (valveImageCrop?.y || 0)) / (valveImageCrop?.height || (image?.height || 75))) * renderSize.height,
+                                                x: renderX + port.x * renderSize.width,
+                                                y: renderY + port.y * renderSize.height,
                                             }
                                             : { x: slotX, y: fallbackY };
                                     };
@@ -5557,7 +5824,7 @@ const App = () => {
                                                     <Line points={getOrthogonalLinkPoints(controllerValvePorts.vplus.x, controllerValvePorts.vplus.y, targetPorts.vplus.y, targetPorts.vplus.x, targetPorts.vplus.y)} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                     <Line points={getOrthogonalLinkPoints(controllerValvePorts.a.x, controllerValvePorts.a.y, targetPorts.a.y, targetPorts.a.x, targetPorts.a.y)} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                     <Line points={getOrthogonalLinkPoints(controllerValvePorts.b.x, controllerValvePorts.b.y, targetPorts.b.y, targetPorts.b.x, targetPorts.b.y)} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={getOrthogonalLinkPoints(controllerValvePorts.gnd.x, controllerValvePorts.gnd.y, targetPorts.gnd.y, targetPorts.gnd.x, targetPorts.gnd.y)} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={getOrthogonalLinkPoints(controllerValvePorts.gnd.x, controllerValvePorts.gnd.y, targetPorts.gnd.y, targetPorts.gnd.x, targetPorts.gnd.y)} stroke="#fbc02d" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                 </>
                                             )}
                                              <Rect
@@ -5594,7 +5861,7 @@ const App = () => {
                                                      />
                                                  </>
                                              )}
-                                             {valveDevice && image && <Image image={image} x={renderX} y={renderY} width={renderSize.width} height={renderSize.height} crop={valveImageCrop} listening={false} />}
+                                              {valveDevice && image && <Image image={image} x={renderX} y={renderY} width={renderSize.width} height={renderSize.height} listening={false} />}
                                              {valveDevice && isHovered && (
                                                  <>
                                                      <Circle
@@ -5712,7 +5979,7 @@ const App = () => {
                                                      <Text x={slotX + slotWidth - 2.5} y={slotY + 1.5} text="×" fontSize={10} fill="#fff" offsetX={3.2} offsetY={5.5} listening={false} />
                                                  </>
                                              )}
-                                            {(pumpDevice || showEmptySlots) && (
+                                            {pumpDevice && (
                                                 <>
                                                     <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={slotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
                                                     <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, slotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={pumpTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={pumpDevice} title={pumpTitle} />
@@ -6571,7 +6838,7 @@ const App = () => {
                                                     ? `${relaySSingleBaseTitle} ${relaySSingleDeviceIndex}`
                                                     : relaySSingleBaseTitle);
                                                 const relaySImageSize = relaySVisualImage
-                                                    ? (relaySTypeForInfo === 'valve'
+                                                    ? (relaySTypeForInfo === 'valve' || relaySTypeForInfo === 'zoneServo'
                                                         ? getFullWidthSize(relaySVisualImage, relaySVisualSlotWidth, relaySVisualSlotHeight)
                                                         : getContainSize(relaySVisualImage, relaySVisualSlotWidth, relaySVisualSlotHeight))
                                                     : { width: relaySVisualSlotWidth, height: relaySVisualSlotHeight };
@@ -6641,11 +6908,12 @@ const App = () => {
                                                                      const relay1HorizontalX = isLeftPart
                                                                          ? Math.max(from1X, to1X)
                                                                          : Math.min(from1X, to1X);
-                                                                     const relay2HorizontalX = isLeftPart
-                                                                         ? Math.max(from2X, to2X)
-                                                                         : Math.min(from2X, to2X);
+                                                                      const relay2HorizontalX = isLeftPart
+                                                                          ? Math.max(from2X, to2X)
+                                                                          : Math.min(from2X, to2X);
+                                                                      const relaySLineStroke = relaySTypeForPorts === '220servo' || relaySTypeForPorts === 'valve' ? '#d32f2f' : '#2e7d32';
 
-                                                                       return (
+                                                                        return (
                                                                            <>
                                                                               {controllerAFeedPort && (() => {
                                                                                   const feedX = controllerAFeedPort.x * controllerImage.width;
@@ -6669,20 +6937,20 @@ const App = () => {
                                                                                       </>
                                                                                   );
                                                                               })()}
-                                                                              <Line
-                                                                                  points={[from1X, from1Y, relay1HorizontalX, from1Y, relay1HorizontalX, to1Y, to1X, to1Y]}
-                                                                                  stroke="#2e7d32"
-                                                                                  strokeWidth={1}
-                                                                                  lineCap="round"
-                                                                                  lineJoin="round"
+                                                                               <Line
+                                                                                   points={[from1X, from1Y, relay1HorizontalX, from1Y, relay1HorizontalX, to1Y, to1X, to1Y]}
+                                                                                   stroke={relaySLineStroke}
+                                                                                   strokeWidth={1}
+                                                                                   lineCap="round"
+                                                                                   lineJoin="round"
                                                                                   listening={false}
                                                                               />
-                                                                              <Line
-                                                                                 points={[from2X, from2Y, relay2HorizontalX, from2Y, relay2HorizontalX, to2Y, to2X, to2Y]}
-                                                                                 stroke="#2e7d32"
-                                                                                 strokeWidth={1}
-                                                                                lineCap="round"
-                                                                                lineJoin="round"
+                                                                               <Line
+                                                                                  points={[from2X, from2Y, relay2HorizontalX, from2Y, relay2HorizontalX, to2Y, to2X, to2Y]}
+                                                                                  stroke={relaySLineStroke}
+                                                                                  strokeWidth={1}
+                                                                                 lineCap="round"
+                                                                                 lineJoin="round"
                                                                                 listening={false}
                                                                             />
                                                                         </>
@@ -6714,8 +6982,8 @@ const App = () => {
                                                                     width={relaySVisualSlotWidth}
                                                                     height={relaySVisualSlotHeight}
                                                                     cornerRadius={10}
-                                                                    fill={isRelaySOccupied ? (isRelaySHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                                    stroke={isRelaySOccupied ? (isRelaySHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                                    fill={isRelaySOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                                    stroke={isRelaySOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                     strokeWidth={1.5}
                                                                 />
                                                                 {isRelaySOccupied && relaySVisualImage && (() => {
@@ -6740,11 +7008,11 @@ const App = () => {
                                                                                />
                                                                            );
                                                                        }
-                                                                         if (controllerType === 'pro' && relaySTypeForInfo === 'pump-220v') {
-                                                                             return (
-                                                                                 <Line
-                                                                                     points={[toX, toY, fromX, toY, fromX, fromY]}
-                                                                                     stroke="#d32f2f"
+                                                                        if (controllerType === 'pro' && relaySTypeForInfo === 'pump-220v') {
+                                                                              return (
+                                                                                  <Line
+                                                                                      points={[toX, toY, fromX, toY, fromX, fromY]}
+                                                                                      stroke="#d32f2f"
                                                                                      strokeWidth={1}
                                                                                      lineCap="round"
                                                                                     lineJoin="round"
@@ -6752,7 +7020,19 @@ const App = () => {
                                                                                 />
                                                                             );
                                                                         }
-                                                                        if (relaySTypeForInfo === 'boiler-pump') {
+                                                                         if (controllerType === 'pro' && relaySTypeForInfo === '220servo') {
+                                                                             return (
+                                                                                 <Line
+                                                                                     points={[toX, toY, fromX, toY, fromX, fromY]}
+                                                                                     stroke="#d32f2f"
+                                                                                     strokeWidth={1}
+                                                                                     lineCap="round"
+                                                                                     lineJoin="round"
+                                                                                     listening={false}
+                                                                                 />
+                                                                             );
+                                                                         }
+                                                                         if (relaySTypeForInfo === 'boiler-pump') {
                                                                             return (
                                                                                 <Line
                                                                                     points={[toX, toY, fromX, toY, fromX, fromY]}
@@ -6785,10 +7065,12 @@ const App = () => {
                                                                         />
                                                                     );
                                                                 })()}
-                                                                 {showPorts && isRelaySOccupied && relaySVisualImageKey && (() => {
-                                                                     const relayPorts = wirelessPortsByType[relaySVisualImageKey] || [];
-                                                                     return relayPorts.map((port) => (
-                                                                        <Circle
+                                                                  {showPorts && isRelaySOccupied && relaySVisualImageKey && (() => {
+                                                                      const relayPorts = isDoubleRelayDevice
+                                                                          ? (wirelessPortsByType[relaySVisualImageKey] || []).filter(isDoubleRelaySignalPort)
+                                                                          : (wirelessPortsByType[relaySVisualImageKey] || []);
+                                                                      return relayPorts.map((port) => (
+                                                                         <Circle
                                                                             key={`relay-s-slot-port-${slotIndex}-${port.name}`}
                                                                             x={relaySImageX + port.x * relaySImageSize.width}
                                                                             y={relaySImageY + port.y * relaySImageSize.height}
@@ -7132,7 +7414,7 @@ const App = () => {
                                                 relaySlotX += relayOffset.x;
                                                 const relaySlotRenderYOffset = relaySlotRenderY + relayOffset.y;
                                                 const relayImageSize = relayVisualImage
-                                                    ? (relayType === 'valve'
+                                                    ? (relayType === 'valve' || relayType === 'zoneServo'
                                                         ? getFullWidthSize(relayVisualImage, relayVisualSlotWidth, relayVisualSlotHeight)
                                                         : getContainSize(relayVisualImage, relayVisualSlotWidth, relayVisualSlotHeight))
                                                     : { width: relayVisualSlotWidth, height: relayVisualSlotHeight };
@@ -7220,8 +7502,8 @@ const App = () => {
                                                                     width={relayVisualSlotWidth}
                                                                     height={relayVisualSlotHeight}
                                                                     cornerRadius={10}
-                                                                    fill={isRelayOccupied ? (isRelaySlotHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                                    stroke={isRelayOccupied ? (isRelaySlotHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                                    fill={isRelayOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                                    stroke={isRelayOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                     strokeWidth={1.5}
                                                                 />
                                                                 {isRelayOccupied && relayVisualImage && (() => {
@@ -7293,7 +7575,9 @@ const App = () => {
                                                             </>
                                                         )}
                                                         {showPorts && isRelayOccupied && relayVisualImageKey && !isCoveredRelaySlot && (() => {
-                                                            const relayPorts = wirelessPortsByType[relayVisualImageKey] || [];
+                                                            const relayPorts = isDoubleRelayRelayDevice
+                                                                ? (wirelessPortsByType[relayVisualImageKey] || []).filter(isDoubleRelaySignalPort)
+                                                                : (wirelessPortsByType[relayVisualImageKey] || []);
                                                             return relayPorts.map((port) => (
                                                                 <Circle
                                                                     key={`relay-slot-port-${slotIndex}-${port.name}`}
@@ -7374,12 +7658,13 @@ const App = () => {
                                                                     : 0;
                                                                 const relay1RouteY = Math.max(from2Y + 4 * indentSize, minRouteY) - routeLiftY;
                                                                 const relay2RouteY = Math.max(from1Y + 3 * indentSize, minRouteY + indentSize) - routeLiftY;
+                                                                const relayLineStroke = relayType === '220servo' || relayType === 'valve' ? '#d32f2f' : '#2e7d32';
 
                                                                 return (
                                                                     <>
                                                                         <Line
                                                                             points={[from1X, from1Y, relay1OutX, from1Y, relay1OutX, relay1RouteY, to1X, relay1RouteY, to1X, to1Y]}
-                                                                            stroke="#2e7d32"
+                                                                            stroke={relayLineStroke}
                                                                             strokeWidth={1}
                                                                             lineCap="round"
                                                                             lineJoin="round"
@@ -7387,7 +7672,7 @@ const App = () => {
                                                                         />
                                                                         <Line
                                                                             points={[from2X, from2Y, relay2OutX, from2Y, relay2OutX, relay2RouteY, to2X, relay2RouteY, to2X, to2Y]}
-                                                                            stroke="#2e7d32"
+                                                                            stroke={relayLineStroke}
                                                                             strokeWidth={1}
                                                                             lineCap="round"
                                                                             lineJoin="round"
@@ -7486,9 +7771,9 @@ const App = () => {
                                                                        </>
                                                                    );
                                                                }
-                                                                if ((controllerType === 'pro' || controllerType === 'smart2') && relayType === 'zoneServo') {
-                                                                    const relayOutX = toX + indentSize;
-                                                                   return (
+                                                                 if ((controllerType === 'pro' || controllerType === 'smart2') && relayType === 'zoneServo') {
+                                                                     const relayOutX = toX + indentSize;
+                                                                    return (
                                                                       <>
                                                                           <Line
                                                                               points={[toX, toY, relayOutX, toY, relayOutX, bendY, fromX, bendY, fromX, fromY]}
@@ -7500,9 +7785,25 @@ const App = () => {
                                                                           />
                                                                           {showPorts && <Circle x={toX} y={toY} radius={2.5} fill="red" listening={false} />}
                                                                       </>
-                                                                  );
-                                                              }
-                                                              return (
+                                                                   );
+                                                               }
+                                                               if (controllerType === 'pro' && relayType === 'valve') {
+                                                                   const relayOutX = toX + indentSize;
+                                                                   return (
+                                                                       <>
+                                                                           <Line
+                                                                               points={[toX, toY, relayOutX, toY, relayOutX, bendY, fromX, bendY, fromX, fromY]}
+                                                                               stroke="#d32f2f"
+                                                                               strokeWidth={1}
+                                                                               lineCap="round"
+                                                                               lineJoin="round"
+                                                                               listening={false}
+                                                                           />
+                                                                           {showPorts && <Circle x={toX} y={toY} radius={2.5} fill="red" listening={false} />}
+                                                                       </>
+                                                                   );
+                                                               }
+                                                               return (
                                                                   <>
                                                                      <Line
                                                                          points={getRelayLinkPointsToDevice({
@@ -7742,7 +8043,7 @@ const App = () => {
                                                              height={diSlotHeight}
                                                             cornerRadius={6}
                                                             fill={device ? 'rgba(0,0,0,0)' : '#f0f0f5'}
-                                                             stroke={device ? (isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                             stroke={device ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                               strokeWidth={1.2}
                                                               onMouseEnter={() => setHoveredNtcSlotKey(hoverKey)}
                                                               onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === hoverKey ? null : prev))}
@@ -8010,8 +8311,8 @@ const App = () => {
                                                             width={slotWidth}
                                                             height={slotHeight}
                                                             cornerRadius={10}
-                                                            fill={isOccupied ? (isHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                            stroke={isOccupied ? (isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                            fill={isOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                            stroke={isOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                             strokeWidth={1.5}
                                                         />
                                                         {isOccupied && busImage && (
@@ -8302,8 +8603,8 @@ const App = () => {
                                                             width={size.width}
                                                             height={size.height}
                                                             cornerRadius={10}
-                                                            fill={invalidDiDragMap[slotIndex] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? (hoveredExtSlotIndex === `di:${slotIndex}` ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5')}
-                                                            stroke={invalidDiDragMap[slotIndex] ? '#d32f2f' : (isOccupied ? (hoveredExtSlotIndex === `di:${slotIndex}` ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4')}
+                                                            fill={invalidDiDragMap[slotIndex] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5')}
+                                                            stroke={invalidDiDragMap[slotIndex] ? '#d32f2f' : (isOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4')}
                                                             strokeWidth={1.5}
                                                         />
                                                           {isOccupied && image && (
@@ -8550,6 +8851,8 @@ const App = () => {
                                                                   const relayImageSize = relayImage
                                                                       ? (relayType === 'valve'
                                                                           ? { width: relayVisualSlotWidth, height: relayVisualSlotHeight }
+                                                                          : relayType === 'zoneServo'
+                                                                              ? getFullWidthSize(relayImage, relayVisualSlotWidth, relayVisualSlotHeight)
                                                                           : getContainSize(relayImage, relayVisualSlotWidth, relayVisualSlotHeight))
                                                                       : { width: relayVisualSlotWidth, height: relayVisualSlotHeight };
                                                                   const relayImageX = relaySlotX + (relayVisualSlotWidth - relayImageSize.width) / 2;
@@ -8629,22 +8932,24 @@ const App = () => {
                                                                                    : null;
                                                                                const nextModuleAPortX = nextAPort ? slotX + nextAPort.x * size.width : null;
                                                                                const nextModuleAPortY = nextAPort ? slotY + nextAPort.y * size.height : null;
-                                                                               return (
-                                                                                   <>
-                                                                                       <Line points={[moduleAPortX, moduleAPortY, moduleAPortX, lRouteY]} stroke="#212121" strokeWidth={1} lineCap="round" listening={false} />
-                                                                                       {nextAPort && <Line points={[nextModuleAPortX, nextModuleAPortY, nextModuleAPortX, lRouteY]} stroke="#212121" strokeWidth={1} lineCap="round" listening={false} />}
-                                                                                       <Text x={moduleAPortX - 8} y={lRouteY - 14} width={16} text="L" fontSize={10} align="center" fill="#212121" listening={false} />
-                                                                                   </>
-                                                                               );
+                                                                                const relayContactStroke = relayType === 'valve' ? '#d32f2f' : '#212121';
+                                                                                return (
+                                                                                    <>
+                                                                                        <Line points={[moduleAPortX, moduleAPortY, moduleAPortX, lRouteY]} stroke={relayContactStroke} strokeWidth={1} lineCap="round" listening={false} />
+                                                                                        {nextAPort && <Line points={[nextModuleAPortX, nextModuleAPortY, nextModuleAPortX, lRouteY]} stroke={relayContactStroke} strokeWidth={1} lineCap="round" listening={false} />}
+                                                                                        <Text x={moduleAPortX - 8} y={lRouteY - 14} width={16} text="L" fontSize={10} align="center" fill="#212121" listening={false} />
+                                                                                    </>
+                                                                                );
                                                                            })()}
                                                                             {relayDevice && relayType !== 'valve' && !isStupidBoilerType(relayType) && bPort && relayInPort && (() => {
                                                                                const routeY = isDoubleRelayDevice && relayType === 'valve' && sourceRelaySlotIndex === 0
                                                                                   ? relayInPortY - 3 * indentSize
-                                                                                  : relayInPortY;
-                                                                              return (
-                                                                                  <Line points={[relayInPortX, relayInPortY, relayInPortX, routeY, moduleBPortX, routeY, moduleBPortX, moduleBPortY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                                              );
-                                                                          })()}
+                                                                                   : relayInPortY;
+                                                                               const relayStroke = relayType === '220servo' ? '#d32f2f' : '#212121';
+                                                                               return (
+                                                                                   <Line points={[relayInPortX, relayInPortY, relayInPortX, routeY, moduleBPortX, routeY, moduleBPortX, moduleBPortY]} stroke={relayStroke} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                               );
+                                                                           })()}
                                                                           {!relayDevice && bPort && moduleBPortX !== null && moduleBPortY !== null && (
                                                                               <Line
                                                                                   points={[relaySlotX + relaySlotSize, relaySlotY + relaySlotSize / 2, moduleBPortX, relaySlotY + relaySlotSize / 2, moduleBPortX, moduleBPortY]}
@@ -8692,8 +8997,8 @@ const App = () => {
                                                                                const to2Y = slotY + nextBPort.y * size.height;
                                                                                return (
                                                                                    <>
-                                                                                       <Line points={[from1X, from1Y, moduleBPortX, from1Y, moduleBPortX, moduleBPortY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                                                       <Line points={[from2X, from2Y, to2X, from2Y, to2X, to2Y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                        <Line points={[from1X, from1Y, moduleBPortX, from1Y, moduleBPortX, moduleBPortY]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                        <Line points={[from2X, from2Y, to2X, from2Y, to2X, to2Y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                                                    </>
                                                                                );
                                                                            })()}
@@ -8843,6 +9148,8 @@ const App = () => {
                                                                   const relayImageSize = relayImage
                                                                       ? (relayType === 'valve'
                                                                           ? { width: relayVisualSlotWidth, height: relayVisualSlotHeight }
+                                                                          : relayType === 'zoneServo'
+                                                                              ? getFullWidthSize(relayImage, relayVisualSlotWidth, relayVisualSlotHeight)
                                                                           : getContainSize(relayImage, relayVisualSlotWidth, relayVisualSlotHeight))
                                                                       : { width: relayVisualSlotWidth, height: relayVisualSlotHeight };
                                                                   const relayImageX = relaySlotX + (relayVisualSlotWidth - relayImageSize.width) / 2;
@@ -8914,7 +9221,7 @@ const App = () => {
                                                                            onMouseLeave={() => setHoveredRelaySlotIndex((prev) => (prev === relayHoverKey ? null : prev))}
                                                                        >
                                                                            {relayDevice && !isStupidBoilerType(relayType) && bPort && relayInPort && (
-                                                                               <Line points={[relayInPortX, relayInPortY, moduleBPortX, relayInPortY, moduleBPortX, moduleBPortY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                <Line points={[relayInPortX, relayInPortY, moduleBPortX, relayInPortY, moduleBPortX, moduleBPortY]} stroke={relayType === '220servo' || relayType === 'valve' ? '#d32f2f' : '#212121'} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                                            )}
                                                                           {!relayDevice && bPort && moduleBPortX !== null && moduleBPortY !== null && (
                                                                               <Line
@@ -9727,8 +10034,8 @@ const App = () => {
                                                             width={slotWidth}
                                                             height={slotHeight}
                                                             cornerRadius={10}
-                                                            fill={invalidExtDragMap[slotIndex] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? (isHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5')}
-                                                            stroke={invalidExtDragMap[slotIndex] ? '#d32f2f' : (isOccupied ? (isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4')}
+                                                            fill={invalidExtDragMap[slotIndex] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5')}
+                                                            stroke={invalidExtDragMap[slotIndex] ? '#d32f2f' : (isOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4')}
                                                             strokeWidth={1.5}
                                                         />
                                                          {isOccupied && image && (
@@ -10008,7 +10315,9 @@ const App = () => {
                                                                 const imageKeyRelay = visualDevice ? getWirelessDeviceImageKey(visualDevice) : null;
                                                                 const imageRelay = imageKeyRelay ? wirelessImages[imageKeyRelay] : null;
                                                                 const imageSizeRelay = imageRelay
-                                                                    ? getContainSize(imageRelay, slotSize.width, slotSize.height)
+                                                                    ? (relayType === 'zoneServo'
+                                                                        ? getFullWidthSize(imageRelay, slotSize.width, slotSize.height)
+                                                                        : getContainSize(imageRelay, slotSize.width, slotSize.height))
                                                                     : slotSize;
                                                                 const imageRelayX = slotRelayX + (slotSize.width - imageSizeRelay.width) / 2;
                                                                 const imageRelayY = slotRelayY + (slotSize.height - imageSizeRelay.height) / 2;
@@ -10063,8 +10372,8 @@ const App = () => {
                                                                             width={slotSize.width}
                                                                             height={slotSize.height}
                                                                             cornerRadius={10}
-                                                                            fill={relayDevice ? (isHoveredRelay ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                                            stroke={relayDevice ? (isHoveredRelay ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                                            fill={relayDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                                            stroke={relayDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                             strokeWidth={1.5}
                                                                         />
                                                                         {!relayDevice && (
@@ -10143,11 +10452,12 @@ const App = () => {
                                                                             const to1Y = slotY + bPort.y * slotHeight;
                                                                             const to2X = slotX + nextBPort.x * slotWidth;
                                                                             const to2Y = slotY + nextBPort.y * slotHeight;
+                                                                            const relayStroke = relayType === '220servo' || relayType === 'valve' ? '#d32f2f' : '#2e7d32';
 
                                                                             return (
                                                                                 <>
-                                                                                    <Line points={[from1X, from1Y, to1X, from1Y, to1X, to1Y]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                                                    <Line points={[from2X, from2Y, to2X, from2Y, to2X, to2Y]} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                    <Line points={[from1X, from1Y, to1X, from1Y, to1X, to1Y]} stroke={relayStroke} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                    <Line points={[from2X, from2Y, to2X, from2Y, to2X, to2Y]} stroke={relayStroke} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                                                 </>
                                                                             );
                                                                         })()}
@@ -10453,8 +10763,8 @@ const App = () => {
                                                                         width={visualSlotWidth}
                                                                         height={visualSlotHeight}
                                                                         cornerRadius={6}
-                                                                        fill={hasDevice ? (isHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                                        stroke={hasDevice ? (isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                                        fill={hasDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                                        stroke={hasDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                         strokeWidth={1.2}
                                                                     />
                                                                     {!hasDevice && showEmptySlots && supportsOwnChannelLine && (
@@ -10730,8 +11040,8 @@ const App = () => {
                                                                             width={di6SlotWidth}
                                                                             height={di6SlotHeight}
                                                                             cornerRadius={6}
-                                                                            fill={hasDevice ? (isHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                                            stroke={hasDevice ? (isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                                            fill={hasDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                                            stroke={hasDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                             strokeWidth={1.2}
                                                                         />
                                                                         {!hasDevice && (
@@ -10846,8 +11156,8 @@ const App = () => {
                                                                     width={bl2BoilerWidth}
                                                                     height={bl2BoilerHeight}
                                                                     cornerRadius={10}
-                                                                    fill={bl2Boiler ? (isHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                                    stroke={bl2Boiler ? (isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                                    fill={bl2Boiler ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                                    stroke={bl2Boiler ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                     strokeWidth={1.5}
                                                                 />
                                                                  {bl2Boiler && bl2BoilerImage && (
@@ -11117,8 +11427,8 @@ const App = () => {
                                                                         width={owWidth}
                                                                         height={owHeight}
                                                                         cornerRadius={10}
-                                                                        fill={invalidExtOneWireDragMap[extOwKey] ? 'rgba(211, 47, 47, 0.08)' : (owDevice ? (isOwHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5')}
-                                                                        stroke={invalidExtOneWireDragMap[extOwKey] ? '#d32f2f' : (owDevice ? (isOwHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4')}
+                                                                        fill={invalidExtOneWireDragMap[extOwKey] ? 'rgba(211, 47, 47, 0.08)' : (owDevice ? 'rgba(0,0,0,0)' : '#f0f0f5')}
+                                                                        stroke={invalidExtOneWireDragMap[extOwKey] ? '#d32f2f' : (owDevice ? 'rgba(0,0,0,0)' : '#d7dbe4')}
                                                                         strokeWidth={1.5}
                                                                     />
                                                                     {owDevice && owImage && (
@@ -11198,8 +11508,8 @@ const App = () => {
                                                                                         width={ntcSlotWidth}
                                                                                         height={ntcSlotHeight}
                                                                                         cornerRadius={6}
-                                                                                        fill={sensor ? (isNtcHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                                                        stroke={sensor ? (isNtcHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                                                        fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                                                        stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                                         strokeWidth={1.2}
                                                                                         onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
                                                                                         onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
@@ -11330,7 +11640,7 @@ const App = () => {
                                                                                 <Group key={`ext-ntc2-slot-${slotIndex}-${extOneWireIndex}-${ntcIndex}`}>
                                                                                     {sensor && modulePortA && <Line points={[sensorPortAX, sensorPortAY, owX + modulePortA.x * owWidth, sensorPortAY, owX + modulePortA.x * owWidth, owY + modulePortA.y * owHeight]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
                                                                                     {sensor && modulePortB && <Line points={[sensorPortBX, sensorPortBY, owX + modulePortB.x * owWidth, sensorPortBY, owX + modulePortB.x * owWidth, owY + modulePortB.y * owHeight]} stroke="#464EE3" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
-                                                                                    <Rect x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? (isNtcHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'} stroke={sensor ? (isNtcHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'} strokeWidth={1.2} onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)} onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))} />
+                                                                                    <Rect x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)} onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))} />
                                                                                     {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
                                                                                     {showPorts && sensor && ntcSensorPorts.map((port) => <Circle key={`ext-ntc2-port-${slotIndex}-${extOneWireIndex}-${ntcIndex}-${port.name}`} x={sensorRenderX + port.x * sensorRenderSize.width} y={sensorRenderY + port.y * sensorRenderSize.height} radius={2.5} fill="red" listening={false} />)}
                                                                                     {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}
@@ -12063,8 +12373,8 @@ const App = () => {
                                                                     width={slotWidth}
                                                                     height={slotHeight}
                                                                     cornerRadius={10}
-                                                                    fill={invalidOneWireDragMap[slotIndex] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? (isHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5')}
-                                                                    stroke={invalidOneWireDragMap[slotIndex] ? '#d32f2f' : (isOccupied ? (isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4')}
+                                                                    fill={invalidOneWireDragMap[slotIndex] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5')}
+                                                                    stroke={invalidOneWireDragMap[slotIndex] ? '#d32f2f' : (isOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4')}
                                                                     strokeWidth={1.5}
                                                                 />
                                                                 {image && (
@@ -12175,8 +12485,8 @@ const App = () => {
                                                                                     width={ntcSlotWidth}
                                                                                     height={ntcSlotHeight}
                                                                                     cornerRadius={6}
-                                                                                    fill={sensor ? (isNtcHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'}
-                                                                                    stroke={sensor ? (isNtcHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'}
+                                                                                    fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'}
+                                                                                    stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                                     strokeWidth={1.2}
                                                                                     onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
                                                                                     onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
@@ -12309,7 +12619,7 @@ const App = () => {
                                                                             <Group key={`onewire-ntc2-slot-${slotIndex}-${ntcIndex}`}>
                                                                                 {sensor && modulePortA && <Line points={[sensorPortAX, sensorPortAY, slotPos.x + modulePortA.x * slotWidth, sensorPortAY, slotPos.x + modulePortA.x * slotWidth, slotPos.y + modulePortA.y * slotHeight]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
                                                                                 {sensor && modulePortB && <Line points={[sensorPortBX, sensorPortBY, slotPos.x + modulePortB.x * slotWidth, sensorPortBY, slotPos.x + modulePortB.x * slotWidth, slotPos.y + modulePortB.y * slotHeight]} stroke="#464EE3" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
-                                                                                <Rect x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? (isNtcHovered ? '#f0f0f5' : 'rgba(0,0,0,0)') : '#f0f0f5'} stroke={sensor ? (isNtcHovered ? '#d7dbe4' : 'rgba(0,0,0,0)') : '#d7dbe4'} strokeWidth={1.2} onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)} onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))} />
+                                                                                <Rect x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)} onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))} />
                                                                                 {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
                                                                                 {showPorts && sensor && ntcSensorPorts.map((port) => <Circle key={`onewire-ntc2-port-${slotIndex}-${ntcIndex}-${port.name}`} x={sensorRenderX + port.x * sensorRenderSize.width} y={sensorRenderY + port.y * sensorRenderSize.height} radius={2.5} fill="red" listening={false} />)}
                                                                                 {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}
@@ -12719,8 +13029,8 @@ const App = () => {
                                                 width={slotWidth}
                                                 height={slotHeight}
                                                 cornerRadius={10}
-                                                fill={isHovered ? '#f0f0f5' : 'rgba(0,0,0,0)'}
-                                                stroke={isHovered ? '#d7dbe4' : 'rgba(0,0,0,0)'}
+                                                fill="rgba(0,0,0,0)"
+                                                stroke="rgba(0,0,0,0)"
                                                 strokeWidth={1.5}
                                             />
                                             {deviceImage && (
@@ -12979,16 +13289,29 @@ const App = () => {
                                 const poweredInstallationModules = installationModuleItems.filter((item) => !powerTypes.has(item.type));
                                 const firstPoweredModule = poweredInstallationModules[0] || null;
                                 const isSmart2Installation = controllerType === 'smart2';
+                                const powerOrder = { 'circuit-breaker': 0, 'power-unit': 1, ups: 2 };
+                                const installationPowerItems = installationModuleItems
+                                    .filter((item) => powerTypes.has(item.type))
+                                    .sort((a, b) => (powerOrder[a.type] ?? 99) - (powerOrder[b.type] ?? 99));
                                 const items = [
-                                    ...installationModuleItems.filter((item) => powerTypes.has(item.type)),
+                                    ...installationPowerItems,
                                     controllerImage ? {
                                         key: 'controller',
                                         type: controllerType,
                                         image: controllerImage,
                                         data: scheme?.controller,
+                                        // DI-входы контроллера, занятые линиями коммутации ИБП (DI-IN-1/2 у pro,
+                                        // первая пара DI-OUT у smart2).
+                                        upsDiPortIndexes: hasInstallationUps ? [0, 1] : null,
+                                        // EXT-цепочка контроллера: сначала EXT-модули, после них EXT-термостаты.
+                                        moduleNextLabel: memoExtModules[0]
+                                            ? getInstallationDeviceLabel(memoExtModules[0])
+                                            : (memoExtLineThermostatDevices[0]
+                                                ? getInstallationDeviceLabel(memoExtLineThermostatDevices[0], 'Термостат')
+                                                : null),
                                         powerPreviousLabel: isSmart2Installation && firstPoweredModule
                                             ? getInstallationItemLabel(firstPoweredModule)
-                                            : (hasInstallationUps ? 'ИБП' : POWER_UNIT_LABEL),
+                                            : (hasInstallationUps ? 'UPS' : POWER_UNIT_LABEL),
                                         powerNextLabel: !isSmart2Installation && firstPoweredModule ? getInstallationItemLabel(firstPoweredModule) : null,
                                     } : null,
                                     ...poweredInstallationModules,
@@ -13116,19 +13439,15 @@ const App = () => {
                                             && !name.includes('LOGO')
                                             && !name.includes('QR');
                                     });
-                                    // Иногда один терминал задан двумя элементами: «RELAY-1-A» и
-                                    // «RELAY-1-A BOILER-GVS» (второй — семантическая зона). Оставляем по
-                                    // одному порту на первый токен имени, предпочитая короткое (сам
-                                    // терминал), чтобы не рисовать две одинаковые лычки.
-                                    const byToken = new Map();
+                                    // Семантический тег — часть идентичности порта: «RELAY-1-A» (реле котла)
+                                    // и «RELAY-1-A BOILER-GVS» (насос ГВС) у ecosmart — разные физические
+                                    // пины. Схлопываем только точные дубликаты полного имени.
+                                    const byName = new Map();
                                     filtered.forEach((port) => {
-                                        const token = String(port?.name || '').toUpperCase().trim().split(/\s+/)[0];
-                                        const existing = byToken.get(token);
-                                        if (!existing || String(port.name).length < String(existing.name).length) {
-                                            byToken.set(token, port);
-                                        }
+                                        const normalizedName = String(port?.name || '').toUpperCase().trim();
+                                        if (!byName.has(normalizedName)) byName.set(normalizedName, port);
                                     });
-                                    return Array.from(byToken.values());
+                                    return Array.from(byName.values());
                                 };
                                 const getInstallationAllPorts = (item) => (item.key === 'controller' ? ports : (wirelessPortsByType[item.type] || []));
                                 const getInstallationIndicatorActive = (item, port) => {
@@ -13376,7 +13695,11 @@ const App = () => {
                                                             // на шине 1-wire. Если следующего в цепочке нет, не рисуем ни
                                                             // изогнутый хвост, ни лычку на этих портах.
                                                             const portName = String(port?.name || '').toUpperCase();
-                                                            if (portName.includes('EXT-OUT')) return Boolean(item.moduleNextLabel);
+                                                            if (portName.includes('EXT-OUT')) {
+                                                                // У ecosmart EXT-OUT также питает EXT-термостаты контроллера.
+                                                                const extDevices = Array.isArray(item?.data?.ext_devices) ? item.data.ext_devices : [];
+                                                                return Boolean(item.moduleNextLabel) || extDevices.some(Boolean);
+                                                            }
                                                             if (portName.includes('VDC-OUT')) return Boolean(item.powerNextLabel);
                                                             if (portName.includes('1-WIRE') && portName.includes('OUT')) return Boolean(item.oneWireNextLabel);
                                                             return true;
@@ -13393,9 +13716,10 @@ const App = () => {
                                                                 nextLabel: nextInstallationLabel,
                                                                 powerPreviousLabel: item.powerPreviousLabel,
                                                                 powerNextLabel: item.powerNextLabel,
+                                                                upsDiTargetLabel: item.upsDiTargetLabel,
                                                             }));
-                                                            const labelFontSize = 4;
-                                                            const labelWidth = labelText ? 10 : 0;
+                                                            const labelFontSize = 3;
+                                                            const labelWidth = labelText ? 8 : 0;
                                                             const labelHeight = labelText
                                                                 ? Math.min(8 * indentSize, Math.max(24, labelText.length * 2.8 + 8))
                                                                 : 0;
@@ -13429,18 +13753,19 @@ const App = () => {
                                                                                 listening={false}
                                                                             />
                                                                             <Text
-                                                                                x={labelX + 2}
-                                                                                y={labelY + labelHeight - 3}
-                                                                                width={labelHeight - 6}
-                                                                                height={labelWidth - 4}
-                                                                                text={labelText}
-                                                                                fontSize={labelFontSize}
-                                                                                fill="#5f4700"
-                                                                                rotation={-90}
-                                                                                align="center"
-                                                                                perfectDrawEnabled={false}
-                                                                                listening={false}
-                                                                            />
+                                                                                x={labelX + 1}
+                                                                                 y={labelY + labelHeight - 1}
+                                                                                 width={labelHeight - 2}
+                                                                                 height={labelWidth - 2}
+                                                                                 text={labelText}
+                                                                                 fontSize={labelFontSize}
+                                                                                 fill="#5f4700"
+                                                                                 rotation={-90}
+                                                                                 align="center"
+                                                                                 verticalAlign="middle"
+                                                                                 perfectDrawEnabled={false}
+                                                                                 listening={false}
+                                                                             />
                                                                         </>
                                                                     )}
                                                                     <KonvaCircle
@@ -13667,12 +13992,14 @@ const App = () => {
                                 </>
                             );
                         })()}
-                        <div
-                            className="ctx-menu-item"
-                            onClick={() => addRelayDeviceFromMenu('stupid')}
-                        >
-                            Тупой котёл
-                        </div>
+                        {relayMenuPos.lineKey !== 'relay_s_devices' && (
+                            <div
+                                className="ctx-menu-item"
+                                onClick={() => addRelayDeviceFromMenu('stupid')}
+                            >
+                                Тупой котёл
+                            </div>
+                        )}
                         {(() => {
                             const isEcosmartRelayBoilerSlot = getControllerType(scheme) === 'ecosmart'
                                 && !relayMenuPos.lineKey
@@ -13735,7 +14062,6 @@ const App = () => {
                         style={{ left: rl2sRelayMenuPos.x, top: rl2sRelayMenuPos.y }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="ctx-menu-item" onClick={() => addRl2sRelayDeviceFromMenu('stupid')}>Тупой котёл</div>
                         <div className="ctx-menu-item" onClick={() => addRl2sRelayDeviceFromMenu('boiler-pump')}>Насос бойлера</div>
                         <div className="ctx-menu-item" onClick={() => addRl2sRelayDeviceFromMenu('pump-220v')}>Насос 220V</div>
                         <div className="ctx-menu-item" onClick={() => addRl2sRelayDeviceFromMenu('zoneServo')}>Сервопривод зоны</div>

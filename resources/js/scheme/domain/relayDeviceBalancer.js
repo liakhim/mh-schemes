@@ -76,7 +76,15 @@ const supportsRelay = (device) => {
     return connectionTypes.includes('relay') || connectionTypes.includes('double_relay');
 };
 
+const isStupidBoilerDevice = (device) => {
+    const type = canonicalDeviceType(device?.type);
+    const rawType = typeof device?.type === 'string' ? device.type.toLowerCase() : '';
+    return type === 'stupid' || rawType === 'stupidboiler' || rawType === 'stupid-boiler';
+};
+
 const supportsRelayS = (device) => {
+    // Тупой котёл не может садиться на RELAY-S порты.
+    if (isStupidBoilerDevice(device)) return false;
     const type = canonicalDeviceType(device?.type);
     const connectionTypes = getConnectionTypes(device);
     if (type === 'valve') {
@@ -136,7 +144,9 @@ export const balanceRelayDevices = (scheme) => {
             })
             .filter(Boolean)
         : [];
-    const relayOnlyDevicesFromRelayS = controllerRelaySDevices.filter((device) => supportsRelay(device) && !supportsRelayS(device));
+    const relayOnlyDevicesFromRelayS = controllerRelaySDevices
+        .filter((device) => (supportsRelay(device) || isStupidBoilerDevice(device)) && !supportsRelayS(device))
+        .map((device) => (isStupidBoilerDevice(device) ? { ...device, connection_type: 'relay' } : device));
     controller.relay_s_devices = controllerRelaySDevices.filter(supportsRelayS);
     controller.relay_devices = [
         ...(Array.isArray(controller.relay_devices) ? controller.relay_devices : []),
@@ -146,6 +156,38 @@ export const balanceRelayDevices = (scheme) => {
     controller.relay_220pump_devices = Array.isArray(controller.relay_220pump_devices) ? [...controller.relay_220pump_devices] : [];
     controller.relay_220pump5_devices = Array.isArray(controller.relay_220pump5_devices) ? [...controller.relay_220pump5_devices] : [];
     controller.relay_220pump3_devices = Array.isArray(controller.relay_220pump3_devices) ? [...controller.relay_220pump3_devices] : [];
+
+    // Тупой котёл не может садиться на RELAY-S порты: вычищаем застрявшие котлы
+    // из relay-s линий модулей и переносим их в обычные relay-линии.
+    const strayStupidBoilers = [];
+    const stripStupidBoilersFromRelayS = (moduleItem) => {
+        if (!Array.isArray(moduleItem.relay_s_devices) || moduleItem.relay_s_devices.length === 0) return;
+        const strays = moduleItem.relay_s_devices.filter(isStupidBoilerDevice);
+        if (strays.length === 0) return;
+        strayStupidBoilers.push(...strays);
+        moduleItem.relay_s_devices = moduleItem.relay_s_devices.filter((device) => !isStupidBoilerDevice(device));
+    };
+    extModules.forEach(stripStupidBoilersFromRelayS);
+    diModules.forEach(stripStupidBoilersFromRelayS);
+
+    const unplacedStupidBoilers = [];
+    if (strayStupidBoilers.length > 0) {
+        const boilerRelayLines = [
+            { devices: controller.relay_devices, capacity: getControllerRelayCapacity(controllerType) },
+            ...extModules
+                .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6')
+                .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: RELAY_LINE_CAPACITY })),
+        ].filter((line) => line.capacity > 0);
+        strayStupidBoilers.forEach((boiler) => {
+            const device = { ...boiler, connection_type: 'relay' };
+            const placed = boilerRelayLines.some((line) => {
+                if (!Array.isArray(line.devices) || occupiedSlots(line.devices) + 1 > line.capacity) return false;
+                line.devices.push(device);
+                return true;
+            });
+            if (!placed) unplacedStupidBoilers.push(device);
+        });
+    }
 
     const lines = [
         { devices: controller.relay_boiler_gvs_devices, capacity: controllerType === 'ecosmart' ? 1 : 0, onlyTypes: new Set(['boiler-pump']) },
@@ -194,5 +236,8 @@ export const balanceRelayDevices = (scheme) => {
         wired_devices: Array.isArray(scheme?.wired_devices)
             ? scheme.wired_devices.filter((device, index) => !placedKeys.has(getDeviceKey(device, index)))
             : scheme?.wired_devices,
+        boilers: unplacedStupidBoilers.length > 0
+            ? [...(Array.isArray(scheme?.boilers) ? scheme.boilers : []), ...unplacedStupidBoilers]
+            : scheme?.boilers,
     };
 };

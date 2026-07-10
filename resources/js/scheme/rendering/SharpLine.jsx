@@ -3,7 +3,7 @@ import { Line as KonvaLine } from 'react-konva';
 
 export const snapPixel = (value) => (Number.isFinite(value) ? Math.round(value) : value);
 
-const CONNECTION_LINE_STROKE_WIDTH = 1.3;
+const CONNECTION_LINE_STROKE_WIDTH = 0.8;
 const PORT_ENTRY_SPREAD = 0.5;
 const PORT_KEY_PRECISION = 100;
 

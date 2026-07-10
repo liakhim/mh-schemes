@@ -104,3 +104,52 @@
     padding: 20px 24px;
     margin-top: 40px;
 }
+
+/* ===== Мобильная адаптация оболочки ===== */
+@media (max-width: 760px) {
+    .old-shell-nav {
+        padding: 12px 16px;
+        gap: 10px;
+    }
+
+    .old-shell-nav-title {
+        font-size: 13px;
+    }
+
+    .old-shell-logo-badge {
+        padding: 5px 12px;
+    }
+
+    .old-shell-logo-badge img {
+        height: 17px;
+    }
+
+    .old-shell-hero {
+        padding: 18px 16px 44px;
+    }
+
+    .old-shell-breadcrumb {
+        margin-bottom: 12px;
+        font-size: 12px;
+    }
+
+    .old-shell-hero h1 {
+        font-size: 22px;
+        margin-bottom: 10px;
+    }
+
+    .old-shell-hero p {
+        font-size: 14px;
+    }
+
+    .old-shell-main {
+        border-radius: 14px 14px 0 0;
+        margin-top: -22px;
+    }
+
+    .old-shell-footer {
+        padding: 16px;
+        font-size: 12px;
+        margin-top: 28px;
+    }
+}

@@ -17,6 +17,17 @@ Route::get('/schemes', function () {
     ]);
 })->name('schemes.index');
 
+Route::delete('/api/schemes', function (Request $request) {
+    $validated = $request->validate([
+        'ids' => ['required', 'array', 'min:1'],
+        'ids.*' => ['required', 'integer', 'distinct'],
+    ]);
+
+    $deleted = Scheme::query()->whereIn('id', $validated['ids'])->delete();
+
+    return response()->json(['deleted' => $deleted]);
+})->name('schemes.destroy-many');
+
 Route::get('/api/schemes/{scheme}', function (Scheme $scheme) {
     return response()->json([
         'id' => $scheme->id,
@@ -65,11 +76,57 @@ Route::patch('/api/schemes/{scheme}', function (Request $request, Scheme $scheme
     ]);
 })->whereNumber('scheme')->name('schemes.update');
 
-Route::post('/api/proxy/integration', function (Request $request) {
-    $response = Http::post('https://my.mhtest.ru/api/landing', $request->all());
+Route::delete('/api/schemes/{scheme}', function (Scheme $scheme) {
+    $scheme->delete();
+
+    return response()->noContent();
+})->whereNumber('scheme')->name('schemes.destroy');
+
+$integrationHeaders = function (Request $request): array {
+    $headers = [
+        'Accept' => '*/*',
+        'Origin' => 'https://mhtest.ru',
+        'Referer' => 'https://mhtest.ru/podbor-oborudovaniya',
+    ];
+
+    if ($request->header('Cookie')) {
+        $headers['Cookie'] = $request->header('Cookie');
+    }
+
+    return $headers;
+};
+
+$proxyIntegration = function (Request $request) use ($integrationHeaders) {
+    $response = Http::withHeaders($integrationHeaders($request))
+        ->asJson()
+        ->timeout(10)
+        ->post('https://mhtest.ru/api/integration', $request->all());
+
     return response($response->body(), $response->status())
         ->header('Content-Type', 'application/json');
-})->name('proxy.integration');
+};
+
+Route::post('/api/proxy/integration', $proxyIntegration)->name('proxy.integration');
+Route::post('/api/integration', $proxyIntegration)->name('integration.proxy');
+
+Route::post('/api/boilers/search', function (Request $request) use ($integrationHeaders) {
+    $validated = $request->validate([
+        'query' => ['required', 'string', 'max:255'],
+    ]);
+
+    $response = Http::withHeaders($integrationHeaders($request))
+        ->asJson()
+        ->timeout(10)
+        ->post('https://mhtest.ru/api/integration', [
+            'action' => 'getNames',
+            'data' => [
+                'name' => $validated['query'],
+            ],
+        ]);
+
+    return response($response->body(), $response->status())
+        ->header('Content-Type', 'application/json');
+})->name('boilers.search');
 
 Route::view('/selection', 'selection')->name('selection');
 Route::view('/selection-old', 'selection-old')->name('selection-old');

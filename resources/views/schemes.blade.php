@@ -70,6 +70,23 @@
         .button.info:hover {
             background: #0ea5e9;
         }
+        .button.danger {
+            background: #dc2626;
+            border-color: #b91c1c;
+            color: #fff;
+        }
+        .button.danger:hover {
+            background: #b91c1c;
+        }
+        .button:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
+        .scheme-select {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
 
         .table-wrap {
             overflow-x: auto;
@@ -272,9 +289,10 @@
     <main class="page">
         <div class="header">
             <h1>Сохраненные схемы</h1>
-            <div style="display:flex;gap:8px">
-                <a class="button warning" href="{{ route('scheme') }}">Открыть пустую схему</a>
-                <button class="button success" id="createBtn" type="button">Создать схему</button>
+             <div style="display:flex;gap:8px">
+                 <a class="button warning" href="{{ route('scheme') }}">Открыть пустую схему</a>
+                 <button class="button danger" id="deleteSelectedBtn" type="button" disabled>Удалить выбранные</button>
+                 <button class="button success" id="createBtn" type="button">Создать схему</button>
             </div>
         </div>
 
@@ -284,8 +302,9 @@
             @else
                 <table>
                     <thead>
-                        <tr>
-                            <th>ID</th>
+                         <tr>
+                             <th><input class="scheme-select" id="selectAllSchemes" type="checkbox" aria-label="Выбрать все схемы"></th>
+                             <th>ID</th>
                             <th>Название</th>
                             <th>Описание</th>
                             <th>User ID</th>
@@ -297,17 +316,24 @@
                     </thead>
                     <tbody>
                         @foreach ($schemes as $scheme)
-                            <tr>
-                                <td>{{ $scheme->id }}</td>
+                             <tr>
+                                 <td><input class="scheme-select scheme-select-item" type="checkbox" value="{{ $scheme->id }}" aria-label="Выбрать схему {{ $scheme->name }}"></td>
+                                 <td>{{ $scheme->id }}</td>
                                 <td class="name">{{ $scheme->name }}</td>
                                 <td class="description">{{ $scheme->description ?: '—' }}</td>
                                 <td>{{ $scheme->user_id ?? '—' }}</td>
                                 <td>{{ $scheme->version }}</td>
                                 <td>{{ $scheme->system_device_id ?? '—' }}</td>
                                 <td class="muted">{{ optional($scheme->updated_at)->format('Y-m-d H:i') }}</td>
-                                <td>
-                                    <a class="button info" href="{{ route('scheme.with-id', ['scheme' => $scheme]) }}" target="_blank">Открыть</a>
-                                </td>
+                                 <td>
+                                     <a class="button info" href="{{ route('scheme.with-id', ['scheme' => $scheme]) }}" target="_blank">Открыть</a>
+                                     <button
+                                         class="button danger delete-scheme-button"
+                                         type="button"
+                                         data-url="{{ route('schemes.destroy', ['scheme' => $scheme]) }}"
+                                         data-name="{{ $scheme->name }}"
+                                     >Удалить</button>
+                                 </td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -368,7 +394,27 @@
             const form = document.getElementById('createForm');
             const errorEl = document.getElementById('formError');
             const submitBtn = document.getElementById('submitBtn');
-            const toast = document.getElementById('toast');
+             const toast = document.getElementById('toast');
+             const deleteButtons = document.querySelectorAll('.delete-scheme-button');
+             const selectAllSchemes = document.getElementById('selectAllSchemes');
+             const schemeSelectionItems = document.querySelectorAll('.scheme-select-item');
+             const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+
+             function selectedSchemeIds() {
+                 return Array.from(schemeSelectionItems)
+                     .filter(function(item) { return item.checked; })
+                     .map(function(item) { return Number(item.value); });
+             }
+
+             function updateBulkDeleteButton() {
+                 const selectedCount = selectedSchemeIds().length;
+                 deleteSelectedBtn.disabled = selectedCount === 0;
+                 deleteSelectedBtn.textContent = selectedCount > 0 ? 'Удалить выбранные (' + selectedCount + ')' : 'Удалить выбранные';
+                 if (selectAllSchemes) {
+                     selectAllSchemes.checked = selectedCount > 0 && selectedCount === schemeSelectionItems.length;
+                     selectAllSchemes.indeterminate = selectedCount > 0 && selectedCount < schemeSelectionItems.length;
+                 }
+             }
 
             function openModal() {
                 overlay.classList.add('open');
@@ -388,9 +434,70 @@
 
             createBtn.addEventListener('click', openModal);
             cancelBtn.addEventListener('click', closeModal);
-            overlay.addEventListener('click', function(e) {
-                if (e.target === overlay) closeModal();
-            });
+             overlay.addEventListener('click', function(e) {
+                 if (e.target === overlay) closeModal();
+             });
+
+             deleteButtons.forEach(function(button) {
+                 button.addEventListener('click', function() {
+                     const name = button.dataset.name || 'эту схему';
+                     if (!window.confirm('Удалить схему «' + name + '»?')) return;
+                     button.disabled = true;
+                     button.textContent = 'Удаление...';
+                     fetch(button.dataset.url, {
+                         method: 'DELETE',
+                         headers: {
+                             'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                             'Accept': 'application/json',
+                         },
+                     })
+                     .then(function(response) {
+                         if (!response.ok) throw new Error('Delete failed');
+                         showToast('Схема удалена');
+                         setTimeout(function() { location.reload(); }, 400);
+                     })
+                     .catch(function() {
+                         button.disabled = false;
+                         button.textContent = 'Удалить';
+                         showToast('Не удалось удалить схему');
+                     });
+                 });
+             });
+
+             if (selectAllSchemes) {
+                 selectAllSchemes.addEventListener('change', function() {
+                     schemeSelectionItems.forEach(function(item) { item.checked = selectAllSchemes.checked; });
+                     updateBulkDeleteButton();
+                 });
+             }
+             schemeSelectionItems.forEach(function(item) {
+                 item.addEventListener('change', updateBulkDeleteButton);
+             });
+             deleteSelectedBtn.addEventListener('click', function() {
+                 const ids = selectedSchemeIds();
+                 if (ids.length === 0) return;
+                 if (!window.confirm('Удалить выбранные схемы (' + ids.length + ' шт.)?')) return;
+                 deleteSelectedBtn.disabled = true;
+                 deleteSelectedBtn.textContent = 'Удаление...';
+                 fetch('{{ route('schemes.destroy-many') }}', {
+                     method: 'DELETE',
+                     headers: {
+                         'Content-Type': 'application/json',
+                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                         'Accept': 'application/json',
+                     },
+                     body: JSON.stringify({ ids: ids }),
+                 })
+                 .then(function(response) {
+                     if (!response.ok) throw new Error('Bulk delete failed');
+                     showToast('Выбранные схемы удалены');
+                     setTimeout(function() { location.reload(); }, 400);
+                 })
+                 .catch(function() {
+                     showToast('Не удалось удалить выбранные схемы');
+                     updateBulkDeleteButton();
+                 });
+             });
 
             form.addEventListener('submit', function(e) {
                 e.preventDefault();

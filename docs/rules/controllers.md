@@ -56,6 +56,25 @@
 - Для всех занятых верхних слотов `ecosmart` всегда используется изображение `resources/assets/sensors/ntcSensorLeftPort.svg`, независимо от типа датчика.
 - Линии `strategy_sensor_devices`, `boiler_sensor_devices`, `mixing_ntc_devices` являются внутренней материализацией; в публичном `incomingScheme` соответствующие устройства должны находиться в `sensors`.
 
+## Ecosmart Slot Controls
+
+- Hover-состояние per-role слотов `ecosmart` (leak-sensor, discrete DI, верхние NTC-слоты, насосы, сервоприводы, клапан, насос ГВС) вешается на Konva `Group` слота, а не на `Rect`: наведение на крестик удаления не должно снимать hover.
+- Занятый controller RELAY-слот `ecosmart` (тупой котёл) показывает hover-крестик удаления; удаление вычищает устройство по id из `controller.relay_devices`, `boilers` и `wired_devices`.
+- Инфоблоки per-role слотов `ecosmart` (включая насос бойлера ГВС) рисуются только при занятом слоте; над пустым слотом инфоблока нет даже при `Show empty slots`.
+
+## Ecosmart Installation Ports
+
+- Семантический тег в имени порта — часть его идентичности: `RELAY-1-A` (реле котла) и `RELAY-1-A BOILER-GVS` (насос ГВС) — разные физические пины; дедупликация портов в режиме монтажа — по полному имени.
+- Занятость/подписи тегированных портов проверяются по per-role линиям контроллера: `BOILER-GVS` -> `relay_boiler_gvs_devices`, `220PUMP` (RELAY-2/5/3) -> `relay_220pump_devices`/`relay_220pump5_devices`/`relay_220pump3_devices`, `VALVE` -> `relay_s_valve_devices`, `CASCADE` -> `strategy_sensor_devices`, `BOILER` (NTC-2) -> `boiler_sensor_devices`, `MIXING` (NTC-3/4) -> `mixing_ntc_devices`.
+- Нетегированные `RELAY-6-A/B` / `RELAY-4-A/B` — слоты сервоприводов смесителей (`220_servo_devices[0]`/`[1]`); `DI-IN-2-DI` — датчик протечки (`leak_sensor_devices[0]`).
+- Хвост и лычка рисуются только на терминалах `A`/`B`; `GND`/`V+` — вспомогательные.
+- `EXT-OUT` занят также при EXT-термостатах (`controller.ext_devices`); линия `4-20` учитывает legacy `devices420`.
+- EXT-цепочка в режиме монтажа: контроллер -> EXT-модули -> EXT-термостаты; `EXT-OUT` последнего EXT-модуля (или контроллера без модулей) получает хвост и лычку с подписью первого EXT-термостата.
+
+## Ecosmart Controller Switch
+
+- При смене контроллера с `ecosmart` на другой (ручной выбор или автоподбор на `/selection`) внутренние материализации разворачиваются: термостаты из `controller.ext_devices` возвращаются в `wired_devices` с `connection_type='1-wire'`, `ecosmart_bl2` удаляется, датчик тупого котла (`flask-sensor-stupid-boiler`) восстанавливается в `sensors`, если в схеме есть тупой котёл.
+
 ## GO / GO+ Aerial
 
 - У `go` и `go+` есть собственная антенна `go-aerial`.

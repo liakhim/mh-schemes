@@ -55,10 +55,22 @@ const getDeviceKey = (device, index) => (device?.id != null ? `id:${device.id}` 
 const isRelayBoiler = (boiler) => {
     const type = canonicalDeviceType(boiler?.type);
     const rawType = typeof boiler?.type === 'string' ? boiler.type.toLowerCase() : '';
+    const connectionTypes = String(boiler?.connection_type || '')
+        .toLowerCase()
+        .split('|')
+        .map((item) => item.trim());
+    if (connectionTypes.includes('relay')) return true;
     return type === 'stupid' || rawType === 'stupidboiler' || rawType === 'stupid-boiler' || boiler?.reserve === true;
 };
 
-const isBusBoiler = (boiler) => canonicalDeviceType(boiler?.type) === 'smart' && boiler?.reserve !== true;
+const isBusBoiler = (boiler) => {
+    const connectionTypes = String(boiler?.connection_type || '')
+        .toLowerCase()
+        .split('|')
+        .map((item) => item.trim());
+    if (connectionTypes.includes('relay')) return false;
+    return canonicalDeviceType(boiler?.type) === 'smart' && boiler?.reserve !== true;
+};
 
 const pushToLine = (line, device, capacity) => {
     if (!Array.isArray(line) || line.length >= capacity) return false;
