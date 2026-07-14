@@ -2065,13 +2065,16 @@ const getThermostatRows = (scheme) => {
     const wiredThermostats = (Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [])
         .filter((device) => canonicalType(device?.type) === 'thermostat')
         .map((device) => ({ device, target: 'wired_devices' }));
+    const extThermostats = (Array.isArray(scheme?.controller?.ext_devices) ? scheme.controller.ext_devices : [])
+        .filter((device) => canonicalType(device?.type) === 'thermostat')
+        .map((device) => ({ device, target: 'ext_devices' }));
     const wirelessThermostats = (Array.isArray(scheme?.wireless_devices) ? scheme.wireless_devices : [])
         .filter((device) => canonicalType(device?.type) === 'thermostat')
         .map((device) => ({ device, target: 'wireless_devices' }));
-    const thermostats = [...wiredThermostats, ...wirelessThermostats];
+    const thermostats = [...wiredThermostats, ...extThermostats, ...wirelessThermostats];
     return aggregateAddedItems(thermostats.map(({ device, target }) => {
         const colorLabel = THERMOSTAT_COLORS.find((item) => item.value === device.color)?.label || device.color || 'Без цвета';
-        const connectionLabel = target === 'wired_devices' ? 'Проводной' : 'Беспроводной';
+        const connectionLabel = target === 'wireless_devices' ? 'Беспроводной' : 'Проводной';
         const hasFloorSensor = Array.isArray(device.additions)
             && device.additions.some((addition) => canonicalType(addition?.type) === 'flask-sensor-floor');
         return {
@@ -2689,10 +2692,23 @@ const SelectionApp = () => {
     }, []);
 
     const removeSchemeItemById = useCallback((target, id) => {
-        setIncomingScheme((prev) => resolveControllerAndRequiredModules({
-            ...prev,
-            [target]: (Array.isArray(prev[target]) ? prev[target] : []).filter((item) => item.id !== id),
-        }));
+        setIncomingScheme((prev) => {
+            if (target === 'ext_devices') {
+                const controller = prev?.controller && typeof prev.controller === 'object' ? prev.controller : {};
+                return resolveControllerAndRequiredModules({
+                    ...prev,
+                    controller: {
+                        ...controller,
+                        ext_devices: (Array.isArray(controller.ext_devices) ? controller.ext_devices : [])
+                            .filter((item) => item.id !== id),
+                    },
+                });
+            }
+            return resolveControllerAndRequiredModules({
+                ...prev,
+                [target]: (Array.isArray(prev[target]) ? prev[target] : []).filter((item) => item.id !== id),
+            });
+        });
     }, []);
 
     const renderUnitStepper = (template, group, templates) => {
