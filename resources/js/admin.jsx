@@ -59,7 +59,7 @@ const deviceImagePaths = {
 
 const moduleConnections = {
     bl2: 'pro',
-    ecosmartbl2: 'ecosmart only, field: controller.ecosmart_bl2 or ecosmart_bl2',
+    ecosmartbl2: 'ecosmart only, field: controller.ecosmart_bl2',
     rl6: 'pro, ecosmart',
     rl6s: 'pro, ecosmart',
     io4: 'pro, ecosmart',

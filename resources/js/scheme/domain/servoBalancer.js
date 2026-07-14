@@ -114,7 +114,7 @@ export const balanceServos = (scheme) => {
             .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: RELAY_LINE_CAPACITY, onlyTypes: new Set(['valve']) })),
         ...diModules
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl2s')
-            .map((moduleItem) => ({ devices: moduleItem.relay_s_devices, capacity: 2, onlyTypes: new Set(['220servo']) })),
+            .map((moduleItem) => ({ devices: moduleItem.relay_s_devices, capacity: 2, onlyTypes: new Set(['220servo', 'valve']) })),
         ...diModules
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl2')
             .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: 2, onlyTypes: new Set(['valve']) })),

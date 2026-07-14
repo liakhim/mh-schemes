@@ -25,8 +25,9 @@
 ## Ecosmart BL2 Overlay
 
 - Правило действует только для controller `ecosmart`.
-- Если во внутреннем состоянии схемы есть `ecosmart_bl2` или `controller.ecosmart_bl2`, отрисовывается `resources/assets/modules/bl2/ecosmartbl2.svg` поверх изображения controller.
-- `ecosmart_bl2` является внутренним render-полем и не должен попадать в публичный `incomingScheme` при показе JSON или сохранении.
+- Если во внутреннем состоянии `controller.ecosmart_bl2` есть модуль, отрисовывается `resources/assets/modules/bl2/ecosmartbl2.svg` поверх изображения controller.
+- `controller.ecosmart_bl2` является внутренним render-полем и не должен попадать в публичный `incomingScheme` при показе JSON или сохранении.
+- Корневое legacy-поле `ecosmart_bl2` при загрузке переносится в `controller.ecosmart_bl2`; новый код использует только поле controller.
 - В `/admin` модуль показывается как `Ecosmart BL2` в группе `ecosmart overlay`.
 - Модуль не подключается через классическую EXT-линию.
 - Позиция рассчитывается так, чтобы `ECOSMART-ANCHOR-1` controller совпал с `ECOSMART-ANCHOR-1` модуля, а `ECOSMART-ANCHOR-2` controller совпал с `ECOSMART-ANCHOR-2` модуля.
@@ -73,7 +74,7 @@
 
 ## Ecosmart Controller Switch
 
-- При смене контроллера с `ecosmart` на другой (ручной выбор или автоподбор на `/selection`) внутренние материализации разворачиваются: термостаты из `controller.ext_devices` возвращаются в `wired_devices` с `connection_type='1-wire'`, `ecosmart_bl2` удаляется, датчик тупого котла (`flask-sensor-stupid-boiler`) восстанавливается в `sensors`, если в схеме есть тупой котёл.
+- При смене контроллера с `ecosmart` на другой (ручной выбор или автоподбор на `/selection`) внутренние материализации разворачиваются: термостаты из `controller.ext_devices` возвращаются в `wired_devices` с `connection_type='1-wire'`, `controller.ecosmart_bl2` удаляется, датчик тупого котла (`flask-sensor-stupid-boiler`) восстанавливается в `sensors`, если в схеме есть тупой котёл.
 
 ## GO / GO+ Aerial
 

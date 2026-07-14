@@ -126,6 +126,7 @@ const CONTROLLER_LIMITS = {
 const GO_ONE_WIRE_THERMOSTAT_LIMIT = 2;
 const ECOSMART_EXT_DEVICE_CAPACITY = 12;
 const PRO_EXT_DEVICE_CAPACITY = 12;
+const AUTO_REQUIRED_MODULE_SOURCE = 'selection-required-module';
 
 const CONTROLLER_LABELS = {
     go: 'GO',
@@ -756,25 +757,28 @@ const getControllerTemplateValue = (controllerType) => {
     return template ? { ...template.value } : null;
 };
 
-const makeExtModule = (type) => ({
+const makeExtModule = (type, autoSource = null) => ({
     id: generateId(),
     type,
     device_type: 'module',
     connection_type: 'EXT',
+    ...(autoSource ? { _auto_source: autoSource } : {}),
 });
 
-const makeDiModule = (type) => ({
+const makeDiModule = (type, autoSource = null) => ({
     id: generateId(),
     type,
     device_type: 'module',
     connection_type: 'DI',
+    ...(autoSource ? { _auto_source: autoSource } : {}),
 });
 
-const makeOneWireModule = (type) => ({
+const makeOneWireModule = (type, autoSource = null) => ({
     id: generateId(),
     type,
     device_type: 'module',
     connection_type: '1-wire',
+    ...(autoSource ? { _auto_source: autoSource } : {}),
 });
 
 const makeEcosmartBl2Module = () => ({
@@ -790,24 +794,20 @@ const getBusSmartBoilerCount = (scheme) => (Array.isArray(scheme?.boilers) ? sch
 
 const withRequiredEcosmartBl2 = (scheme) => {
     if (getControllerType(scheme) !== 'ecosmart') return scheme;
-    const currentModules = Array.isArray(scheme?.ecosmart_bl2) ? scheme.ecosmart_bl2 : [];
+    const controller = scheme?.controller && typeof scheme.controller === 'object' ? scheme.controller : { type: 'ecosmart' };
+    const currentModules = Array.isArray(controller.ecosmart_bl2) ? controller.ecosmart_bl2 : [];
     if (getBusSmartBoilerCount(scheme) < 2) {
         if (currentModules.length === 0) return scheme;
-        const nextModules = currentModules.filter((moduleItem) => canonicalType(moduleItem?.type) !== 'ecosmartbl2');
-        if (nextModules.length === currentModules.length) return scheme;
-        if (nextModules.length === 0) {
-            const { ecosmart_bl2: removedEcosmartBl2, ...rest } = scheme;
-            return rest;
-        }
-        return { ...scheme, ecosmart_bl2: nextModules };
+        const { ecosmart_bl2: removedEcosmartBl2, ...nextController } = controller;
+        return { ...scheme, controller: nextController };
     }
     if (currentModules.some((moduleItem) => canonicalType(moduleItem?.type) === 'ecosmartbl2')) return scheme;
     return {
         ...scheme,
-        ecosmart_bl2: [
-            ...currentModules,
-            makeEcosmartBl2Module(),
-        ],
+        controller: {
+            ...controller,
+            ecosmart_bl2: [...currentModules, makeEcosmartBl2Module()],
+        },
     };
 };
 
@@ -865,19 +865,20 @@ const moveExtModuleDevicesToPublicLines = (scheme) => {
 const withoutEcosmartStupidBoilerSensor = (scheme) => {
     const isStupidBoilerSensor = (device) => canonicalType(device?.type) === 'flask-sensor-stupid-boiler';
     const controller = scheme?.controller && typeof scheme.controller === 'object' ? scheme.controller : null;
-    const nextController = controller && Array.isArray(controller.one_wire_devices)
-        ? {
-            ...controller,
-            one_wire_devices: controller.one_wire_devices.filter((device) => !isStupidBoilerSensor(device)),
-        }
+    const controllerDevices = Array.isArray(controller?.one_wire_devices) ? controller.one_wire_devices : null;
+    const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : null;
+    const hasControllerSensor = controllerDevices?.some(isStupidBoilerSensor);
+    const hasPublicSensor = sensors?.some(isStupidBoilerSensor);
+    if (!hasControllerSensor && !hasPublicSensor) return scheme;
+
+    const nextController = hasControllerSensor
+        ? { ...controller, one_wire_devices: controllerDevices.filter((device) => !isStupidBoilerSensor(device)) }
         : controller;
 
     return {
         ...scheme,
         ...(nextController ? { controller: nextController } : {}),
-        sensors: Array.isArray(scheme?.sensors)
-            ? scheme.sensors.filter((sensor) => !isStupidBoilerSensor(sensor))
-            : scheme?.sensors,
+        sensors: hasPublicSensor ? sensors.filter((sensor) => !isStupidBoilerSensor(sensor)) : sensors,
     };
 };
 
@@ -936,9 +937,9 @@ const unwindEcosmartInternals = (scheme) => {
         };
     }
 
-    if (Array.isArray(nextScheme?.ecosmart_bl2)) {
-        const { ecosmart_bl2: removedEcosmartBl2, ...rest } = nextScheme;
-        nextScheme = rest;
+    if (nextScheme?.controller && typeof nextScheme.controller === 'object' && Array.isArray(nextScheme.controller.ecosmart_bl2)) {
+        const { ecosmart_bl2: removedEcosmartBl2, ...restController } = nextScheme.controller;
+        nextScheme = { ...nextScheme, controller: restController };
     }
 
     const boilers = Array.isArray(nextScheme?.boilers) ? nextScheme.boilers : [];
@@ -961,7 +962,16 @@ const normalizeModulesForController = (scheme) => {
     const controllerType = getControllerType(scheme);
     let nextScheme = scheme;
 
-    if (controllerType !== 'ecosmart' && Array.isArray(nextScheme?.ecosmart_bl2)) {
+    if (controllerType === 'ecosmart' && Array.isArray(nextScheme?.ecosmart_bl2)) {
+        const { ecosmart_bl2: legacyEcosmartBl2, ...rest } = nextScheme;
+        const controller = rest.controller && typeof rest.controller === 'object' ? rest.controller : { type: 'ecosmart' };
+        nextScheme = {
+            ...rest,
+            controller: Array.isArray(controller.ecosmart_bl2) && controller.ecosmart_bl2.length > 0
+                ? controller
+                : { ...controller, ecosmart_bl2: legacyEcosmartBl2 },
+        };
+    } else if (controllerType !== 'ecosmart' && Array.isArray(nextScheme?.ecosmart_bl2)) {
         const { ecosmart_bl2: removedEcosmartBl2, ...rest } = nextScheme;
         nextScheme = rest;
     }
@@ -978,36 +988,6 @@ const normalizeModulesForController = (scheme) => {
         if (Array.isArray(nextScheme.di_modules) && nextScheme.di_modules.length > 0) {
             const { di_modules: removedDiModules, ...rest } = nextScheme;
             nextScheme = rest;
-        }
-        const stats = getCompatibilityStats(nextScheme, 'pro');
-        const requiredBl2Count = Math.max(0, getBusSmartBoilerCount(nextScheme) - CONTROLLER_LIMITS.pro.bus);
-        const requiredIo4Count = Math.max(
-            Math.ceil(Math.max(0, stats.analog420 - CONTROLLER_LIMITS.pro.analog420) / 4),
-            Math.ceil(Math.max(0, stats.io4Only - CONTROLLER_LIMITS.pro.io4Channels) / 4),
-        );
-        const requiredDi6Count = Math.ceil(Math.max(0, stats.di - (CONTROLLER_LIMITS.pro.di + requiredIo4Count * 4)) / 6);
-        const extModules = Array.isArray(nextScheme.ext_modules) ? nextScheme.ext_modules : [];
-        let keptBl2Count = 0;
-        let keptIo4Count = 0;
-        let keptDi6Count = 0;
-        const nextExtModules = extModules.filter((moduleItem) => {
-            const type = canonicalType(moduleItem?.type);
-            if (type === 'bl2') {
-                keptBl2Count += 1;
-                return keptBl2Count <= requiredBl2Count;
-            }
-            if (type === 'io4') {
-                keptIo4Count += 1;
-                return keptIo4Count <= requiredIo4Count;
-            }
-            if (type === 'di6') {
-                keptDi6Count += 1;
-                return keptDi6Count <= requiredDi6Count;
-            }
-            return true;
-        });
-        if (nextExtModules.length !== extModules.length) {
-            nextScheme = { ...nextScheme, ext_modules: nextExtModules };
         }
         return nextScheme;
     }
@@ -1050,7 +1030,7 @@ const withRequiredModules = (scheme) => {
     if (stats.requiredNtcModules > 0) {
         oneWireModules = [
             ...oneWireModules,
-            ...Array.from({ length: stats.requiredNtcModules }, () => makeOneWireModule('ntc-1-wire')),
+            ...Array.from({ length: stats.requiredNtcModules }, () => makeOneWireModule('ntc-1-wire', AUTO_REQUIRED_MODULE_SOURCE)),
         ];
         changed = true;
     }
@@ -1058,7 +1038,7 @@ const withRequiredModules = (scheme) => {
     if (stats.requiredRdt2Modules > 0) {
         oneWireModules = [
             ...oneWireModules,
-            ...Array.from({ length: stats.requiredRdt2Modules }, () => makeOneWireModule('rdt2')),
+            ...Array.from({ length: stats.requiredRdt2Modules }, () => makeOneWireModule('rdt2', AUTO_REQUIRED_MODULE_SOURCE)),
         ];
         changed = true;
     }
@@ -1087,8 +1067,8 @@ const withRequiredModules = (scheme) => {
 
         diModules = [
             ...diModules,
-            ...Array.from({ length: moduleCount }, () => makeDiModule('rl2')),
-            ...Array.from({ length: relaySModuleCount }, () => makeDiModule('rl2s')),
+            ...Array.from({ length: moduleCount }, () => makeDiModule('rl2', AUTO_REQUIRED_MODULE_SOURCE)),
+            ...Array.from({ length: relaySModuleCount }, () => makeDiModule('rl2s', AUTO_REQUIRED_MODULE_SOURCE)),
         ];
 
         return { ...scheme, di_modules: diModules, one_wire_modules: oneWireModules };
@@ -1118,7 +1098,7 @@ const withRequiredModules = (scheme) => {
         if (bl2Count > 0) {
             extModules = [
                 ...extModules,
-                ...Array.from({ length: bl2Count }, () => makeExtModule('bl2')),
+                ...Array.from({ length: bl2Count }, () => makeExtModule('bl2', AUTO_REQUIRED_MODULE_SOURCE)),
             ];
             changed = true;
             limits = {
@@ -1131,7 +1111,7 @@ const withRequiredModules = (scheme) => {
     if (relayModuleCount > 0) {
         extModules = [
             ...extModules,
-            ...Array.from({ length: relayModuleCount }, () => makeExtModule('rl6')),
+            ...Array.from({ length: relayModuleCount }, () => makeExtModule('rl6', AUTO_REQUIRED_MODULE_SOURCE)),
         ];
         changed = true;
         limits = {
@@ -1147,7 +1127,7 @@ const withRequiredModules = (scheme) => {
     if (relaySModuleCount > 0) {
         extModules = [
             ...extModules,
-            ...Array.from({ length: relaySModuleCount }, () => makeExtModule('rl6s')),
+            ...Array.from({ length: relaySModuleCount }, () => makeExtModule('rl6s', AUTO_REQUIRED_MODULE_SOURCE)),
         ];
         changed = true;
         limits = {
@@ -1163,7 +1143,7 @@ const withRequiredModules = (scheme) => {
     if (oneWireModuleCount > 0) {
         extModules = [
             ...extModules,
-            ...Array.from({ length: oneWireModuleCount }, () => makeExtModule('rl6')),
+            ...Array.from({ length: oneWireModuleCount }, () => makeExtModule('rl6', AUTO_REQUIRED_MODULE_SOURCE)),
         ];
         changed = true;
         limits = {
@@ -1182,7 +1162,7 @@ const withRequiredModules = (scheme) => {
     if (io4Count > 0) {
         extModules = [
             ...extModules,
-            ...Array.from({ length: io4Count }, () => makeExtModule('io4')),
+            ...Array.from({ length: io4Count }, () => makeExtModule('io4', AUTO_REQUIRED_MODULE_SOURCE)),
         ];
         changed = true;
         limits = {
@@ -1198,7 +1178,7 @@ const withRequiredModules = (scheme) => {
     if (di6Count > 0) {
         extModules = [
             ...extModules,
-            ...Array.from({ length: di6Count }, () => makeExtModule('di6')),
+            ...Array.from({ length: di6Count }, () => makeExtModule('di6', AUTO_REQUIRED_MODULE_SOURCE)),
         ];
         changed = true;
     }
@@ -1207,18 +1187,87 @@ const withRequiredModules = (scheme) => {
     return { ...scheme, ext_modules: extModules, one_wire_modules: oneWireModules };
 };
 
+const isAutoRequiredModule = (moduleItem) => moduleItem?._auto_source === AUTO_REQUIRED_MODULE_SOURCE;
+
+const getRequiredModuleCounts = (items) => (Array.isArray(items) ? items : []).reduce((counts, moduleItem) => {
+    if (!isAutoRequiredModule(moduleItem)) return counts;
+    const type = canonicalType(moduleItem?.type);
+    counts.set(type, (counts.get(type) || 0) + 1);
+    return counts;
+}, new Map());
+
+const reconcileRequiredModuleList = (currentItems, requiredItems) => {
+    const requiredCounts = getRequiredModuleCounts(requiredItems);
+    const retainedCounts = new Map();
+    const result = [];
+    let changed = false;
+
+    (Array.isArray(currentItems) ? currentItems : []).forEach((moduleItem) => {
+        if (!isAutoRequiredModule(moduleItem)) {
+            result.push(moduleItem);
+            return;
+        }
+
+        const type = canonicalType(moduleItem?.type);
+        const retained = retainedCounts.get(type) || 0;
+        if (retained < (requiredCounts.get(type) || 0)) {
+            retainedCounts.set(type, retained + 1);
+            result.push(moduleItem);
+        } else {
+            changed = true;
+        }
+    });
+
+    (Array.isArray(requiredItems) ? requiredItems : []).forEach((moduleItem) => {
+        if (!isAutoRequiredModule(moduleItem)) return;
+        const type = canonicalType(moduleItem?.type);
+        const retained = retainedCounts.get(type) || 0;
+        if (retained >= (requiredCounts.get(type) || 0)) return;
+        retainedCounts.set(type, retained + 1);
+        result.push(moduleItem);
+        changed = true;
+    });
+
+    return { items: result, changed };
+};
+
+const reconcileRequiredModules = (scheme) => {
+    const withoutAutoModules = (items) => (Array.isArray(items)
+        ? items.filter((moduleItem) => !isAutoRequiredModule(moduleItem))
+        : []);
+    const manualScheme = {
+        ...scheme,
+        ext_modules: withoutAutoModules(scheme?.ext_modules),
+        di_modules: withoutAutoModules(scheme?.di_modules),
+        one_wire_modules: withoutAutoModules(scheme?.one_wire_modules),
+    };
+    const requiredScheme = withRequiredModules(manualScheme);
+    const extModules = reconcileRequiredModuleList(scheme?.ext_modules, requiredScheme?.ext_modules);
+    const diModules = reconcileRequiredModuleList(scheme?.di_modules, requiredScheme?.di_modules);
+    const oneWireModules = reconcileRequiredModuleList(scheme?.one_wire_modules, requiredScheme?.one_wire_modules);
+
+    if (!extModules.changed && !diModules.changed && !oneWireModules.changed) return scheme;
+    return {
+        ...scheme,
+        ext_modules: extModules.items,
+        di_modules: diModules.items,
+        one_wire_modules: oneWireModules.items,
+    };
+};
+
 const resolveControllerAndRequiredModules = (scheme) => {
     scheme = normalizeModulesForController(scheme);
+    scheme = reconcileRequiredModules(scheme);
     const currentControllerIssues = getControllerCompatibilityIssues(scheme);
     if (currentControllerIssues.length > 0) {
         const compatibleOption = getCompatibleControllerOptions(scheme)[0] || null;
         const controllerValue = compatibleOption ? getControllerTemplateValue(compatibleOption.type) : null;
         if (controllerValue) {
-            return withRequiredModules(normalizeModulesForController(withControllerValue(scheme, controllerValue)));
+            return reconcileRequiredModules(normalizeModulesForController(withControllerValue(scheme, controllerValue)));
         }
     }
 
-    return withRequiredModules(scheme);
+    return scheme;
 };
 
 const UPS_TEMPLATES = [
@@ -2062,7 +2111,7 @@ const getExpansionModuleRows = (incomingSchemeValue) => {
         ...(Array.isArray(incomingSchemeValue?.ext_modules) ? incomingSchemeValue.ext_modules : []),
         ...(Array.isArray(incomingSchemeValue?.di_modules) ? incomingSchemeValue.di_modules : []),
         ...(Array.isArray(incomingSchemeValue?.one_wire_modules) ? incomingSchemeValue.one_wire_modules : []),
-        ...(Array.isArray(incomingSchemeValue?.ecosmart_bl2) ? incomingSchemeValue.ecosmart_bl2 : []),
+        ...(Array.isArray(incomingSchemeValue?.controller?.ecosmart_bl2) ? incomingSchemeValue.controller.ecosmart_bl2 : []),
     ];
     return aggregateAddedItems(items.map((item) => {
         const type = canonicalType(typeof item === 'string' ? item : item?.type);
@@ -2328,7 +2377,7 @@ const SelectionApp = () => {
         [incomingScheme, controllerType],
     );
     const proAndEcosmartOptions = useMemo(() => {
-        if (controllerType !== 'pro') return false;
+        if (controllerType !== 'pro' && controllerType !== 'ecosmart') return false;
         const optionTypes = new Set(compatibleControllerOptions.map((item) => item.type));
         return optionTypes.has('pro') && optionTypes.has('ecosmart');
     }, [controllerType, compatibleControllerOptions]);
@@ -2340,7 +2389,7 @@ const SelectionApp = () => {
         if (!ecosmartAvailableForProScheme) return null;
         const controllerValue = getControllerTemplateValue('ecosmart');
         if (!controllerValue) return null;
-        return withRequiredModules({ ...incomingScheme, controller: controllerValue });
+        return resolveControllerAndRequiredModules(withControllerValue(incomingScheme, controllerValue));
     }, [ecosmartAvailableForProScheme, incomingScheme]);
     const wiredThermostatTemplate = useMemo(() => makeThermostatTemplate({
         target: 'wired',
@@ -2366,10 +2415,10 @@ const SelectionApp = () => {
     ), [wirelessTemperatureSensorKey, wirelessTemperatureSensorOptions]);
 
     useEffect(() => {
-        const nextScheme = resolveControllerAndRequiredModules(incomingScheme);
-        if (nextScheme !== incomingScheme) {
-            setIncomingScheme(nextScheme);
-        }
+        setIncomingScheme((prev) => {
+            const nextScheme = resolveControllerAndRequiredModules(prev);
+            return nextScheme === prev ? prev : nextScheme;
+        });
     }, [incomingScheme]);
 
     const measureControllerConnectors = useCallback(() => {

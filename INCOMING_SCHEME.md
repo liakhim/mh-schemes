@@ -335,7 +335,7 @@ sensors: [
 
 | Внутреннее поле | Публичный источник при сериализации |
 |---|---|
-| `controller.ecosmart_bl2` / `ecosmart_bl2` | не сохраняется как линия входа |
+| `controller.ecosmart_bl2` | не сохраняется как линия входа |
 | `controller.leak_sensor_devices` | `sensors` |
 | `controller.strategy_sensor_devices` | `sensors` |
 | `controller.boiler_sensor_devices` | `sensors` |
@@ -348,6 +348,8 @@ sensors: [
 | `controller.relay_220pump3_devices` | `wired_devices` |
 
 Отрисовка использует внутреннее состояние после балансировки, поэтому скрытие этих полей из JSON не меняет canvas. При повторной загрузке публичного `incomingScheme` балансировщики снова создают нужные внутренние линии.
+
+Legacy-формат `ecosmart_bl2` в корне схемы читается только при загрузке старой записи и переносится в `controller.ecosmart_bl2`; новый код не должен его создавать.
 
 ## DI-модули
 
