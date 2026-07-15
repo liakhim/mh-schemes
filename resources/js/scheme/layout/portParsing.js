@@ -17,6 +17,12 @@ const FALLBACK_PORTS_BY_IMAGE_KEY = {
     'zoneServo-right-port': [
         { name: 'RELAY-IN', x: 0.92, y: 0.84, width: 0, height: 0 },
     ],
+    'rinnai-adapter': [
+        { name: 'BUS-OUT-A', x: 0.04, y: 0.23, width: 0, height: 0 },
+        { name: 'BUS-OUT-B', x: 0.04, y: 0.27, width: 0, height: 0 },
+        { name: 'BUS-IN-A', x: 0.04, y: 0.75, width: 0, height: 0 },
+        { name: 'BUS-IN-B', x: 0.04, y: 0.79, width: 0, height: 0 },
+    ],
 };
 
 export const parsePorts = async (svgUrl) => {
@@ -51,9 +57,21 @@ export const parsePorts = async (svgUrl) => {
     return ports;
 };
 
-export const withFallbackPorts = (imageKey, ports) => (
-    ports.length > 0 ? ports : (FALLBACK_PORTS_BY_IMAGE_KEY[imageKey] || [])
-);
+export const withFallbackPorts = (imageKey, ports) => {
+    if (imageKey === 'rinnai-adapter') {
+        const makeBusPortAliases = (name) => ports
+            .filter((port) => port.name === name)
+            .sort((a, b) => a.y - b.y)
+            .map((port, index) => ({ ...port, name: `${name}-${index === 0 ? 'A' : 'B'}` }));
+        const aliases = [
+            ...makeBusPortAliases('BUS-OUT'),
+            ...makeBusPortAliases('BUS-IN'),
+        ];
+        return aliases.length > 0 ? [...ports, ...aliases] : FALLBACK_PORTS_BY_IMAGE_KEY[imageKey];
+    }
+
+    return ports.length > 0 ? ports : (FALLBACK_PORTS_BY_IMAGE_KEY[imageKey] || []);
+};
 
 export const getPortsByClassToken = (portsList, className) => {
     if (!Array.isArray(portsList) || !className) return null;

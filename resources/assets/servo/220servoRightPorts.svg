@@ -18,10 +18,10 @@
 <path d="M48.5753 54.8778H39.4492C35.2738 54.8778 31.8809 51.4874 31.8809 47.3066V46.1385H35.665V47.3066C35.665 49.4006 37.3579 51.0957 39.4492 51.0957H44.8054" stroke="black" stroke-width="0.26" stroke-miterlimit="3.86"/>
 <path d="M40.5942 46.8793L52.9781 59.2793M42.2373 46.8793L54.6212 59.2793" stroke="black" stroke-width="0.13" stroke-linecap="round" stroke-linejoin="round"/>
 </g>
-<rect class="RELAY-IN-GND" x="68" y="46" width="2" height="2" rx="1" fill="transparent"/>
+<rect class="RELAY-IN-V+" x="68" y="46" width="2" height="2" rx="1" fill="transparent"/>
 <rect class="RELAY-IN-1" x="68" y="50" width="2" height="2" rx="1" fill="transparent"/>
 <rect class="RELAY-IN-2" x="68" y="54" width="2" height="2" rx="1" fill="transparent"/>
-<rect class="RELAY-IN-V+" x="68" y="58" width="2" height="2" rx="1" fill="transparent"/>
+<rect class="RELAY-IN-GND" x="68" y="58" width="2" height="2" rx="1" fill="transparent"/>
 </g>
 <path d="M68.9604 41V44.7239H68.5229L66.4885 41.8H66.4521V44.7239H66V41H66.4375L68.4792 43.9311H68.5156V41H68.9604Z" fill="black"/>
 <path d="M65 62.084C65 60.9348 65.951 60 67.1118 60C68.2726 60 69.2101 60.9392 69.2101 62.0884C69.2101 63.2551 68.2636 64.1863 67.076 64.1724C65.9108 64.1636 64.9956 63.2105 65 62.084ZM65.2411 62.0796C65.2411 63.0949 66.0715 63.9324 67.0939 63.9368C68.1297 63.9368 68.969 63.1125 68.9735 62.084C68.9735 61.0862 68.1386 60.245 67.1386 60.2407C66.0849 60.2407 65.2411 61.0511 65.2366 62.0796H65.2411Z" fill="black"/>

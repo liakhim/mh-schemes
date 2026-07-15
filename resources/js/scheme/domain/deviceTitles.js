@@ -29,7 +29,6 @@ const materializedDeviceNames = {
     discrete_ventilation: 'Дискретная вентиляция',
     'leak-sensor': 'Датчик протечки',
     'pressure-sensor': 'Датчик давления',
-    'ntc-sensor': 'NTC датчик',
     'mixing-ntc-sensor': 'NTC смесителя',
     'boiler-ntc-sensor': 'Датчик бойлера',
     '010pump': 'Насос 0-10V',
@@ -74,6 +73,7 @@ const makeDeviceTitle = (device, counters) => {
 
 const withDeviceTitle = (device, counters) => {
     if (!device || typeof device !== 'object') return device;
+    if (canonicalDeviceType(device.type) === 'ntc-sensor') return device;
 
     return {
         ...device,

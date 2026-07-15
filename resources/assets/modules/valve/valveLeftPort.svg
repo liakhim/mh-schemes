@@ -2,8 +2,8 @@
 <path d="M3.16037 15.275V18.9989H2.72287L0.688491 16.075H0.652029V18.9989H0.199951V15.275H0.63745L2.67912 18.2061H2.71558V15.275H3.16037Z" fill="black"/>
 <path d="M11.8621 26.275L0.562988 20.275" stroke="black" stroke-linecap="round"/>
 <path d="M11.8618 26.2749L0.562988 32.275" stroke="#CFF400" stroke-linecap="round"/>
-<path d="M11.8618 26.2749L0.562988 24.275" stroke="#FE0000" stroke-linecap="round"/>
-<path d="M11.8618 26.275L0.562989 28.275" stroke="#FE0000" stroke-linecap="round"/>
+<path d="M11.8618 26.2749L0.562988 24.275" stroke="#D32F2F" stroke-linecap="round"/>
+<path d="M11.8618 26.275L0.562989 28.275" stroke="#D32F2F" stroke-linecap="round"/>
 <path d="M37.0449 22.6276V35.4374H46.3655V22.6276H37.0449Z" fill="#D5D5D5"/>
 <path d="M21.7366 45.2334L22.0523 44.6854V31.6171L21.7366 31.0743" fill="#D5D5D5"/>
 <path d="M21.7366 45.2334L22.0523 44.6854V31.6171L21.7366 31.0743" stroke="black" stroke-width="0.25" stroke-miterlimit="2"/>

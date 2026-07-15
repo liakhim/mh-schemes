@@ -123,19 +123,48 @@ const createGridPatternImage = (step) => {
 };
 
 const buildSchemeFromIncoming = (sourceScheme) => {
+    const withRinnaiAdapter = (boiler) => (
+        String(boiler?.name || '').toLowerCase().includes('rinnai')
+            ? { ...boiler, adapter: { ...boiler?.adapter, type: 'rinnai' } }
+            : boiler
+    );
+    const normalizeRinnaiAdapters = (schemeValue) => {
+        const controller = schemeValue?.controller && typeof schemeValue.controller === 'object'
+            ? {
+                ...schemeValue.controller,
+                bus_devices: Array.isArray(schemeValue.controller.bus_devices)
+                    ? schemeValue.controller.bus_devices.map(withRinnaiAdapter)
+                    : schemeValue.controller.bus_devices,
+            }
+            : schemeValue?.controller;
+
+        return {
+            ...schemeValue,
+            controller,
+            boilers: Array.isArray(schemeValue?.boilers) ? schemeValue.boilers.map(withRinnaiAdapter) : schemeValue?.boilers,
+            ext_modules: Array.isArray(schemeValue?.ext_modules)
+                ? schemeValue.ext_modules.map((moduleItem) => ({
+                    ...moduleItem,
+                    bus_devices: Array.isArray(moduleItem?.bus_devices)
+                        ? moduleItem.bus_devices.map(withRinnaiAdapter)
+                        : moduleItem?.bus_devices,
+                }))
+                : schemeValue?.ext_modules,
+        };
+    };
     const legacyEcosmartBl2 = Array.isArray(sourceScheme?.ecosmart_bl2) ? sourceScheme.ecosmart_bl2 : null;
     const { ecosmart_bl2: removedEcosmartBl2, ...schemeWithoutLegacyEcosmartBl2 } = sourceScheme || {};
     const controller = schemeWithoutLegacyEcosmartBl2.controller;
     const normalizedController = controller && typeof controller === 'object'
         ? controller
         : { type: canonicalDeviceType(controller) || 'ecosmart' };
-    const normalizedScheme = legacyEcosmartBl2
+    const normalizedScheme = normalizeRinnaiAdapters(legacyEcosmartBl2
         && (!Array.isArray(normalizedController.ecosmart_bl2) || normalizedController.ecosmart_bl2.length === 0)
         ? {
             ...schemeWithoutLegacyEcosmartBl2,
             controller: { ...normalizedController, ecosmart_bl2: legacyEcosmartBl2 },
         }
-        : schemeWithoutLegacyEcosmartBl2;
+        : schemeWithoutLegacyEcosmartBl2);
 
     return {
         ...materializeBalancedOneWireScheme(normalizedScheme),
@@ -280,9 +309,9 @@ const getWirelessSlotYByIndex = (devices, index, showEmptySlots, controllerType,
             : getWirelessSlotHeight(device, indentSize);
     };
     const firstHeight = getSlotHeight(devices[0] || null);
-    let y = getWirelessSlotY(controllerType, firstHeight, moduleHeightValue);
+    let y = getWirelessSlotY(controllerType, firstHeight, moduleHeightValue) + 54 * indentSize;
     for (let i = 0; i < index; i += 1) {
-        y += getSlotHeight(devices[i] || null) + WIRELESS_SLOT_GAP;
+        y += getSlotHeight(devices[i] || null) + 4 * indentSize + WIRELESS_SLOT_GAP;
     }
     return y;
 };
@@ -307,7 +336,7 @@ const getWirelessInfoBlockY = (wirelessLineTop) => (
 const getWirelessSlotX = (devices, index, showEmptySlots, controllerType = null, indentSize = 8, slotWidth = null) => {
     if (controllerType === 'ecosmart') {
         const width = slotWidth ?? getWirelessSlotWidth(devices[index] || null, showEmptySlots);
-        return -40 * indentSize - width;
+        return -25 * indentSize - width / 2;
     }
     const baseX = 10;
     if (index <= 0) return baseX;
@@ -380,6 +409,10 @@ const getAnchoredOneWirePortsForDisplay = (device, originalPorts = []) => {
 };
 
 const getWirelessDeviceKey = (device, index) => (device?.id ?? `${device?.type || 'wireless'}-${index}`);
+const getMorphImageKey = (device) => {
+    const type = canonicalDeviceType(device?.type) || 'unknown';
+    return device?.id != null ? `${type}:id:${device.id}` : `${type}:${JSON.stringify(device)}`;
+};
 const getControllerType = (schemeOrController) => {
     const controller = schemeOrController?.controller ?? schemeOrController;
     return canonicalDeviceType(typeof controller === 'string' ? controller : controller?.type);
@@ -1054,6 +1087,7 @@ const App = () => {
     const [showHelpModal, setShowHelpModal] = useState(() => window.localStorage?.getItem(HELP_MODAL_STORAGE_KEY) !== '1');
     const [showOfferModal, setShowOfferModal] = useState(false);
     const [installationMode, setInstallationMode] = useState(true);
+    const [morphImages, setMorphImages] = useState([]);
     const [installationPanelSize, setInstallationPanelSize] = useState(null);
     const [installationItemOffsets, setInstallationItemOffsets] = useState({});
     const [slotMenuPos, setSlotMenuPos] = useState(null);
@@ -1095,6 +1129,9 @@ const App = () => {
     const relayDragStartOffsetsRef = useRef({});
     const controller420DragStartOffsetRef = useRef({ x: 0, y: 0 });
     const extOneWireDragStartOffsetsRef = useRef({});
+    const pendingMorphRef = useRef(null);
+    const morphImageRefs = useRef(new Map());
+    const morphTweensRef = useRef([]);
     const indentSize = parseInt(indent, 10) || 8;
     const moduleHeightValue = parseInt(module_height, 10) || 200;
     const dinSize = parseInt(din, 10) || 40;
@@ -1110,6 +1147,7 @@ const App = () => {
     const [schemeJsonText, setSchemeJsonText] = useState(() => JSON.stringify(initialSchemeRecord?.incoming_scheme || incomingScheme, null, 2));
     const [schemeJsonDirty, setSchemeJsonDirty] = useState(false);
     const [schemeJsonError, setSchemeJsonError] = useState(null);
+    const [schemeNameEditor, setSchemeNameEditor] = useState(null);
     const [titleEditor, setTitleEditor] = useState(null);
     const [commentEditor, setCommentEditor] = useState(null);
     const [commentViewer, setCommentViewer] = useState(null);
@@ -1120,6 +1158,7 @@ const App = () => {
     const panStartStageRef = useRef({ x: 0, y: 0 });
     const zoomFrameRef = useRef(null);
     const zoomPendingRef = useRef(null);
+    const zoomLastDrawAtRef = useRef(0);
 
     useEffect(() => {
         const handleResize = () => setCanvasSize(getCanvasSize());
@@ -1272,16 +1311,100 @@ const App = () => {
 
     const setInstallationModeEnabled = (enabled) => {
         if (enabled && !canUseInstallationMode) return;
+        const stage = stageRef.current;
+        const sourceImages = stage
+            ? stage.find('Image').reduce((items, node) => {
+                const name = node.name();
+                if (!name.startsWith('morph:')) return items;
+                items.set(name, {
+                    name,
+                    image: node.image(),
+                    ...node.getAbsolutePosition(stage),
+                    width: node.width(),
+                    height: node.height(),
+                });
+                return items;
+            }, new Map())
+            : new Map();
+        const shouldMorph = sourceImages.size > 0;
+        pendingMorphRef.current = shouldMorph ? { sourceImages } : null;
         setInstallationMode(enabled);
         if (!enabled) return;
         setShowSettingsModal(false);
-        const stage = stageRef.current;
         if (stage) {
             stage.position({ x: 0, y: 0 });
             stage.scale({ x: 1, y: 1 });
             stage.batchDraw();
         }
     };
+
+    useLayoutEffect(() => {
+        const pendingMorph = pendingMorphRef.current;
+        const stage = stageRef.current;
+        if (!pendingMorph || !stage) return;
+        pendingMorphRef.current = null;
+
+        const targets = stage.find('Image').reduce((items, node) => {
+            const name = node.name();
+            if (name.startsWith('morph:')) items.set(name, node);
+            return items;
+        }, new Map());
+        const nextMorphImages = Array.from(pendingMorph.sourceImages.values()).flatMap((source) => {
+            const target = targets.get(source.name);
+            if (!target) return [];
+            const position = target.getAbsolutePosition(stage);
+            target.opacity(0);
+            return [{
+                ...source,
+                targetX: position.x,
+                targetY: position.y,
+                targetWidth: target.width(),
+                targetHeight: target.height(),
+            }];
+        });
+        if (nextMorphImages.length > 0) setMorphImages(nextMorphImages);
+    }, [installationMode]);
+
+    useEffect(() => {
+        if (morphImages.length === 0) return undefined;
+        let completedTweens = 0;
+        const tweens = morphImages
+            .map((item) => {
+                const node = morphImageRefs.current.get(item.name);
+                if (!node) return null;
+
+                return new Konva.Tween({
+                    node,
+                    duration: 0.45,
+                    x: item.targetX,
+                    y: item.targetY,
+                    width: item.targetWidth,
+                    height: item.targetHeight,
+                    easing: Konva.Easings.EaseInOut,
+                    onFinish: () => {
+                        completedTweens += 1;
+                        if (completedTweens !== tweens.length) return;
+                        const stage = stageRef.current;
+                        stage?.find('Image').forEach((imageNode) => {
+                            if (imageNode.name().startsWith('morph:')) imageNode.opacity(1);
+                        });
+                        setMorphImages([]);
+                    },
+                });
+            })
+            .filter(Boolean);
+
+        if (tweens.length === 0) {
+            setMorphImages([]);
+            return undefined;
+        }
+        morphTweensRef.current = tweens;
+        tweens.forEach((tween) => tween.play());
+        return () => {
+            tweens.forEach((tween) => tween.destroy());
+            if (morphTweensRef.current === tweens) morphTweensRef.current = [];
+        };
+    }, [morphImages]);
 
     const handleRenderSchemeJson = () => {
         try {
@@ -1343,6 +1466,34 @@ const App = () => {
             })
             .catch(() => {
                 setSchemeSaveState('error');
+            });
+    };
+
+    const saveSchemeName = () => {
+        const name = String(schemeNameEditor?.value || '').trim();
+        if (!routeSchemeId || !name || schemeNameEditor?.state === 'saving') return;
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        setSchemeNameEditor((current) => (current ? { ...current, state: 'saving' } : current));
+
+        fetch(`/api/schemes/${routeSchemeId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify({ name }),
+        })
+            .then((response) => {
+                if (!response.ok) throw new Error('Rename failed');
+                return response.json();
+            })
+            .then((payload) => {
+                setSchemeName(payload.name || name);
+                setSchemeNameEditor(null);
+            })
+            .catch(() => {
+                setSchemeNameEditor((current) => (current ? { ...current, state: 'error' } : current));
             });
     };
 
@@ -1616,13 +1767,18 @@ const App = () => {
                 ...(Array.isArray(currentScheme.controller.mixing_ntc_devices) ? currentScheme.controller.mixing_ntc_devices : []),
             ].filter(isNumberedNtcSensor)
             : [];
-        const extDevices = (Array.isArray(currentScheme?.ext_modules) ? currentScheme.ext_modules : [])
+        const extModules = Array.isArray(currentScheme?.ext_modules) ? currentScheme.ext_modules : [];
+        const extOneWireDevices = extModules
             .flatMap((moduleItem) => (Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : []));
+        const extChannelDevices = extModules
+            .flatMap((moduleItem) => (Array.isArray(moduleItem?.channel_devices) ? moduleItem.channel_devices : []))
+            .filter(isNumberedNtcSensor);
 
         return [
             ...controllerDevices.flatMap(fromModuleDevice),
             ...controllerEcosmartNtcDevices,
-            ...extDevices.flatMap(fromModuleDevice),
+            ...extOneWireDevices.flatMap(fromModuleDevice),
+            ...extChannelDevices,
             ...getNtcSensorsFromScheme(currentScheme),
         ];
     };
@@ -1634,6 +1790,13 @@ const App = () => {
             if (sensor?.id != null && item?.id != null) return sensor.id === item.id;
             return sensor === item;
         }) + 1;
+    };
+
+    const getNtcSensorTitle = (currentScheme, sensor, fallbackIndex = 1) => {
+        const storedTitle = getDeviceStoredTitle(sensor);
+        const isGeneratedTitle = /^NTC[- ]датчик(?:\s+\d+)?$/i.test(storedTitle || '');
+        const index = getNtcSensorDisplayIndex(currentScheme, sensor) || fallbackIndex;
+        return !storedTitle || isGeneratedTitle ? `NTC-датчик ${index}` : storedTitle;
     };
 
     const getPressureSensorFromScheme = (currentScheme) => {
@@ -3621,7 +3784,19 @@ const App = () => {
             )}
             <div className="spa-scheme-title spa-fixed-scheme-title" title={schemeName}>
                 <span className="spa-scheme-title-label">Схема</span>
-                <strong>{schemeName}</strong>
+                <div className="spa-scheme-title-value">
+                    <strong>{schemeName}</strong>
+                    <button
+                        type="button"
+                        className="spa-scheme-title-edit"
+                        aria-label="Переименовать схему"
+                        title="Переименовать схему"
+                        disabled={!routeSchemeId}
+                        onClick={() => setSchemeNameEditor({ value: schemeName, state: 'idle' })}
+                    >
+                        &#9998;
+                    </button>
+                </div>
             </div>
             {schemeLoadError && (
                 <div style={{ position: 'fixed', top: 72, right: 16, zIndex: 60, color: '#d32f2f', background: '#fff', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>
@@ -3659,6 +3834,44 @@ const App = () => {
                         <div className="title-editor-actions">
                             <button type="button" className="title-editor-secondary" onClick={closeTitleEditor}>Отмена</button>
                             <button type="submit" className="title-editor-primary" disabled={!String(titleEditor.value || '').trim()}>Сохранить</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+            {schemeNameEditor && (
+                <div className="title-editor-backdrop" onMouseDown={() => setSchemeNameEditor(null)}>
+                    <form
+                        className="title-editor-modal"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            saveSchemeName();
+                        }}
+                        onMouseDown={(event) => event.stopPropagation()}
+                    >
+                        <div className="title-editor-header">
+                            <strong>Переименовать схему</strong>
+                            <button type="button" className="title-editor-close" onClick={() => setSchemeNameEditor(null)}>×</button>
+                        </div>
+                        <label className="title-editor-label" htmlFor="scheme-name-editor-input">Название схемы</label>
+                        <input
+                            id="scheme-name-editor-input"
+                            className="title-editor-input"
+                            value={schemeNameEditor.value}
+                            autoFocus
+                            onChange={(event) => setSchemeNameEditor((current) => (current ? { ...current, value: event.target.value, state: 'idle' } : current))}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Escape') {
+                                    event.preventDefault();
+                                    setSchemeNameEditor(null);
+                                }
+                            }}
+                        />
+                        {schemeNameEditor.state === 'error' && <div className="title-editor-error">Не удалось переименовать схему</div>}
+                        <div className="title-editor-actions">
+                            <button type="button" className="title-editor-secondary" onClick={() => setSchemeNameEditor(null)}>Отмена</button>
+                            <button type="submit" className="title-editor-primary" disabled={!String(schemeNameEditor.value || '').trim() || schemeNameEditor.state === 'saving'}>
+                                {schemeNameEditor.state === 'saving' ? 'Сохраняем...' : 'Сохранить'}
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -3824,7 +4037,15 @@ const App = () => {
                         pending.pointer = pointer;
                         zoomPendingRef.current = pending;
                         if (zoomFrameRef.current) return;
-                        zoomFrameRef.current = window.requestAnimationFrame(() => {
+                        const flushZoom = (timestamp) => {
+                            const minFrameDuration = 1000 / 45;
+                            const remainingDelay = minFrameDuration - (timestamp - zoomLastDrawAtRef.current);
+                            if (remainingDelay > 0) {
+                                window.setTimeout(() => {
+                                    zoomFrameRef.current = window.requestAnimationFrame(flushZoom);
+                                }, remainingDelay);
+                                return;
+                            }
                             zoomFrameRef.current = null;
                             const next = zoomPendingRef.current;
                             zoomPendingRef.current = null;
@@ -3842,7 +4063,9 @@ const App = () => {
                             });
                             stage.scale({ x: clampedScale, y: clampedScale });
                             stage.batchDraw();
-                        });
+                            zoomLastDrawAtRef.current = timestamp;
+                        };
+                        zoomFrameRef.current = window.requestAnimationFrame(flushZoom);
                     }}
                 >
                     {showGrid && !installationMode && gridPatternImage && (
@@ -3886,7 +4109,7 @@ const App = () => {
                                 }}
                             >
                                 <Image
-                                    name="scheme-controller"
+                                    name="morph:controller"
                                     image={controllerImage}
                                 />
                                 {(() => {
@@ -3923,6 +4146,7 @@ const App = () => {
 
                                     return (
                                         <Image
+                                            name={`morph:${getMorphImageKey(ecosmartBl2Modules[0])}`}
                                             image={ecosmartBl2Image}
                                             x={x}
                                             y={y}
@@ -4057,8 +4281,102 @@ const App = () => {
                                     });
                                 })()}
                                 {(() => {
-                                    const alwaysOnIndicators = ['POWER-INDICATOR', 'NETWORK-INDICATOR'];
-                                    return alwaysOnIndicators.map((indicatorName) => {
+                                    const alwaysOnIndicators = ['POWER-INDICATOR', 'NETWORK-INDICATOR', 'WI-FI-INDICATOR'];
+                                    return alwaysOnIndicators.flatMap((indicatorName) => ports
+                                        .filter((port) => String(port?.name || '').toUpperCase() === indicatorName)
+                                        .map((indicatorPort, index) => {
+                                            const indicatorWidth = Math.max(1, (indicatorPort.width || 0) * controllerImage.width);
+                                            const indicatorHeight = Math.max(1, (indicatorPort.height || 0) * controllerImage.height);
+                                            const indicatorRadius = Math.min(indicatorWidth, indicatorHeight) / 2;
+                                            return (
+                                                <Rect
+                                                    key={`always-on-indicator-${indicatorName}-${index}`}
+                                                    x={indicatorPort.x * controllerImage.width - indicatorWidth / 2}
+                                                    y={indicatorPort.y * controllerImage.height - indicatorHeight / 2}
+                                                    width={indicatorWidth}
+                                                    height={indicatorHeight}
+                                                    cornerRadius={indicatorRadius}
+                                                    fill={ACTIVE_INDICATOR_COLOR}
+                                                    shadowColor={ACTIVE_INDICATOR_COLOR}
+                                                    shadowBlur={ACTIVE_INDICATOR_SHADOW_BLUR}
+                                                    listening={false}
+                                                />
+                                            );
+                                        }));
+                                })()}
+                                {(() => {
+                                    if (controllerType !== 'ecosmart') return null;
+                                    const indicatorPort = ports.find((port) => String(port?.name || '').toUpperCase() === 'BOILER-RELAY-INDICATOR');
+                                    if (!indicatorPort) return null;
+                                    const active = Boolean(getControllerLineDevices(scheme, 'relay_devices')[0]);
+                                    const indicatorWidth = Math.max(1, (indicatorPort.width || 0) * controllerImage.width);
+                                    const indicatorHeight = Math.max(1, (indicatorPort.height || 0) * controllerImage.height);
+                                    const indicatorRadius = Math.min(indicatorWidth, indicatorHeight) / 2;
+                                    return (
+                                        <Rect
+                                            key="ecosmart-boiler-relay-indicator"
+                                            x={indicatorPort.x * controllerImage.width - indicatorWidth / 2}
+                                            y={indicatorPort.y * controllerImage.height - indicatorHeight / 2}
+                                            width={indicatorWidth}
+                                            height={indicatorHeight}
+                                            cornerRadius={indicatorRadius}
+                                            fill={active ? ACTIVE_INDICATOR_COLOR : '#D2D2D2'}
+                                            shadowColor={active ? ACTIVE_INDICATOR_COLOR : undefined}
+                                            shadowBlur={active ? ACTIVE_INDICATOR_SHADOW_BLUR : 0}
+                                            listening={false}
+                                        />
+                                    );
+                                })()}
+                                {(() => {
+                                    if (controllerType !== 'ecosmart') return null;
+                                    const indicatorPort = ports.find((port) => String(port?.name || '').toUpperCase() === 'VALVE-INDICATOR');
+                                    if (!indicatorPort) return null;
+                                    const active = Boolean(getControllerLineDevices(scheme, 'relay_s_valve_devices')[0]);
+                                    const indicatorWidth = Math.max(1, (indicatorPort.width || 0) * controllerImage.width);
+                                    const indicatorHeight = Math.max(1, (indicatorPort.height || 0) * controllerImage.height);
+                                    const indicatorRadius = Math.min(indicatorWidth, indicatorHeight) / 2;
+                                    return (
+                                        <Rect
+                                            key="ecosmart-valve-indicator"
+                                            x={indicatorPort.x * controllerImage.width - indicatorWidth / 2}
+                                            y={indicatorPort.y * controllerImage.height - indicatorHeight / 2}
+                                            width={indicatorWidth}
+                                            height={indicatorHeight}
+                                            cornerRadius={indicatorRadius}
+                                            fill={active ? ACTIVE_INDICATOR_COLOR : '#D2D2D2'}
+                                            shadowColor={active ? ACTIVE_INDICATOR_COLOR : undefined}
+                                            shadowBlur={active ? ACTIVE_INDICATOR_SHADOW_BLUR : 0}
+                                            listening={false}
+                                        />
+                                    );
+                                })()}
+                                {(() => {
+                                    if (controllerType !== 'ecosmart') return null;
+                                    const indicatorPort = ports.find((port) => String(port?.name || '').toUpperCase() === 'BOILER-GVS-INDICATOR');
+                                    if (!indicatorPort) return null;
+                                    const active = Boolean(getControllerLineDevices(scheme, 'relay_boiler_gvs_devices')[0]);
+                                    const indicatorWidth = Math.max(1, (indicatorPort.width || 0) * controllerImage.width);
+                                    const indicatorHeight = Math.max(1, (indicatorPort.height || 0) * controllerImage.height);
+                                    const indicatorRadius = Math.min(indicatorWidth, indicatorHeight) / 2;
+                                    return (
+                                        <Rect
+                                            key="ecosmart-boiler-gvs-indicator"
+                                            x={indicatorPort.x * controllerImage.width - indicatorWidth / 2}
+                                            y={indicatorPort.y * controllerImage.height - indicatorHeight / 2}
+                                            width={indicatorWidth}
+                                            height={indicatorHeight}
+                                            cornerRadius={indicatorRadius}
+                                            fill={active ? ACTIVE_INDICATOR_COLOR : '#D2D2D2'}
+                                            shadowColor={active ? ACTIVE_INDICATOR_COLOR : undefined}
+                                            shadowBlur={active ? ACTIVE_INDICATOR_SHADOW_BLUR : 0}
+                                            listening={false}
+                                        />
+                                    );
+                                })()}
+                                {(() => {
+                                    if (controllerType !== 'ecosmart') return null;
+                                    const active = Boolean(getControllerLineDevices(scheme, '220_servo_devices')[0]);
+                                    return ['MIXING-INDICATOR-1', 'MIXING-INDICATOR-2'].map((indicatorName) => {
                                         const indicatorPort = ports.find((port) => String(port?.name || '').toUpperCase() === indicatorName);
                                         if (!indicatorPort) return null;
                                         const indicatorWidth = Math.max(1, (indicatorPort.width || 0) * controllerImage.width);
@@ -4066,19 +4384,113 @@ const App = () => {
                                         const indicatorRadius = Math.min(indicatorWidth, indicatorHeight) / 2;
                                         return (
                                             <Rect
-                                                key={`always-on-indicator-${indicatorName}`}
+                                                key={`ecosmart-${indicatorName.toLowerCase()}`}
                                                 x={indicatorPort.x * controllerImage.width - indicatorWidth / 2}
                                                 y={indicatorPort.y * controllerImage.height - indicatorHeight / 2}
                                                 width={indicatorWidth}
                                                 height={indicatorHeight}
                                                 cornerRadius={indicatorRadius}
-                                                fill={ACTIVE_INDICATOR_COLOR}
-                                                shadowColor={ACTIVE_INDICATOR_COLOR}
-                                                shadowBlur={ACTIVE_INDICATOR_SHADOW_BLUR}
+                                                fill={active ? ACTIVE_INDICATOR_COLOR : '#D2D2D2'}
+                                                shadowColor={active ? ACTIVE_INDICATOR_COLOR : undefined}
+                                                shadowBlur={active ? ACTIVE_INDICATOR_SHADOW_BLUR : 0}
                                                 listening={false}
                                             />
                                         );
                                     });
+                                })()}
+                                {(() => {
+                                    if (controllerType !== 'ecosmart') return null;
+                                    const indicatorPort = ports.find((port) => String(port?.name || '').toUpperCase() === 'MIXING-PUMP-INDICATOR');
+                                    if (!indicatorPort) return null;
+                                    const active = Boolean(getControllerLineDevices(scheme, 'relay_220pump5_devices')[0]);
+                                    const indicatorWidth = Math.max(1, (indicatorPort.width || 0) * controllerImage.width);
+                                    const indicatorHeight = Math.max(1, (indicatorPort.height || 0) * controllerImage.height);
+                                    const indicatorRadius = Math.min(indicatorWidth, indicatorHeight) / 2;
+                                    return (
+                                        <Rect
+                                            key="ecosmart-mixing-pump-indicator"
+                                            x={indicatorPort.x * controllerImage.width - indicatorWidth / 2}
+                                            y={indicatorPort.y * controllerImage.height - indicatorHeight / 2}
+                                            width={indicatorWidth}
+                                            height={indicatorHeight}
+                                            cornerRadius={indicatorRadius}
+                                            fill={active ? ACTIVE_INDICATOR_COLOR : '#D2D2D2'}
+                                            shadowColor={active ? ACTIVE_INDICATOR_COLOR : undefined}
+                                            shadowBlur={active ? ACTIVE_INDICATOR_SHADOW_BLUR : 0}
+                                            listening={false}
+                                        />
+                                    );
+                                })()}
+                                {(() => {
+                                    if (controllerType !== 'ecosmart') return null;
+                                    const indicatorPort = ports.find((port) => String(port?.name || '').toUpperCase() === 'CIRCUIT-PUMP-INDICATOR');
+                                    if (!indicatorPort) return null;
+                                    const active = Boolean(getControllerLineDevices(scheme, 'relay_220pump_devices')[0]);
+                                    const indicatorWidth = Math.max(1, (indicatorPort.width || 0) * controllerImage.width);
+                                    const indicatorHeight = Math.max(1, (indicatorPort.height || 0) * controllerImage.height);
+                                    const indicatorRadius = Math.min(indicatorWidth, indicatorHeight) / 2;
+                                    return (
+                                        <Rect
+                                            key="ecosmart-circuit-pump-indicator"
+                                            x={indicatorPort.x * controllerImage.width - indicatorWidth / 2}
+                                            y={indicatorPort.y * controllerImage.height - indicatorHeight / 2}
+                                            width={indicatorWidth}
+                                            height={indicatorHeight}
+                                            cornerRadius={indicatorRadius}
+                                            fill={active ? ACTIVE_INDICATOR_COLOR : '#D2D2D2'}
+                                            shadowColor={active ? ACTIVE_INDICATOR_COLOR : undefined}
+                                            shadowBlur={active ? ACTIVE_INDICATOR_SHADOW_BLUR : 0}
+                                            listening={false}
+                                        />
+                                    );
+                                })()}
+                                {(() => {
+                                    if (controllerType !== 'ecosmart') return null;
+                                    const active = Boolean(getControllerLineDevices(scheme, '220_servo_devices')[1]);
+                                    return ['MIXING-INDICATOR-3', 'MIXING-INDICATOR-4'].map((indicatorName) => {
+                                        const indicatorPort = ports.find((port) => String(port?.name || '').toUpperCase() === indicatorName);
+                                        if (!indicatorPort) return null;
+                                        const indicatorWidth = Math.max(1, (indicatorPort.width || 0) * controllerImage.width);
+                                        const indicatorHeight = Math.max(1, (indicatorPort.height || 0) * controllerImage.height);
+                                        const indicatorRadius = Math.min(indicatorWidth, indicatorHeight) / 2;
+                                        return (
+                                            <Rect
+                                                key={`ecosmart-${indicatorName.toLowerCase()}`}
+                                                x={indicatorPort.x * controllerImage.width - indicatorWidth / 2}
+                                                y={indicatorPort.y * controllerImage.height - indicatorHeight / 2}
+                                                width={indicatorWidth}
+                                                height={indicatorHeight}
+                                                cornerRadius={indicatorRadius}
+                                                fill={active ? ACTIVE_INDICATOR_COLOR : '#D2D2D2'}
+                                                shadowColor={active ? ACTIVE_INDICATOR_COLOR : undefined}
+                                                shadowBlur={active ? ACTIVE_INDICATOR_SHADOW_BLUR : 0}
+                                                listening={false}
+                                            />
+                                        );
+                                    });
+                                })()}
+                                {(() => {
+                                    if (controllerType !== 'ecosmart') return null;
+                                    const indicatorPort = ports.find((port) => String(port?.name || '').toUpperCase() === 'MIXING-PUMP-INDICATOR-2');
+                                    if (!indicatorPort) return null;
+                                    const active = Boolean(getControllerLineDevices(scheme, 'relay_220pump3_devices')[0]);
+                                    const indicatorWidth = Math.max(1, (indicatorPort.width || 0) * controllerImage.width);
+                                    const indicatorHeight = Math.max(1, (indicatorPort.height || 0) * controllerImage.height);
+                                    const indicatorRadius = Math.min(indicatorWidth, indicatorHeight) / 2;
+                                    return (
+                                        <Rect
+                                            key="ecosmart-mixing-pump-indicator-2"
+                                            x={indicatorPort.x * controllerImage.width - indicatorWidth / 2}
+                                            y={indicatorPort.y * controllerImage.height - indicatorHeight / 2}
+                                            width={indicatorWidth}
+                                            height={indicatorHeight}
+                                            cornerRadius={indicatorRadius}
+                                            fill={active ? ACTIVE_INDICATOR_COLOR : '#D2D2D2'}
+                                            shadowColor={active ? ACTIVE_INDICATOR_COLOR : undefined}
+                                            shadowBlur={active ? ACTIVE_INDICATOR_SHADOW_BLUR : 0}
+                                            listening={false}
+                                        />
+                                    );
                                 })()}
                                 {(() => {
                                     if (controllerType !== 'smart2') return null;
@@ -4568,8 +4980,8 @@ const App = () => {
                                             {(leakSensor || showEmptySlots) && (
                                                 <>
                                                     <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, leakPorts.gnd.x, targetPorts.gnd.y, leakPorts.gnd.x, leakPorts.gnd.y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.di.x, targetPorts.di.y, leakPorts.di.x, targetPorts.di.y, leakPorts.di.x, leakPorts.di.y]} stroke="#DEDC00" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, leakPorts.vplus.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.di.x, targetPorts.di.y, leakPorts.di.x, targetPorts.di.y, leakPorts.di.x, leakPorts.di.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, leakPorts.vplus.y]} stroke="#fbc02d" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                 </>
                                             )}
                                             <Rect
@@ -5451,10 +5863,10 @@ const App = () => {
                                          >
                                             {(servoDevice || showEmptySlots) && (
                                                 <>
-                                                    <Line points={[targetPorts.vplus.x, targetPorts.vplus.y, targetPorts.vplus.x + indentSize, targetPorts.vplus.y, controllerServoPorts.vplus.x, targetPorts.vplus.y, controllerServoPorts.vplus.x, controllerServoPorts.vplus.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x + indentSize, targetPorts.a.y, controllerServoPorts.a.x, targetPorts.a.y, controllerServoPorts.a.x, controllerServoPorts.a.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.b.x, targetPorts.b.y, targetPorts.b.x + indentSize, targetPorts.b.y, controllerServoPorts.b.x, targetPorts.b.y, controllerServoPorts.b.x, controllerServoPorts.b.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x + indentSize, targetPorts.gnd.y, controllerServoPorts.gnd.x, targetPorts.gnd.y, controllerServoPorts.gnd.x, controllerServoPorts.gnd.y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.vplus.x, targetPorts.vplus.y, targetPorts.vplus.x + indentSize, targetPorts.vplus.y, controllerServoPorts.vplus.x, targetPorts.vplus.y, controllerServoPorts.vplus.x, controllerServoPorts.vplus.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x + indentSize, targetPorts.a.y, controllerServoPorts.a.x, targetPorts.a.y, controllerServoPorts.a.x, controllerServoPorts.a.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.b.x, targetPorts.b.y, targetPorts.b.x + indentSize, targetPorts.b.y, controllerServoPorts.b.x, targetPorts.b.y, controllerServoPorts.b.x, controllerServoPorts.b.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x + indentSize, targetPorts.gnd.y, controllerServoPorts.gnd.x, targetPorts.gnd.y, controllerServoPorts.gnd.x, controllerServoPorts.gnd.y]} stroke="#fbc02d" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                 </>
                                             )}
                                              <Rect x={slotX} y={slotY} width={slotWidth} height={slotHeight} cornerRadius={6} fill={servoDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={servoDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} onClick={!servoDevice ? () => addEcosmartServo(0) : undefined} onTap={!servoDevice ? () => addEcosmartServo(0) : undefined} />
@@ -5549,8 +5961,8 @@ const App = () => {
                                             {(pumpDevice || showEmptySlots) && (
                                                 <>
                                                     <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x + indentSize, targetPorts.a.y, controllerPumpPorts.a.x, targetPorts.a.y, controllerPumpPorts.a.x, controllerPumpPorts.a.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.b.x, targetPorts.b.y, targetPorts.b.x + indentSize, targetPorts.b.y, controllerPumpPorts.b.x, targetPorts.b.y, controllerPumpPorts.b.x, controllerPumpPorts.b.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x + indentSize, targetPorts.gnd.y, controllerPumpPorts.gnd.x, targetPorts.gnd.y, controllerPumpPorts.gnd.x, controllerPumpPorts.gnd.y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.b.x, targetPorts.b.y, targetPorts.b.x + indentSize, targetPorts.b.y, controllerPumpPorts.b.x, targetPorts.b.y, controllerPumpPorts.b.x, controllerPumpPorts.b.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x + indentSize, targetPorts.gnd.y, controllerPumpPorts.gnd.x, targetPorts.gnd.y, controllerPumpPorts.gnd.x, controllerPumpPorts.gnd.y]} stroke="#fbc02d" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                 </>
                                             )}
                                              <Rect x={slotX} y={slotY} width={slotWidth} height={slotHeight} cornerRadius={6} fill={pumpDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={pumpDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} onClick={!pumpDevice ? () => addEcosmartPump('relay_220pump5_devices', 'pump-220v') : undefined} onTap={!pumpDevice ? () => addEcosmartPump('relay_220pump5_devices', 'pump-220v') : undefined} />
@@ -5648,10 +6060,10 @@ const App = () => {
                                          >
                                             {(servoDevice || showEmptySlots) && (
                                                 <>
-                                                    <Line points={[targetPorts.vplus.x, targetPorts.vplus.y, targetPorts.vplus.x + indentSize, targetPorts.vplus.y, controllerServoPorts.vplus.x, targetPorts.vplus.y, controllerServoPorts.vplus.x, controllerServoPorts.vplus.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x + indentSize, targetPorts.a.y, controllerServoPorts.a.x, targetPorts.a.y, controllerServoPorts.a.x, controllerServoPorts.a.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.b.x, targetPorts.b.y, targetPorts.b.x + indentSize, targetPorts.b.y, controllerServoPorts.b.x, targetPorts.b.y, controllerServoPorts.b.x, controllerServoPorts.b.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x + indentSize, targetPorts.gnd.y, controllerServoPorts.gnd.x, targetPorts.gnd.y, controllerServoPorts.gnd.x, controllerServoPorts.gnd.y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.vplus.x, targetPorts.vplus.y, targetPorts.vplus.x + indentSize, targetPorts.vplus.y, controllerServoPorts.vplus.x, targetPorts.vplus.y, controllerServoPorts.vplus.x, controllerServoPorts.vplus.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x + indentSize, targetPorts.a.y, controllerServoPorts.a.x, targetPorts.a.y, controllerServoPorts.a.x, controllerServoPorts.a.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.b.x, targetPorts.b.y, targetPorts.b.x + indentSize, targetPorts.b.y, controllerServoPorts.b.x, targetPorts.b.y, controllerServoPorts.b.x, controllerServoPorts.b.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x + indentSize, targetPorts.gnd.y, controllerServoPorts.gnd.x, targetPorts.gnd.y, controllerServoPorts.gnd.x, controllerServoPorts.gnd.y]} stroke="#fbc02d" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                 </>
                                             )}
                                              <Rect x={slotX} y={slotY} width={slotWidth} height={slotHeight} cornerRadius={6} fill={servoDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={servoDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} onClick={!servoDevice ? () => addEcosmartServo(1) : undefined} onTap={!servoDevice ? () => addEcosmartServo(1) : undefined} />
@@ -5752,9 +6164,9 @@ const App = () => {
                                          >
                                             {(pumpDevice || showEmptySlots) && (
                                                 <>
-                                                    <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x + indentSize, targetPorts.a.y, controllerPumpPorts.a.x, targetPorts.a.y, controllerPumpPorts.a.x, controllerPumpPorts.a.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.b.x, targetPorts.b.y, targetPorts.b.x + indentSize, targetPorts.b.y, controllerPumpPorts.b.x, targetPorts.b.y, controllerPumpPorts.b.x, controllerPumpPorts.b.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x + indentSize, targetPorts.gnd.y, controllerPumpPorts.gnd.x, targetPorts.gnd.y, controllerPumpPorts.gnd.x, controllerPumpPorts.gnd.y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                     <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x + indentSize, targetPorts.a.y, controllerPumpPorts.a.x, targetPorts.a.y, controllerPumpPorts.a.x, controllerPumpPorts.a.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                     <Line points={[targetPorts.b.x, targetPorts.b.y, targetPorts.b.x + indentSize, targetPorts.b.y, controllerPumpPorts.b.x, targetPorts.b.y, controllerPumpPorts.b.x, controllerPumpPorts.b.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                     <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x + indentSize, targetPorts.gnd.y, controllerPumpPorts.gnd.x, targetPorts.gnd.y, controllerPumpPorts.gnd.x, controllerPumpPorts.gnd.y]} stroke="#fbc02d" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                 </>
                                             )}
                                              <Rect x={slotX} y={slotY} width={slotWidth} height={slotHeight} cornerRadius={6} fill={pumpDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={pumpDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} onClick={!pumpDevice ? () => addEcosmartPump('relay_220pump3_devices', 'pump-220v') : undefined} onTap={!pumpDevice ? () => addEcosmartPump('relay_220pump3_devices', 'pump-220v') : undefined} />
@@ -5842,9 +6254,9 @@ const App = () => {
                                          >
                                             {(valveDevice || showEmptySlots) && (
                                                 <>
-                                                    <Line points={getOrthogonalLinkPoints(controllerValvePorts.vplus.x, controllerValvePorts.vplus.y, targetPorts.vplus.y, targetPorts.vplus.x, targetPorts.vplus.y)} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={getOrthogonalLinkPoints(controllerValvePorts.a.x, controllerValvePorts.a.y, targetPorts.a.y, targetPorts.a.x, targetPorts.a.y)} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={getOrthogonalLinkPoints(controllerValvePorts.b.x, controllerValvePorts.b.y, targetPorts.b.y, targetPorts.b.x, targetPorts.b.y)} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={getOrthogonalLinkPoints(controllerValvePorts.vplus.x, controllerValvePorts.vplus.y, targetPorts.vplus.y, targetPorts.vplus.x, targetPorts.vplus.y)} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={getOrthogonalLinkPoints(controllerValvePorts.a.x, controllerValvePorts.a.y, targetPorts.a.y, targetPorts.a.x, targetPorts.a.y)} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={getOrthogonalLinkPoints(controllerValvePorts.b.x, controllerValvePorts.b.y, targetPorts.b.y, targetPorts.b.x, targetPorts.b.y)} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                     <Line points={getOrthogonalLinkPoints(controllerValvePorts.gnd.x, controllerValvePorts.gnd.y, targetPorts.gnd.y, targetPorts.gnd.x, targetPorts.gnd.y)} stroke="#fbc02d" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                 </>
                                             )}
@@ -5973,9 +6385,9 @@ const App = () => {
                                          >
                                             {(pumpDevice || showEmptySlots) && (
                                                 <>
-                                                    <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x - indentSize, targetPorts.a.y, controllerPumpPorts.a.x, targetPorts.a.y, controllerPumpPorts.a.x, controllerPumpPorts.a.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x - indentSize, targetPorts.a.y, controllerPumpPorts.a.x, targetPorts.a.y, controllerPumpPorts.a.x, controllerPumpPorts.a.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                     <Line points={[targetPorts.b.x, targetPorts.b.y, targetPorts.b.x - indentSize, targetPorts.b.y, controllerPumpPorts.b.x, targetPorts.b.y, controllerPumpPorts.b.x, controllerPumpPorts.b.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x - indentSize, targetPorts.gnd.y, controllerPumpPorts.gnd.x, targetPorts.gnd.y, controllerPumpPorts.gnd.x, controllerPumpPorts.gnd.y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x - indentSize, targetPorts.gnd.y, controllerPumpPorts.gnd.x, targetPorts.gnd.y, controllerPumpPorts.gnd.x, controllerPumpPorts.gnd.y]} stroke="#fbc02d" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                 </>
                                             )}
                                              <Rect x={slotX} y={slotY} width={slotWidth} height={slotHeight} cornerRadius={6} fill={pumpDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={pumpDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} onClick={!pumpDevice ? () => addEcosmartPump('relay_boiler_gvs_devices', 'boiler-pump') : undefined} onTap={!pumpDevice ? () => addEcosmartPump('relay_boiler_gvs_devices', 'boiler-pump') : undefined} />
@@ -6073,9 +6485,9 @@ const App = () => {
                                          >
                                             {(pumpDevice || showEmptySlots) && (
                                                 <>
-                                                    <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x - indentSize, targetPorts.a.y, controllerPumpPorts.a.x, targetPorts.a.y, controllerPumpPorts.a.x, controllerPumpPorts.a.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.a.x, targetPorts.a.y, targetPorts.a.x - indentSize, targetPorts.a.y, controllerPumpPorts.a.x, targetPorts.a.y, controllerPumpPorts.a.x, controllerPumpPorts.a.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                     <Line points={[targetPorts.b.x, targetPorts.b.y, targetPorts.b.x - indentSize, targetPorts.b.y, controllerPumpPorts.b.x, targetPorts.b.y, controllerPumpPorts.b.x, controllerPumpPorts.b.y]} stroke="#1565c0" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x - indentSize, targetPorts.gnd.y, controllerPumpPorts.gnd.x, targetPorts.gnd.y, controllerPumpPorts.gnd.x, controllerPumpPorts.gnd.y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, targetPorts.gnd.x - indentSize, targetPorts.gnd.y, controllerPumpPorts.gnd.x, targetPorts.gnd.y, controllerPumpPorts.gnd.x, controllerPumpPorts.gnd.y]} stroke="#fbc02d" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                 </>
                                             )}
                                              <Rect x={slotX} y={slotY} width={slotWidth} height={slotHeight} cornerRadius={6} fill={pumpDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={pumpDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} onClick={!pumpDevice ? () => addEcosmartPump('relay_220pump_devices', 'pump-220v') : undefined} onTap={!pumpDevice ? () => addEcosmartPump('relay_220pump_devices', 'pump-220v') : undefined} />
@@ -6211,6 +6623,7 @@ const App = () => {
                                                         />
                                                          {image && (
                                                              <Image
+                                                                 name={`morph:${getMorphImageKey(item.moduleDevice)}`}
                                                                  image={image}
                                                                  x={item.x}
                                                                  y={item.y}
@@ -6218,9 +6631,12 @@ const App = () => {
                                                                  height={item.height}
                                                              />
                                                          )}
-                                                         {item.moduleDevice.type === 'power-unit' && key && (() => {
-                                                             const indicatorPort = (wirelessPortsByType[key] || [])
-                                                                 .find((port) => String(port?.name || '').toUpperCase() === 'POWER-INDICATOR');
+                                                          {['power-unit', 'ups'].includes(item.moduleDevice.type) && key && (() => {
+                                                              const indicatorNames = item.moduleDevice.type === 'ups'
+                                                                  ? ['STATUS-INDICATOR', 'POWER-INDICATOR']
+                                                                  : ['POWER-INDICATOR'];
+                                                              const indicatorPort = (wirelessPortsByType[key] || [])
+                                                                  .find((port) => indicatorNames.includes(String(port?.name || '').toUpperCase()));
                                                              if (!indicatorPort) return null;
                                                              const indicatorWidth = Math.max(1, (indicatorPort.width || 0) * item.width);
                                                              const indicatorHeight = Math.max(1, (indicatorPort.height || 0) * item.height);
@@ -8203,12 +8619,24 @@ const App = () => {
                                                         return { x: lineIndex * (slotWidth + 2 * indentSize), y: -moduleHeightValue - slotHeight - 6 * indentSize };
                                                     }
                                                     return { x: getAlignedXByBusA(0), y: controllerImage.height + moduleHeightValue * 0.25 };
-                                                };
-                                                const slotPos = getBusSlotPosition();
-                                                const busOffset = busSlotOffsets[lineIndex] || { x: 0, y: 0 };
-                                                const slotX = slotPos.x + busOffset.x;
-                                                const slotY = slotPos.y + busOffset.y;
-                                                const isOccupied = !!busDevice;
+                                                 };
+                                                 const slotPos = getBusSlotPosition();
+                                                 const busOffset = busSlotOffsets[lineIndex] || { x: 0, y: 0 };
+                                                 const hasRinnaiAdapter = busDevice?.adapter?.type === 'rinnai';
+                                                 const useEcosmartRinnaiLayout = hasRinnaiAdapter && controllerType === 'ecosmart';
+                                                 const slotX = slotPos.x + busOffset.x
+                                                     - (hasRinnaiAdapter ? (useEcosmartRinnaiLayout ? 5.5 : 5) * indentSize : 0)
+                                                     - (useEcosmartRinnaiLayout && lineIndex === 0 ? indentSize : 0)
+                                                     + (useEcosmartRinnaiLayout && lineIndex === 1 ? 6 * indentSize : 0);
+                                                 const slotY = slotPos.y + busOffset.y;
+                                                 const isOccupied = !!busDevice;
+                                                const rinnaiAdapterImage = hasRinnaiAdapter ? wirelessImages['rinnai-adapter'] : null;
+                                                const rinnaiAdapterPorts = hasRinnaiAdapter ? (wirelessPortsByType['rinnai-adapter'] || []) : [];
+                                                const rinnaiAdapterWidth = rinnaiAdapterImage?.width || 27;
+                                                const rinnaiAdapterHeight = rinnaiAdapterImage?.height || 47;
+                                                 const rinnaiAdapterX = slotX + slotWidth + (useEcosmartRinnaiLayout ? 4 : 2) * indentSize;
+                                                 const rinnaiAdapterY = slotY + (slotHeight - rinnaiAdapterHeight) / 2
+                                                     + (useEcosmartRinnaiLayout && lineIndex === 1 ? 5 * indentSize : 0);
                                                 if (!isOccupied && !showEmptySlots) return null;
                                                 const isHovered = hoveredBusLineIndex === lineIndex;
                                                 const busTitle = getDeviceStoredTitle(busDevice) || (typeof busDevice?.name === 'string' && busDevice.name.trim().length > 0
@@ -8262,21 +8690,58 @@ const App = () => {
                                                                         { controllerPort: 'BUS-A', boilerPort: 'BUS-A', offset: 1 * indentSize, color: '#2e7d32' },
                                                                         { controllerPort: 'BUS-B', boilerPort: 'BUS-B', offset: 2 * indentSize, color: '#2e7d32' },
                                                                     ]);
-                                                            const fallbackBusPorts = busPorts.filter((port) => port.name === 'BUS' || port.name.startsWith('BUS'));
-                                                            return links.map((link) => {
-                                                                const fromPort = ports.find((port) => port.name === link.controllerPort);
+                                                             const fallbackBusPorts = busPorts.filter((port) => port.name === 'BUS' || port.name.startsWith('BUS'));
+                                                             return links.map((link) => {
+                                                                 const fromPort = ports.find((port) => port.name === link.controllerPort);
                                                                 let toPort = busPorts.find((port) => port.name === link.boilerPort);
                                                                 if (!toPort) {
                                                                     toPort = link.boilerPort === 'BUS-A'
                                                                         ? (fallbackBusPorts[0] || null)
                                                                         : (fallbackBusPorts[1] || fallbackBusPorts[0] || null);
-                                                                }
-                                                                if (!fromPort || !toPort) return null;
-                                                                const fromX = fromPort.x * controllerImage.width;
-                                                                const fromY = fromPort.y * controllerImage.height;
-                                                                const toX = slotX + toPort.x * slotWidth;
-                                                                const toY = slotY + toPort.y * slotHeight;
-                                                                const bendYFromBoiler = slotY + slotHeight + link.offset;
+                                                                 }
+                                                                 if (!fromPort || !toPort) return null;
+                                                                 const fromX = fromPort.x * controllerImage.width;
+                                                                 const fromY = fromPort.y * controllerImage.height;
+                                                                  const toX = slotX + toPort.x * slotWidth;
+                                                                  const toY = slotY + toPort.y * slotHeight;
+                                                                  if (hasRinnaiAdapter) {
+                                                                      if (useEcosmartRinnaiLayout) {
+                                                                          const isLeftBoilerLine = link.boilerPort === 'BUS-B';
+                                                                          const adapterOutPort = rinnaiAdapterPorts.find((port) => port.name === `BUS-OUT-${isLeftBoilerLine ? 'A' : 'B'}`);
+                                                                          const adapterInPort = rinnaiAdapterPorts.find((port) => port.name === `BUS-IN-${link.controllerPort.slice(-1)}`);
+                                                                          if (!adapterOutPort || !adapterInPort) return null;
+                                                                          const adapterOutX = rinnaiAdapterX + adapterOutPort.x * rinnaiAdapterWidth;
+                                                                          const adapterOutY = rinnaiAdapterY + adapterOutPort.y * rinnaiAdapterHeight;
+                                                                          const adapterInX = rinnaiAdapterX + adapterInPort.x * rinnaiAdapterWidth;
+                                                                          const adapterInY = rinnaiAdapterY + adapterInPort.y * rinnaiAdapterHeight;
+                                                                          const boilerBendY = slotY + slotHeight + (isLeftBoilerLine ? 1 : 0.5) * indentSize;
+                                                                          const boilerBendX = slotX + slotWidth + (isLeftBoilerLine ? 1 : 0.5) * indentSize;
+                                                                          return (
+                                                                              <Group key={`ecosmart-rinnai-bus-link-${lineIndex}-${link.controllerPort}`}>
+                                                                                  <Line points={[toX, toY, toX, boilerBendY, boilerBendX, boilerBendY, boilerBendX, adapterOutY, adapterOutX, adapterOutY]} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                  <Line points={[adapterInX, adapterInY, adapterInX - indentSize, adapterInY, fromX, adapterInY, fromX, fromY]} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                              </Group>
+                                                                          );
+                                                                      }
+                                                                      const adapterOutPort = rinnaiAdapterPorts.find((port) => port.name === `BUS-OUT-${link.controllerPort.slice(-1)}`);
+                                                                     const adapterInPort = rinnaiAdapterPorts.find((port) => port.name === `BUS-IN-${link.boilerPort.slice(-1)}`);
+                                                                     if (!adapterOutPort || !adapterInPort) return null;
+                                                                      const adapterOutX = rinnaiAdapterX + adapterOutPort.x * rinnaiAdapterWidth;
+                                                                      const adapterOutY = rinnaiAdapterY + adapterOutPort.y * rinnaiAdapterHeight;
+                                                                      const adapterInX = rinnaiAdapterX + adapterInPort.x * rinnaiAdapterWidth;
+                                                                      const adapterInY = rinnaiAdapterY + adapterInPort.y * rinnaiAdapterHeight;
+                                                                      const boilerBendY = Math.max(slotY + slotHeight, rinnaiAdapterY + rinnaiAdapterHeight) + link.offset + 2 * indentSize;
+                                                                      const adapterInApproachX = adapterInX - (link.boilerPort === 'BUS-B' ? 0.5 : 1) * indentSize;
+                                                                      const adapterOutLeftX = adapterOutX - (link.boilerPort === 'BUS-A' ? 1 : 0.5) * indentSize;
+                                                                      const adapterOutBendY = adapterOutY - (link.boilerPort === 'BUS-A' ? 4 : 3) * indentSize;
+                                                                      return (
+                                                                          <Group key={`rinnai-bus-link-${lineIndex}-${link.controllerPort}`}>
+                                                                              <Line points={[toX, toY, toX, boilerBendY, adapterInApproachX, boilerBendY, adapterInApproachX, adapterInY, adapterInX, adapterInY]} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                              <Line points={[adapterOutX, adapterOutY, adapterOutLeftX, adapterOutY, adapterOutLeftX, adapterOutBendY, fromX, adapterOutBendY, fromX, fromY]} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                          </Group>
+                                                                      );
+                                                                 }
+                                                                 const bendYFromBoiler = slotY + slotHeight + link.offset;
                                                                 const controllerMinOffset = controllerType === 'pro'
                                                                     ? (link.boilerPort === 'BUS-B' ? 4 * indentSize : 3 * indentSize)
                                                                     : (link.boilerPort === 'BUS-B' ? 2 * indentSize : 1 * indentSize);
@@ -8337,6 +8802,9 @@ const App = () => {
                                                                 y={slotY}
                                                                 listening={false}
                                                             />
+                                                        )}
+                                                        {hasRinnaiAdapter && rinnaiAdapterImage && (
+                                                            <Image image={rinnaiAdapterImage} x={rinnaiAdapterX} y={rinnaiAdapterY} width={rinnaiAdapterWidth} height={rinnaiAdapterHeight} listening={false} />
                                                         )}
                                                         {showPorts && isOccupied && busPorts.map((port, portIndex) => (
                                                             <Circle
@@ -8623,8 +9091,9 @@ const App = () => {
                                                             strokeWidth={1.5}
                                                         />
                                                           {isOccupied && image && (
-                                                              <Image
-                                                                  image={image}
+                                                               <Image
+                                                                   name={`morph:${getMorphImageKey(device)}`}
+                                                                   image={image}
                                                                    x={slotX}
                                                                    y={slotY}
                                                                    width={size.width}
@@ -9759,10 +10228,17 @@ const App = () => {
                                                   const isHovered = hoveredExtSlotIndex === slotIndex;
                                                   const extNormalizedType = canonicalDeviceType(renderDevice?.type);
                                                   const isExtThermostat = extNormalizedType === 'thermostat';
-                                                  const extThermostatIndex = isExtThermostat && isOccupied
-                                                      ? extModules.slice(0, slotIndex + 1).filter((item) => canonicalDeviceType(item?.type) === 'thermostat').length
-                                                      : 0;
-                                                  const extThermostatTitle = getDeviceStoredTitle(device) || (extThermostatIndex > 0 ? `Проводной термостат ${extThermostatIndex}` : 'Проводной термостат');
+                                                   const extThermostatIndex = isExtThermostat && isOccupied
+                                                       ? extModules.slice(0, slotIndex + 1).filter((item) => canonicalDeviceType(item?.type) === 'thermostat').length
+                                                       : 0;
+                                                   const hasExtThermostatFloorSensor = isExtThermostat && (Array.isArray(device?.additions) ? device.additions : [])
+                                                       .some((addition) => {
+                                                           const additionType = canonicalDeviceType(addition?.type);
+                                                           return additionType === 'floor-sensor' || additionType === 'flask-sensor-floor';
+                                                       });
+                                                   const extThermostatTitle = getDeviceStoredTitle(device) || (hasExtThermostatFloorSensor
+                                                       ? `Проводной термостат с датчиком пола${extThermostatIndex > 0 ? ` ${extThermostatIndex}` : ''}`
+                                                       : (extThermostatIndex > 0 ? `Проводной термостат ${extThermostatIndex}` : 'Проводной термостат'));
                                                   const hasAlwaysOnPowerIndicator = isOccupied && ['rl6', 'rl6s', 'rl6w', 'rl6sw'].includes(extNormalizedType);
                                                 const supportsOwnOneWire = isOccupied && (device.type === 'rl6' || device.type === 'rl6s');
                                                 const supportsOwnChannelLine = isOccupied && extNormalizedType === 'io4';
@@ -9773,7 +10249,6 @@ const App = () => {
                                                     : [];
                                                 const extOneWireSlotsCount = extOneWireDevices.length + ((showEmptySlots && extOneWireDevices.length < 6) ? 1 : 0);
                                                 const pressureSensorsInSystem = getPressureSensorsFromScheme(scheme);
-                                                const ntcSensorsInSystem = getNtcSensorsFromScheme(scheme);
                                                 const pumps010InSystem = getIo4OnlyWiredDevices(scheme)
                                                     .filter((item) => canonicalDeviceType(item?.type) === '010pump');
                                                 const servos010InSystem = getIo4OnlyWiredDevices(scheme)
@@ -9849,12 +10324,20 @@ const App = () => {
                                                         || null;
                                                     return singleBus ? singleBus.x : null;
                                                 };
-                                                const moduleBusCenterX = getBusPairCenterX(extPorts);
-                                                const boilerBusCenterX = getBusPairCenterX(bl2BoilerPorts);
-                                                const bl2BusSlotX = (moduleBusCenterX !== null && boilerBusCenterX !== null)
-                                                    ? (slotX + moduleBusCenterX * slotWidth - boilerBusCenterX * bl2BoilerWidth)
-                                                    : (slotX + slotWidth - bl2BoilerWidth);
-                                                const bl2BusSlotY = slotY - bl2BoilerHeight - 2 * indentSize;
+                                                  const moduleBusCenterX = getBusPairCenterX(extPorts);
+                                                  const boilerBusCenterX = getBusPairCenterX(bl2BoilerPorts);
+                                                  const bl2BusSlotBaseX = (moduleBusCenterX !== null && boilerBusCenterX !== null)
+                                                      ? (slotX + moduleBusCenterX * slotWidth - boilerBusCenterX * bl2BoilerWidth)
+                                                      : (slotX + slotWidth - bl2BoilerWidth);
+                                                  const bl2BusSlotY = slotY - bl2BoilerHeight - 2 * indentSize;
+                                                  const hasBl2RinnaiAdapter = bl2Boiler?.adapter?.type === 'rinnai';
+                                                  const bl2BusSlotX = bl2BusSlotBaseX - (hasBl2RinnaiAdapter ? 5.5 * indentSize : 0);
+                                                 const bl2RinnaiAdapterImage = hasBl2RinnaiAdapter ? wirelessImages['rinnai-adapter'] : null;
+                                                 const bl2RinnaiAdapterPorts = hasBl2RinnaiAdapter ? (wirelessPortsByType['rinnai-adapter'] || []) : [];
+                                                 const bl2RinnaiAdapterWidth = bl2RinnaiAdapterImage?.width || 27;
+                                                 const bl2RinnaiAdapterHeight = bl2RinnaiAdapterImage?.height || 47;
+                                                  const bl2RinnaiAdapterX = bl2BusSlotX + bl2BoilerWidth + 4 * indentSize;
+                                                 const bl2RinnaiAdapterY = bl2BusSlotY + (bl2BoilerHeight - bl2RinnaiAdapterHeight) / 2;
                                                 const extOneWireGap = 2 * indentSize;
                                                 const extNtcTopExtraOffset = 12 * indentSize;
                                                 const extNtcSideExtraGap = 10 * indentSize;
@@ -10077,8 +10560,8 @@ const App = () => {
                                                             strokeWidth={1.5}
                                                         />
                                                          {isOccupied && image && (
-                                                              <Image
-                                                                name="scheme-module"
+                                                               <Image
+                                                                name={`morph:${getMorphImageKey(device)}`}
                                                                  image={image}
                                                                 x={slotX}
                                                                 y={slotY}
@@ -10650,13 +11133,9 @@ const App = () => {
                                                                 }) + 1)
                                                                 : 0;
                                                             const pressureInfoTitle = getDeviceStoredTitle(slotDevice) || (pressureSensorIndex > 0 ? `Датчик давления ${pressureSensorIndex}` : 'Датчик давления');
-                                                            const ntcSensorIndex = slotDeviceType === 'ntc-sensor'
-                                                                ? (ntcSensorsInSystem.findIndex((sensor) => {
-                                                                    if (slotDevice?.id != null && sensor?.id != null) return slotDevice.id === sensor.id;
-                                                                    return sensor === slotDevice;
-                                                                }) + 1)
-                                                                : 0;
-                                                            const ntcInfoTitle = getDeviceStoredTitle(slotDevice) || (ntcSensorIndex > 0 ? `NTC датчик ${ntcSensorIndex}` : 'NTC датчик');
+                                                            const ntcInfoTitle = slotDeviceType === 'ntc-sensor'
+                                                                ? getNtcSensorTitle(scheme, slotDevice)
+                                                                : getDeviceStoredTitle(slotDevice);
                                                             const pump010Index = slotDeviceType === '010pump'
                                                                 ? (pumps010InSystem.findIndex((pump) => {
                                                                     if (slotDevice?.id != null && pump?.id != null) return slotDevice.id === pump.id;
@@ -10746,7 +11225,9 @@ const App = () => {
                                                                                 targetX,
                                                                                 targetY,
                                                                             ]}
-                                                                            stroke={slotDeviceType === 'pressure-sensor' ? '#f57c00' : '#1565c0'}
+                                                                            stroke={slotDeviceType === 'pressure-sensor'
+                                                                                ? '#f57c00'
+                                                                                : (isNtcLikeChannelSensor ? '#212121' : '#1565c0')}
                                                                             strokeWidth={1}
                                                                             lineCap="round"
                                                                             lineJoin="round"
@@ -10780,7 +11261,7 @@ const App = () => {
                                                                                 targetGndX,
                                                                                 targetGndY,
                                                                             ]}
-                                                                            stroke="#212121"
+                                                                            stroke="#1565c0"
                                                                             strokeWidth={1}
                                                                             lineCap="round"
                                                                             lineJoin="round"
@@ -11190,13 +11671,16 @@ const App = () => {
                                                                     stroke={bl2Boiler ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                     strokeWidth={1.5}
                                                                 />
-                                                                 {bl2Boiler && bl2BoilerImage && (
-                                                                     <Image
-                                                                         image={bl2BoilerImage}
-                                                                         x={bl2BusSlotX}
-                                                                         y={bl2BusSlotY}
-                                                                     />
-                                                                 )}
+                                                                  {bl2Boiler && bl2BoilerImage && (
+                                                                      <Image
+                                                                          image={bl2BoilerImage}
+                                                                          x={bl2BusSlotX}
+                                                                          y={bl2BusSlotY}
+                                                                      />
+                                                                  )}
+                                                                  {hasBl2RinnaiAdapter && bl2RinnaiAdapterImage && (
+                                                                      <Image image={bl2RinnaiAdapterImage} x={bl2RinnaiAdapterX} y={bl2RinnaiAdapterY} width={bl2RinnaiAdapterWidth} height={bl2RinnaiAdapterHeight} listening={false} />
+                                                                  )}
                                                                  {!bl2Boiler && showEmptySlots && (
                                                                      <>
                                                                          <Circle
@@ -11239,11 +11723,29 @@ const App = () => {
                                                                                 : (fallbackBusPorts[1] || fallbackBusPorts[0] || null);
                                                                         }
                                                                         if (!fromPort || !toPort) return null;
-                                                                        const fromX = slotX + fromPort.x * slotWidth;
-                                                                        const fromY = slotY + fromPort.y * slotHeight;
-                                                                        const toX = bl2BusSlotX + toPort.x * bl2BoilerWidth;
-                                                                        const toY = bl2BusSlotY + toPort.y * bl2BoilerHeight;
-                                                                        return (
+                                                                         const fromX = slotX + fromPort.x * slotWidth;
+                                                                         const fromY = slotY + fromPort.y * slotHeight;
+                                                                          const toX = bl2BusSlotX + toPort.x * bl2BoilerWidth;
+                                                                          const toY = bl2BusSlotY + toPort.y * bl2BoilerHeight;
+                                                                          if (hasBl2RinnaiAdapter) {
+                                                                             const isLeftBoilerLine = link.boilerPort === 'BUS-B';
+                                                                             const adapterOutPort = bl2RinnaiAdapterPorts.find((port) => port.name === `BUS-OUT-${isLeftBoilerLine ? 'A' : 'B'}`);
+                                                                             const adapterInPort = bl2RinnaiAdapterPorts.find((port) => port.name === `BUS-IN-${link.controllerPort.slice(-1)}`);
+                                                                             if (!adapterOutPort || !adapterInPort) return null;
+                                                                             const adapterOutX = bl2RinnaiAdapterX + adapterOutPort.x * bl2RinnaiAdapterWidth;
+                                                                             const adapterOutY = bl2RinnaiAdapterY + adapterOutPort.y * bl2RinnaiAdapterHeight;
+                                                                             const adapterInX = bl2RinnaiAdapterX + adapterInPort.x * bl2RinnaiAdapterWidth;
+                                                                             const adapterInY = bl2RinnaiAdapterY + adapterInPort.y * bl2RinnaiAdapterHeight;
+                                                                             const boilerBendY = bl2BusSlotY + bl2BoilerHeight + (isLeftBoilerLine ? 1 : 0.5) * indentSize;
+                                                                             const boilerBendX = bl2BusSlotX + bl2BoilerWidth + (isLeftBoilerLine ? 1 : 0.5) * indentSize;
+                                                                             return (
+                                                                                 <Group key={`bl2-rinnai-bus-link-${slotIndex}-${link.controllerPort}`}>
+                                                                                     <Line points={[toX, toY, toX, boilerBendY, boilerBendX, boilerBendY, boilerBendX, adapterOutY, adapterOutX, adapterOutY]} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                     <Line points={[adapterInX, adapterInY, adapterInX - indentSize, adapterInY, fromX, adapterInY, fromX, fromY]} stroke={link.color} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                 </Group>
+                                                                             );
+                                                                         }
+                                                                         return (
                                                                             <Line
                                                                                 key={`bl2-bus-link-${slotIndex}-${link.controllerPort}-${link.boilerPort}`}
                                                                                 points={[toX, toY, toX, fromY]}
@@ -11481,8 +11983,7 @@ const App = () => {
                                                                             const ntcHoverKey = `ext:${slotIndex}:${extOneWireIndex}:${ntcIndex}`;
                                                                             const isNtcHovered = hoveredNtcSlotKey === ntcHoverKey;
                                                                             const ntcChannel = getNtcChannelBySlot(ntcIndex, 'ntc1_devices');
-                                                                            const sensorDisplayIndex = getNtcSensorDisplayIndex(scheme, sensor);
-                                                                            const sensorTitle = getDeviceStoredTitle(sensor) || (sensorDisplayIndex > 0 ? `NTC-датчик ${sensorDisplayIndex}` : `NTC-датчик ${ntcChannel}`);
+                                                                            const sensorTitle = getNtcSensorTitle(scheme, sensor, ntcChannel);
                                                                             const sensorPortA = ntcSensorPorts.find((port) => port.name === 'NTC-A') || ntcSensorPorts.find((port) => String(port?.name || '').startsWith('NTC-')) || null;
                                                                             const sensorPortB = ntcSensorPorts.find((port) => port.name === 'NTC-B') || sensorPortA;
                                                                             const sensorRenderSize = ntcSensorImage
@@ -11653,8 +12154,7 @@ const App = () => {
                                                                             const ntcHoverKey = `ext2:${slotIndex}:${extOneWireIndex}:${ntcIndex}`;
                                                                             const isNtcHovered = hoveredNtcSlotKey === ntcHoverKey;
                                                                             const ntcChannel = getNtcChannelBySlot(ntcIndex, 'ntc2_devices');
-                                                                            const sensorDisplayIndex = getNtcSensorDisplayIndex(scheme, sensor);
-                                                                            const sensorTitle = getDeviceStoredTitle(sensor) || (sensorDisplayIndex > 0 ? `NTC-датчик ${sensorDisplayIndex}` : `NTC-датчик ${ntcChannel}`);
+                                                                            const sensorTitle = getNtcSensorTitle(scheme, sensor, ntcChannel);
                                                                             const sensorPortA = ntcSensorPorts.find((port) => port.name === 'NTC-A') || ntcSensorPorts.find((port) => String(port?.name || '').startsWith('NTC-')) || null;
                                                                             const sensorPortB = ntcSensorPorts.find((port) => port.name === 'NTC-B') || sensorPortA;
                                                                             const sensorRenderSize = ntcSensorImage ? getContainSize(ntcSensorImage, ntcSlotWidth, ntcSlotHeight) : { width: ntcSlotWidth, height: ntcSlotHeight };
@@ -12184,50 +12684,6 @@ const App = () => {
                                         const batterySize = hasUps ? getPowerModuleSize('battery') : null;
                                         if (batterySize) includeBottom(controllerBottom + 11 * indentSize, batterySize.height);
 
-                                        const relaySAssignedDevices = getRelaySAssignedDevices(
-                                            scheme,
-                                            getRelaySLineConfig('pro', ports).length || 4,
-                                        );
-                                        const relayDevices = [
-                                            ...getRelayDevicesForController(scheme),
-                                            ...getControllerLineDevices(scheme, 'relay_s_devices', getRelaySPreferredDevices(scheme))
-                                                .filter((device) => {
-                                                    if (relaySAssignedDevices.some((item) => isSameDevice(item, device))) return false;
-                                                    const connectionTypes = getConnectionTypes(device);
-                                                    return connectionTypes.includes('relay') || connectionTypes.includes('double_relay');
-                                                }),
-                                        ];
-                                        const relaySlotsCount = getRelayLineConfig('pro', ports).length;
-                                        const relayOccupancy = buildRelaySlotOccupancyPreserveIndexes(
-                                            relayDevices,
-                                            relaySlotsCount,
-                                            (device) => (String(device?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1),
-                                        );
-                                        const hasOccupiedRelaySlot = relayOccupancy.some(Boolean);
-                                        if (relaySlotsCount > 0 && (showEmptySlots || hasOccupiedRelaySlot)) {
-                                            const relaySlotY = controllerBottom
-                                                + (batterySize ? batterySize.height + 11 * indentSize : 0)
-                                                + 11 * indentSize;
-                                            relayOccupancy.forEach((slotState, slotIndex) => {
-                                                const relayDevice = slotState?.device || null;
-                                                if (slotState?.covered || (!relayDevice && !showEmptySlots)) return;
-                                                const relayOffset = relayDevice ? (relaySlotOffsets[slotIndex] || { x: 0, y: 0 }) : { x: 0, y: 0 };
-                                                const boilerOffset = isRelayBoilerType(canonicalDeviceType(relayDevice?.type)) ? indentSize : 0;
-                                                includeBottom(relaySlotY + relayOffset.y - boilerOffset, RELAY_SLOT_SIZE);
-                                            });
-                                        }
-
-                                        const busDevice = getBusDevices(scheme)[0] || null;
-                                        if (busDevice || showEmptySlots) {
-                                            const busImageKey = busDevice ? getWirelessDeviceImageKey(busDevice) : null;
-                                            const busImage = busImageKey ? wirelessImages[busImageKey] : null;
-                                            const busHeight = busImage?.height || BUS_SLOT_SIZE;
-                                            const occupiedRelayPortsCount = relayOccupancy.filter(Boolean).length;
-                                            const busOffsetMultiplier = occupiedRelayPortsCount >= 3 && hasUps ? 1.9 : 0.95;
-                                            const busOffset = busSlotOffsets[0] || { x: 0, y: 0 };
-                                            includeBottom(controllerBottom + moduleHeightValue * busOffsetMultiplier + busOffset.y, busHeight);
-                                        }
-
                                         const extModules = [...memoExtModules, ...memoExtLineThermostatDevices];
                                         const getExtModuleSize = (device) => {
                                             const imageKey = getWirelessDeviceImageKey(device);
@@ -12597,6 +13053,7 @@ const App = () => {
                                                                 />
                                                                 {image && (
                                                                     <Image
+                                                                        name={`morph:${getMorphImageKey(device)}`}
                                                                         image={image}
                                                                         x={slotPos.x}
                                                                         y={slotPos.y}
@@ -12645,8 +13102,7 @@ const App = () => {
                                                                         const ntcHoverKey = `main:${slotIndex}:${ntcIndex}`;
                                                                         const isNtcHovered = hoveredNtcSlotKey === ntcHoverKey;
                                                                         const ntcChannel = getNtcChannelBySlot(ntcIndex, 'ntc1_devices');
-                                                                        const sensorDisplayIndex = getNtcSensorDisplayIndex(scheme, sensor);
-                                                                        const sensorTitle = getDeviceStoredTitle(sensor) || (sensorDisplayIndex > 0 ? `NTC-датчик ${sensorDisplayIndex}` : `NTC-датчик ${ntcChannel}`);
+                                                                        const sensorTitle = getNtcSensorTitle(scheme, sensor, ntcChannel);
                                                                         const sensorPortA = ntcSensorPorts.find((port) => port.name === 'NTC-A') || ntcSensorPorts.find((port) => String(port?.name || '').startsWith('NTC-')) || null;
                                                                         const sensorPortB = ntcSensorPorts.find((port) => port.name === 'NTC-B') || sensorPortA;
                                                                         const sensorRenderSize = ntcSensorImage
@@ -12819,8 +13275,7 @@ const App = () => {
                                                                         const ntcHoverKey = `main2:${slotIndex}:${ntcIndex}`;
                                                                         const isNtcHovered = hoveredNtcSlotKey === ntcHoverKey;
                                                                         const ntcChannel = getNtcChannelBySlot(ntcIndex, 'ntc2_devices');
-                                                                        const sensorDisplayIndex = getNtcSensorDisplayIndex(scheme, sensor);
-                                                                        const sensorTitle = getDeviceStoredTitle(sensor) || (sensorDisplayIndex > 0 ? `NTC-датчик ${sensorDisplayIndex}` : `NTC-датчик ${ntcChannel}`);
+                                                                        const sensorTitle = getNtcSensorTitle(scheme, sensor, ntcChannel);
                                                                         const sensorPortA = ntcSensorPorts.find((port) => port.name === 'NTC-A') || ntcSensorPorts.find((port) => String(port?.name || '').startsWith('NTC-')) || null;
                                                                         const sensorPortB = ntcSensorPorts.find((port) => port.name === 'NTC-B') || sensorPortA;
                                                                         const sensorRenderSize = ntcSensorImage ? getContainSize(ntcSensorImage, ntcSlotWidth, ntcSlotHeight) : { width: ntcSlotWidth, height: ntcSlotHeight };
@@ -13122,8 +13577,8 @@ const App = () => {
                                     }
                                     const frameSlotRects = slotRects.length > 0
                                         ? slotRects
-                                        : [{ left: controllerType === 'ecosmart' ? (-40 * indentSize - 80) : 10, top: wirelessLineTop, right: controllerType === 'ecosmart' ? -40 * indentSize : 90, bottom: wirelessLineTop + 10 * indentSize }];
-                                    const wirelessInfoBlockX = controllerType === 'ecosmart' ? (-40 * indentSize - 134) : 10;
+                                        : [{ left: controllerType === 'ecosmart' ? (-25 * indentSize - 40) : 10, top: wirelessLineTop, right: controllerType === 'ecosmart' ? (-25 * indentSize + 40) : 90, bottom: wirelessLineTop + 10 * indentSize }];
+                                    const wirelessInfoBlockX = controllerType === 'ecosmart' ? (-25 * indentSize - 67) : 10;
                                     const minX = Math.min(wirelessInfoBlockX, ...frameSlotRects.map((r) => r.left));
                                     const minY = Math.min(wirelessInfoBlockY, ...frameSlotRects.map((r) => r.top));
                                     const maxX = Math.max(wirelessInfoBlockX + 134, ...frameSlotRects.map((r) => r.right));
@@ -13147,7 +13602,7 @@ const App = () => {
                                 {(memoWirelessDevices.length > 0 || showEmptySlots || showLineFrames) && (() => {
                                     const wirelessLineTop = getWirelessLineTop(memoWirelessDevices, showEmptySlots, controllerType, moduleHeightValue, indentSize);
                                     const wirelessInfoBlockY = getWirelessInfoBlockY(wirelessLineTop);
-                                    const wirelessInfoBlockX = controllerType === 'ecosmart' ? (-40 * indentSize - 134) : 10;
+                                    const wirelessInfoBlockX = controllerType === 'ecosmart' ? (-25 * indentSize - 67) : 10;
                                     return (
                                         <>
                                 <Rect
@@ -13210,6 +13665,13 @@ const App = () => {
                                     const thermostatOneWireSlotSize = THERMOSTAT_FLOOR_SLOT_SIZE;
                                     const thermostatOneWireSlotX = imageX + imageSize.width + THERMOSTAT_FLOOR_SLOT_GAP;
                                     const thermostatOneWireSlotY = imageY + (THERMOSTAT_IMAGE_SIZE - thermostatOneWireSlotSize) / 2;
+                                    const isEcosmartThermostat = controllerType === 'ecosmart' && device.type === 'thermostat';
+                                    const thermostatVisualLeft = imageX;
+                                    const thermostatVisualRight = hasFloorSensor
+                                        ? thermostatOneWireSlotX + thermostatOneWireSlotSize
+                                        : imageX + imageSize.width;
+                                    const infoBlockWidth = isEcosmartThermostat ? thermostatVisualRight - thermostatVisualLeft : slotWidth;
+                                    const infoBlockX = isEcosmartThermostat ? thermostatVisualLeft : slotX;
                                     const showThermostatOneWire = hasFloorSensor || showEmptySlots;
                                     const isHovered = hoveredWirelessDeviceKey === deviceKey;
                                     return (
@@ -13219,16 +13681,16 @@ const App = () => {
                                             onMouseLeave={() => setHoveredWirelessDeviceKey(null)}
                                         >
                                             <Rect
-                                                x={slotX}
+                                                x={infoBlockX}
                                                 y={slotY}
                                                 width={slotWidth}
                                                 height={slotHeight}
                                                 fill="rgba(0,0,0,0)"
                                             />
                                             <Rect
-                                                x={slotX}
+                                                x={infoBlockX}
                                                 y={slotY - 4 * indentSize}
-                                                width={slotWidth}
+                                                width={infoBlockWidth}
                                                 height={INFO_BLOCK_HEIGHT}
                                                 cornerRadius={1}
                                                 fill="#fff"
@@ -13236,15 +13698,18 @@ const App = () => {
                                                 strokeWidth={INFO_BLOCK_STROKE_WIDTH}
                                             />
                                             <EditableInfoTitle
-                                                x={slotX + 4}
+                                                x={infoBlockX + 4}
                                                 y={slotY - 4 * indentSize}
                                                 text={deviceTitle}
                                                 fontSize={4}
                                                 fill="#4a6a8a"
-                                                width={slotWidth - 8}
+                                                width={infoBlockWidth - 8}
                                                 height={INFO_BLOCK_HEIGHT}
                                                 align="center"
-                                                verticalAlign="middle" device={device} title={deviceTitle} />
+                                                verticalAlign="middle"
+                                                device={device}
+                                                title={deviceTitle}
+                                            />
                                             <Rect
                                                 x={slotX}
                                                 y={slotY}
@@ -13676,6 +14141,14 @@ const App = () => {
                                     const name = String(port?.name || '').toUpperCase();
                                     const data = item?.data && typeof item.data === 'object' ? item.data : {};
                                     if (name === 'POWER-INDICATOR' || name === 'NETWORK-INDICATOR' || name === 'WI-FI-INDICATOR') return true;
+                                    if (name === 'BOILER-RELAY-INDICATOR') return Array.isArray(data.relay_devices) && Boolean(data.relay_devices[0]);
+                                    if (name === 'VALVE-INDICATOR') return Array.isArray(data.relay_s_valve_devices) && Boolean(data.relay_s_valve_devices[0]);
+                                    if (name === 'BOILER-GVS-INDICATOR') return Array.isArray(data.relay_boiler_gvs_devices) && Boolean(data.relay_boiler_gvs_devices[0]);
+                                    if (name === 'MIXING-INDICATOR-1' || name === 'MIXING-INDICATOR-2') return Array.isArray(data['220_servo_devices']) && Boolean(data['220_servo_devices'][0]);
+                                    if (name === 'MIXING-INDICATOR-3' || name === 'MIXING-INDICATOR-4') return Array.isArray(data['220_servo_devices']) && Boolean(data['220_servo_devices'][1]);
+                                    if (name === 'MIXING-PUMP-INDICATOR') return Array.isArray(data.relay_220pump5_devices) && Boolean(data.relay_220pump5_devices[0]);
+                                    if (name === 'MIXING-PUMP-INDICATOR-2') return Array.isArray(data.relay_220pump3_devices) && Boolean(data.relay_220pump3_devices[0]);
+                                    if (name === 'CIRCUIT-PUMP-INDICATOR') return Array.isArray(data.relay_220pump_devices) && Boolean(data.relay_220pump_devices[0]);
                                     if (name === 'BUS-INDICATOR') return Array.isArray(data.bus_devices) && data.bus_devices.some(Boolean);
                                     if (name === 'ALERT-INDICATOR') return false;
 
@@ -13839,6 +14312,7 @@ const App = () => {
                                                     }}
                                                 >
                                                     <Image
+                                                        name={item.key === 'controller' ? 'morph:controller' : `morph:${getMorphImageKey(item.data)}`}
                                                         image={item.image}
                                                         width={itemWidth}
                                                         height={item.image.height}
@@ -14063,6 +14537,25 @@ const App = () => {
                                     </>
                                 );
                             })()}
+                        </Layer>
+                    )}
+                    {morphImages.length > 0 && (
+                        <Layer listening={false}>
+                            {morphImages.map((item) => (
+                                <Image
+                                    key={`morph-ghost-${item.name}`}
+                                    ref={(node) => {
+                                        if (node) morphImageRefs.current.set(item.name, node);
+                                        else morphImageRefs.current.delete(item.name);
+                                    }}
+                                    image={item.image}
+                                    x={item.x}
+                                    y={item.y}
+                                    width={item.width}
+                                    height={item.height}
+                                    listening={false}
+                                />
+                            ))}
                         </Layer>
                     )}
                 </Stage>

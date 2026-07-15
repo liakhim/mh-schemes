@@ -56,6 +56,7 @@ export const wirelessDeviceImagePaths = {
     'power-unit': new URL('../../../assets/modules/power-unit/power-unit.svg', import.meta.url).href,
     battery: new URL('../../../assets/modules/battery/battery.svg', import.meta.url).href,
     ups: new URL('../../../assets/modules/ups/ups.svg', import.meta.url).href,
+    'rinnai-adapter': new URL('../../../assets/other/rinnai-adapter.svg', import.meta.url).href,
     'other-equipment-right-port': new URL('../../../assets/engineerings/otherEquipment/otherEquipmentRightPort.svg', import.meta.url).href,
     'other-equipment-left-port': new URL('../../../assets/engineerings/otherEquipment/otherEquipmentLeftPort.svg', import.meta.url).href,
     'pump-220v-right-port': new URL('../../../assets/pumps/220pumpRightPort.svg', import.meta.url).href,

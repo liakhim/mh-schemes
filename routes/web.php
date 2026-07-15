@@ -64,14 +64,21 @@ Route::post('/api/schemes', function (Request $request) {
 
 Route::patch('/api/schemes/{scheme}', function (Request $request, Scheme $scheme) {
     $validated = $request->validate([
-        'incoming_scheme' => ['required', 'array'],
+        'name' => ['sometimes', 'required', 'string', 'max:255'],
+        'incoming_scheme' => ['sometimes', 'required', 'array'],
     ]);
 
-    $scheme->incoming_scheme = $validated['incoming_scheme'];
+    if (array_key_exists('name', $validated)) {
+        $scheme->name = $validated['name'];
+    }
+    if (array_key_exists('incoming_scheme', $validated)) {
+        $scheme->incoming_scheme = $validated['incoming_scheme'];
+    }
     $scheme->save();
 
     return response()->json([
         'id' => $scheme->id,
+        'name' => $scheme->name,
         'incoming_scheme' => $scheme->incoming_scheme,
     ]);
 })->whereNumber('scheme')->name('schemes.update');

@@ -89,13 +89,42 @@ body {
 }
 
 .spa-scheme-title strong {
-    display: block;
+    min-width: 0;
     overflow: hidden;
     color: #1f2933;
     font-size: 15px;
     line-height: 1.15;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.spa-scheme-title-value {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.spa-scheme-title-value strong {
+    flex: 1 1 auto;
+}
+
+.spa-scheme-title-edit {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    padding: 0;
+    border: 1px solid #b8d6aa;
+    border-radius: 5px;
+    color: #2e7d32;
+    background: #fff;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+}
+
+.spa-scheme-title-edit:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
 .spa-alpha-notice {
@@ -1034,6 +1063,7 @@ body {
     flex-wrap: wrap;
     margin: 0;
     padding-top: 12px;
+    justify-content: space-between;
 }
 
 .sel-quick-nav a {

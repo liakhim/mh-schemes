@@ -312,21 +312,28 @@ const getOneWireCapacityUsage = (scheme, controllerType) => {
     const extDevices = Array.isArray(scheme?.controller?.ext_devices) ? scheme.controller.ext_devices : [];
     let freeExtSlots = Math.max(0, PRO_EXT_DEVICE_CAPACITY - extDevices.length);
     const movedDeviceIndexes = new Set();
+    const thermostatGroups = new Map();
+
+    devices.forEach((device, index) => {
+        const ownerKey = device?.ownerThermostatKey;
+        if (!ownerKey) return;
+
+        const group = thermostatGroups.get(ownerKey) || { indexes: [], hasFloorSensor: false };
+        group.indexes.push(index);
+        const type = canonicalType(device?.type);
+        if (type === 'floor-sensor' || type === 'flask-sensor-floor') {
+            group.hasFloorSensor = true;
+        }
+        thermostatGroups.set(ownerKey, group);
+    });
 
     devices.forEach((device, index) => {
         if (freeExtSlots <= 0 || canonicalType(device?.type) !== 'thermostat') return;
         const ownerKey = device?.ownerThermostatKey;
         if (!ownerKey) return;
-        const groupIndexes = devices.reduce((indexes, candidate, candidateIndex) => {
-            if (candidate?.ownerThermostatKey === ownerKey) indexes.push(candidateIndex);
-            return indexes;
-        }, []);
-        const hasFloorSensor = groupIndexes.some((candidateIndex) => {
-            const type = canonicalType(devices[candidateIndex]?.type);
-            return type === 'floor-sensor' || type === 'flask-sensor-floor';
-        });
-        if (!hasFloorSensor) return;
-        groupIndexes.forEach((candidateIndex) => movedDeviceIndexes.add(candidateIndex));
+        const group = thermostatGroups.get(ownerKey);
+        if (!group?.hasFloorSensor) return;
+        group.indexes.forEach((candidateIndex) => movedDeviceIndexes.add(candidateIndex));
         freeExtSlots -= 1;
     });
 
@@ -1351,6 +1358,12 @@ const normalizeBoilerSearchResults = (data) => {
     })).filter((item) => item.name);
 };
 
+const withRinnaiAdapter = (boiler) => (
+    String(boiler?.name || '').toLowerCase().includes('rinnai')
+        ? { ...boiler, adapter: { ...boiler?.adapter, type: 'rinnai' } }
+        : boiler
+);
+
 const makeSchemeName = () => {
     const now = new Date();
     return `Подбор ${now.toLocaleDateString('ru-RU')} ${now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
@@ -1381,7 +1394,7 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     },
     {
         key: 'wired-wall-digital',
-        label: 'Проводной настенный цифровой датчик',
+        label: 'Проводной Настенный цифровой датчик',
         target: 'sensors',
         data: {
             id: 13,
@@ -1794,7 +1807,7 @@ const ThermostatCard = ({ template, color, onColorChange, hasFloorSensor, onFloo
                     background: '#3498db',
                     color: '#fff',
                     cursor: 'pointer',
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: 700,
                 }}
             >
@@ -1868,7 +1881,7 @@ const TemperatureSensorCard = ({ options, selectedKey, onSelectKey, template, on
                     background: '#3498db',
                     color: '#fff',
                     cursor: 'pointer',
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: 700,
                 }}
             >
@@ -1909,7 +1922,7 @@ const QTY_STEPPER_BLOCK_STYLE = {
     boxSizing: 'border-box',
 };
 
-const QtyStepper = ({ count, onDecrement, onIncrement }) => {
+const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false }) => {
     if (!count) return null;
     return (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
@@ -1917,7 +1930,8 @@ const QtyStepper = ({ count, onDecrement, onIncrement }) => {
                 type="button"
                 title="Убрать одно"
                 onClick={onDecrement}
-                style={{ ...QTY_STEPPER_BLOCK_STYLE, cursor: 'pointer', color: '#e74c3c' }}
+                disabled={disabled}
+                style={{ ...QTY_STEPPER_BLOCK_STYLE, cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#94a3b8' : '#e74c3c', opacity: disabled ? 0.6 : 1 }}
             >
                 −
             </button>
@@ -1926,7 +1940,8 @@ const QtyStepper = ({ count, onDecrement, onIncrement }) => {
                 type="button"
                 title="Добавить ещё"
                 onClick={onIncrement}
-                style={{ ...QTY_STEPPER_BLOCK_STYLE, cursor: 'pointer', color: '#2e7d32' }}
+                disabled={disabled}
+                style={{ ...QTY_STEPPER_BLOCK_STYLE, cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#94a3b8' : '#2e7d32', opacity: disabled ? 0.6 : 1 }}
             >
                 +
             </button>
@@ -2369,6 +2384,10 @@ const SelectionApp = () => {
         () => getCompatibleControllerOptions(incomingScheme),
         [incomingScheme],
     );
+    const compatibleControllerTypes = useMemo(
+        () => new Set(compatibleControllerOptions.map((item) => item.type)),
+        [compatibleControllerOptions],
+    );
     const controllerType = getControllerType(incomingScheme);
     const unifiedLeakLoop = incomingScheme.unified_leak_loop === true;
     const leakSensorCount = [
@@ -2376,8 +2395,8 @@ const SelectionApp = () => {
         ...(Array.isArray(incomingScheme.wired_devices) ? incomingScheme.wired_devices : []),
     ].filter((item) => canonicalType(item?.type) === 'leak-sensor').length;
     const equipmentOfferSections = useMemo(
-        () => getEquipmentOfferSections(incomingScheme, controllerType),
-        [incomingScheme, controllerType],
+        () => (isOfferModalOpen ? getEquipmentOfferSections(incomingScheme, controllerType) : []),
+        [incomingScheme, controllerType, isOfferModalOpen],
     );
     const proAndEcosmartOptions = useMemo(() => {
         if (controllerType !== 'pro' && controllerType !== 'ecosmart') return false;
@@ -2416,13 +2435,6 @@ const SelectionApp = () => {
     const wirelessTemperatureSensorTemplate = useMemo(() => (
         wirelessTemperatureSensorOptions.find((template) => template.key === wirelessTemperatureSensorKey) || wirelessTemperatureSensorOptions[0]
     ), [wirelessTemperatureSensorKey, wirelessTemperatureSensorOptions]);
-
-    useEffect(() => {
-        setIncomingScheme((prev) => {
-            const nextScheme = resolveControllerAndRequiredModules(prev);
-            return nextScheme === prev ? prev : nextScheme;
-        });
-    }, [incomingScheme]);
 
     const measureControllerConnectors = useCallback(() => {
         const wrap = controllerWrapRef.current;
@@ -2521,14 +2533,14 @@ const SelectionApp = () => {
         const isStupid = result.bus_type === 127;
         setIncomingScheme((prev) => {
             const boilers = Array.isArray(prev.boilers) ? [...prev.boilers] : [];
-            const boiler = {
+            const boiler = withRinnaiAdapter({
                 id: generateId(),
                 device_type: 'boiler',
                 type: isStupid ? 'stupid' : 'smart',
                 name: result.name,
                 reserve: false,
                 connection_type: isStupid ? 'RELAY' : 'BUS',
-            };
+            });
             boilers.push(boiler);
             const nextScheme = withStupidBoilerSensor({ ...prev, boilers }, boiler);
             return resolveControllerAndRequiredModules(syncStrategySensorForSmartBoilers(nextScheme));
@@ -2538,7 +2550,7 @@ const SelectionApp = () => {
     const addBoiler = useCallback((template) => {
         setIncomingScheme((prev) => {
             const boilers = Array.isArray(prev.boilers) ? [...prev.boilers] : [];
-            const boiler = { ...template.data, id: generateId() };
+            const boiler = withRinnaiAdapter({ ...template.data, id: generateId() });
             boilers.push(boiler);
             const nextScheme = withStupidBoilerSensor({ ...prev, boilers }, boiler);
             return resolveControllerAndRequiredModules(syncStrategySensorForSmartBoilers(nextScheme));
@@ -2586,7 +2598,7 @@ const SelectionApp = () => {
             const sensors = Array.isArray(prev.sensors)
                 ? prev.sensors.filter((s) => s._uid !== unitUid)
                 : [];
-            return { ...prev, wired_devices: wiredDevices, sensors };
+            return resolveControllerAndRequiredModules({ ...prev, wired_devices: wiredDevices, sensors });
         });
     }, []);
 
@@ -2602,7 +2614,7 @@ const SelectionApp = () => {
         setIncomingScheme((prev) => {
             const devices = Array.isArray(prev.wireless_devices) ? [...prev.wireless_devices] : [];
             devices.splice(index, 1);
-            return { ...prev, wireless_devices: devices };
+            return resolveControllerAndRequiredModules({ ...prev, wireless_devices: devices });
         });
     }, []);
 
@@ -2656,7 +2668,7 @@ const SelectionApp = () => {
         setIncomingScheme((prev) => {
             const sensors = Array.isArray(prev.sensors) ? prev.sensors : [];
             const wiredDevices = Array.isArray(prev.wired_devices) ? prev.wired_devices : [];
-            if (!enabled) return { ...prev, unified_leak_loop: false };
+            if (!enabled) return resolveControllerAndRequiredModules({ ...prev, unified_leak_loop: false });
 
             let retained = false;
             const keepFirstLeakSensor = (item) => {
@@ -2685,7 +2697,7 @@ const SelectionApp = () => {
     }, []);
 
     const removePowerModule = useCallback((value) => {
-        setIncomingScheme((prev) => ({
+        setIncomingScheme((prev) => resolveControllerAndRequiredModules({
             ...prev,
             power_modules: (Array.isArray(prev.power_modules) ? prev.power_modules : []).filter((m) => m !== value),
         }));
@@ -2724,7 +2736,7 @@ const SelectionApp = () => {
         );
     };
 
-    const renderItemStepper = (target, type, onIncrement) => {
+    const renderItemStepper = (target, type, onIncrement, disabled = false) => {
         const items = (Array.isArray(incomingScheme[target]) ? incomingScheme[target] : [])
             .filter((item) => canonicalType(item?.type) === canonicalType(type));
         if (items.length === 0) return null;
@@ -2733,6 +2745,7 @@ const SelectionApp = () => {
                 count={items.length}
                 onIncrement={onIncrement}
                 onDecrement={() => removeSchemeItemById(target, items[items.length - 1].id)}
+                disabled={disabled}
             />
         );
     };
@@ -2921,11 +2934,14 @@ const SelectionApp = () => {
                 <div className="sel-stuck-controllers" style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', paddingTop: 8, justifyContent: 'flex-start' }}>
                     {CONTROLLER_TEMPLATES.map((item, index) => {
                         const isActive = incomingScheme.controller?.type === item.value.type;
+                        const isCompatible = compatibleControllerTypes.has(item.value.type);
                         return (
                             <div
                                 key={index}
                                 className="sel-stuck-controller-card"
-                                onClick={() => setController(item.value)}
+                                onClick={isCompatible ? () => setController(item.value) : undefined}
+                                aria-disabled={!isCompatible}
+                                title={isCompatible ? undefined : 'Этот контроллер не поддерживает текущую конфигурацию'}
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -2935,11 +2951,12 @@ const SelectionApp = () => {
                                     borderRadius: 8,
                                     padding: '4px 10px 4px 6px',
                                     background: isActive ? '#fff7ed' : '#fff',
-                                    cursor: 'pointer',
+                                    cursor: isCompatible ? 'pointer' : 'not-allowed',
                                     fontWeight: isActive ? 700 : 400,
                                     fontSize: 13,
                                     whiteSpace: 'nowrap',
                                     transition: 'border-color 0.15s, background 0.15s',
+                                    opacity: isCompatible ? 1 : 0.45,
                                 }}
                             >
                                 <img
@@ -3025,22 +3042,26 @@ const SelectionApp = () => {
                         {CONTROLLER_TEMPLATES.map((item, index) => {
                             const isActive = incomingScheme.controller?.type === item.value.type;
                             const controllerTypeValue = item.value.type;
+                            const isCompatible = compatibleControllerTypes.has(controllerTypeValue);
                             return (
                                 <div
                                     key={index}
                                     ref={(el) => { controllerCardRefs.current[index] = el; }}
-                                    onClick={() => setController(item.value)}
+                                    onClick={isCompatible ? () => setController(item.value) : undefined}
+                                    aria-disabled={!isCompatible}
+                                    title={isCompatible ? undefined : 'Этот контроллер не поддерживает текущую конфигурацию'}
                                     style={{
                                         border: `2px solid ${isActive ? ORANGE : '#d7dbe4'}`,
                                         borderRadius: 10,
                                         padding: 12,
                                         background: isActive ? '#fff7ed' : '#fff',
-                                        cursor: 'pointer',
+                                        cursor: isCompatible ? 'pointer' : 'not-allowed',
                                         fontWeight: isActive ? 700 : 400,
                                         fontSize: 15,
                                         textAlign: 'center',
                                         width: 210,
                                         transition: 'border-color 0.15s, background 0.15s',
+                                        opacity: isCompatible ? 1 : 0.45,
                                     }}
                                 >
                                     <img
@@ -3278,6 +3299,7 @@ const SelectionApp = () => {
                                         color: '#fff',
                                         cursor: 'pointer',
                                         fontSize: 13,
+                                        fontWeight: 700,
                                     }}
                                 >
                                     Добавить
@@ -3337,6 +3359,7 @@ const SelectionApp = () => {
                                         color: '#fff',
                                         cursor: 'pointer',
                                         fontSize: 13,
+                                        fontWeight: 700,
                                     }}
                                 >
                                     Добавить
@@ -3396,6 +3419,7 @@ const SelectionApp = () => {
                                         color: '#fff',
                                         cursor: 'pointer',
                                         fontSize: 13,
+                                        fontWeight: 700,
                                     }}
                                 >
                                     Добавить
@@ -3499,6 +3523,7 @@ const SelectionApp = () => {
                                             color: '#fff',
                                             cursor: 'pointer',
                                             fontSize: 13,
+                                            fontWeight: 700,
                                         }}
                                     >
                                         Добавить
@@ -3557,6 +3582,7 @@ const SelectionApp = () => {
                                         color: '#fff',
                                         cursor: 'pointer',
                                         fontSize: 13,
+                                        fontWeight: 700,
                                     }}
                                 >
                                     Добавить
@@ -3651,6 +3677,7 @@ const SelectionApp = () => {
                                         color: '#fff',
                                         cursor: 'pointer',
                                         fontSize: 13,
+                                        fontWeight: 700,
                                     }}
                                 >
                                     Добавить
@@ -3731,14 +3758,16 @@ const SelectionApp = () => {
                                         color: isUnifiedLeakLimitReached ? '#94a3b8' : '#fff',
                                         cursor: isUnifiedLeakLimitReached ? 'not-allowed' : 'pointer',
                                         fontSize: 13,
+                                        fontWeight: 700,
                                     }}
                                 >
                                     Добавить
                                 </button>
-                                {(!unifiedLeakLoop || !isLeakSensor) && renderItemStepper(
+                                {renderItemStepper(
                                     item.target === 'sensors' ? 'sensors' : 'wired_devices',
                                     item.data.type,
                                     () => addLeakItem(item),
+                                    unifiedLeakLoop && isLeakSensor,
                                 )}
                             </div>
                         </div>
@@ -3792,6 +3821,7 @@ const SelectionApp = () => {
                                         color: '#fff',
                                         cursor: 'pointer',
                                         fontSize: 13,
+                                        fontWeight: 700,
                                     }}
                                 >
                                     Добавить
@@ -3851,6 +3881,7 @@ const SelectionApp = () => {
                                         color: '#fff',
                                         cursor: 'pointer',
                                         fontSize: 13,
+                                        fontWeight: 700,
                                     }}
                                 >
                                     Добавить

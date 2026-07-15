@@ -63,7 +63,7 @@
 <path d="M18.4448 73.7412H25.4749C28.6913 73.7412 31.3049 71.1346 31.3049 67.9202V67.0221H28.3899V67.9202C28.3899 69.5301 27.0858 70.8334 25.4749 70.8334H21.3489" stroke="black" stroke-width="0.26" stroke-miterlimit="3.86"/>
 <path d="M15.0453 77.1249L24.585 67.5911M13.7796 77.1249L23.3192 67.5911" stroke="black" stroke-width="0.13" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M2.96042 61.1251V64.849H2.52292L0.488539 61.9251H0.452078V64.849H0V61.1251H0.437499L2.47917 64.0562H2.51563V61.1251H2.96042Z" fill="black"/>
-<rect class="RELAY-IN B" y="71.6251" width="1" height="1" rx="0.5" fill="transparent"/>
-<rect class="RELAY-IN-GND" y="65.1251" width="1" height="1" rx="0.5" fill="transparent"/>
-<rect class="RELAY-IN A" x="0.199951" y="77.6251" width="1" height="1" rx="0.5" fill="transparent"/>
+<rect class="RELAY-IN A" y="71.6251" width="1" height="1" rx="0.5" fill="transparent"/>
+<rect class="RELAY-IN B" y="65.1251" width="1" height="1" rx="0.5" fill="transparent"/>
+<rect class="RELAY-IN-GND" x="0.199951" y="77.6251" width="1" height="1" rx="0.5" fill="transparent"/>
 </svg>
