@@ -444,6 +444,17 @@ const getStoredRelaySlotIndex = (device, fallbackIndex) => {
 };
 const ONE_WIRE_SLOT_SIZE = 80;
 const ONE_WIRE_THERMOSTAT_SIZE = 120;
+const ECOSMART_FIRST_ONE_WIRE_EXTRA_DOWN = {
+    'ntc-1-wire': 3,
+    thermostat: 3,
+    rdt2: 8,
+    'flask-sensor': 3,
+    'flask-sensor-temperature': 3,
+    'wall-digital-sensor': 3,
+};
+const getEcosmartFirstOneWireExtraDown = (device) => (
+    ECOSMART_FIRST_ONE_WIRE_EXTRA_DOWN[canonicalDeviceType(device?.type)] || 0
+);
 const EXT_SLOT_SIZE = 80;
 const EXT_SLOT_MIN_GAP_MULTIPLIER = 4;
 const EXT_MODULE_TYPES = ['bl2', 'rl6', 'rl6s', 'io4', 'di6'];
@@ -3199,6 +3210,9 @@ const App = () => {
                     y += 5 * (parseInt(indent, 10) || 8);
                 }
                 const firstDevice = oneWireDevices[0] || null;
+                if (currentControllerType === 'ecosmart') {
+                    y += getEcosmartFirstOneWireExtraDown(firstDevice) * (parseInt(indent, 10) || 8);
+                }
                 if (canonicalDeviceType(firstDevice?.type) === 'ntc-1-wire') {
                     x += ntcSideExtraGap;
                 }
@@ -10115,7 +10129,7 @@ const App = () => {
                                         const offset = extSlotOffsets[slotIndex] || { x: 0, y: 0 };
                                         const baseX = getExtSlotX(slotIndex);
                                           const baseY = isEcosmartThermostatExtLine
-                                              ? -2.25 * moduleHeightValue - 5 * indentSize + slotIndex * 9 * indentSize
+                                               ? -2.25 * moduleHeightValue - 5 * indentSize + slotIndex * 10 * indentSize
                                              : controllerImage.height - slotSize.height;
                                         const isInitialPosition = offset.x === 0 && offset.y === 0;
                                         return {
@@ -10128,7 +10142,7 @@ const App = () => {
                                         const slotSize = slotDevice ? getExtModuleSize(slotDevice) : { width: EXT_SLOT_SIZE, height: EXT_SLOT_SIZE };
                                         const baseX = getExtSlotX(slotIndex);
                                           const baseY = isEcosmartThermostatExtLine
-                                              ? -2.25 * moduleHeightValue - 5 * indentSize + slotIndex * 9 * indentSize
+                                               ? -2.25 * moduleHeightValue - 5 * indentSize + slotIndex * 10 * indentSize
                                              : controllerImage.height - slotSize.height;
                                         return {
                                             x: snapToGrid(baseX, indentSize),
@@ -10153,13 +10167,13 @@ const App = () => {
                                             const lastPos = getExtOccupiedSlotPosition(lastIndex);
                                              return {
                                                  x: lastPos.x + lastLayoutWidth + minGap,
-                                                 y: lastPos.y + (lastSize.height - slotSize.height) + (isEcosmartThermostatExtLine ? 9 * indentSize : 0),
+                                                  y: lastPos.y + (lastSize.height - slotSize.height) + (isEcosmartThermostatExtLine ? 10 * indentSize : 0),
                                              };
                                         }
                                         const offset = extSlotOffsets[slotIndex] || { x: 0, y: 0 };
                                         const baseX = getExtSlotX(slotIndex);
                                          const baseY = isEcosmartThermostatExtLine
-                                              ? -2.25 * moduleHeightValue - 5 * indentSize + slotIndex * 9 * indentSize
+                                               ? -2.25 * moduleHeightValue - 5 * indentSize + slotIndex * 10 * indentSize
                                              : controllerImage.height - slotSize.height;
                                         const isInitialPosition = offset.x === 0 && offset.y === 0;
                                         return {
@@ -12839,14 +12853,17 @@ const App = () => {
                                         const baseOffset = oneWireSlotOffsets[0] || { x: 0, y: 0 };
                                          let x = oneWireGeometry.firstSlotX + baseOffset.x;
                                          let y = oneWireGeometry.firstSlotY + baseOffset.y;
-                                        if (controllerType === 'ecosmart') {
-                                            y += 5 * indentSize;
-                                        }
-                                        const firstDeviceForSideGap = oneWireDevices[0] || null;
+                                         if (controllerType === 'ecosmart') {
+                                             y += 5 * indentSize;
+                                         }
+                                         const firstDeviceForSideGap = oneWireDevices[0] || null;
                                          if (canonicalDeviceType(firstDeviceForSideGap?.type) === 'ntc-1-wire') {
                                              x += ntcSideExtraGap;
                                          }
                                          const firstDevice = oneWireDevices[0] || null;
+                                         if (controllerType === 'ecosmart') {
+                                             y += getEcosmartFirstOneWireExtraDown(firstDevice) * indentSize;
+                                         }
                                          if (slotIndex >= 0 && canonicalDeviceType(firstDevice?.type) === 'ntc-1-wire') {
                                              y += ntcTopExtraOffset;
                                          }
@@ -12876,14 +12893,17 @@ const App = () => {
                                         const baseOffset = offsets[0] || { x: 0, y: 0 };
                                          let x = oneWireGeometry.firstSlotX + baseOffset.x;
                                          let y = oneWireGeometry.firstSlotY + baseOffset.y;
-                                        if (controllerType === 'ecosmart') {
-                                            y += 5 * indentSize;
-                                        }
-                                        const firstDeviceForSideGap = oneWireDevices[0] || null;
+                                         if (controllerType === 'ecosmart') {
+                                             y += 5 * indentSize;
+                                         }
+                                         const firstDeviceForSideGap = oneWireDevices[0] || null;
                                          if (canonicalDeviceType(firstDeviceForSideGap?.type) === 'ntc-1-wire') {
                                              x += ntcSideExtraGap;
                                          }
                                          const firstDevice = oneWireDevices[0] || null;
+                                         if (controllerType === 'ecosmart') {
+                                             y += getEcosmartFirstOneWireExtraDown(firstDevice) * indentSize;
+                                         }
                                          if (slotIndex >= 0 && canonicalDeviceType(firstDevice?.type) === 'ntc-1-wire') {
                                              y += ntcTopExtraOffset;
                                          }
@@ -13471,10 +13491,30 @@ const App = () => {
                                                                             : link.name === '1-WIRE-DAT'
                                                                                 ? 2
                                                                                 : 3;
-                                                                        const upY = -offsetMultiplier * indentSize;
-                                                                        const leftX = -(offsetMultiplier + 6) * indentSize;
-                                                                        const isFirstDeviceModule = normalizedOneWireType === 'ntc-1-wire' || normalizedOneWireType === 'rdt2';
-                                                                        if (isFirstDeviceModule) {
+                                                                         const upY = -offsetMultiplier * indentSize;
+                                                                         const leftX = -(offsetMultiplier + 6) * indentSize;
+                                                                         const isFirstDeviceModule = normalizedOneWireType === 'ntc-1-wire' || normalizedOneWireType === 'rdt2';
+                                                                         const emptySlotDetourIndent = link.name === '1-WIRE-V+'
+                                                                             ? 1
+                                                                             : (link.name === '1-WIRE-DAT'
+                                                                                 ? 2
+                                                                                 : (link.name === '1-WIRE-GND' ? 3 : 0));
+                                                                         if (!isOccupied && emptySlotDetourIndent > 0) {
+                                                                             const slotBottomY = slotPos.y + slotHeight;
+                                                                             const detourY = slotBottomY + emptySlotDetourIndent * indentSize;
+                                                                             return (
+                                                                                 <Line
+                                                                                     key={`one-wire-link-${slotIndex}-${link.name}`}
+                                                                                     points={[fromX, fromY, fromX, upY, leftX, upY, leftX, detourY, toX, detourY, toX, slotBottomY]}
+                                                                                     stroke={getOneWirePortColor(link.name)}
+                                                                                     strokeWidth={1}
+                                                                                     lineCap="round"
+                                                                                     lineJoin="round"
+                                                                                     listening={false}
+                                                                                 />
+                                                                             );
+                                                                         }
+                                                                         if (isFirstDeviceModule) {
                                                                             const moduleBottomY = slotPos.y + slotHeight;
                                                                             const downY = moduleBottomY + offsetMultiplier * indentSize;
                                                                             return (
