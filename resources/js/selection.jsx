@@ -18,12 +18,12 @@ const thermostatImagePaths = {
 
 const MYHEAT_LOGO_PATH = new URL('../assets/logo/logo.svg', import.meta.url).href;
 
-const MyHeatBadge = () => (
+const MyHeatBadge = ({ size = 16 }) => (
     <img
         src={MYHEAT_LOGO_PATH}
         alt="MyHeat"
         title="Оборудование MyHeat"
-        style={{ height: 16, width: 'auto', flexShrink: 0, alignSelf: 'center' }}
+        style={{ height: size, width: 'auto', flexShrink: 0, alignSelf: 'center' }}
     />
 );
 
@@ -160,7 +160,7 @@ const CONTROLLER_KIT_TEMPERATURE_DEVICES = {
         { label: 'Цифровой датчик температуры в колбе', count: 2, templateKey: 'wired-flask-digital' },
     ],
     smart2: [
-        { label: 'Датчик температуры настенный проводной', count: 1, templateKey: 'wired-wall-digital' },
+        { label: 'Проводной Настенный цифровой датчик', count: 1, templateKey: 'wired-wall-digital' },
     ],
     ecosmart: [
         { label: 'NTC-датчик температуры', count: 3, templateKey: 'wired-flask-ntc' },
@@ -1330,6 +1330,7 @@ const LEAK_TEMPLATES = [
     },
     {
         label: 'Запорный клапан',
+        description: 'Предназначен для фиксации протечки воды и передачи аварийного сигнала на контроллер.',
         target: 'wired',
         data: { id: 0, device_type: 'equipment', type: 'valve', connection_type: 'double_relay', additions: [] },
     },
@@ -1722,11 +1723,11 @@ const BoilerConnectionSwitch = ({ connectionType, onChange }) => {
     );
 };
 
-const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, myheat = false, price = null, disabled = false, control = null, hideCount = false }) => (
+const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, myheat = false, price = null, disabled = false, control = null, hideCount = false }) => (
     <div
         style={{
             display: 'flex',
-            alignItems: 'baseline',
+            alignItems: badgeAbove ? 'flex-end' : 'baseline',
             gap: 8,
             width: '100%',
             margin: '8px 0',
@@ -1736,8 +1737,8 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, myheat = fa
             boxSizing: 'border-box',
         }}
     >
-        {myheat && <MyHeatBadge />}
-        {badge && (
+        {myheat && !badgeAbove && <MyHeatBadge />}
+        {badge && !badgeAbove && (
             <span
                 style={{
                     alignSelf: 'center',
@@ -1753,12 +1754,36 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, myheat = fa
                 {badge}
             </span>
         )}
-        <span>{label}</span>
-        <span style={{ flex: 1, borderBottom: '1px dotted #6b7f95', transform: 'translateY(-3px)' }} />
+        {badgeAbove ? (
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}>
+                {(myheat || badge) && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, minHeight: 14 }}>
+                        {myheat && <MyHeatBadge size={8} />}
+                        {badge && (
+                            <span
+                                style={{
+                                    padding: '2px 8px',
+                                    borderRadius: 999,
+                                    background: '#dcfce7',
+                                    color: '#166534',
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                {badge}
+                            </span>
+                        )}
+                    </span>
+                )}
+                <span>{label}</span>
+            </span>
+        ) : <span>{label}</span>}
+        <span style={{ flex: 1, borderBottom: '1px dotted #6b7f95', transform: badgeAbove ? 'none' : 'translateY(-3px)' }} />
         {control}
         {!hideCount && <span style={{ whiteSpace: 'nowrap' }}>{count} шт</span>}
         {price != null && (
-            <span style={{ whiteSpace: 'nowrap', fontWeight: 700, minWidth: 88, textAlign: 'right' }}>
+            <span style={{ whiteSpace: 'nowrap', fontWeight: 700, minWidth: 64, textAlign: 'right' }}>
                 {price.toLocaleString('ru-RU')} ₽
             </span>
         )}
@@ -2390,6 +2415,7 @@ const EquipmentOfferModal = ({ sections, onClose }) => (
                                         label={row.label}
                                         count={row.count}
                                         badge={row.badge || null}
+                                        badgeAbove
                                         myheat={unitPrice != null}
                                         disabled={unitPrice == null}
                                         price={unitPrice != null ? unitPrice * billableCount : null}
@@ -3005,7 +3031,7 @@ const SelectionApp = () => {
             {isControllerBarStuck && (
                 <>
                 <div className="sel-stuck-controllers-title" style={{ paddingTop: 10, fontSize: 13, fontWeight: 700, color: '#475569' }}>Подобранный контроллер</div>
-                <div className="sel-stuck-controllers" style={{ display: 'flex', gap: 8, flexWrap: 'nowrap', overflowX: 'auto', paddingTop: 8, justifyContent: 'flex-start' }}>
+                <div className="sel-stuck-controllers" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 8, justifyContent: 'flex-start' }}>
                     {CONTROLLER_TEMPLATES.map((item, index) => {
                         const isActive = incomingScheme.controller?.type === item.value.type;
                         const isCompatible = compatibleControllerTypes.has(item.value.type);
@@ -3112,7 +3138,7 @@ const SelectionApp = () => {
             <div className="sel-group-label" id="chapter-controller">Контроллер</div>
             <section style={{ marginBottom: 32 }}>
                 <div ref={controllerWrapRef} style={{ position: 'relative', paddingBottom: proAndEcosmartOptions ? 108 : 0 }}>
-                    <div style={{ display: 'flex', gap: 12, flexWrap: 'nowrap', justifyContent: 'space-between', overflowX: 'auto', paddingBottom: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, paddingBottom: 8 }}>
                         {CONTROLLER_TEMPLATES.map((item, index) => {
                             const isActive = incomingScheme.controller?.type === item.value.type;
                             const controllerTypeValue = item.value.type;
@@ -3133,7 +3159,8 @@ const SelectionApp = () => {
                                         fontWeight: isActive ? 700 : 400,
                                         fontSize: 15,
                                         textAlign: 'center',
-                                        width: 210,
+                                        width: '100%',
+                                        boxSizing: 'border-box',
                                         transition: 'border-color 0.15s, background 0.15s',
                                         opacity: isCompatible ? 1 : 0.45,
                                     }}
@@ -3141,7 +3168,7 @@ const SelectionApp = () => {
                                     <img
                                         src={controllerImagePaths[controllerTypeValue]}
                                         alt={item.label}
-                                        style={{ display: 'block', width: '100%', height: 132, objectFit: 'contain', marginBottom: 10 }}
+                                        style={{ display: 'block', width: '100%', height: 160, objectFit: 'contain', marginBottom: 10 }}
                                     />
                                     <div>{item.label}</div>
                                 </div>
@@ -3556,7 +3583,7 @@ const SelectionApp = () => {
 
                 <section>
                     <h2>Зоны</h2>
-                    <SectionSubtitle>Каким количеством зон будет управлять система с помощью двухходовых сервоприводов?</SectionSubtitle>
+                    <SectionSubtitle>Настройте управление системой с помощью зонирования</SectionSubtitle>
                     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
                         {ZONE_TEMPLATES.map((item, index) => (
                             <div
@@ -3573,6 +3600,9 @@ const SelectionApp = () => {
                                 }}
                             >
                                 <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
+                                <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
+                                    Определите, на сколько зон будет разделена система, чтобы эффективно управлять оборудованием черех двухходовые сервоприводы.
+                                </p>
                                 <pre
                                     style={{
                                         background: '#f5f7fb',
@@ -3615,7 +3645,7 @@ const SelectionApp = () => {
             <div className="sel-group-label" id="chapter-other-equipment">Прочее оборудование</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
             <section style={{ flex: '1 1 360px', minWidth: 0 }}>
-                <SectionSubtitle>Какое кол-во прочего оборудования (сирены и т.д.) будет управляться с помощью контроллера?</SectionSubtitle>
+                <SectionSubtitle>Какое количество прочего оборудования (сирены и т.д.) будет управляться с помощью контроллера?</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
                     {OTHER_EQUIP_TEMPLATES.map((item, index) => (
                         <div

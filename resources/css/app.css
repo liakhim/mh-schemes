@@ -1038,7 +1038,6 @@ body {
     color: var(--text);
     margin: 0 0 24px;
     padding-top: 28px;
-    border-top: 1px solid var(--line);
     scroll-margin-top: 96px;
 }
 
@@ -1378,7 +1377,7 @@ body {
         border-radius: 6px !important;
     }
 
-    .sel-stuck-controller-card img {
+    .sel-stuck-controller-card > img {
         width: 32px !important;
         height: 24px !important;
     }

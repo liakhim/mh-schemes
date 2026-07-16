@@ -508,7 +508,9 @@ const DI_DEVICE_TITLES = {
     discrete_ventilation: 'Дискретная вентиляция',
     'leak-sensor': 'Датчик протечки',
 };
-const shouldShowDiDeviceInfoBlock = (device) => Boolean(device);
+const shouldShowDiDeviceInfoBlock = (device) => (
+    DI_WIRED_DEVICE_TYPES.includes(canonicalDeviceType(device?.type))
+);
 const isDiscreteDiDeviceType = (type) => DISCRETE_DI_DEVICE_TYPES.includes(canonicalDeviceType(type));
 const getDeviceStoredTitle = (device) => {
     const type = canonicalDeviceType(device?.type);
@@ -2931,7 +2933,7 @@ const App = () => {
         }
         setScheme((s) => {
             const isRelaySLine = relayMenuPos.lineKey === 'relay_s_devices';
-            const isDoubleRelayPayload = (isRelaySLine && type === '220servo') || (!isRelaySLine && type === 'valve');
+            const isDoubleRelayPayload = (isRelaySLine && (type === '220servo' || type === 'valve')) || (!isRelaySLine && type === 'valve');
             const connectionType = isDoubleRelayPayload
                 ? 'double_relay'
                 : (type === 'zoneServo' ? 'relay | relay-s' : (isRelaySLine ? 'relay-s' : 'relay'));
@@ -2985,7 +2987,9 @@ const App = () => {
                 }
                 const nextScheme = patchControllerLine(s, controllerLineKey, (currentLine) => {
                     if (isDoubleRelayPayload) {
-                        const slotCount = controllerLineKey === 'relay_s_devices' ? 4 : 6;
+                        const slotCount = controllerLineKey === 'relay_s_devices'
+                            ? 4
+                            : getRelayLineConfig(getControllerType(s), ports).length;
                         const occupancy = buildRelaySlotOccupancyPreserveIndexes(
                             currentLine,
                             slotCount,
@@ -3021,6 +3025,32 @@ const App = () => {
             (relayDevice) => (String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1),
         );
         return !occupancy[0] && !occupancy[1];
+    };
+    const canAddDoubleRelayToExtModule = (currentScheme, moduleIndex, lineKey, slotIndex) => {
+        const moduleItem = Array.isArray(currentScheme?.ext_modules) ? currentScheme.ext_modules[moduleIndex] : null;
+        const devices = Array.isArray(moduleItem?.[lineKey]) ? moduleItem[lineKey] : [];
+        const occupancy = buildRelaySlotOccupancyPreserveIndexes(
+            devices,
+            6,
+            (device) => (String(device?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1),
+        );
+        return Number.isInteger(slotIndex)
+            && slotIndex < 5
+            && !occupancy[slotIndex]
+            && !occupancy[slotIndex + 1];
+    };
+    const canAddDoubleRelayToControllerRelay = (currentScheme, slotIndex) => {
+        const slotCount = getRelayLineConfig(getControllerType(currentScheme), ports).length;
+        const devices = getControllerLineDevices(currentScheme, 'relay_devices', getRelayDevicesForController(currentScheme));
+        const occupancy = buildRelaySlotOccupancyPreserveIndexes(
+            devices,
+            slotCount,
+            (device) => (String(device?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1),
+        );
+        return Number.isInteger(slotIndex)
+            && slotIndex < slotCount - 1
+            && !occupancy[slotIndex]
+            && !occupancy[slotIndex + 1];
     };
 
     const addRl2sRelayDeviceFromMenu = (type) => {
@@ -11186,7 +11216,7 @@ const App = () => {
                                                                 : null;
                                                             const visualSlotWidth = slotDeviceType === 'pressure-sensor'
                                                                 ? 7 * indentSize
-                                                                : (slotDeviceType === '010pump' || slotDeviceType === '010servo' ? 8 * indentSize : channelSlotWidth);
+                                                                : (slotDeviceType === '010pump' ? 8 * indentSize : channelSlotWidth);
                                                             const visualSlotHeight = slotDeviceType === 'pressure-sensor'
                                                                 ? 2 * indentSize
                                                                 : (slotDeviceType === '010pump' || slotDeviceType === '010servo' ? 8 * indentSize : channelSlotHeight);
@@ -12390,11 +12420,13 @@ const App = () => {
                                                                 />
                                                             </>
                                                         )}
-                                                         {renderDevice && extLinks.map((link, linkIndex) => {
-                                                             const targetPort = findExtDevicePort(renderDevice, extPorts, link.moduleTo);
-                                                            if (!targetPort) return null;
-                                                            const toX = slotX + targetPort.x * slotWidth;
-                                                            const toY = slotY + targetPort.y * slotHeight;
+                                                          {renderDevice && extLinks.map((link, linkIndex) => {
+                                                              const targetPort = findExtDevicePort(renderDevice, extPorts, link.moduleTo);
+                                                             if (!targetPort) return null;
+                                                             const toX = controllerType === 'ecosmart' && !isOccupied
+                                                                 ? slotX
+                                                                 : slotX + targetPort.x * slotWidth;
+                                                             const toY = slotY + targetPort.y * slotHeight;
                                                             let fromX;
                                                             let fromY;
 
@@ -14702,6 +14734,25 @@ const App = () => {
                                             && relayMenuPos.moduleGroup !== 'di'
                                             && (relayMenuPos.lineKey || 'relay_devices') === 'relay_devices'
                                         ) return false;
+                                        if (
+                                            getControllerType(scheme) === 'pro'
+                                            && relayMenuPos.moduleGroup == null
+                                            && !Number.isInteger(relayMenuPos.moduleIndex)
+                                            && (relayMenuPos.lineKey || 'relay_devices') === 'relay_devices'
+                                        ) {
+                                            return canAddDoubleRelayToControllerRelay(scheme, relayMenuPos.slotIndex);
+                                        }
+                                        if (
+                                            Number.isInteger(relayMenuPos.moduleIndex)
+                                            && relayMenuPos.moduleGroup !== 'di'
+                                        ) {
+                                            return canAddDoubleRelayToExtModule(
+                                                scheme,
+                                                relayMenuPos.moduleIndex,
+                                                'relay_devices',
+                                                relayMenuPos.relaySlotIndex,
+                                            );
+                                        }
                                         if (relayMenuPos.moduleGroup !== 'di') return true;
                                         const moduleItem = Array.isArray(scheme?.di_modules) ? scheme.di_modules[relayMenuPos.moduleIndex] : null;
                                         return canAddDoubleRelayToDiModule(moduleItem, 'relay_devices');
@@ -14750,7 +14801,14 @@ const App = () => {
                                         Сервопривод зоны
                                     </div>
                                     {relayMenuPos.lineKey === 'relay_s_devices' && (() => {
-                                        if (Number.isInteger(relayMenuPos.moduleIndex)) return true;
+                                        if (Number.isInteger(relayMenuPos.moduleIndex)) {
+                                            return canAddDoubleRelayToExtModule(
+                                                scheme,
+                                                relayMenuPos.moduleIndex,
+                                                'relay_s_devices',
+                                                relayMenuPos.relaySlotIndex,
+                                            );
+                                        }
                                         const slotIndex = relayMenuPos.slotIndex;
                                         if (!Number.isInteger(slotIndex) || slotIndex % 2 !== 0) return false;
                                         const controllerDevices = getControllerLineDevices(scheme, 'relay_s_devices', getRelaySPreferredDevices(scheme));
@@ -14769,6 +14827,14 @@ const App = () => {
                                             >
                                                 Сервопривод 220
                                             </div>
+                                            {Number.isInteger(relayMenuPos.moduleIndex) && relayMenuPos.moduleGroup !== 'di' && (
+                                                <div
+                                                    className="ctx-menu-item"
+                                                    onClick={() => addRelayDeviceFromMenu('valve')}
+                                                >
+                                                    Запорный клапан
+                                                </div>
+                                            )}
                                         </>
                                     )}
                                 </>
