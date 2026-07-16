@@ -1119,13 +1119,17 @@ body {
     position: sticky;
     top: 0;
     z-index: 200;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(241, 245, 249, 0.66)),
+        rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
     margin: -24px -24px 28px;
     padding: 14px 24px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-top: 0;
     border-radius: 0 0 20px 20px;
-    box-shadow: 0 2px 12px rgba(32, 39, 56, 0.06);
+    box-shadow: 0 10px 30px rgba(32, 39, 56, 0.1), inset 0 1px rgba(255, 255, 255, 0.7);
 }
 
 .sel-header {

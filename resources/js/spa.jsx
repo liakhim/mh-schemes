@@ -990,6 +990,13 @@ const isDoubleRelaySignalPort = (port) => {
         || name === 'RELAY-2';
 };
 
+const getRelayInputPort = (portsList, deviceType, imageKey) => {
+    if (deviceType === 'pump-220v' && imageKey === 'pump-220v-right-port') {
+        return portsList.find((port) => port.name === 'RELAY-IN B') || null;
+    }
+    return (getPortsByClassToken(portsList, 'RELAY-IN') || [])[0] || null;
+};
+
 const OFFER_PRICES = {
     controllers: { go: 16990, 'go+': 22490, smart2: 18990, pro: 44990, ecosmart: 46990 },
     modules: { rl2: 3890, rl2s: 3890, rl6: 8990, rl6s: 9990, rdt2: 4990, di6: 7990, io4: 7990, 'ntc-1-wire': 4190, bl2: 6990, ecosmartbl2: 6990 },
@@ -1794,7 +1801,7 @@ const App = () => {
 
     const getNtcSensorTitle = (currentScheme, sensor, fallbackIndex = 1) => {
         const storedTitle = getDeviceStoredTitle(sensor);
-        const isGeneratedTitle = /^NTC[- ]датчик(?:\s+\d+)?$/i.test(storedTitle || '');
+        const isGeneratedTitle = /^(?:NTC[- ]датчик(?:\s+\d+)?|Проводной NTC-датчик в колбе)$/i.test(storedTitle || '');
         const index = getNtcSensorDisplayIndex(currentScheme, sensor) || fallbackIndex;
         return !storedTitle || isGeneratedTitle ? `NTC-датчик ${index}` : storedTitle;
     };
@@ -7421,7 +7428,7 @@ const App = () => {
                                                                     return <Image image={relaySVisualImage} x={relaySImageX} y={relaySImageY} width={relaySImageSize.width} height={relaySImageSize.height} listening={false} />;
                                                                 })()}
                                                                 {isRelaySOccupied && !isDoubleRelayDevice && relaySBStub && (() => {
-                                                                    const relayInPort = (getPortsByClassToken(relaySPorts, 'RELAY-IN') || [])[0] || null;
+                                                                    const relayInPort = getRelayInputPort(relaySPorts, relaySTypeForInfo, relaySVisualImageKey);
                                                                     if (!relayInPort) return null;
                                                                     const fromX = relaySBStub.fromX;
                                                                     const fromY = relaySBStub.fromY;
@@ -8144,7 +8151,7 @@ const App = () => {
                                                                 );
                                                             }
 
-                                                            const relayInPort = (getPortsByClassToken(relayPorts, 'RELAY-IN') || [])[0] || null;
+                                                            const relayInPort = getRelayInputPort(relayPorts, relayType, relayVisualImageKey);
                                                             if (!relayInPort) return null;
                                                             const fromX = controllerRelayBPort.x * controllerImage.width;
                                                             const fromY = controllerRelayBPort.y * controllerImage.height;
@@ -9348,7 +9355,7 @@ const App = () => {
                                                                           || relayPorts.find((port) => port.name === `RELAY-${relayIndex}`)
                                                                           || (getPortsByClassToken(relayPorts, `RELAY-${relayIndex}`) || [])[0]
                                                                           || null)
-                                                                      : (relayPorts.find((port) => port.name === 'RELAY-IN') || (getPortsByClassToken(relayPorts, 'RELAY-IN') || [])[0] || null);
+                                                                       : getRelayInputPort(relayPorts, relayType, relayImageKey);
                                                                  const moduleAPortX = aPort ? slotX + aPort.x * size.width : null;
                                                                  const moduleAPortY = aPort ? slotY + aPort.y * size.height : null;
                                                                  const moduleBPortX = bPort ? slotX + bPort.x * size.width : null;
@@ -9646,7 +9653,7 @@ const App = () => {
                                                                           || relayPorts.find((port) => port.name === `RELAY-${relayIndex}`)
                                                                           || (getPortsByClassToken(relayPorts, `RELAY-${relayIndex}`) || [])[0]
                                                                           || null)
-                                                                      : (relayPorts.find((port) => port.name === 'RELAY-IN') || (getPortsByClassToken(relayPorts, 'RELAY-IN') || [])[0] || null);
+                                                                       : getRelayInputPort(relayPorts, relayType, relayImageKey);
                                                                   const moduleBPortX = bPort ? slotX + bPort.x * size.width : null;
                                                                   const moduleBPortY = bPort ? slotY + bPort.y * size.height : null;
                                                                   const getRelayImagePortPoint = (port) => {
@@ -10866,7 +10873,7 @@ const App = () => {
                                                                     || extPorts.find((port) => port.name === `${relayPortPrefix}-${relayIndex}`);
                                                                 const bPort = extPorts.find((port) => port.name === `${relayPortPrefix}-${relayIndex}-B`);
                                                                 const relayPorts = imageKeyRelay ? (wirelessPortsByType[imageKeyRelay] || []) : [];
-                                                                const relayInPort = (getPortsByClassToken(relayPorts, 'RELAY-IN') || [])[0] || null;
+                                                                const relayInPort = getRelayInputPort(relayPorts, relayType, imageKeyRelay);
                                                                 const boilerBusAPort = relayPorts.find((port) => port.name === 'BUS-A') || null;
                                                                 const boilerBusBPort = relayPorts.find((port) => port.name === 'BUS-B') || null;
                                                                 const moduleAPortX = aPort ? slotX + aPort.x * slotWidth : null;

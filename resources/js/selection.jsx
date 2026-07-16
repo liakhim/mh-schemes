@@ -509,6 +509,12 @@ const getCompatibilityStats = (scheme, controllerTypeOverride = null) => {
     return { oneWire, oneWireThermostats, bus, relay, relayS, di, io4Only, analog420, ups, requiredNtcModules, totalNtcModules, requiredNtcOneWireLines, oneWireLines, requiredRdt2Modules };
 };
 
+const getPreferredGoControllerType = (scheme) => (
+    Array.isArray(scheme?.wireless_devices) && scheme.wireless_devices.length > 0
+        ? 'go+'
+        : 'go'
+);
+
 // идентификация ecosmart
 const isEcosmartIdentified = (scheme) => {
     const controller = scheme?.controller && typeof scheme.controller === 'object' ? scheme.controller : {};
@@ -637,12 +643,13 @@ const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null)
 const getControllerRecommendation = (scheme, controllerType) => {
     const baseLimits = CONTROLLER_LIMITS[controllerType];
     if (!baseLimits) return { compatible: false, modules: [] };
+    const candidateScheme = getControllerCandidateScheme(scheme, controllerType);
 
     if (controllerType === 'ecosmart') {
-        return { compatible: isEcosmartIdentified(scheme), modules: [] };
+        return { compatible: isEcosmartIdentified(candidateScheme), modules: [] };
     }
 
-    const stats = getCompatibilityStats(scheme, controllerType);
+    const stats = getCompatibilityStats(candidateScheme, controllerType);
     const modules = [];
     let limits = { ...baseLimits };
     const addModules = (type, count) => {
@@ -654,7 +661,7 @@ const getControllerRecommendation = (scheme, controllerType) => {
 
     if (controllerType === 'smart2') {
         if (stats.ups > 0) limits.di = Math.max(0, limits.di - 2);
-        const baseRelayStats = getRelayStatsForLimits(scheme, limits);
+        const baseRelayStats = getRelayStatsForLimits(candidateScheme, limits);
         const relayDeficit = Math.max(0, baseRelayStats.relay - limits.relay);
         const flexibleRelayOverflow = Math.max(0, baseRelayStats.flexibleRelayDevices - baseRelayStats.flexibleRelayOnRelay);
         const freeRelaySSlots = Math.max(0, limits.relayS - baseRelayStats.strictRelayS);
@@ -663,7 +670,7 @@ const getControllerRecommendation = (scheme, controllerType) => {
             Math.ceil(relayDeficit / 2),
             Math.ceil(flexibleRelayOverflowBeyondRelayS / 2),
         );
-        const relayStatsAfterRelayModules = getRelayStatsForLimits(scheme, {
+        const relayStatsAfterRelayModules = getRelayStatsForLimits(candidateScheme, {
             ...limits,
             relay: limits.relay + rl2Count * 2,
         });
@@ -689,7 +696,7 @@ const getControllerRecommendation = (scheme, controllerType) => {
             addModules('bl2', bl2Count);
         }
 
-        const baseRelayStats = getRelayStatsForLimits(scheme, limits);
+        const baseRelayStats = getRelayStatsForLimits(candidateScheme, limits);
         const relayDeficit = Math.max(0, baseRelayStats.relay - limits.relay);
         const flexibleRelayOverflow = Math.max(0, baseRelayStats.flexibleRelayDevices - baseRelayStats.flexibleRelayOnRelay);
         const freeRelaySSlots = Math.max(0, limits.relayS - baseRelayStats.strictRelayS);
@@ -701,7 +708,7 @@ const getControllerRecommendation = (scheme, controllerType) => {
         limits.relay += relayModuleCount * 6;
         limits.oneWire += relayModuleCount * 6;
         oneWireLineCount += relayModuleCount;
-        const relayStatsAfterRelayModules = getRelayStatsForLimits(scheme, limits);
+        const relayStatsAfterRelayModules = getRelayStatsForLimits(candidateScheme, limits);
         const relaySDeficit = Math.max(0, relayStatsAfterRelayModules.relayS - limits.relayS);
         const relaySModuleCount = Math.ceil(relaySDeficit / 6);
         limits.relayS += relaySModuleCount * 6;
@@ -733,7 +740,7 @@ const getControllerRecommendation = (scheme, controllerType) => {
         addModules('di6', di6Count);
     }
 
-    const finalRelayStats = getRelayStatsForLimits(scheme, limits);
+    const finalRelayStats = getRelayStatsForLimits(candidateScheme, limits);
     const compatible = finalRelayStats.relay <= limits.relay
         && finalRelayStats.relayS <= limits.relayS
         && stats.bus <= limits.bus
@@ -1021,6 +1028,14 @@ const normalizeModulesForController = (scheme) => {
     return nextScheme;
 };
 
+const getControllerCandidateScheme = (scheme, controllerType) => {
+    if (getControllerType(scheme) === controllerType) return scheme;
+    const controllerValue = getControllerTemplateValue(controllerType);
+    return controllerValue
+        ? normalizeModulesForController(withControllerValue(scheme, controllerValue))
+        : scheme;
+};
+
 const withRequiredModules = (scheme) => {
     scheme = normalizeModulesForController(scheme);
     const controllerType = getControllerType(scheme);
@@ -1265,6 +1280,17 @@ const reconcileRequiredModules = (scheme) => {
 const resolveControllerAndRequiredModules = (scheme) => {
     scheme = normalizeModulesForController(scheme);
     scheme = reconcileRequiredModules(scheme);
+    const currentControllerType = getControllerType(scheme);
+    const preferredGoControllerType = getPreferredGoControllerType(scheme);
+    if (
+        (currentControllerType === 'go' || currentControllerType === 'go+')
+        && currentControllerType !== preferredGoControllerType
+    ) {
+        scheme = reconcileRequiredModules(normalizeModulesForController(withControllerValue(
+            scheme,
+            getControllerTemplateValue(preferredGoControllerType),
+        )));
+    }
     const currentControllerIssues = getControllerCompatibilityIssues(scheme);
     if (currentControllerIssues.length > 0) {
         const compatibleOption = getCompatibleControllerOptions(scheme)[0] || null;
@@ -1442,6 +1468,37 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
 const TEMPERATURE_SENSOR_TYPES = new Set(TEMPERATURE_SENSOR_TEMPLATES.map((template) => canonicalType(template.data.type)));
 const isTemperatureSensor = (device) => TEMPERATURE_SENSOR_TYPES.has(canonicalType(device?.type));
 const getTemperatureSensorGroup = (template) => (template.target === 'wireless_devices' ? 'wireless' : 'wired');
+
+const getKitTemperatureSensorTemplateKey = (device, controllerType) => {
+    const type = canonicalType(device?.type);
+    if (controllerType === 'ecosmart' && [
+        'ntc-sensor',
+        'mixing-ntc-sensor',
+        'flask-sensor-gvs-boiler',
+        'flask-sensor-strategy',
+    ].includes(type)) return 'wired-flask-ntc';
+    if (controllerType === 'pro') {
+        if (type === 'wall-digital-sensor') return 'wired-wall-digital';
+        if ([
+            'flask-sensor-temperature',
+            'flask-sensor-gvs-boiler',
+            'flask-sensor-strategy',
+            'flask-sensor-mixing-unit',
+            'flask-sensor-stupid-boiler',
+        ].includes(type)) return 'wired-flask-digital';
+    }
+    if ((controllerType === 'smart2' || controllerType === 'go') && type === 'wall-digital-sensor') return 'wired-wall-digital';
+    if (controllerType === 'go+' && type === 'wall-temperature-sensor') return 'wireless-wall';
+    return null;
+};
+
+const getKitTemperatureSensorLabel = (device) => {
+    const type = canonicalType(device?.type);
+    if (type === 'mixing-ntc-sensor') return 'NTC-датчик температуры';
+    if (type === 'flask-sensor-gvs-boiler') return 'Датчик бойлера';
+    if (type === 'flask-sensor-strategy') return 'Датчик стратегии котлов';
+    return getTemperatureSensorLabel(device);
+};
 
 const OTHER_EQUIP_TEMPLATES = [
     {
@@ -2031,41 +2088,43 @@ const getGroupedDeviceRows = (scheme, group, templates) => {
 };
 
 const getTemperatureSensorRows = (scheme, controllerType) => {
+    const isKitTemperatureSensor = (device) => getKitTemperatureSensorTemplateKey(device, controllerType) !== null;
     const wirelessTemperatureSensors = (Array.isArray(scheme?.wireless_devices) ? scheme.wireless_devices : [])
-        .filter(isTemperatureSensor)
+        .filter((device) => isTemperatureSensor(device) || isKitTemperatureSensor(device))
         .map((device) => ({ device, target: 'wireless_devices' }));
     const wiredTemperatureSensors = (Array.isArray(scheme?.sensors) ? scheme.sensors : [])
-        .filter(isTemperatureSensor)
+        .filter((device) => isTemperatureSensor(device) || isKitTemperatureSensor(device))
         .map((device) => ({ device, target: 'sensors' }));
-    const temperatureSensors = [...wirelessTemperatureSensors, ...wiredTemperatureSensors];
+    const embeddedTemperatureSensors = (Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [])
+        .flatMap((device) => (Array.isArray(device?.additions) ? device.additions : []))
+        .filter(isKitTemperatureSensor)
+        .map((device) => ({ device, target: null }));
+    const temperatureSensors = [...wirelessTemperatureSensors, ...wiredTemperatureSensors, ...embeddedTemperatureSensors];
     const kitTemperatureDevices = CONTROLLER_KIT_TEMPERATURE_DEVICES[controllerType] || [];
 
-    const addedRows = aggregateAddedItems(temperatureSensors.map(({ device, target }) => ({
-        label: getTemperatureSensorLabel(device),
-        templateKey: getTemperatureSensorTemplateKey(device),
-        removeKey: { target, id: device.id },
-    })));
-    const mergedAddedLabels = new Set();
-    const kitRows = kitTemperatureDevices.map((device) => {
-        const matchedRow = device.templateKey
-            ? addedRows.find((row) => row.templateKey === device.templateKey)
-            : null;
-        if (!matchedRow) {
-            return { key: `kit:${device.label}`, label: device.label, count: device.count, badge: 'Комплектный', removeKey: null, templateKey: device.templateKey || null, paidCount: 0 };
-        }
-        mergedAddedLabels.add(matchedRow.label);
-        return {
-            key: `kit:${device.label}`,
-            label: device.label,
-            count: device.count + matchedRow.count,
-            badge: 'Комплектный',
-            removeKey: matchedRow.removeKeys[0],
-            templateKey: device.templateKey || null,
-            paidCount: matchedRow.count,
-        };
+    const kitRemainingByTemplateKey = new Map(kitTemperatureDevices.map((device) => [device.templateKey, device.count]));
+    const extraSensors = temperatureSensors.filter(({ device }) => {
+        const templateKey = getKitTemperatureSensorTemplateKey(device, controllerType);
+        const remaining = kitRemainingByTemplateKey.get(templateKey) || 0;
+        if (remaining <= 0) return true;
+        kitRemainingByTemplateKey.set(templateKey, remaining - 1);
+        return false;
     });
-    const remainingRows = addedRows
-        .filter((row) => !mergedAddedLabels.has(row.label))
+    const extraRows = aggregateAddedItems(extraSensors.map(({ device, target }) => ({
+        label: getKitTemperatureSensorLabel(device),
+        templateKey: getTemperatureSensorTemplateKey(device, controllerType) || getTemperatureSensorTemplateKey(device),
+        removeKey: target ? { target, id: device.id } : null,
+    })));
+    const kitRows = kitTemperatureDevices.map((device) => ({
+        key: `kit:${device.label}`,
+        label: device.label,
+        count: device.count,
+        badge: 'Комплектный',
+        removeKey: null,
+        templateKey: device.templateKey || null,
+        paidCount: 0,
+    }));
+    const remainingRows = extraRows
         .map((row) => ({ key: row.label, label: row.label, count: row.count, badge: null, removeKey: row.removeKeys[0], templateKey: row.templateKey || null, paidCount: row.count }));
 
     return [...kitRows, ...remainingRows];
@@ -2291,8 +2350,23 @@ const EquipmentOfferModal = ({ sections, onClose }) => (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <h2 style={{ margin: 0, fontSize: 20 }}>Коммерческое предложение</h2>
                 <button
+                    type="button"
                     onClick={onClose}
-                    style={{ border: 'none', background: 'none', fontSize: 22, cursor: 'pointer', color: '#64748b', lineHeight: 1, padding: 4 }}
+                    style={{
+                        width: 32,
+                        height: 32,
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '50%',
+                        background: '#f8fafc',
+                        color: '#475569',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 22,
+                        lineHeight: 1,
+                        padding: 0,
+                    }}
                     aria-label="Закрыть"
                 >
                     ×
@@ -2318,7 +2392,7 @@ const EquipmentOfferModal = ({ sections, onClose }) => (
                                         badge={row.badge || null}
                                         myheat={unitPrice != null}
                                         disabled={unitPrice == null}
-                                        price={unitPrice != null && billableCount > 0 ? unitPrice * billableCount : null}
+                                        price={unitPrice != null ? unitPrice * billableCount : null}
                                     />
                                 );
                             })}
@@ -2751,7 +2825,7 @@ const SelectionApp = () => {
     };
 
     const setController = useCallback((controllerValue) => {
-        setIncomingScheme((prev) => resolveControllerAndRequiredModules(withControllerValue(prev, controllerValue)));
+        setIncomingScheme((prev) => reconcileRequiredModules(normalizeModulesForController(withControllerValue(prev, controllerValue))));
     }, []);
 
     const clearScheme = useCallback(() => {
