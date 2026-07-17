@@ -455,6 +455,58 @@ const ECOSMART_FIRST_ONE_WIRE_EXTRA_DOWN = {
 const getEcosmartFirstOneWireExtraDown = (device) => (
     ECOSMART_FIRST_ONE_WIRE_EXTRA_DOWN[canonicalDeviceType(device?.type)] || 0
 );
+const CONTROLLER_KIT_SENSOR_LIMITS = {
+    pro: { wall: 1, flask: 2 },
+    smart2: { wall: 1 },
+    ecosmart: { ntc: 3 },
+    go: { wall: 1 },
+    'go+': { wireless: 1 },
+};
+const getControllerKitSensorBucket = (controllerType, type) => {
+    if (controllerType === 'pro') {
+        if (type === 'wall-digital-sensor') return 'wall';
+        if (['flask-sensor-temperature', 'flask-sensor-gvs-boiler', 'flask-sensor-strategy', 'flask-sensor-mixing-unit', 'flask-sensor-stupid-boiler'].includes(type)) return 'flask';
+    }
+    if ((controllerType === 'smart2' || controllerType === 'go') && type === 'wall-digital-sensor') return 'wall';
+    if (controllerType === 'ecosmart' && ['ntc-sensor', 'mixing-ntc-sensor', 'flask-sensor-gvs-boiler', 'flask-sensor-strategy'].includes(type)) return 'ntc';
+    if (controllerType === 'go+' && type === 'wall-temperature-sensor') return 'wireless';
+    return null;
+};
+const getSensorIdentity = (device) => (
+    device?.id != null ? `${canonicalDeviceType(device.type)}:${device.id}` : null
+);
+const getBundledSensorDevices = (scheme, controllerType) => {
+    const limits = CONTROLLER_KIT_SENSOR_LIMITS[controllerType] || {};
+    const remaining = { ...limits };
+    const controller = scheme?.controller || {};
+    const candidates = [
+        ...(Array.isArray(scheme?.wireless_devices) ? scheme.wireless_devices : []),
+        ...(Array.isArray(controller?.one_wire_devices) ? controller.one_wire_devices : []),
+        ...(Array.isArray(scheme?.sensors) ? scheme.sensors : []),
+        ...(Array.isArray(scheme?.wired_devices) ? scheme.wired_devices.flatMap((device) => device?.additions || []) : []),
+        ...['mixing_ntc_devices', 'boiler_sensor_devices', 'strategy_sensor_devices'].flatMap((key) => controller?.[key] || []),
+    ];
+    const bundled = new Set();
+    candidates.forEach((device) => {
+        const type = canonicalDeviceType(device?.type);
+        const bucket = getControllerKitSensorBucket(controllerType, type);
+        if (!bucket || !remaining[bucket]) return;
+        bundled.add(device);
+        const identity = getSensorIdentity(device);
+        if (identity) bundled.add(identity);
+        remaining[bucket] -= 1;
+    });
+    return bundled;
+};
+const isBundledSensorDevice = (bundledSensors, device) => (
+    bundledSensors.has(device) || bundledSensors.has(getSensorIdentity(device))
+);
+const KitBadge = ({ x, y }) => (
+    <>
+        <Rect x={x} y={y} width={38} height={8} cornerRadius={2} fill="#e8f5e9" stroke="#43a047" strokeWidth={0.5} listening={false} />
+        <Text x={x} y={y + 1} width={38} height={7} padding={0} text="Комплектный" fontSize={4.2} fill="#2e7d32" align="center" verticalAlign="middle" listening={false} />
+    </>
+);
 const EXT_SLOT_SIZE = 80;
 const EXT_SLOT_MIN_GAP_MULTIPLIER = 4;
 const EXT_MODULE_TYPES = ['bl2', 'rl6', 'rl6s', 'io4', 'di6'];
@@ -3478,6 +3530,10 @@ const App = () => {
         () => (Array.isArray(scheme.wireless_devices) ? scheme.wireless_devices : []),
         [scheme.wireless_devices],
     );
+    const memoBundledSensorDevices = useMemo(
+        () => getBundledSensorDevices(scheme, getControllerType(scheme)),
+        [scheme],
+    );
     const memoWirelessSlotX = useMemo(
         () => memoWirelessDevices.map((device, idx) => getWirelessSlotX(
             memoWirelessDevices,
@@ -5819,12 +5875,13 @@ const App = () => {
                                                         <Circle x={controllerPortB.x} y={controllerPortB.y} radius={2.5} fill="red" listening={false} />
                                                     </>
                                                 )}
-                                                {sensor && (
-                                                    <>
-                                                        <Rect x={slotX} y={y - (INFO_BLOCK_HEIGHT + 4)} width={slotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                        <EditableInfoTitle x={slotX + 3} y={y - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, slotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={sensor} title={sensorTitle} />
-                                                    </>
-                                                )}
+                                                 {sensor && (
+                                                     <>
+                                                         <Rect x={slotX} y={y - (INFO_BLOCK_HEIGHT + 4)} width={slotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
+                                                         <EditableInfoTitle x={slotX + 3} y={y - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, slotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={sensor} title={sensorTitle} />
+                                                         {isBundledSensorDevice(memoBundledSensorDevices, sensor) && <KitBadge x={slotX} y={y + 1} />}
+                                                     </>
+                                                 )}
                                                 {sensor && isHovered && (
                                                     <>
                                                         <Circle
@@ -13073,7 +13130,7 @@ const App = () => {
                                                                     event.target.position({ x: 0, y: 0 });
                                                                 }}
                                                             >
-                                                                {isOccupied && !hideInfoBlock && (
+                                                                 {isOccupied && !hideInfoBlock && (
                                                                     <>
                                                                         <Rect
                                                                             x={slotPos.x}
@@ -13099,8 +13156,8 @@ const App = () => {
                                                                             title={getDeviceStoredTitle(device) || getOneWireDeviceTitle(oneWireDevices, device, slotIndex)}
                                                                         />
                                                                     </>
-                                                                )}
-                                                                <Rect
+                                                                 )}
+                                                                 <Rect
                                                                     x={slotPos.x}
                                                                     y={slotPos.y}
                                                                     width={slotWidth}
@@ -13110,18 +13167,19 @@ const App = () => {
                                                                     stroke={invalidOneWireDragMap[slotIndex] ? '#d32f2f' : (isOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4')}
                                                                     strokeWidth={1.5}
                                                                 />
-                                                                {image && (
-                                                                    <Image
+                                                                 {image && (
+                                                                     <Image
                                                                         name={`morph:${getMorphImageKey(device)}`}
                                                                         image={image}
                                                                         x={slotPos.x}
                                                                         y={slotPos.y}
                                                                         width={slotWidth}
                                                                         height={slotHeight}
-                                                                        listening={false}
-                                                                    />
-                                                                )}
-                                                                {normalizedOneWireType === 'rdt2' && aerialImage && (() => {
+                                                                         listening={false}
+                                                                     />
+                                                                 )}
+                                                                 {isOccupied && isBundledSensorDevice(memoBundledSensorDevices, device) && <KitBadge x={slotPos.x} y={slotPos.y + 1} />}
+                                                                 {normalizedOneWireType === 'rdt2' && aerialImage && (() => {
                                                                     const aerialPorts = getPortsByClassToken(getDevicePorts(device), 'AERIAL');
                                                                     if (!aerialPorts) return null;
                                                                     return aerialPorts.map((aerialPort, portIndex) => {
@@ -13799,7 +13857,7 @@ const App = () => {
                                                 stroke="rgba(0,0,0,0)"
                                                 strokeWidth={1.5}
                                             />
-                                            {deviceImage && (
+                                             {deviceImage && (
                                                 <Image
                                                     image={deviceImage}
                                                     x={imageX}
@@ -13807,8 +13865,9 @@ const App = () => {
                                                     width={imageSize.width}
                                                     height={imageSize.height}
                                                 />
-                                            )}
-                                            {hasThermostatOneWire && showThermostatOneWire && (
+                                             )}
+                                             {isBundledSensorDevice(memoBundledSensorDevices, device) && <KitBadge x={slotX} y={slotY + 1} />}
+                                             {hasThermostatOneWire && showThermostatOneWire && (
                                                 <>
                                                     {!hasFloorSensor && showEmptySlots && (
                                                         <Rect
@@ -14531,8 +14590,8 @@ const App = () => {
                                                                             <Text
                                                                                 x={labelX + 1}
                                                                                  y={labelY + labelHeight - 1}
-                                                                                 width={labelHeight - 2}
-                                                                                 height={labelWidth - 2}
+                                                                                 width={labelHeight - 1}
+                                                                                 height={labelWidth - 1}
                                                                                  text={labelText}
                                                                                  fontSize={labelFontSize}
                                                                                  fill="#5f4700"
