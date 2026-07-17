@@ -2970,7 +2970,7 @@ const SelectionApp = () => {
             </div>
             <SelectionQuickNav />
             {isControllerBarStuck && (
-                <>
+                <div className="sel-stuck-controllers-panel">
                 <div className="sel-stuck-controllers-title" style={{ paddingTop: 10, fontSize: 13, fontWeight: 700, color: '#475569' }}>Подобранный контроллер</div>
                 <div className="sel-stuck-controllers" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 8, justifyContent: 'flex-start' }}>
                     {CONTROLLER_TEMPLATES.map((item, index) => {
@@ -3066,7 +3066,7 @@ const SelectionApp = () => {
                         </button>
                     </div>
                 )}
-                </>
+                </div>
             )}
             </div>
             {buildSchemeError && (
