@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import EquipmentOfferModal from './components/EquipmentOfferModal';
 import { getAllOneWireDevicesForBalancing } from './scheme/domain/initialState';
 
 const controllerImagePaths = {
@@ -2345,114 +2346,6 @@ const MYHEAT_PRICES = {
 };
 
 const RADIO_MODULE_ACTIVATION_LABEL = 'Активация радиомодуля';
-
-const EquipmentOfferModal = ({ sections, onClose }) => (
-    <div
-        onClick={onClose}
-        style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.55)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2000,
-            padding: 24,
-        }}
-    >
-        <div
-            onClick={(event) => event.stopPropagation()}
-            style={{
-                background: '#fff',
-                borderRadius: 14,
-                padding: 24,
-                width: 'min(560px, 100%)',
-                maxHeight: '85vh',
-                overflowY: 'auto',
-                boxShadow: '0 24px 60px rgba(15, 23, 42, 0.35)',
-            }}
-        >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <h2 style={{ margin: 0, fontSize: 20 }}>Коммерческое предложение</h2>
-                <button
-                    type="button"
-                    onClick={onClose}
-                    style={{
-                        width: 32,
-                        height: 32,
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '50%',
-                        background: '#f8fafc',
-                        color: '#475569',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 22,
-                        lineHeight: 1,
-                        padding: 0,
-                    }}
-                    aria-label="Закрыть"
-                >
-                    ×
-                </button>
-            </div>
-            {sections.length === 0 ? (
-                <div style={{ color: '#64748b', fontSize: 14 }}>Оборудование пока не выбрано.</div>
-            ) : (
-                <>
-                    {sections.map((section) => (
-                        <div key={section.title} style={{ marginBottom: 18 }}>
-                            <h3 style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                {section.title}
-                            </h3>
-                            {section.rows.map((row) => {
-                                const unitPrice = row.unitPrice ?? null;
-                                const billableCount = row.paidCount != null ? row.paidCount : (row.count || 1);
-                                return (
-                                    <AddedDeviceLine
-                                        key={row.label}
-                                        label={row.label}
-                                        count={row.count}
-                                        badge={row.badge || null}
-                                        badgeAbove
-                                        myheat={unitPrice != null}
-                                        disabled={unitPrice == null}
-                                        price={unitPrice != null ? unitPrice * billableCount : null}
-                                    />
-                                );
-                            })}
-                        </div>
-                    ))}
-                    <div
-                        style={{
-                            display: 'flex',
-                            alignItems: 'baseline',
-                            justifyContent: 'space-between',
-                            gap: 12,
-                            marginTop: 20,
-                            paddingTop: 14,
-                            borderTop: '2px solid #e2e8f0',
-                            fontSize: 17,
-                            fontWeight: 700,
-                            color: '#203040',
-                        }}
-                    >
-                        <span>Итого</span>
-                        <span style={{ whiteSpace: 'nowrap' }}>
-                            {sections.reduce((sum, section) => sum + section.rows.reduce((rowSum, row) => {
-                                const unitPrice = row.unitPrice ?? null;
-                                if (unitPrice == null) return rowSum;
-                                const billableCount = row.paidCount != null ? row.paidCount : (row.count || 1);
-                                return rowSum + unitPrice * billableCount;
-                            }, 0), 0).toLocaleString('ru-RU')} ₽
-                        </span>
-                    </div>
-                </>
-            )}
-        </div>
-    </div>
-);
 
 const SelectionApp = () => {
     const [incomingScheme, setIncomingScheme] = useState({

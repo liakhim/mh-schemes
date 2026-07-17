@@ -14,6 +14,7 @@ import { getOneWireDirectionForDevice, getOneWireLineGeometry } from './scheme/l
 import { parsePorts, withFallbackPorts, getPortsByClassToken } from './scheme/layout/portParsing';
 import { getOneWirePortByRole, getPortPosition } from './scheme/layout/ports';
 import { Line, snapPixel } from './scheme/rendering/SharpLine';
+import EquipmentOfferModal from './components/EquipmentOfferModal';
 import commentIconPath from '../assets/icons/comment-icon.svg';
 import commentAddIconPath from '../assets/icons/comment-add-icon.svg';
 import logoPath from '../assets/logo/logo.svg';
@@ -635,9 +636,7 @@ const POWER_UNIT_LABEL = 'Блок питания';
 const uppercaseInstallationModuleTokens = (label) => String(label || '')
     .replace(/\b(rl2s|rl2|rl6s|rl6|di6|io4|bl2|rdt2|rdt)\b/gi, (match) => match.toUpperCase());
 const getInstallationMarkerText = (label) => {
-    const value = uppercaseInstallationModuleTokens(label).trim();
-    if (value.length <= 24) return value;
-    return `${value.slice(0, 23)}...`;
+    return uppercaseInstallationModuleTokens(label).trim();
 };
 const IO4_ONLY_WIRED_DEVICE_TYPES = ['010pump', '010servo'];
 const BUS_SLOT_SIZE = 80;
@@ -1074,6 +1073,19 @@ const OFFER_PRICES = {
     'wired-wall-digital': 1650,
     'wired-flask-digital': 1450,
     'wired-flask-ntc': 3190,
+    radioModuleActivation: 3000,
+};
+
+const OFFER_CONTROLLER_LABELS = { go: 'GO', 'go+': 'GO+', smart2: 'Smart2', pro: 'PRO', ecosmart: 'ECOsmart' };
+const OFFER_CONTROLLER_KIT_ROWS = {
+    pro: [
+        { key: 'wired-wall-digital', label: 'Цифровой датчик температуры настенный', count: 1 },
+        { key: 'wired-flask-digital', label: 'Цифровой датчик температуры в колбе', count: 2 },
+    ],
+    smart2: [{ key: 'wired-wall-digital', label: 'Проводной Настенный цифровой датчик', count: 1 }],
+    ecosmart: [{ key: 'wired-flask-ntc', label: 'NTC-датчик температуры', count: 3 }],
+    go: [{ key: 'wired-wall-digital', label: 'Настенный цифровой датчик температуры', count: 1 }],
+    'go+': [{ key: 'wireless-wall', label: 'Беспроводной комнатный датчик температуры', count: 1 }],
 };
 
 const OFFER_MODULE_LABELS = {
@@ -1082,45 +1094,74 @@ const OFFER_MODULE_LABELS = {
     bl2: 'Модуль BUS BL2', ecosmartbl2: 'Модуль ECOsmart BL2',
 };
 
+const getOfferTemperatureProduct = (type, controllerType) => {
+    const kitBucket = getControllerKitSensorBucket(controllerType, type);
+    if (kitBucket === 'wall') return ['wired-wall-digital', 'Датчик температуры настенный проводной'];
+    if (kitBucket === 'flask') return ['wired-flask-digital', 'Датчик температуры в колбе проводной'];
+    if (kitBucket === 'ntc') return ['wired-flask-ntc', 'Датчик температуры в колбе NTC 10K'];
+    if (kitBucket === 'wireless') return ['wireless-wall', 'Радиодатчик температуры и влажности комнатный'];
+    if (type === 'outdoor-temperature-sensor') return ['wireless-outdoor', 'Радиодатчик температуры уличный'];
+    if (type === 'wall-temperature-sensor') return ['wireless-wall', 'Радиодатчик температуры и влажности комнатный'];
+    if (type === 'wall-digital-sensor') return ['wired-wall-digital', 'Датчик температуры настенный проводной'];
+    if (type === 'ntc-sensor' || type === 'mixing-ntc-sensor') return ['wired-flask-ntc', 'Датчик температуры в колбе NTC 10K'];
+    if (String(type || '').startsWith('flask-sensor') && type !== 'flask-sensor-floor') {
+        return ['wired-flask-digital', 'Датчик температуры в колбе проводной'];
+    }
+    return null;
+};
+
 const getSchemeOfferSections = (scheme) => {
     const rowsBySection = { controller: [], modules: [], equipment: [] };
     const counts = new Map();
-    const add = (section, key, label, price) => {
+    const add = (section, key, label, price, { count = 1, paidCount = count, badge = null } = {}) => {
         const countKey = `${section}:${key}`;
-        const row = counts.get(countKey) || { label, count: 0, price };
-        row.count += 1;
+        const row = counts.get(countKey) || { key: countKey, label, count: 0, paidCount: 0, unitPrice: price, badge };
+        row.count += count;
+        row.paidCount += paidCount;
         counts.set(countKey, row);
     };
     const controllerType = canonicalDeviceType(typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type);
     if (OFFER_PRICES.controllers[controllerType] != null) {
-        add('controller', controllerType, String(controllerType).toUpperCase(), OFFER_PRICES.controllers[controllerType]);
+        add('controller', controllerType, OFFER_CONTROLLER_LABELS[controllerType], OFFER_PRICES.controllers[controllerType]);
+    }
+    if (controllerType === 'go' && Array.isArray(scheme?.wireless_devices) && scheme.wireless_devices.length > 0) {
+        add('controller', 'radio-module-activation', 'Активация радиомодуля', OFFER_PRICES.radioModuleActivation);
     }
 
-    const seen = new Set();
+    const kitRemaining = { ...(CONTROLLER_KIT_SENSOR_LIMITS[controllerType] || {}) };
+    (OFFER_CONTROLLER_KIT_ROWS[controllerType] || []).forEach((row) => {
+        add('equipment', `kit:${row.key}`, row.label, OFFER_PRICES[row.key], {
+            count: row.count,
+            paidCount: 0,
+            badge: 'Комплектный',
+        });
+    });
+
+    const seen = new WeakSet();
     const visit = (value) => {
         if (!value || typeof value !== 'object') return;
         if (Array.isArray(value)) {
             value.forEach(visit);
             return;
         }
+        if (seen.has(value)) return;
+        seen.add(value);
         const type = canonicalDeviceType(value.type);
-        const identity = value.id != null ? `${type}:${value.id}` : null;
-        if (identity && seen.has(identity)) return;
-        if (identity) seen.add(identity);
         if (OFFER_PRICES.modules[type] != null) add('modules', type, OFFER_MODULE_LABELS[type], OFFER_PRICES.modules[type]);
         const equipment = {
             thermostat: ['Термостат MyHeat', OFFER_PRICES.thermostat],
             'pressure-sensor': ['Датчик давления', OFFER_PRICES.pressure],
             'leak-sensor': ['Датчик протечки', OFFER_PRICES.leak],
-            'outdoor-temperature-sensor': ['Радиодатчик температуры уличный', OFFER_PRICES['wireless-outdoor']],
-            'wall-temperature-sensor': ['Радиодатчик температуры и влажности комнатный', OFFER_PRICES['wireless-wall']],
-            'wall-digital-sensor': ['Датчик температуры настенный проводной', OFFER_PRICES['wired-wall-digital']],
-            'ntc-sensor': ['Датчик температуры в колбе NTC 10K', OFFER_PRICES['wired-flask-ntc']],
-            'mixing-ntc-sensor': ['Датчик температуры в колбе NTC 10K', OFFER_PRICES['wired-flask-ntc']],
         }[type];
         if (equipment) add('equipment', type, equipment[0], equipment[1]);
-        if (String(type || '').startsWith('flask-sensor') && type !== 'flask-sensor-floor') {
-            add('equipment', 'wired-flask-digital', 'Датчик температуры в колбе проводной', OFFER_PRICES['wired-flask-digital']);
+        const temperatureProduct = getOfferTemperatureProduct(type, controllerType);
+        if (temperatureProduct) {
+            const kitBucket = getControllerKitSensorBucket(controllerType, type);
+            if (kitBucket && kitRemaining[kitBucket] > 0) {
+                kitRemaining[kitBucket] -= 1;
+            } else {
+                add('equipment', temperatureProduct[0], temperatureProduct[1], OFFER_PRICES[temperatureProduct[0]]);
+            }
         }
         Object.values(value).forEach(visit);
     };
@@ -1132,10 +1173,10 @@ const getSchemeOfferSections = (scheme) => {
     });
     counts.forEach((row, key) => rowsBySection[key.split(':')[0]].push(row));
     return [
-        ['Контроллер', rowsBySection.controller],
-        ['Модули расширения', rowsBySection.modules],
-        ['Оборудование MyHeat', rowsBySection.equipment],
-    ].filter(([, rows]) => rows.length > 0);
+        { title: 'Контроллер', rows: rowsBySection.controller },
+        { title: 'Модули расширения', rows: rowsBySection.modules },
+        { title: 'Оборудование MyHeat', rows: rowsBySection.equipment },
+    ].filter((section) => section.rows.length > 0);
 };
 
 const App = () => {
@@ -3771,46 +3812,9 @@ const App = () => {
                     </div>
                 </div>
             )}
-            {showOfferModal && (() => {
-                const total = schemeOfferSections.flatMap(([, rows]) => rows)
-                    .reduce((sum, row) => sum + row.count * row.price, 0);
-                return (
-                    <div className="scheme-help-backdrop" onMouseDown={() => setShowOfferModal(false)}>
-                        <div className="scheme-offer-modal" onMouseDown={(event) => event.stopPropagation()}>
-                            <div className="scheme-offer-header">
-                                <div>
-                                    <h2>Коммерческое предложение</h2>
-                                    <span>Оборудование MyHeat в текущей схеме</span>
-                                </div>
-                                <button type="button" className="scheme-settings-close" onClick={() => setShowOfferModal(false)}>×</button>
-                            </div>
-                            <div className="scheme-offer-content">
-                                {schemeOfferSections.length === 0 ? (
-                                    <p>Оборудование MyHeat пока не выбрано.</p>
-                                ) : schemeOfferSections.map(([title, rows]) => (
-                                    <section key={title} className="scheme-offer-section">
-                                        <h3>{title}</h3>
-                                        {rows.map((row) => (
-                                            <div key={row.label} className="scheme-offer-row">
-                                                <span className="scheme-offer-item">
-                                                    <img src={logoPath} alt="MyHeat" />
-                                                    <span>{row.label}</span>
-                                                </span>
-                                                <span className="scheme-offer-leader" />
-                                                <span>{row.count} шт</span>
-                                                <strong>{(row.count * row.price).toLocaleString('ru-RU')} ₽</strong>
-                                            </div>
-                                        ))}
-                                    </section>
-                                ))}
-                            </div>
-                            {schemeOfferSections.length > 0 && (
-                                <div className="scheme-offer-total">Итого: {total.toLocaleString('ru-RU')} ₽</div>
-                            )}
-                        </div>
-                    </div>
-                );
-            })()}
+            {showOfferModal && (
+                <EquipmentOfferModal sections={schemeOfferSections} onClose={() => setShowOfferModal(false)} />
+            )}
             {showSettingsModal && (
                 <div className="scheme-settings-backdrop" onMouseDown={() => setShowSettingsModal(false)}>
                     <aside className="scheme-settings-sidebar" onMouseDown={(event) => event.stopPropagation()}>
@@ -14555,9 +14559,9 @@ const App = () => {
                                                             const labelFontSize = 3;
                                                             const labelWidth = labelText ? 8 : 0;
                                                             const labelHeight = labelText
-                                                                ? Math.min(8 * indentSize, Math.max(24, labelText.length * 2.8 + 8))
+                                                                ? Math.min(8 * indentSize, Math.max(16, labelText.length * 1.9 + 4))
                                                                 : 0;
-                                                            const labelX = portX + indentSize * 0.5 - labelWidth / 2;
+                                                            const labelX = portX - labelWidth / 2 + 2;
                                                             const labelY = isTopPort ? bendY - labelHeight - 2 : bendY + 2;
                                                             return (
                                                                 <React.Fragment key={`installation-port-tail-${item.key}-${port.name}-${portIndex}`}>
@@ -14590,8 +14594,8 @@ const App = () => {
                                                                             <Text
                                                                                 x={labelX + 1}
                                                                                  y={labelY + labelHeight - 1}
-                                                                                 width={labelHeight - 1}
-                                                                                 height={labelWidth - 1}
+                                                                                 width={labelHeight - 2}
+                                                                                 height={labelWidth - 2}
                                                                                  text={labelText}
                                                                                  fontSize={labelFontSize}
                                                                                  fill="#5f4700"
