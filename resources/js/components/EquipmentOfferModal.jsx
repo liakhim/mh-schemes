@@ -1,13 +1,23 @@
 import React from 'react';
 import logoPath from '../../assets/logo/logo.svg';
-
-const getBillableCount = (row) => row.paidCount ?? (row.count || 1);
+import { downloadOfferPdf, getBillableCount } from '../scheme/export/offerPdfExport';
 
 const EquipmentOfferModal = ({ sections, onClose }) => {
+    const [isDownloading, setIsDownloading] = React.useState(false);
     const total = sections.reduce((sum, section) => sum + section.rows.reduce((rowSum, row) => {
         if (row.unitPrice == null) return rowSum;
         return rowSum + row.unitPrice * getBillableCount(row);
     }, 0), 0);
+
+    const handleDownloadPdf = async () => {
+        if (isDownloading) return;
+        setIsDownloading(true);
+        try {
+            await downloadOfferPdf(sections);
+        } finally {
+            setIsDownloading(false);
+        }
+    };
 
     return (
         <div className="equipment-offer-backdrop" onMouseDown={onClose}>
@@ -20,7 +30,19 @@ const EquipmentOfferModal = ({ sections, onClose }) => {
             >
                 <header className="equipment-offer-header">
                     <h2 id="equipment-offer-title">Коммерческое предложение</h2>
-                    <button type="button" className="equipment-offer-close" onClick={onClose} aria-label="Закрыть">×</button>
+                    <div className="equipment-offer-header-actions">
+                        {sections.length > 0 && (
+                            <button
+                                type="button"
+                                className="equipment-offer-download"
+                                onClick={handleDownloadPdf}
+                                disabled={isDownloading}
+                            >
+                                {isDownloading ? 'Готовим PDF…' : 'Скачать PDF'}
+                            </button>
+                        )}
+                        <button type="button" className="equipment-offer-close" onClick={onClose} aria-label="Закрыть">×</button>
+                    </div>
                 </header>
                 <div className="equipment-offer-content">
                     {sections.length === 0 ? (

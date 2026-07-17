@@ -326,6 +326,35 @@ body {
     background: #f1f5f9;
 }
 
+.equipment-offer-header-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.equipment-offer-download {
+    padding: 6px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.equipment-offer-download:hover {
+    border-color: #94a3b8;
+    background: #f1f5f9;
+}
+
+.equipment-offer-download:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
 .equipment-offer-empty {
     margin: 0;
     color: #64748b;

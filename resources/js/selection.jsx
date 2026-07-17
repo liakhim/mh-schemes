@@ -510,11 +510,27 @@ const getCompatibilityStats = (scheme, controllerTypeOverride = null) => {
     return { oneWire, oneWireThermostats, bus, relay, relayS, di, io4Only, analog420, ups, requiredNtcModules, totalNtcModules, requiredNtcOneWireLines, oneWireLines, requiredRdt2Modules };
 };
 
-const getPreferredGoControllerType = (scheme) => (
-    Array.isArray(scheme?.wireless_devices) && scheme.wireless_devices.length > 0
+const getPreferredGoControllerType = (scheme, upsRequested = false) => (
+    upsRequested || (Array.isArray(scheme?.wireless_devices) && scheme.wireless_devices.length > 0)
         ? 'go+'
         : 'go'
 );
+
+const isUpsPowerModule = (moduleItem) => (
+    canonicalType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type) === 'ups'
+);
+
+const materializeUpsIntentForController = (scheme, controllerType, upsRequested) => {
+    const powerModules = (Array.isArray(scheme?.power_modules) ? scheme.power_modules : [])
+        .filter((moduleItem) => !isUpsPowerModule(moduleItem));
+    if (upsRequested && (controllerType === 'smart2' || controllerType === 'pro')) {
+        powerModules.push('ups');
+    }
+    if (powerModules.length > 0) return { ...scheme, power_modules: powerModules };
+    if (!Object.prototype.hasOwnProperty.call(scheme || {}, 'power_modules')) return scheme;
+    const { power_modules: removedPowerModules, ...rest } = scheme;
+    return rest;
+};
 
 // идентификация ecosmart
 const isEcosmartIdentified = (scheme) => {
@@ -587,8 +603,12 @@ const getSmart2UsedDiPorts = (scheme) => {
     return usedByUps + usedByDiModules + stats.di;
 };
 
-const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null) => {
+const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null, upsRequested = false) => {
     const controllerType = controllerTypeOverride || getControllerType(scheme);
+    if (upsRequested && controllerType === 'go') {
+        return ['Для бесперебойного питания требуется GO+ со встроенным ИБП либо Smart2/PRO с внешним UPS.'];
+    }
+    scheme = materializeUpsIntentForController(scheme, controllerType, upsRequested);
     const limits = getModuleAdjustedLimits(scheme, controllerType);
     if (!limits) return ['Не выбран поддерживаемый контроллер.'];
 
@@ -641,10 +661,13 @@ const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null)
     return issues;
 };
 
-const getControllerRecommendation = (scheme, controllerType) => {
+const getControllerRecommendation = (scheme, controllerType, upsRequested = false) => {
     const baseLimits = CONTROLLER_LIMITS[controllerType];
     if (!baseLimits) return { compatible: false, modules: [] };
-    const candidateScheme = getControllerCandidateScheme(scheme, controllerType);
+    if (upsRequested && controllerType === 'go') {
+        return { compatible: false, modules: [] };
+    }
+    const candidateScheme = getControllerCandidateScheme(scheme, controllerType, upsRequested);
 
     if (controllerType === 'ecosmart') {
         return { compatible: isEcosmartIdentified(candidateScheme), modules: [] };
@@ -759,11 +782,11 @@ const getControllerRecommendation = (scheme, controllerType) => {
     return { compatible, modules };
 };
 
-const getCompatibleControllerOptions = (scheme) => CONTROLLER_TEMPLATES
+const getCompatibleControllerOptions = (scheme, upsRequested = false) => CONTROLLER_TEMPLATES
     .map((item) => ({
         type: item.value.type,
         label: item.label,
-        ...getControllerRecommendation(scheme, item.value.type),
+        ...getControllerRecommendation(scheme, item.value.type, upsRequested),
     }))
     .filter((item) => item.compatible);
 
@@ -1029,11 +1052,17 @@ const normalizeModulesForController = (scheme) => {
     return nextScheme;
 };
 
-const getControllerCandidateScheme = (scheme, controllerType) => {
-    if (getControllerType(scheme) === controllerType) return scheme;
+const getControllerCandidateScheme = (scheme, controllerType, upsRequested = false) => {
+    if (getControllerType(scheme) === controllerType) {
+        return materializeUpsIntentForController(scheme, controllerType, upsRequested);
+    }
     const controllerValue = getControllerTemplateValue(controllerType);
     return controllerValue
-        ? normalizeModulesForController(withControllerValue(scheme, controllerValue))
+        ? materializeUpsIntentForController(
+            normalizeModulesForController(withControllerValue(scheme, controllerValue)),
+            controllerType,
+            upsRequested,
+        )
         : scheme;
 };
 
@@ -1278,35 +1307,34 @@ const reconcileRequiredModules = (scheme) => {
     };
 };
 
-const resolveControllerAndRequiredModules = (scheme) => {
+const resolveControllerAndRequiredModules = (scheme, upsRequested = false) => {
+    const initialControllerType = getControllerType(scheme);
+    const preferredGoControllerType = getPreferredGoControllerType(scheme, upsRequested);
+    if (
+        (initialControllerType === 'go' || initialControllerType === 'go+')
+        && initialControllerType !== preferredGoControllerType
+    ) {
+        scheme = withControllerValue(scheme, getControllerTemplateValue(preferredGoControllerType));
+    }
+    scheme = materializeUpsIntentForController(scheme, getControllerType(scheme), upsRequested);
     scheme = normalizeModulesForController(scheme);
     scheme = reconcileRequiredModules(scheme);
-    const currentControllerType = getControllerType(scheme);
-    const preferredGoControllerType = getPreferredGoControllerType(scheme);
-    if (
-        (currentControllerType === 'go' || currentControllerType === 'go+')
-        && currentControllerType !== preferredGoControllerType
-    ) {
-        scheme = reconcileRequiredModules(normalizeModulesForController(withControllerValue(
-            scheme,
-            getControllerTemplateValue(preferredGoControllerType),
-        )));
-    }
-    const currentControllerIssues = getControllerCompatibilityIssues(scheme);
+    const currentControllerIssues = getControllerCompatibilityIssues(scheme, null, upsRequested);
     if (currentControllerIssues.length > 0) {
-        const compatibleOption = getCompatibleControllerOptions(scheme)[0] || null;
+        const compatibleOption = getCompatibleControllerOptions(scheme, upsRequested)[0] || null;
         const controllerValue = compatibleOption ? getControllerTemplateValue(compatibleOption.type) : null;
         if (controllerValue) {
-            return reconcileRequiredModules(normalizeModulesForController(withControllerValue(scheme, controllerValue)));
+            const candidateScheme = materializeUpsIntentForController(
+                withControllerValue(scheme, controllerValue),
+                compatibleOption.type,
+                upsRequested,
+            );
+            return reconcileRequiredModules(normalizeModulesForController(candidateScheme));
         }
     }
 
-    return scheme;
+    return materializeUpsIntentForController(scheme, getControllerType(scheme), upsRequested);
 };
-
-const UPS_TEMPLATES = [
-    { label: 'Источник бесперебойного питания', value: 'ups' },
-];
 
 const DISCRETE_TEMPLATES = [
     { label: 'Запрос тепла от бассейна', data: { id: 8, device_type: 'equipment', type: 'discrete_pool', connection_type: 'di' } },
@@ -2365,23 +2393,37 @@ const SelectionApp = () => {
     const [boilerSearchLoading, setBoilerSearchLoading] = useState(false);
     const [controllerConnectorGeometry, setControllerConnectorGeometry] = useState(null);
     const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+    const [upsRequested, setUpsRequested] = useState(false);
+    const upsRequestedRef = useRef(false);
+    const upsRequestSourceRef = useRef(null);
     const controllerWrapRef = useRef(null);
     const controllerCardRefs = useRef([]);
     const stickyTopRef = useRef(null);
     const [isControllerBarStuck, setIsControllerBarStuck] = useState(false);
+    const resolveSelectionScheme = useCallback(
+        (scheme, requested = upsRequestedRef.current) => resolveControllerAndRequiredModules(scheme, requested),
+        [],
+    );
     const controllerCompatibilityIssues = useMemo(
-        () => getControllerCompatibilityIssues(incomingScheme),
-        [incomingScheme],
+        () => getControllerCompatibilityIssues(incomingScheme, null, upsRequested),
+        [incomingScheme, upsRequested],
     );
     const compatibleControllerOptions = useMemo(
-        () => getCompatibleControllerOptions(incomingScheme),
-        [incomingScheme],
+        () => getCompatibleControllerOptions(incomingScheme, upsRequested),
+        [incomingScheme, upsRequested],
     );
     const compatibleControllerTypes = useMemo(
         () => new Set(compatibleControllerOptions.map((item) => item.type)),
         [compatibleControllerOptions],
     );
     const controllerType = getControllerType(incomingScheme);
+    useEffect(() => {
+        if (upsRequestSourceRef.current !== 'go+' || controllerType === 'go+') return;
+        upsRequestSourceRef.current = null;
+        upsRequestedRef.current = false;
+        setUpsRequested(false);
+        setIncomingScheme((prev) => resolveSelectionScheme(prev, false));
+    }, [controllerType, resolveSelectionScheme]);
     const unifiedLeakLoop = incomingScheme.unified_leak_loop === true;
     const leakSensorCount = [
         ...(Array.isArray(incomingScheme.sensors) ? incomingScheme.sensors : []),
@@ -2404,8 +2446,8 @@ const SelectionApp = () => {
         if (!ecosmartAvailableForProScheme) return null;
         const controllerValue = getControllerTemplateValue('ecosmart');
         if (!controllerValue) return null;
-        return resolveControllerAndRequiredModules(withControllerValue(incomingScheme, controllerValue));
-    }, [ecosmartAvailableForProScheme, incomingScheme]);
+        return resolveSelectionScheme(withControllerValue(incomingScheme, controllerValue));
+    }, [ecosmartAvailableForProScheme, incomingScheme, resolveSelectionScheme]);
     const wiredThermostatTemplate = useMemo(() => makeThermostatTemplate({
         target: 'wired',
         color: wiredThermostatColor,
@@ -2536,7 +2578,7 @@ const SelectionApp = () => {
             });
             boilers.push(boiler);
             const nextScheme = withStupidBoilerSensor({ ...prev, boilers }, boiler);
-            return resolveControllerAndRequiredModules(syncStrategySensorForSmartBoilers(nextScheme));
+            return resolveSelectionScheme(syncStrategySensorForSmartBoilers(nextScheme));
         });
     }, []);
 
@@ -2546,7 +2588,7 @@ const SelectionApp = () => {
             const boiler = withRinnaiAdapter({ ...template.data, id: generateId() });
             boilers.push(boiler);
             const nextScheme = withStupidBoilerSensor({ ...prev, boilers }, boiler);
-            return resolveControllerAndRequiredModules(syncStrategySensorForSmartBoilers(nextScheme));
+            return resolveSelectionScheme(syncStrategySensorForSmartBoilers(nextScheme));
         });
     }, []);
 
@@ -2554,7 +2596,7 @@ const SelectionApp = () => {
         setIncomingScheme((prev) => {
             const boilers = Array.isArray(prev.boilers) ? [...prev.boilers] : [];
             boilers.splice(index, 1);
-            return resolveControllerAndRequiredModules(syncStrategySensorForSmartBoilers({ ...prev, boilers }));
+            return resolveSelectionScheme(syncStrategySensorForSmartBoilers({ ...prev, boilers }));
         });
     }, []);
 
@@ -2564,7 +2606,7 @@ const SelectionApp = () => {
             const boiler = boilers[index];
             if (!boiler || canonicalType(boiler.type) !== 'smart') return prev;
             boilers[index] = { ...boiler, connection_type: connectionType };
-            return resolveControllerAndRequiredModules(syncStrategySensorForSmartBoilers({ ...prev, boilers }));
+            return resolveSelectionScheme(syncStrategySensorForSmartBoilers({ ...prev, boilers }));
         });
     }, []);
 
@@ -2579,7 +2621,7 @@ const SelectionApp = () => {
                 sensors.push({ ...s, id: generateId(), _uid: unitUid, _group: group, _label: template.label });
             });
 
-            return resolveControllerAndRequiredModules({ ...prev, wired_devices: wiredDevices, sensors });
+            return resolveSelectionScheme({ ...prev, wired_devices: wiredDevices, sensors });
         });
     }, []);
 
@@ -2591,7 +2633,7 @@ const SelectionApp = () => {
             const sensors = Array.isArray(prev.sensors)
                 ? prev.sensors.filter((s) => s._uid !== unitUid)
                 : [];
-            return resolveControllerAndRequiredModules({ ...prev, wired_devices: wiredDevices, sensors });
+            return resolveSelectionScheme({ ...prev, wired_devices: wiredDevices, sensors });
         });
     }, []);
 
@@ -2599,7 +2641,7 @@ const SelectionApp = () => {
         setIncomingScheme((prev) => {
             const devices = Array.isArray(prev.wireless_devices) ? [...prev.wireless_devices] : [];
             devices.push({ ...template.wirelessDevice, id: generateId() });
-            return resolveControllerAndRequiredModules({ ...prev, wireless_devices: devices });
+            return resolveSelectionScheme({ ...prev, wireless_devices: devices });
         });
     }, []);
 
@@ -2607,7 +2649,7 @@ const SelectionApp = () => {
         setIncomingScheme((prev) => {
             const devices = Array.isArray(prev.wireless_devices) ? [...prev.wireless_devices] : [];
             devices.splice(index, 1);
-            return resolveControllerAndRequiredModules({ ...prev, wireless_devices: devices });
+            return resolveSelectionScheme({ ...prev, wireless_devices: devices });
         });
     }, []);
 
@@ -2616,12 +2658,12 @@ const SelectionApp = () => {
             if (template.target === 'wireless_devices') {
                 const devices = Array.isArray(prev.wireless_devices) ? [...prev.wireless_devices] : [];
                 devices.push({ ...template.data, id: generateId(), title: template.label });
-                return resolveControllerAndRequiredModules({ ...prev, wireless_devices: devices });
+                return resolveSelectionScheme({ ...prev, wireless_devices: devices });
             }
 
             const sensors = Array.isArray(prev.sensors) ? [...prev.sensors] : [];
             sensors.push({ ...template.data, id: generateId(), title: template.label });
-            return resolveControllerAndRequiredModules({ ...prev, sensors });
+            return resolveSelectionScheme({ ...prev, sensors });
         });
     }, []);
 
@@ -2631,11 +2673,11 @@ const SelectionApp = () => {
             if (template.target === 'wireless') {
                 const devices = Array.isArray(prev.wireless_devices) ? [...prev.wireless_devices] : [];
                 devices.push({ ...template.data, id: generateId() });
-                return resolveControllerAndRequiredModules({ ...prev, wireless_devices: devices });
+                return resolveSelectionScheme({ ...prev, wireless_devices: devices });
             }
             const devices = Array.isArray(prev.wired_devices) ? [...prev.wired_devices] : [];
             devices.push({ ...template.data, id: generateId() });
-            return resolveControllerAndRequiredModules({ ...prev, wired_devices: devices });
+            return resolveSelectionScheme({ ...prev, wired_devices: devices });
         });
     }, []);
 
@@ -2649,11 +2691,11 @@ const SelectionApp = () => {
             if (template.target === 'sensors') {
                 const items = Array.isArray(prev.sensors) ? [...prev.sensors] : [];
                 items.push({ ...template.data, id: generateId() });
-                return resolveControllerAndRequiredModules({ ...prev, sensors: items });
+                return resolveSelectionScheme({ ...prev, sensors: items });
             }
             const items = Array.isArray(prev.wired_devices) ? [...prev.wired_devices] : [];
             items.push({ ...template.data, id: generateId() });
-            return resolveControllerAndRequiredModules({ ...prev, wired_devices: items });
+            return resolveSelectionScheme({ ...prev, wired_devices: items });
         });
     }, []);
 
@@ -2661,7 +2703,7 @@ const SelectionApp = () => {
         setIncomingScheme((prev) => {
             const sensors = Array.isArray(prev.sensors) ? prev.sensors : [];
             const wiredDevices = Array.isArray(prev.wired_devices) ? prev.wired_devices : [];
-            if (!enabled) return resolveControllerAndRequiredModules({ ...prev, unified_leak_loop: false });
+            if (!enabled) return resolveSelectionScheme({ ...prev, unified_leak_loop: false });
 
             let retained = false;
             const keepFirstLeakSensor = (item) => {
@@ -2670,7 +2712,7 @@ const SelectionApp = () => {
                 retained = true;
                 return true;
             };
-            return resolveControllerAndRequiredModules({
+            return resolveSelectionScheme({
                 ...prev,
                 unified_leak_loop: true,
                 sensors: sensors.filter(keepFirstLeakSensor),
@@ -2679,28 +2721,18 @@ const SelectionApp = () => {
         });
     }, []);
 
-    const addPowerModule = useCallback((template) => {
-        setIncomingScheme((prev) => {
-            const modules = Array.isArray(prev.power_modules) ? [...prev.power_modules] : [];
-            if (!modules.includes(template.value)) {
-                modules.push(template.value);
-            }
-            return resolveControllerAndRequiredModules({ ...prev, power_modules: modules });
-        });
-    }, []);
-
-    const removePowerModule = useCallback((value) => {
-        setIncomingScheme((prev) => resolveControllerAndRequiredModules({
-            ...prev,
-            power_modules: (Array.isArray(prev.power_modules) ? prev.power_modules : []).filter((m) => m !== value),
-        }));
+    const setUpsIntent = useCallback((enabled) => {
+        upsRequestSourceRef.current = enabled ? 'manual' : null;
+        upsRequestedRef.current = enabled;
+        setUpsRequested(enabled);
+        setIncomingScheme((prev) => resolveSelectionScheme(prev, enabled));
     }, []);
 
     const removeSchemeItemById = useCallback((target, id) => {
         setIncomingScheme((prev) => {
             if (target === 'ext_devices') {
                 const controller = prev?.controller && typeof prev.controller === 'object' ? prev.controller : {};
-                return resolveControllerAndRequiredModules({
+                return resolveSelectionScheme({
                     ...prev,
                     controller: {
                         ...controller,
@@ -2709,7 +2741,7 @@ const SelectionApp = () => {
                     },
                 });
             }
-            return resolveControllerAndRequiredModules({
+            return resolveSelectionScheme({
                 ...prev,
                 [target]: (Array.isArray(prev[target]) ? prev[target] : []).filter((item) => item.id !== id),
             });
@@ -2744,10 +2776,26 @@ const SelectionApp = () => {
     };
 
     const setController = useCallback((controllerValue) => {
-        setIncomingScheme((prev) => reconcileRequiredModules(normalizeModulesForController(withControllerValue(prev, controllerValue))));
-    }, []);
+        const targetControllerType = canonicalType(controllerValue?.type);
+        let requested = upsRequestedRef.current;
+        if (targetControllerType === 'go+') {
+            requested = true;
+            if (upsRequestSourceRef.current !== 'manual') upsRequestSourceRef.current = 'go+';
+        } else if (targetControllerType === 'go' || upsRequestSourceRef.current === 'go+') {
+            requested = false;
+            upsRequestSourceRef.current = null;
+        }
+        if (requested !== upsRequestedRef.current) {
+            upsRequestedRef.current = requested;
+            setUpsRequested(requested);
+        }
+        setIncomingScheme((prev) => resolveSelectionScheme(withControllerValue(prev, controllerValue), requested));
+    }, [controllerType, resolveSelectionScheme]);
 
     const clearScheme = useCallback(() => {
+        upsRequestSourceRef.current = null;
+        upsRequestedRef.current = false;
+        setUpsRequested(false);
         setIncomingScheme({
             controller: { type: 'go', relay_devices: [], one_wire_devices: [], bus_devices: [] },
         });
@@ -2927,7 +2975,9 @@ const SelectionApp = () => {
                 <div className="sel-stuck-controllers" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 8, justifyContent: 'flex-start' }}>
                     {CONTROLLER_TEMPLATES.map((item, index) => {
                         const isActive = incomingScheme.controller?.type === item.value.type;
-                        const isCompatible = compatibleControllerTypes.has(item.value.type);
+                        const isGoFamilySwitch = (controllerType === 'go' && item.value.type === 'go+')
+                            || (controllerType === 'go+' && item.value.type === 'go');
+                        const isCompatible = compatibleControllerTypes.has(item.value.type) || isGoFamilySwitch;
                         return (
                             <div
                                 key={index}
@@ -3035,7 +3085,9 @@ const SelectionApp = () => {
                         {CONTROLLER_TEMPLATES.map((item, index) => {
                             const isActive = incomingScheme.controller?.type === item.value.type;
                             const controllerTypeValue = item.value.type;
-                            const isCompatible = compatibleControllerTypes.has(controllerTypeValue);
+                            const isGoFamilySwitch = (controllerType === 'go' && controllerTypeValue === 'go+')
+                                || (controllerType === 'go+' && controllerTypeValue === 'go');
+                            const isCompatible = compatibleControllerTypes.has(controllerTypeValue) || isGoFamilySwitch;
                             return (
                                 <div
                                     key={index}
@@ -3839,58 +3891,32 @@ const SelectionApp = () => {
                 <h2>Источник бесперебойного питания</h2>
                 <SectionSubtitle>Требуется ли установка источника бесперебойного питания</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-                    {UPS_TEMPLATES.map((item, index) => (
-                        <div
-                            key={index}
-                            className="sel-card"
-                            style={{
-                                border: '1px solid #d7dbe4',
-                                borderRadius: 10,
-                                padding: 16,
-                                background: '#fff',
-                                flex: '1 1 260px',
-                                minWidth: 260,
-                                maxWidth: 'calc(50% - 8px)',
-                            }}
-                        >
-                            <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
-                            <pre
-                                style={{
-                                    background: '#f5f7fb',
-                                    padding: 10,
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    overflow: 'auto',
-                                    margin: 0,
-                                }}
-                            >
-'{item.value}'
-                            </pre>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
-                                <button
-                                    onClick={() => addPowerModule(item)}
-                                    style={{
-                                        padding: '6px 14px',
-                                        border: '1px solid #3498db',
-                                        borderRadius: 6,
-                                        background: '#3498db',
-                                        color: '#fff',
-                                        cursor: 'pointer',
-                                        fontSize: 13,
-                                        fontWeight: 700,
-                                    }}
-                                >
-                                    Добавить
-                                </button>
-                                <QtyStepper
-                                    count={(Array.isArray(incomingScheme.power_modules) ? incomingScheme.power_modules : []).filter((m) => m === item.value).length}
-                                    onIncrement={() => addPowerModule(item)}
-                                    onDecrement={() => removePowerModule(item.value)}
-                                />
-                            </div>
-                        </div>
-                    ))}
+                    <div
+                        className="sel-card"
+                        style={{
+                            border: '1px solid #d7dbe4',
+                            borderRadius: 10,
+                            padding: 16,
+                            background: '#fff',
+                            flex: '1 1 260px',
+                            minWidth: 260,
+                            maxWidth: 'calc(50% - 8px)',
+                        }}
+                    >
+                        <label className="scheme-settings-switch-row">
+                            <span className="sel-card-title" style={{ fontWeight: 700, fontSize: 14 }}>
+                                {controllerType === 'go'
+                                    ? 'Сменить контроллер с Go на Go+ (имеет встроенный ИБП)'
+                                    : 'Источник бесперебойного питания'}
+                            </span>
+                            <input
+                                type="checkbox"
+                                checked={upsRequested}
+                                onChange={(event) => setUpsIntent(event.target.checked)}
+                            />
+                            <span className="scheme-settings-switch" aria-hidden="true" />
+                        </label>
+                    </div>
                 </div>
 
             </section>
