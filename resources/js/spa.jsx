@@ -520,6 +520,18 @@ const hasExtThermostatFloorSensor = (device) => (
     && Array.isArray(device?.additions)
     && device.additions.some(isThermostatFloorSensorAddition)
 );
+const getControllerExtFloorThermostat = (item) => {
+    const controllerType = canonicalDeviceType(item?.type || item?.data?.type);
+    if (controllerType !== 'pro' && controllerType !== 'ecosmart') return null;
+    const extDevices = Array.isArray(item?.data?.ext_devices) ? item.data.ext_devices : [];
+    return extDevices.find((device) => {
+        const connectionTypes = String(device?.connection_type || '')
+            .toUpperCase()
+            .split('|')
+            .map((value) => value.trim());
+        return connectionTypes.includes('EXT') && hasExtThermostatFloorSensor(device);
+    }) || null;
+};
 const isExtModuleAllowedForController = (moduleType, controllerType) => (
     !(canonicalDeviceType(controllerType) === 'ecosmart' && canonicalDeviceType(moduleType) === 'bl2')
 );
@@ -702,15 +714,44 @@ const getOneWirePortColor = (name) => {
     return '#212121';
 };
 
-const getInstallationPortLineColor = (name) => {
-    const normalized = String(name || '').toUpperCase();
-    if (normalized.includes('V+') || normalized.includes('12V') || normalized.includes('VDC')) return '#d32f2f';
-    if (normalized.includes('DAT') || normalized.includes('-DI') || normalized.endsWith('DI') || normalized.includes('DI-IN')) return '#DEDC00';
-    if (/\bNTC-\d+-A\b/.test(normalized)) return '#1565c0';
-    if (normalized.includes('GND') || normalized.includes('COM')) return '#212121';
-    if (normalized.includes('4-20')) return '#f57c00';
-    if (normalized.includes('RELAY') || normalized.includes('AI') || normalized.includes('A-') || normalized.includes('B-')) return '#1565c0';
-    if (normalized.includes('BUS') || normalized.includes('EXT')) return '#2e7d32';
+const getInstallationPortLineColor = (name, item) => {
+    const [terminal, ...tags] = String(name || '').toUpperCase().trim().split(/\s+/);
+    const tag = tags.join(' ');
+    const itemType = canonicalDeviceType(item?.type || item?.data?.type);
+
+    if (itemType === 'ecosmart') {
+        if (/^NTC-\d+-A$/.test(terminal)) return '#212121';
+        if (/^NTC-\d+-B$/.test(terminal)) return '#464EE3';
+        if (/^RELAY-(?:4|6)-V\+$/.test(terminal) || terminal === 'RELAY-S-1-V+') return '#1565c0';
+        if (/^RELAY-(?:4|6)-[AB]$/.test(terminal) || /^RELAY-S-1-[AB]$/.test(terminal)) return '#d32f2f';
+        if (/^RELAY-(?:4|6)-GND$/.test(terminal) || terminal === 'RELAY-S-1-GND') return '#fbc02d';
+        if (tag === '220PUMP' || tag === 'BOILER-GVS') {
+            if (terminal.endsWith('-GND')) return '#fbc02d';
+            const blueOnA = terminal.startsWith('RELAY-3-') || terminal.startsWith('RELAY-5-');
+            if (terminal.endsWith('-A')) return blueOnA ? '#1565c0' : '#d32f2f';
+            if (terminal.endsWith('-B')) return blueOnA ? '#d32f2f' : '#1565c0';
+        }
+        if (!tag && /^RELAY-1-[AB]$/.test(terminal)) return '#2e7d32';
+        if (terminal === 'DI-IN-2-GND') return '#212121';
+        if (terminal === 'DI-IN-2-DI') return '#d32f2f';
+        if (terminal === 'DI-IN-2-V+') return '#fbc02d';
+    }
+
+    if (terminal === '1-WIRE-V+') return '#d32f2f';
+    if (terminal === '1-WIRE-DAT') return '#fbc02d';
+    if (terminal === '1-WIRE-GND') return '#212121';
+    if (/^NTC-\d+-A$/.test(terminal)) return '#212121';
+    if (/^NTC-\d+-B$/.test(terminal)) return '#464EE3';
+    if (/^4-20.*-V\+$/.test(terminal)) return '#d32f2f';
+    if (terminal.startsWith('4-20')) return '#f57c00';
+    if (/^BUS(?:-\d+)?-[AB]$/.test(terminal) || terminal.startsWith('EXT-')) return '#2e7d32';
+    if (/^MODBUS-[AB]$/.test(terminal)) return '#212121';
+    if (terminal.startsWith('AI')) return '#4fc3f7';
+    if (/^DI-(?:IN-|OUT-)?\d+(?:-DI)?$/.test(terminal)) return '#1565c0';
+    if (/^RELAY(?:-S)?-.*-(?:A|COM)$/.test(terminal)) return '#212121';
+    if (/^RELAY(?:-S)?-.*-(?:B|NO|NC)$/.test(terminal)) return '#d32f2f';
+    if (terminal.includes('GND') || terminal.endsWith('-COM')) return '#212121';
+    if (terminal.includes('V+') || terminal.includes('12V') || terminal.includes('VDC')) return '#d32f2f';
     return '#212121';
 };
 
@@ -869,7 +910,12 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
         if (itemType === 'power-unit' && normalizedPortName === 'L-IN') return 'Авто.выключатель';
         if (itemType === 'circuit-breaker' && normalizedPortName === 'L-IN') return 'Линия';
         if (itemType === 'circuit-breaker' && normalizedPortName === 'L-OUT') return POWER_UNIT_LABEL;
-        if (normalizedPortName.includes('12VDC-OUT') || normalizedPortName.includes('VDC-OUT')) return options.powerNextLabel || null;
+        if (normalizedPortName.includes('12VDC-OUT') || normalizedPortName.includes('VDC-OUT')) {
+            if (options.powerNextLabel) return options.powerNextLabel;
+            const extFloorThermostat = getControllerExtFloorThermostat(item);
+            if (!extFloorThermostat) return null;
+            return getInstallationDeviceLabel(extFloorThermostat, 'Термостат EXT');
+        }
         if (normalizedPortName.includes('12VDC-IN') || normalizedPortName.includes('VDC-IN')) return options.powerPreviousLabel || null;
         if (normalizedPortName.includes('EXT-OUT')) {
             if (options.nextLabel) return options.nextLabel;
@@ -14538,7 +14584,9 @@ const App = () => {
                                                                 const extDevices = Array.isArray(item?.data?.ext_devices) ? item.data.ext_devices : [];
                                                                 return Boolean(item.moduleNextLabel) || extDevices.some(Boolean);
                                                             }
-                                                            if (portName.includes('VDC-OUT')) return Boolean(item.powerNextLabel);
+                                                            if (portName.includes('VDC-OUT')) {
+                                                                return Boolean(item.powerNextLabel) || Boolean(getControllerExtFloorThermostat(item));
+                                                            }
                                                             if (portName.includes('1-WIRE') && portName.includes('OUT')) return Boolean(item.oneWireNextLabel);
                                                             return true;
                                                         })
@@ -14567,7 +14615,7 @@ const App = () => {
                                                                 <React.Fragment key={`installation-port-tail-${item.key}-${port.name}-${portIndex}`}>
                                                                     <Line
                                                                         points={[portX, portY, portX, midY, portX + indentSize * 0.25, bendY, portX + indentSize * 0.5, edgeY]}
-                                                                        stroke={getInstallationPortLineColor(port.name)}
+                                                                        stroke={getInstallationPortLineColor(port.name, item)}
                                                                         strokeWidth={1.25}
                                                                         tension={0.65}
                                                                          lineCap="round"
@@ -14611,7 +14659,7 @@ const App = () => {
                                                                         x={portX}
                                                                         y={portY}
                                                                         radius={2.2}
-                                                                         fill={getInstallationPortLineColor(port.name)}
+                                                                         fill={getInstallationPortLineColor(port.name, item)}
                                                                          opacity={0.95}
                                                                          perfectDrawEnabled={false}
                                                                          listening={false}
