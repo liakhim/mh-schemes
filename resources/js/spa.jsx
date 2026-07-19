@@ -79,6 +79,21 @@ const getCanvasSize = () => ({
     height: Math.max(window.innerHeight - NAV_HEIGHT, 240),
 });
 
+const scaleStageAtPoint = (stage, point, nextScale) => {
+    const oldScale = stage.scaleX();
+    const clampedScale = Math.max(0.4, Math.min(nextScale, 3));
+    const contentPoint = {
+        x: (point.x - stage.x()) / oldScale,
+        y: (point.y - stage.y()) / oldScale,
+    };
+    stage.position({
+        x: snapPixel(point.x - contentPoint.x * clampedScale),
+        y: snapPixel(point.y - contentPoint.y * clampedScale),
+    });
+    stage.scale({ x: clampedScale, y: clampedScale });
+    stage.batchDraw();
+};
+
 const getContainSize = (image, maxWidth, maxHeight) => {
     if (!image?.width || !image?.height) {
         return { width: maxWidth, height: maxHeight };
@@ -1249,6 +1264,7 @@ const App = () => {
     const [morphImages, setMorphImages] = useState([]);
     const [installationPanelSize, setInstallationPanelSize] = useState(null);
     const [installationItemOffsets, setInstallationItemOffsets] = useState({});
+    const [installationItemsLocked, setInstallationItemsLocked] = useState(true);
     const [slotMenuPos, setSlotMenuPos] = useState(null);
     const [oneWireMenuPos, setOneWireMenuPos] = useState(null);
     const [extMenuPos, setExtMenuPos] = useState(null);
@@ -1298,6 +1314,7 @@ const App = () => {
     const routeSchemeId = getRouteSchemeId();
     const initialSchemeRecord = getInitialSchemeRecord();
     const [schemeName, setSchemeName] = useState(initialSchemeRecord?.name || 'Hardcoded scheme');
+    const [schemeDescription, setSchemeDescription] = useState(initialSchemeRecord?.description || '');
     const [schemeLoadState, setSchemeLoadState] = useState(routeSchemeId ? (initialSchemeRecord ? 'loaded' : 'loading') : 'hardcoded');
     const [schemeLoadError, setSchemeLoadError] = useState(null);
     const [schemeSaveState, setSchemeSaveState] = useState('idle');
@@ -1307,6 +1324,7 @@ const App = () => {
     const [schemeJsonDirty, setSchemeJsonDirty] = useState(false);
     const [schemeJsonError, setSchemeJsonError] = useState(null);
     const [schemeNameEditor, setSchemeNameEditor] = useState(null);
+    const [schemeDescriptionEditor, setSchemeDescriptionEditor] = useState(null);
     const [titleEditor, setTitleEditor] = useState(null);
     const [commentEditor, setCommentEditor] = useState(null);
     const [commentViewer, setCommentViewer] = useState(null);
@@ -1318,11 +1336,52 @@ const App = () => {
     const zoomFrameRef = useRef(null);
     const zoomPendingRef = useRef(null);
     const zoomLastDrawAtRef = useRef(0);
+    const gestureZoomRef = useRef(null);
 
     useEffect(() => {
         const handleResize = () => setCanvasSize(getCanvasSize());
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    useEffect(() => {
+        const stage = stageRef.current;
+        const container = stage?.container();
+        if (!stage || !container) return undefined;
+
+        const getGesturePoint = (event) => {
+            const rect = container.getBoundingClientRect();
+            const clientX = Number.isFinite(event.clientX) ? event.clientX : rect.left + rect.width / 2;
+            const clientY = Number.isFinite(event.clientY) ? event.clientY : rect.top + rect.height / 2;
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        };
+        const handleGestureStart = (event) => {
+            event.preventDefault();
+            gestureZoomRef.current = {
+                startScale: stage.scaleX(),
+                point: getGesturePoint(event),
+            };
+        };
+        const handleGestureChange = (event) => {
+            event.preventDefault();
+            const gesture = gestureZoomRef.current;
+            if (!gesture) return;
+            const scale = Number.isFinite(event.scale) ? event.scale : 1;
+            scaleStageAtPoint(stage, gesture.point, gesture.startScale * scale);
+        };
+        const handleGestureEnd = (event) => {
+            event.preventDefault();
+            gestureZoomRef.current = null;
+        };
+
+        container.addEventListener('gesturestart', handleGestureStart, { passive: false });
+        container.addEventListener('gesturechange', handleGestureChange, { passive: false });
+        container.addEventListener('gestureend', handleGestureEnd, { passive: false });
+        return () => {
+            container.removeEventListener('gesturestart', handleGestureStart);
+            container.removeEventListener('gesturechange', handleGestureChange);
+            container.removeEventListener('gestureend', handleGestureEnd);
+        };
     }, []);
 
     useEffect(() => {
@@ -1349,6 +1408,7 @@ const App = () => {
                 setSchemeJsonDirty(false);
                 setSchemeJsonError(null);
                 setSchemeName(payload.name || `Scheme #${routeSchemeId}`);
+                setSchemeDescription(payload.description || '');
                 setOneWireSlotOffsets({});
                 setExtSlotOffsets({});
                 setDiSlotOffsets({});
@@ -1653,6 +1713,34 @@ const App = () => {
             })
             .catch(() => {
                 setSchemeNameEditor((current) => (current ? { ...current, state: 'error' } : current));
+            });
+    };
+
+    const saveSchemeDescription = () => {
+        if (!routeSchemeId || schemeDescriptionEditor?.state === 'saving') return;
+
+        const description = String(schemeDescriptionEditor?.value || '').trim();
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        setSchemeDescriptionEditor((current) => (current ? { ...current, state: 'saving' } : current));
+
+        fetch(`/api/schemes/${routeSchemeId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify({ description: description || null }),
+        })
+            .then((response) => {
+                if (!response.ok) throw new Error('Description update failed');
+                return response.json();
+            })
+            .then((payload) => {
+                setSchemeDescription(payload.description || '');
+                setSchemeDescriptionEditor(null);
+            })
+            .catch(() => {
+                setSchemeDescriptionEditor((current) => (current ? { ...current, state: 'error' } : current));
             });
     };
 
@@ -3577,8 +3665,11 @@ const App = () => {
     const startStagePan = (event) => {
         if (event?.evt?.type?.startsWith('mouse') && event.evt.button !== 0) return;
         const stage = stageRef.current;
-        if (installationMode && event.target !== stage && event.target?.getClassName?.() !== 'Rect') return;
-        if (installationMode && event.target?.name?.() === 'installation-panel-resize') return;
+        const isLockedDinItem = installationMode
+            && installationItemsLocked
+            && (event.target?.hasName?.('installation-din-item') || event.target?.findAncestor?.('.installation-din-item'));
+        if (installationMode && event.target !== stage && event.target?.getClassName?.() !== 'Rect' && !isLockedDinItem) return;
+        if (installationMode && ['installation-panel-resize', 'installation-panel-lock'].includes(event.target?.name?.())) return;
         if (!stage || (!installationMode && event.target !== stage)) return;
         const pointer = stage.getPointerPosition();
         if (!pointer) return;
@@ -3939,9 +4030,9 @@ const App = () => {
                     </aside>
                 </div>
             )}
-            <div className="spa-scheme-title spa-fixed-scheme-title" title={schemeName}>
+            <div className="spa-scheme-title spa-fixed-scheme-title">
                 <span className="spa-scheme-title-label">Схема</span>
-                <div className="spa-scheme-title-value">
+                <div className="spa-scheme-title-value" title={schemeName}>
                     <strong>{schemeName}</strong>
                     <button
                         type="button"
@@ -3950,6 +4041,22 @@ const App = () => {
                         title="Переименовать схему"
                         disabled={!routeSchemeId}
                         onClick={() => setSchemeNameEditor({ value: schemeName, state: 'idle' })}
+                    >
+                        &#9998;
+                    </button>
+                </div>
+                <span className="spa-scheme-description-label">Описание</span>
+                <div className="spa-scheme-description-value" title={schemeDescription || 'Без описания'}>
+                    <span className={schemeDescription ? undefined : 'spa-scheme-description-empty'}>
+                        {schemeDescription || 'Без описания'}
+                    </span>
+                    <button
+                        type="button"
+                        className="spa-scheme-title-edit"
+                        aria-label="Редактировать описание схемы"
+                        title="Редактировать описание схемы"
+                        disabled={!routeSchemeId}
+                        onClick={() => setSchemeDescriptionEditor({ value: schemeDescription, state: 'idle' })}
                     >
                         &#9998;
                     </button>
@@ -4028,6 +4135,44 @@ const App = () => {
                             <button type="button" className="title-editor-secondary" onClick={() => setSchemeNameEditor(null)}>Отмена</button>
                             <button type="submit" className="title-editor-primary" disabled={!String(schemeNameEditor.value || '').trim() || schemeNameEditor.state === 'saving'}>
                                 {schemeNameEditor.state === 'saving' ? 'Сохраняем...' : 'Сохранить'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+            {schemeDescriptionEditor && (
+                <div className="title-editor-backdrop" onMouseDown={() => setSchemeDescriptionEditor(null)}>
+                    <form
+                        className="title-editor-modal"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            saveSchemeDescription();
+                        }}
+                        onMouseDown={(event) => event.stopPropagation()}
+                    >
+                        <div className="title-editor-header">
+                            <strong>Описание схемы</strong>
+                            <button type="button" className="title-editor-close" onClick={() => setSchemeDescriptionEditor(null)}>×</button>
+                        </div>
+                        <label className="title-editor-label" htmlFor="scheme-description-editor-input">Описание</label>
+                        <textarea
+                            id="scheme-description-editor-input"
+                            className="title-editor-input title-editor-textarea"
+                            value={schemeDescriptionEditor.value}
+                            autoFocus
+                            onChange={(event) => setSchemeDescriptionEditor((current) => (current ? { ...current, value: event.target.value, state: 'idle' } : current))}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Escape') {
+                                    event.preventDefault();
+                                    setSchemeDescriptionEditor(null);
+                                }
+                            }}
+                        />
+                        {schemeDescriptionEditor.state === 'error' && <div className="title-editor-error">Не удалось сохранить описание схемы</div>}
+                        <div className="title-editor-actions">
+                            <button type="button" className="title-editor-secondary" onClick={() => setSchemeDescriptionEditor(null)}>Отмена</button>
+                            <button type="submit" className="title-editor-primary" disabled={schemeDescriptionEditor.state === 'saving'}>
+                                {schemeDescriptionEditor.state === 'saving' ? 'Сохраняем...' : 'Сохранить'}
                             </button>
                         </div>
                     </form>
@@ -4190,7 +4335,8 @@ const App = () => {
                          const pointer = stage.getPointerPosition();
                          if (!pointer) return;
                         const pending = zoomPendingRef.current || { deltaY: 0, pointer };
-                        pending.deltaY += event.evt.deltaY;
+                         const zoomSensitivity = event.evt.ctrlKey ? 0.01 : 0.0008;
+                         pending.deltaY += event.evt.deltaY * zoomSensitivity;
                         pending.pointer = pointer;
                         zoomPendingRef.current = pending;
                         if (zoomFrameRef.current) return;
@@ -4207,20 +4353,9 @@ const App = () => {
                             const next = zoomPendingRef.current;
                             zoomPendingRef.current = null;
                             if (!next) return;
-                            const oldScale = stage.scaleX();
-                            const nextScale = oldScale * Math.exp(-next.deltaY * 0.0008);
-                            const clampedScale = Math.max(0.4, Math.min(nextScale, 3));
-                            const cursorPoint = {
-                                x: (next.pointer.x - stage.x()) / oldScale,
-                                y: (next.pointer.y - stage.y()) / oldScale,
-                            };
-                            stage.position({
-                                x: snapPixel(next.pointer.x - cursorPoint.x * clampedScale),
-                                y: snapPixel(next.pointer.y - cursorPoint.y * clampedScale),
-                            });
-                            stage.scale({ x: clampedScale, y: clampedScale });
-                            stage.batchDraw();
-                            zoomLastDrawAtRef.current = timestamp;
+                             const nextScale = stage.scaleX() * Math.exp(-next.deltaY);
+                             scaleStageAtPoint(stage, next.pointer, nextScale);
+                             zoomLastDrawAtRef.current = timestamp;
                         };
                         zoomFrameRef.current = window.requestAnimationFrame(flushZoom);
                     }}
@@ -5102,7 +5237,7 @@ const App = () => {
                                     const controllerPortCenterX = (leakPorts.gnd.x + leakPorts.di.x + leakPorts.vplus.x) / 3;
                                     const controllerPortCenterY = (leakPorts.gnd.y + leakPorts.di.y + leakPorts.vplus.y) / 3;
                                     const slotWidth = 7 * indentSize;
-                                    const slotHeight = 4 * indentSize;
+                                    const slotHeight = 7 * indentSize;
                                     const slotX = controllerPortCenterX - slotWidth - 2 * indentSize;
                                     const slotY = -slotHeight - 12 * indentSize;
                                     const imageKey = controllerPortCenterX > slotX + slotWidth / 2 ? 'leak-sensor-right-port' : 'leak-sensor';
@@ -12128,7 +12263,7 @@ const App = () => {
                                                                         const ntcSensorImage = wirelessImages['ntc-sensor'] || null;
                                                                         const ntcSensorPorts = wirelessPortsByType['ntc-sensor'] || [];
                                                                         const ntcSlotWidth = 11 * indentSize;
-                                                                        const ntcSlotHeight = 2 * indentSize;
+                                                                        const ntcSlotHeight = 3 * indentSize;
                                                                         const ntcSlotGap = 3 * indentSize;
                                                                         const lineX = owX - ntcSlotWidth;
                                                                         const lineTotalHeight = NTC_LINE_SLOTS_COUNT * ntcSlotHeight + (NTC_LINE_SLOTS_COUNT - 1) * ntcSlotGap;
@@ -12299,7 +12434,7 @@ const App = () => {
                                                                         const ntcSensorImage = wirelessImages['ntc-sensor-left'] || null;
                                                                         const ntcSensorPorts = wirelessPortsByType['ntc-sensor-left'] || [];
                                                                         const ntcSlotWidth = 11 * indentSize;
-                                                                        const ntcSlotHeight = 2 * indentSize;
+                                                                        const ntcSlotHeight = 3 * indentSize;
                                                                         const ntcSlotGap = 3 * indentSize;
                                                                         const lineX = owX + owWidth;
                                                                         const lineTotalHeight = NTC_LINE_SLOTS_COUNT * ntcSlotHeight + (NTC_LINE_SLOTS_COUNT - 1) * ntcSlotGap;
@@ -13256,7 +13391,7 @@ const App = () => {
                                                                     const ntcSensorImage = wirelessImages['ntc-sensor'] || null;
                                                                     const ntcSensorPorts = wirelessPortsByType['ntc-sensor'] || [];
                                                                     const ntcSlotWidth = 11 * indentSize;
-                                                                    const ntcSlotHeight = 2 * indentSize;
+                                                                    const ntcSlotHeight = 3 * indentSize;
                                                                     const ntcSlotGap = 3 * indentSize;
                                                                     const lineX = slotPos.x - ntcSlotWidth;
                                                                     const lineTotalHeight = NTC_LINE_SLOTS_COUNT * ntcSlotHeight + (NTC_LINE_SLOTS_COUNT - 1) * ntcSlotGap;
@@ -13429,7 +13564,7 @@ const App = () => {
                                                                     const ntcSensorImage = wirelessImages['ntc-sensor-left'] || null;
                                                                     const ntcSensorPorts = wirelessPortsByType['ntc-sensor-left'] || [];
                                                                     const ntcSlotWidth = 11 * indentSize;
-                                                                    const ntcSlotHeight = 2 * indentSize;
+                                                                    const ntcSlotHeight = 3 * indentSize;
                                                                     const ntcSlotGap = 3 * indentSize;
                                                                     const lineX = slotPos.x + slotWidth;
                                                                     const lineTotalHeight = NTC_LINE_SLOTS_COUNT * ntcSlotHeight + (NTC_LINE_SLOTS_COUNT - 1) * ntcSlotGap;
@@ -14248,6 +14383,7 @@ const App = () => {
                                 const railX = panelX + innerPanelInset;
                                 const railWidth = panelWidth - innerPanelInset * 2;
                                 const resizeHandleSize = 18;
+                                const lockButtonSize = 22;
 
                                 // Минимальный размер щита задаётся по занятым DIN-позициям: ширина не
                                 // режет модули справа, высота не убирает ряды, на которых есть модули.
@@ -14475,10 +14611,12 @@ const App = () => {
                                             return (
                                                 <Group
                                                     key={`installation-${item.key}`}
+                                                    name="installation-din-item"
                                                     x={x}
                                                     y={y}
-                                                    draggable={!isLeftController}
+                                                    draggable={!isLeftController && !installationItemsLocked}
                                                     onDragEnd={(event) => {
+                                                        if (installationItemsLocked) return;
                                                         const node = event.target;
                                                         const minAbsX = panelX + panelPaddingX;
                                                         const maxAbsX = panelX + panelWidth - panelPaddingX - itemWidth;
@@ -14671,6 +14809,71 @@ const App = () => {
                                             );
                                         })}
                                         {showPanel && (<>
+                                        {(() => {
+                                            const buttonX = panelX + panelWidth - lockButtonSize / 2;
+                                            const buttonY = panelY - lockButtonSize / 2;
+                                            const centerX = buttonX + lockButtonSize / 2;
+                                            const bodyY = buttonY + 10;
+                                            const toggleLock = (event) => {
+                                                event.cancelBubble = true;
+                                                setInstallationItemsLocked((locked) => !locked);
+                                            };
+                                            return (
+                                                <Group>
+                                                    <Rect
+                                                        name="installation-panel-lock"
+                                                        x={buttonX}
+                                                        y={buttonY}
+                                                        width={lockButtonSize}
+                                                        height={lockButtonSize}
+                                                        cornerRadius={6}
+                                                        fill={installationItemsLocked ? '#c85e18' : '#2563eb'}
+                                                        stroke={installationItemsLocked ? '#9a4312' : '#1d4ed8'}
+                                                        strokeWidth={1}
+                                                        shadowColor="rgba(15, 23, 42, 0.32)"
+                                                        shadowBlur={4}
+                                                        shadowOffsetY={2}
+                                                        shadowForStrokeEnabled={false}
+                                                        onClick={toggleLock}
+                                                        onTap={toggleLock}
+                                                        onMouseEnter={(event) => {
+                                                            const stage = event.target.getStage();
+                                                            if (stage) stage.container().style.cursor = 'pointer';
+                                                        }}
+                                                        onMouseLeave={(event) => {
+                                                            const stage = event.target.getStage();
+                                                            if (stage) stage.container().style.cursor = 'default';
+                                                        }}
+                                                    />
+                                                    <Line
+                                                        points={installationItemsLocked
+                                                            ? [centerX - 4, bodyY, centerX - 4, bodyY - 3, centerX - 2, bodyY - 6, centerX + 2, bodyY - 6, centerX + 4, bodyY - 3, centerX + 4, bodyY]
+                                                            : [centerX - 4, bodyY, centerX - 4, bodyY - 3, centerX - 2, bodyY - 6, centerX + 2, bodyY - 6, centerX + 4, bodyY - 3]}
+                                                        stroke="#fff"
+                                                        strokeWidth={1.5}
+                                                        lineCap="round"
+                                                        lineJoin="round"
+                                                        listening={false}
+                                                    />
+                                                    <Rect
+                                                        x={centerX - 6}
+                                                        y={bodyY}
+                                                        width={12}
+                                                        height={8}
+                                                        cornerRadius={2}
+                                                        fill="#fff"
+                                                        listening={false}
+                                                    />
+                                                    <KonvaCircle
+                                                        x={centerX}
+                                                        y={bodyY + 3}
+                                                        radius={1.2}
+                                                        fill={installationItemsLocked ? '#c85e18' : '#2563eb'}
+                                                        listening={false}
+                                                    />
+                                                </Group>
+                                            );
+                                        })()}
                                         <Rect
                                             name="installation-panel-resize"
                                             x={panelX + panelWidth - resizeHandleSize / 2}

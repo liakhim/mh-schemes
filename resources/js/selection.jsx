@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useR
 import { createRoot } from 'react-dom/client';
 import EquipmentOfferModal from './components/EquipmentOfferModal';
 import { getAllOneWireDevicesForBalancing } from './scheme/domain/initialState';
+import { materializePowerModules } from './scheme/domain/powerModules';
 
 const controllerImagePaths = {
     go: new URL('../assets/controllers/go/go.svg', import.meta.url).href,
@@ -516,20 +517,22 @@ const getPreferredGoControllerType = (scheme, upsRequested = false) => (
         : 'go'
 );
 
-const isUpsPowerModule = (moduleItem) => (
-    canonicalType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type) === 'ups'
-);
-
 const materializeUpsIntentForController = (scheme, controllerType, upsRequested) => {
-    const powerModules = (Array.isArray(scheme?.power_modules) ? scheme.power_modules : [])
-        .filter((moduleItem) => !isUpsPowerModule(moduleItem));
-    if (upsRequested && (controllerType === 'smart2' || controllerType === 'pro')) {
-        powerModules.push('ups');
-    }
+    const powerModules = materializePowerModules(scheme?.power_modules, controllerType, upsRequested);
     if (powerModules.length > 0) return { ...scheme, power_modules: powerModules };
     if (!Object.prototype.hasOwnProperty.call(scheme || {}, 'power_modules')) return scheme;
     const { power_modules: removedPowerModules, ...rest } = scheme;
     return rest;
+};
+
+const requiresProForBoilerCombination = (scheme) => {
+    const boilers = Array.isArray(scheme?.boilers) ? scheme.boilers : [];
+    const smartBoilers = boilers.filter((boiler) => canonicalType(boiler?.type) === 'smart');
+    const stupidBoilers = boilers.filter((boiler) => canonicalType(boiler?.type) === 'stupid');
+
+    return smartBoilers.length >= 2
+        && stupidBoilers.length >= 1
+        && smartBoilers.some((boiler) => hasConnectionType(boiler, 'relay'));
 };
 
 // идентификация ecosmart
@@ -605,6 +608,9 @@ const getSmart2UsedDiPorts = (scheme) => {
 
 const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null, upsRequested = false) => {
     const controllerType = controllerTypeOverride || getControllerType(scheme);
+    if (controllerType !== 'pro' && requiresProForBoilerCombination(scheme)) {
+        return ['Комбинация из двух умных и одного тупого котла, где умный котёл подключён по RELAY, требует контроллер PRO.'];
+    }
     if (upsRequested && controllerType === 'go') {
         return ['Для бесперебойного питания требуется GO+ со встроенным ИБП либо Smart2/PRO с внешним UPS.'];
     }
@@ -664,6 +670,9 @@ const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null,
 const getControllerRecommendation = (scheme, controllerType, upsRequested = false) => {
     const baseLimits = CONTROLLER_LIMITS[controllerType];
     if (!baseLimits) return { compatible: false, modules: [] };
+    if (controllerType !== 'pro' && requiresProForBoilerCombination(scheme)) {
+        return { compatible: false, modules: [] };
+    }
     if (upsRequested && controllerType === 'go') {
         return { compatible: false, modules: [] };
     }

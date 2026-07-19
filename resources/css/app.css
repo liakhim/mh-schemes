@@ -108,6 +108,43 @@ body {
     flex: 1 1 auto;
 }
 
+.spa-scheme-description-label {
+    display: block;
+    margin-top: 7px;
+    margin-bottom: 2px;
+    color: #64748b;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.spa-scheme-description-value {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.spa-scheme-description-value > span {
+    display: -webkit-box;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    color: #475569;
+    font-size: 12px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.spa-scheme-description-value .spa-scheme-description-empty {
+    color: #94a3b8;
+    font-style: italic;
+}
+
 .spa-scheme-title-edit {
     width: 24px;
     height: 24px;
