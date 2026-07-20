@@ -145,6 +145,64 @@ body {
     font-style: italic;
 }
 
+.spa-unused-kit-sensors {
+    margin-top: 9px;
+    padding-top: 8px;
+    border-top: 1px solid #dbe7d7;
+}
+
+.spa-unused-kit-sensors-label {
+    display: block;
+    margin-bottom: 5px;
+    color: #2e7d32;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.spa-unused-kit-sensors-list {
+    display: grid;
+    gap: 4px;
+}
+
+.spa-unused-kit-sensor-card {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid #b8d6aa;
+    border-radius: 6px;
+    color: #31543a;
+    background: #f3faef;
+    font-size: 11px;
+    line-height: 1.25;
+}
+
+.spa-unused-kit-sensor-card > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spa-unused-kit-sensor-card > strong {
+    flex: 0 0 auto;
+    color: #2e7d32;
+    font-size: 12px;
+}
+
+.spa-unused-kit-sensors-empty {
+    display: block;
+    color: #7b8794;
+    font-size: 11px;
+    font-style: italic;
+    line-height: 1.3;
+}
+
 .spa-scheme-title-edit {
     width: 24px;
     height: 24px;

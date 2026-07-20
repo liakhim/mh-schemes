@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/spa.jsx', 'resources/js/admin.jsx', 'resources/js/selection.jsx', 'resources/css/selection-old.css', 'resources/js/selection-old.jsx'],
+            input: ['resources/css/app.css', 'resources/js/spa.jsx', 'resources/js/admin.jsx', 'resources/js/selection.jsx', 'resources/css/selection-old.css', 'resources/js/selection-old.jsx', 'resources/css/svg-editor.css', 'resources/js/svg-editor.jsx'],
             refresh: true,
         }),
         react(),

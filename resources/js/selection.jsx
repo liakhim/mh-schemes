@@ -108,6 +108,12 @@ const makeStupidBoilerSensor = () => ({
     title: 'Датчик котла',
 });
 
+/**
+ * Добавляет обязательный датчик подачи для котла с релейным управлением.
+ * @param {object} scheme Текущая схема.
+ * @param {object} boiler Добавляемый котел.
+ * @returns {object} Исходная либо дополненная схема.
+ */
 const withStupidBoilerSensor = (scheme, boiler) => {
     if (canonicalType(boiler?.type) !== 'stupid') return scheme;
     const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
@@ -227,6 +233,11 @@ const NTC_MODULES_PER_ONE_WIRE_LINE = 2;
 const isDirectNtcSensor = (sensor) => sensor?.device_type === 'sensor'
     && String(sensor?.connection_type || '').toLowerCase() === 'ntc';
 
+/**
+ * Считает свободные NTC-входы конкретного модуля ntc-1-wire.
+ * @param {string|object} device Тип либо объект модуля с внутренними линиями.
+ * @returns {number} Число свободных входов от 0 до 6.
+ */
 const getNtcModuleFreeSlots = (device) => {
     const type = canonicalType(typeof device === 'string' ? device : device?.type);
     if (type !== 'ntc-1-wire') return 0;
@@ -249,6 +260,11 @@ const getExistingNtcModuleFreeSlots = (scheme) => {
         .reduce((sum, device) => sum + getNtcModuleFreeSlots(device), 0);
 };
 
+/**
+ * Рассчитывает дефицит модулей ntc-1-wire для прямых NTC-датчиков схемы.
+ * @param {object} scheme Анализируемая схема.
+ * @returns {number} Число дополнительных модулей.
+ */
 const getRequiredNtcOneWireModuleCount = (scheme) => {
     const controllerType = getControllerType(scheme);
     const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
@@ -299,6 +315,12 @@ const countRdt2Modules = (scheme) => {
         .length;
 };
 
+/**
+ * Определяет, требуется ли радиомодуль RDT2 для выбранного контроллера.
+ * @param {object} scheme Анализируемая схема.
+ * @param {?string} controllerTypeOverride Тип контроллера вместо указанного в схеме.
+ * @returns {number} Ноль либо один требуемый модуль.
+ */
 const getRequiredRdt2ModuleCount = (scheme, controllerTypeOverride = null) => {
     const controllerType = controllerTypeOverride || getControllerType(scheme);
     if (!RDT2_REQUIRED_CONTROLLERS.has(controllerType)) return 0;
@@ -307,6 +329,12 @@ const getRequiredRdt2ModuleCount = (scheme, controllerTypeOverride = null) => {
     return countRdt2Modules(scheme) > 0 ? 0 : 1;
 };
 
+/**
+ * Считает загрузку 1-wire с учетом переноса термостатов PRO на EXT.
+ * @param {object} scheme Анализируемая схема.
+ * @param {string} controllerType Тип контроллера, задающий правила подсчета.
+ * @returns {number} Число занятых позиций 1-wire.
+ */
 const getOneWireCapacityUsage = (scheme, controllerType) => {
     const devices = getAllOneWireDevicesForBalancing(scheme);
     if (controllerType !== 'pro') return devices.length;
@@ -344,6 +372,11 @@ const getOneWireCapacityUsage = (scheme, controllerType) => {
 
 const STRATEGY_SENSOR_AUTO_SOURCE = 'smart-boilers-strategy';
 
+/**
+ * Синхронизирует автоматический датчик стратегии для двух и более умных котлов.
+ * @param {object} scheme Текущая схема.
+ * @returns {object} Схема с актуальным составом датчиков.
+ */
 const syncStrategySensorForSmartBoilers = (scheme) => {
     const boilers = Array.isArray(scheme?.boilers) ? scheme.boilers : [];
     const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
@@ -377,6 +410,13 @@ const syncStrategySensorForSmartBoilers = (scheme) => {
 const deviceHasMixingNtcAddition = (device) => Array.isArray(device?.additions)
     && device.additions.some((addition) => canonicalType(addition?.type) === 'mixing-ntc-sensor');
 
+/**
+ * Проверяет принадлежность устройства составной пользовательской группе.
+ * @param {object} device Устройство схемы.
+ * @param {string} group Идентификатор группы: mixing, pump, zone и т.п.
+ * @param {Array<object>} templates Шаблоны допустимых устройств группы.
+ * @returns {boolean} Принадлежит ли устройство группе.
+ */
 const isGroupedDevice = (device, group, templates) => {
     if (!device?._uid) return false;
     if (device._group) return device._group === group;
@@ -391,6 +431,12 @@ const isGroupedDevice = (device, group, templates) => {
     return templates.some((template) => canonicalType(template.wiredDevice?.type) === canonicalType(device?.type));
 };
 
+/**
+ * Рассчитывает доступные порты контроллера после учета расширений и UPS.
+ * @param {object} scheme Схема с установленными модулями.
+ * @param {string} controllerType Проверяемый контроллер.
+ * @returns {?object} Итоговые лимиты либо null для неизвестного контроллера.
+ */
 const getModuleAdjustedLimits = (scheme, controllerType) => {
     const baseLimits = CONTROLLER_LIMITS[controllerType];
     if (!baseLimits) return null;
@@ -441,6 +487,12 @@ const getModuleAdjustedLimits = (scheme, controllerType) => {
     return limits;
 };
 
+/**
+ * Распределяет строгие и гибкие устройства между линиями RELAY и RELAY-S.
+ * @param {object} scheme Анализируемая схема.
+ * @param {object} limits Доступные емкости relay-линий.
+ * @returns {object} Загрузка линий и промежуточные счетчики.
+ */
 const getRelayStatsForLimits = (scheme, limits) => {
     const wiredDevices = Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [];
     const boilers = Array.isArray(scheme?.boilers) ? scheme.boilers : [];
@@ -479,6 +531,12 @@ const getRelayStatsForLimits = (scheme, limits) => {
     };
 };
 
+/**
+ * Собирает сводную потребность схемы во всех типах портов и модулей.
+ * @param {object} scheme Анализируемая схема.
+ * @param {?string} controllerTypeOverride Проверяемый тип вместо текущего.
+ * @returns {object} Счетчики BUS, relay, 1-wire, DI, 4-20 и модулей.
+ */
 const getCompatibilityStats = (scheme, controllerTypeOverride = null) => {
     const controllerType = controllerTypeOverride || getControllerType(scheme);
     const wiredDevices = Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [];
@@ -517,6 +575,13 @@ const getPreferredGoControllerType = (scheme, upsRequested = false) => (
         : 'go'
 );
 
+/**
+ * Преобразует пользовательский выбор UPS в формат конкретного контроллера.
+ * @param {object} scheme Текущая схема.
+ * @param {string} controllerType Целевой контроллер.
+ * @param {boolean} upsRequested Требуется ли бесперебойное питание.
+ * @returns {object} Схема с актуальными power_modules.
+ */
 const materializeUpsIntentForController = (scheme, controllerType, upsRequested) => {
     const powerModules = materializePowerModules(scheme?.power_modules, controllerType, upsRequested);
     if (powerModules.length > 0) return { ...scheme, power_modules: powerModules };
@@ -536,6 +601,11 @@ const requiresProForBoilerCombination = (scheme) => {
 };
 
 // идентификация ecosmart
+/**
+ * Проверяет, помещается ли оборудование в фиксированные линии ECOsmart.
+ * @param {object} scheme Полная схема, включая устройства внутри модулей.
+ * @returns {boolean} Поддерживает ли ECOsmart такой состав оборудования.
+ */
 const isEcosmartIdentified = (scheme) => {
     const controller = scheme?.controller && typeof scheme.controller === 'object' ? scheme.controller : {};
     const extModules = Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [];
@@ -596,8 +666,8 @@ const getSmart2FreeDiPorts = (scheme) => {
     return Math.max(0, 4 - usedByUps - usedByDiModules - stats.di);
 };
 
-const getSmart2UsedDiPorts = (scheme) => {
-    const stats = getCompatibilityStats(scheme, 'smart2');
+const getSmart2UsedDiPorts = (scheme, preparedStats = null) => {
+    const stats = preparedStats || getCompatibilityStats(scheme, 'smart2');
     const usedByDiModules = (Array.isArray(scheme?.di_modules) ? scheme.di_modules : [])
         .map((moduleItem) => canonicalType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type))
         .filter((type) => type === 'rl2' || type === 'rl2s')
@@ -606,6 +676,13 @@ const getSmart2UsedDiPorts = (scheme) => {
     return usedByUps + usedByDiModules + stats.di;
 };
 
+/**
+ * Возвращает понятные пользователю причины несовместимости схемы с контроллером.
+ * @param {object} scheme Проверяемая схема.
+ * @param {?string} controllerTypeOverride Контроллер-кандидат вместо текущего.
+ * @param {boolean} upsRequested Требуется ли UPS.
+ * @returns {string[]} Список нарушенных ограничений.
+ */
 const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null, upsRequested = false) => {
     const controllerType = controllerTypeOverride || getControllerType(scheme);
     if (controllerType !== 'pro' && requiresProForBoilerCombination(scheme)) {
@@ -653,7 +730,7 @@ const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null,
     }
     addCapacityIssue('DI-входы', stats.di, limits.di);
     if (controllerType === 'smart2') {
-        const usedDiPorts = getSmart2UsedDiPorts(scheme);
+        const usedDiPorts = getSmart2UsedDiPorts(scheme, stats);
         if (usedDiPorts > 4) {
             issues.push(`DI-порты smart2: требуется ${usedDiPorts}, доступно 4.`);
         }
@@ -667,6 +744,13 @@ const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null,
     return issues;
 };
 
+/**
+ * Проверяет контроллер-кандидат и рассчитывает необходимые модули расширения.
+ * @param {object} scheme Исходная схема.
+ * @param {string} controllerType Тип контроллера-кандидата.
+ * @param {boolean} upsRequested Требуется ли UPS.
+ * @returns {{compatible: boolean, modules: string[]}} Результат подбора.
+ */
 const getControllerRecommendation = (scheme, controllerType, upsRequested = false) => {
     const baseLimits = CONTROLLER_LIMITS[controllerType];
     if (!baseLimits) return { compatible: false, modules: [] };
@@ -858,6 +942,11 @@ const withRequiredEcosmartBl2 = (scheme) => {
     };
 };
 
+/**
+ * Возвращает устройства удаляемых EXT-модулей в публичные массивы схемы.
+ * @param {object} scheme Схема с ext_modules.
+ * @returns {object} Схема с восстановленными устройствами, датчиками и котлами.
+ */
 const moveExtModuleDevicesToPublicLines = (scheme) => {
     const extModules = Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [];
     if (extModules.length === 0) return scheme;
@@ -929,6 +1018,11 @@ const withoutEcosmartStupidBoilerSensor = (scheme) => {
     };
 };
 
+/**
+ * Переносит подходящие проводные термостаты на встроенную EXT-линию ECOsmart.
+ * @param {object} scheme Схема ECOsmart.
+ * @returns {object} Схема с материализованной ext_devices.
+ */
 const moveEcosmartWiredThermostatsToExtLine = (scheme) => {
     if (getControllerType(scheme) !== 'ecosmart') return scheme;
     const wiredDevices = Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [];
@@ -968,6 +1062,11 @@ const moveEcosmartWiredThermostatsToExtLine = (scheme) => {
 
 // Откатывает внутренние ecosmart-материализации, чтобы при смене контроллера
 // устройства не терялись вместе с заменяемым объектом controller.
+/**
+ * Разворачивает внутренние линии ECOsmart перед переходом на другой контроллер.
+ * @param {object} scheme Материализованная схема ECOsmart.
+ * @returns {object} Публичное представление устройств.
+ */
 const unwindEcosmartInternals = (scheme) => {
     let nextScheme = scheme;
     const controller = nextScheme?.controller && typeof nextScheme.controller === 'object' ? nextScheme.controller : null;
@@ -1005,6 +1104,11 @@ const withControllerValue = (scheme, controllerValue) => {
     return { ...base, controller: controllerValue };
 };
 
+/**
+ * Приводит модули и размещение устройств к правилам текущего контроллера.
+ * @param {object} scheme Схема после выбора контроллера.
+ * @returns {object} Нормализованная схема.
+ */
 const normalizeModulesForController = (scheme) => {
     const controllerType = getControllerType(scheme);
     let nextScheme = scheme;
@@ -1061,6 +1165,13 @@ const normalizeModulesForController = (scheme) => {
     return nextScheme;
 };
 
+/**
+ * Строит нормализованную копию схемы для проверки контроллера-кандидата.
+ * @param {object} scheme Исходная схема.
+ * @param {string} controllerType Проверяемый контроллер.
+ * @param {boolean} upsRequested Требуется ли UPS.
+ * @returns {object} Схема-кандидат без изменения исходного объекта.
+ */
 const getControllerCandidateScheme = (scheme, controllerType, upsRequested = false) => {
     if (getControllerType(scheme) === controllerType) {
         return materializeUpsIntentForController(scheme, controllerType, upsRequested);
@@ -1075,6 +1186,11 @@ const getControllerCandidateScheme = (scheme, controllerType, upsRequested = fal
         : scheme;
 };
 
+/**
+ * Добавляет автоматически необходимые модули для текущего состава оборудования.
+ * @param {object} scheme Нормализуемая схема.
+ * @returns {object} Схема с рассчитанными EXT, DI и 1-wire модулями.
+ */
 const withRequiredModules = (scheme) => {
     scheme = normalizeModulesForController(scheme);
     const controllerType = getControllerType(scheme);
@@ -1257,6 +1373,12 @@ const getRequiredModuleCounts = (items) => (Array.isArray(items) ? items : []).r
     return counts;
 }, new Map());
 
+/**
+ * Согласует текущие автоматические модули с заново рассчитанным набором.
+ * @param {Array<object>} currentItems Текущий список, включая ручные модули.
+ * @param {Array<object>} requiredItems Новый расчет автоматических модулей.
+ * @returns {{items: Array<object>, changed: boolean}} Итоговый список и признак изменения.
+ */
 const reconcileRequiredModuleList = (currentItems, requiredItems) => {
     const requiredCounts = getRequiredModuleCounts(requiredItems);
     const retainedCounts = new Map();
@@ -1292,6 +1414,11 @@ const reconcileRequiredModuleList = (currentItems, requiredItems) => {
     return { items: result, changed };
 };
 
+/**
+ * Пересчитывает автоматические модули, сохраняя добавленные вручную.
+ * @param {object} scheme Текущая схема.
+ * @returns {object} Согласованная схема.
+ */
 const reconcileRequiredModules = (scheme) => {
     const withoutAutoModules = (items) => (Array.isArray(items)
         ? items.filter((moduleItem) => !isAutoRequiredModule(moduleItem))
@@ -1316,6 +1443,12 @@ const reconcileRequiredModules = (scheme) => {
     };
 };
 
+/**
+ * Выполняет полный цикл выбора контроллера, нормализации и подбора модулей.
+ * @param {object} scheme Входная схема после пользовательского изменения.
+ * @param {boolean} upsRequested Пользовательское требование UPS.
+ * @returns {object} Готовая согласованная схема.
+ */
 const resolveControllerAndRequiredModules = (scheme, upsRequested = false) => {
     const initialControllerType = getControllerType(scheme);
     const preferredGoControllerType = getPreferredGoControllerType(scheme, upsRequested);
@@ -1380,6 +1513,14 @@ const THERMOSTAT_COLORS = [
     { value: 'gray', label: 'Серый' },
 ];
 
+/**
+ * Создает шаблон термостата по подключению, цвету и наличию датчика пола.
+ * @param {object} options Параметры шаблона.
+ * @param {'wired'|'wireless'} options.target Способ подключения.
+ * @param {string} options.color Цвет корпуса.
+ * @param {boolean} options.hasFloorSensor Добавлять ли датчик пола.
+ * @returns {object} Шаблон карточки и устройства.
+ */
 const makeThermostatTemplate = ({ target, color, hasFloorSensor }) => ({
     label: `${target === 'wired' ? 'Проводной' : 'Беспроводной'} ${THERMOSTAT_COLORS.find((item) => item.value === color)?.label.toLowerCase()} термостат${hasFloorSensor ? ' с датчиком пола' : ''}`,
     target,
@@ -1405,6 +1546,11 @@ const makeBoilerSearchPayload = (query) => ({
     data: { name: query },
 });
 
+/**
+ * Приводит варианты ответа API поиска котлов к единому массиву.
+ * @param {*} data Непроверенный JSON-ответ сервера.
+ * @returns {Array<object>} Результаты с едиными id и name.
+ */
 const normalizeBoilerSearchResults = (data) => {
     const items = Array.isArray(data)
         ? data
@@ -1841,7 +1987,8 @@ const AddedDevicesTitle = ({ children }) => (
     <h3 style={{ margin: '0 0 14px', fontSize: 18, fontWeight: 500 }}>{children}</h3>
 );
 
-const ThermostatCard = ({ template, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd }) => (
+/** Карточка термостата: callbacks меняют цвет, датчик пола и добавляют устройство. */
+const ThermostatCard = ({ template, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, showJsonDetails = false }) => (
     <div
         className="sel-card"
         style={{
@@ -1915,7 +2062,7 @@ const ThermostatCard = ({ template, color, onColorChange, hasFloorSensor, onFloo
                     margin: '0 0 12px',
                 }}
             >
-{JSON.stringify(template.data, null, 4)}
+{showJsonDetails ? JSON.stringify(template.data, null, 4) : null}
             </pre>
             <button
                 onClick={onAdd}
@@ -1937,7 +2084,8 @@ const ThermostatCard = ({ template, color, onColorChange, hasFloorSensor, onFloo
     </div>
 );
 
-const TemperatureSensorCard = ({ options, selectedKey, onSelectKey, template, onAdd, stepper = null }) => (
+/** Карточка датчика: options задает варианты, selectedKey выбор, stepper счетчик. */
+const TemperatureSensorCard = ({ options, selectedKey, onSelectKey, template, onAdd, stepper = null, showJsonDetails = false }) => (
     <div
         className="sel-card"
         style={{
@@ -1989,7 +2137,7 @@ const TemperatureSensorCard = ({ options, selectedKey, onSelectKey, template, on
                 margin: '0 0 12px',
             }}
         >
-{JSON.stringify(template?.data, null, 4)}
+{showJsonDetails ? JSON.stringify(template?.data, null, 4) : null}
         </pre>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
@@ -2110,14 +2258,32 @@ const getTemperatureSensorTemplateKey = (device) => TEMPERATURE_SENSOR_TEMPLATES
     (template) => canonicalType(template.data.type) === canonicalType(device?.type),
 )?.key || null;
 
-const aggregateAddedItems = (items) => Object.values(items.reduce((acc, item) => {
-    const key = item.label;
-    if (!acc[key]) acc[key] = { label: item.label, count: 0, removeKeys: [], templateKey: item.templateKey || null };
-    acc[key].count += 1;
-    acc[key].removeKeys.push(item.removeKey);
-    return acc;
-}, {}));
+/**
+ * Агрегирует одинаковые позиции интерфейса и собирает ключи для удаления.
+ * @param {Array<object>} items Плоские позиции с label и removeKey.
+ * @returns {Array<object>} Строки со счетчиком и removeKeys.
+ */
+const aggregateAddedItems = (items) => Array.from(items.reduce((rows, item) => {
+    const row = rows.get(item.label) || {
+        label: item.label,
+        count: 0,
+        removeKeys: [],
+        templateKey: item.templateKey || null,
+    };
+    row.count += 1;
+    row.removeKeys.push(item.removeKey);
+    rows.set(item.label, row);
+    return rows;
+}, new Map()).values());
 
+/**
+ * Определяет подпись составной единицы оборудования по ее uid.
+ * @param {number|string} uidVal Идентификатор группы.
+ * @param {Array<object>} devices Устройства группы.
+ * @param {Array<object>} sensors Датчики схемы.
+ * @param {Array<object>} templates Шаблоны группы.
+ * @returns {string} Отображаемая подпись.
+ */
 const getGroupedUnitLabel = (uidVal, devices, sensors, templates) => {
     if (devices[0]?._label) return devices[0]._label;
 
@@ -2134,6 +2300,13 @@ const getGroupedUnitLabel = (uidVal, devices, sensors, templates) => {
     return getTemplateLabelByType(templates, devices[0]?.type, devices.map((device) => device.type).join(' + '));
 };
 
+/**
+ * Строит агрегированные строки устройств выбранной логической группы.
+ * @param {object} scheme Текущая схема.
+ * @param {string} group Имя группы.
+ * @param {Array<object>} templates Шаблоны распознавания.
+ * @returns {Array<object>} Строки для AddedDevicesBlock.
+ */
 const getGroupedDeviceRows = (scheme, group, templates) => {
     const wiredDevices = Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [];
     const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
@@ -2150,6 +2323,12 @@ const getGroupedDeviceRows = (scheme, group, templates) => {
     })));
 };
 
+/**
+ * Разделяет комплектные и платные температурные датчики для отображения.
+ * @param {object} scheme Текущая схема.
+ * @param {string} controllerType Тип контроллера, определяющий комплект.
+ * @returns {Array<object>} Агрегированные строки датчиков.
+ */
 const getTemperatureSensorRows = (scheme, controllerType) => {
     const isKitTemperatureSensor = (device) => getKitTemperatureSensorTemplateKey(device, controllerType) !== null;
     const wirelessTemperatureSensors = (Array.isArray(scheme?.wireless_devices) ? scheme.wireless_devices : [])
@@ -2259,6 +2438,12 @@ const getExpansionModuleRows = (incomingSchemeValue) => {
     }));
 };
 
+/**
+ * Формирует разделы коммерческого предложения из подобранной схемы.
+ * @param {object} incomingSchemeValue Публичная схема.
+ * @param {string} controllerType Тип контроллера для комплекта и цен.
+ * @returns {Array<object>} Разделы КП.
+ */
 const getEquipmentOfferSections = (incomingSchemeValue, controllerType) => {
     const sections = [];
     const wiredDevices = Array.isArray(incomingSchemeValue?.wired_devices) ? incomingSchemeValue.wired_devices : [];
@@ -2426,6 +2611,8 @@ const SelectionApp = () => {
         [compatibleControllerOptions],
     );
     const controllerType = getControllerType(incomingScheme);
+    // При уходе с автоматически выбранного GO+ снимает связанное с ним намерение UPS
+    // и повторно согласует контроллер и обязательные модули.
     useEffect(() => {
         if (upsRequestSourceRef.current !== 'go+' || controllerType === 'go+') return;
         upsRequestSourceRef.current = null;
@@ -2480,6 +2667,7 @@ const SelectionApp = () => {
         wirelessTemperatureSensorOptions.find((template) => template.key === wirelessTemperatureSensorKey) || wirelessTemperatureSensorOptions[0]
     ), [wirelessTemperatureSensorKey, wirelessTemperatureSensorOptions]);
 
+    /** Измеряет карточки PRO/ECOsmart и обновляет геометрию соединительной подсказки. */
     const measureControllerConnectors = useCallback(() => {
         const wrap = controllerWrapRef.current;
         const proEl = controllerCardRefs.current[3];
@@ -2511,20 +2699,41 @@ const SelectionApp = () => {
         });
     }, []);
 
+    // До отрисовки кадра измеряет карточки PRO/ECOsmart и пересчитывает соединитель;
+    // resize ограничен одним animation frame, cleanup снимает подписку.
     useLayoutEffect(() => {
-        measureControllerConnectors();
-        window.addEventListener('resize', measureControllerConnectors);
-        return () => window.removeEventListener('resize', measureControllerConnectors);
+        let frameId = null;
+        const scheduleMeasure = () => {
+            if (frameId !== null) return;
+            frameId = window.requestAnimationFrame(() => {
+                frameId = null;
+                measureControllerConnectors();
+            });
+        };
+        scheduleMeasure();
+        window.addEventListener('resize', scheduleMeasure);
+        return () => {
+            window.removeEventListener('resize', scheduleMeasure);
+            if (frameId !== null) window.cancelAnimationFrame(frameId);
+        };
     }, [measureControllerConnectors]);
 
+    // Следит за прокруткой и resize, чтобы показывать компактную закрепленную панель;
+    // измерения DOM выполняются не чаще одного раза за кадр.
     useEffect(() => {
+        let frameId = null;
         const updateControllerBarStuck = () => {
-            const wrap = controllerWrapRef.current;
-            const sticky = stickyTopRef.current;
-            if (!wrap || !sticky) return;
-            const stickyBottom = sticky.getBoundingClientRect().bottom;
-            const wrapBottom = wrap.getBoundingClientRect().bottom;
-            setIsControllerBarStuck(wrapBottom <= stickyBottom);
+            if (frameId !== null) return;
+            frameId = window.requestAnimationFrame(() => {
+                frameId = null;
+                const wrap = controllerWrapRef.current;
+                const sticky = stickyTopRef.current;
+                if (!wrap || !sticky) return;
+                const stickyBottom = sticky.getBoundingClientRect().bottom;
+                const wrapBottom = wrap.getBoundingClientRect().bottom;
+                const nextValue = wrapBottom <= stickyBottom;
+                setIsControllerBarStuck((currentValue) => (currentValue === nextValue ? currentValue : nextValue));
+            });
         };
         updateControllerBarStuck();
         window.addEventListener('scroll', updateControllerBarStuck, { passive: true });
@@ -2532,9 +2741,12 @@ const SelectionApp = () => {
         return () => {
             window.removeEventListener('scroll', updateControllerBarStuck);
             window.removeEventListener('resize', updateControllerBarStuck);
+            if (frameId !== null) window.cancelAnimationFrame(frameId);
         };
     }, []);
 
+    // После паузы во вводе ищет котлы по текущему запросу;
+    // cleanup отменяет debounce и предыдущий HTTP-запрос при изменении строки.
     useEffect(() => {
         const query = boilerQuery.trim();
         if (!query) {
@@ -2542,10 +2754,10 @@ const SelectionApp = () => {
             setBoilerSearchLoading(false);
             return;
         }
-        setBoilerSearchLoading(true);
         const controller = new AbortController();
         const timer = setTimeout(async () => {
             try {
+                setBoilerSearchLoading(true);
                 const res = await fetch(BOILER_SEARCH_ENDPOINT, {
                     method: 'POST',
                     headers: {
@@ -2619,6 +2831,7 @@ const SelectionApp = () => {
         });
     }, []);
 
+    /** Добавляет составное устройство и связанные датчики; group задает логическую группу. */
     const addMixingUnit = useCallback((template, group = 'mixing') => {
         setIncomingScheme((prev) => {
             const unitUid = uid();
@@ -2708,6 +2921,7 @@ const SelectionApp = () => {
         });
     }, []);
 
+    /** Переключает единый шлейф и при включении оставляет только один датчик протечки. */
     const setUnifiedLeakLoop = useCallback((enabled) => {
         setIncomingScheme((prev) => {
             const sensors = Array.isArray(prev.sensors) ? prev.sensors : [];
@@ -2737,6 +2951,7 @@ const SelectionApp = () => {
         setIncomingScheme((prev) => resolveSelectionScheme(prev, enabled));
     }, []);
 
+    /** Удаляет устройство с идентификатором id из массива target либо из EXT-линии. */
     const removeSchemeItemById = useCallback((target, id) => {
         setIncomingScheme((prev) => {
             if (target === 'ext_devices') {
@@ -2757,6 +2972,7 @@ const SelectionApp = () => {
         });
     }, []);
 
+    /** Строит счетчик составных устройств указанного шаблона и группы. */
     const renderUnitStepper = (template, group, templates) => {
         const row = getGroupedDeviceRows(incomingScheme, group, templates)
             .find((item) => item.label === template.label);
@@ -2770,6 +2986,7 @@ const SelectionApp = () => {
         );
     };
 
+    /** Строит счетчик однотипных элементов массива target. */
     const renderItemStepper = (target, type, onIncrement, disabled = false) => {
         const items = (Array.isArray(incomingScheme[target]) ? incomingScheme[target] : [])
             .filter((item) => canonicalType(item?.type) === canonicalType(type));
@@ -2784,6 +3001,7 @@ const SelectionApp = () => {
         );
     };
 
+    /** Переключает controllerValue и синхронизирует UPS и обязательные модули. */
     const setController = useCallback((controllerValue) => {
         const targetControllerType = canonicalType(controllerValue?.type);
         let requested = upsRequestedRef.current;
@@ -2799,7 +3017,7 @@ const SelectionApp = () => {
             setUpsRequested(requested);
         }
         setIncomingScheme((prev) => resolveSelectionScheme(withControllerValue(prev, controllerValue), requested));
-    }, [controllerType, resolveSelectionScheme]);
+    }, [resolveSelectionScheme]);
 
     const clearScheme = useCallback(() => {
         upsRequestSourceRef.current = null;
@@ -2811,7 +3029,12 @@ const SelectionApp = () => {
         setBuildSchemeError('');
     }, []);
 
+    /** Сохраняет согласованную схему и открывает ее редактор в новой вкладке. */
     const buildScheme = useCallback(async () => {
+        if (controllerCompatibilityIssues.length > 0) {
+            setBuildSchemeError('Сначала устраните несовместимость оборудования с выбранным контроллером.');
+            return;
+        }
         setIsBuildingScheme(true);
         setBuildSchemeError('');
 
@@ -2856,7 +3079,7 @@ const SelectionApp = () => {
             setBuildSchemeError(error instanceof Error ? error.message : 'Не удалось сохранить схему');
             setIsBuildingScheme(false);
         }
-    }, [incomingScheme]);
+    }, [controllerCompatibilityIssues, incomingScheme]);
 
     return (
         <div
@@ -2939,17 +3162,17 @@ const SelectionApp = () => {
                     </button>
                     <button
                         onClick={buildScheme}
-                        disabled={isBuildingScheme}
+                        disabled={isBuildingScheme || controllerCompatibilityIssues.length > 0}
                         style={{
                             padding: '10px 16px',
                             border: '1px solid #3498db',
                             borderRadius: 8,
                             background: '#3498db',
                             color: '#fff',
-                            cursor: isBuildingScheme ? 'not-allowed' : 'pointer',
+                            cursor: isBuildingScheme || controllerCompatibilityIssues.length > 0 ? 'not-allowed' : 'pointer',
                             fontSize: 14,
                             fontWeight: 700,
-                            opacity: isBuildingScheme ? 0.72 : 1,
+                            opacity: isBuildingScheme || controllerCompatibilityIssues.length > 0 ? 0.72 : 1,
                         }}
                     >
                         {isBuildingScheme ? 'Сохраняем...' : 'Построить схему'}
@@ -3341,7 +3564,7 @@ const SelectionApp = () => {
                                     margin: 0,
                                 }}
                             >
-{JSON.stringify({ wired_device: item.wiredDevice, sensors: item.sensors }, null, 4)}
+{showJsonDetails ? JSON.stringify({ wired_device: item.wiredDevice, sensors: item.sensors }, null, 4) : null}
                             </pre>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                 <button
@@ -3401,7 +3624,7 @@ const SelectionApp = () => {
                                     margin: 0,
                                 }}
                             >
-{JSON.stringify({ wired_device: item.wiredDevice, sensors: item.sensors }, null, 4)}
+{showJsonDetails ? JSON.stringify({ wired_device: item.wiredDevice, sensors: item.sensors }, null, 4) : null}
                             </pre>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                 <button
@@ -3461,7 +3684,7 @@ const SelectionApp = () => {
                                     margin: 0,
                                 }}
                             >
-{JSON.stringify(item.wiredDevice, null, 4)}
+{showJsonDetails ? JSON.stringify(item.wiredDevice, null, 4) : null}
                             </pre>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                 <button
@@ -3503,6 +3726,7 @@ const SelectionApp = () => {
                         hasFloorSensor={wiredThermostatHasFloorSensor}
                         onFloorSensorChange={setWiredThermostatHasFloorSensor}
                         onAdd={() => addThermostat(wiredThermostatTemplate)}
+                        showJsonDetails={showJsonDetails}
                     />
                     <ThermostatCard
                         template={wirelessThermostatTemplate}
@@ -3511,6 +3735,7 @@ const SelectionApp = () => {
                         hasFloorSensor={wirelessThermostatHasFloorSensor}
                         onFloorSensorChange={setWirelessThermostatHasFloorSensor}
                         onAdd={() => addThermostat(wirelessThermostatTemplate)}
+                        showJsonDetails={showJsonDetails}
                     />
                 </div>
 
@@ -3568,7 +3793,7 @@ const SelectionApp = () => {
                                         margin: 0,
                                     }}
                                 >
-{JSON.stringify(item.wiredDevice, null, 4)}
+{showJsonDetails ? JSON.stringify(item.wiredDevice, null, 4) : null}
                             </pre>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                     <button
@@ -3627,7 +3852,7 @@ const SelectionApp = () => {
                                     margin: 0,
                                 }}
                             >
-{JSON.stringify(item.wiredDevice, null, 4)}
+{showJsonDetails ? JSON.stringify(item.wiredDevice, null, 4) : null}
                             </pre>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                 <button
@@ -3667,6 +3892,7 @@ const SelectionApp = () => {
                         onSelectKey={setWiredTemperatureSensorKey}
                         template={wiredTemperatureSensorTemplate}
                         onAdd={() => addTemperatureSensor(wiredTemperatureSensorTemplate)}
+                        showJsonDetails={showJsonDetails}
                         stepper={wiredTemperatureSensorTemplate ? renderItemStepper(
                             wiredTemperatureSensorTemplate.target,
                             wiredTemperatureSensorTemplate.data.type,
@@ -3679,6 +3905,7 @@ const SelectionApp = () => {
                         onSelectKey={setWirelessTemperatureSensorKey}
                         template={wirelessTemperatureSensorTemplate}
                         onAdd={() => addTemperatureSensor(wirelessTemperatureSensorTemplate)}
+                        showJsonDetails={showJsonDetails}
                         stepper={wirelessTemperatureSensorTemplate ? renderItemStepper(
                             wirelessTemperatureSensorTemplate.target,
                             wirelessTemperatureSensorTemplate.data.type,
@@ -3722,7 +3949,7 @@ const SelectionApp = () => {
                                     margin: 0,
                                 }}
                             >
-{JSON.stringify(item.data, null, 4)}
+{showJsonDetails ? JSON.stringify(item.data, null, 4) : null}
                             </pre>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                 <button
@@ -3802,7 +4029,7 @@ const SelectionApp = () => {
                                     margin: 0,
                                 }}
                             >
-{JSON.stringify(item.data, null, 4)}
+{showJsonDetails ? JSON.stringify(item.data, null, 4) : null}
                             </pre>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                 <button
@@ -3866,7 +4093,7 @@ const SelectionApp = () => {
                                     margin: 0,
                                 }}
                             >
-{JSON.stringify(item.data, null, 4)}
+{showJsonDetails ? JSON.stringify(item.data, null, 4) : null}
                             </pre>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                 <button

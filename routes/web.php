@@ -140,6 +140,8 @@ Route::post('/api/boilers/search', function (Request $request) use ($integration
         ->header('Content-Type', 'application/json');
 })->name('boilers.search');
 
+Route::view('/svg-editor', 'svg-editor')->name('svg-editor');
+
 Route::view('/selection', 'selection')->name('selection');
 Route::view('/selection-old', 'selection-old')->name('selection-old');
 Route::view('/scheme', 'spa', ['scheme' => null])->name('scheme');

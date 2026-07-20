@@ -19,7 +19,7 @@ import commentIconPath from '../assets/icons/comment-icon.svg';
 import commentAddIconPath from '../assets/icons/comment-add-icon.svg';
 import logoPath from '../assets/logo/logo.svg';
 
-Konva.pixelRatio = Math.max(2, window.devicePixelRatio || 1);
+Konva.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
 
 const NAV_HEIGHT = 64;
 const ACTIVE_INDICATOR_COLOR = '#00DA00';
@@ -43,6 +43,8 @@ const isPortDotCircle = ({ fill, radius, listening }) => (
 const Circle = ({ fill, radius, listening, ...props }) => {
     const circleRef = useRef(null);
 
+    // После каждого рендера выносит служебную красную точку порта поверх слоя;
+    // cleanup удаляет предыдущий overlay и возвращает видимость исходному узлу.
     useLayoutEffect(() => {
         const node = circleRef.current;
         if (!node || !isPortDotCircle({ fill, radius, listening })) return undefined;
@@ -79,6 +81,12 @@ const getCanvasSize = () => ({
     height: Math.max(window.innerHeight - NAV_HEIGHT, 240),
 });
 
+/**
+ * Масштабирует сцену относительно экранной точки, оставляя объект под курсором на месте.
+ * @param {Konva.Stage} stage Сцена Konva.
+ * @param {{x: number, y: number}} point Точка масштабирования в координатах сцены.
+ * @param {number} nextScale Требуемый масштаб; функция ограничит его диапазоном 0.4-3.
+ */
 const scaleStageAtPoint = (stage, point, nextScale) => {
     const oldScale = stage.scaleX();
     const clampedScale = Math.max(0.4, Math.min(nextScale, 3));
@@ -138,6 +146,11 @@ const createGridPatternImage = (step) => {
     return canvas;
 };
 
+/**
+ * Приводит входной JSON к внутренней модели редактора и материализует распределенные линии.
+ * @param {object} sourceScheme Публичная incoming_scheme, включая возможные legacy-поля.
+ * @returns {object} Схема, готовая для отрисовки и ручного редактирования.
+ */
 const buildSchemeFromIncoming = (sourceScheme) => {
     const withRinnaiAdapter = (boiler) => (
         String(boiler?.name || '').toLowerCase().includes('rinnai')
@@ -224,6 +237,12 @@ const getPublicDeviceKey = (device) => {
     return device.id != null ? `${type}:id:${device.id}` : `${type}:${JSON.stringify(device)}`;
 };
 
+/**
+ * Добавляет устройства в массив без повторов по типу и id либо содержимому объекта.
+ * @param {Array<object>} items Исходные устройства.
+ * @param {Array<object>} devicesToAppend Устройства, которые нужно добавить.
+ * @returns {Array<object>} Новый массив без дубликатов.
+ */
 const appendUniqueDevices = (items, devicesToAppend) => {
     const result = Array.isArray(items) ? [...items] : [];
     const existingKeys = new Set(result.map(getPublicDeviceKey).filter(Boolean));
@@ -244,6 +263,11 @@ const normalizePublicEcosmartSensor = (device) => {
     return { ...device, type };
 };
 
+/**
+ * Сворачивает внутренние линии редактора обратно в публичный формат API.
+ * @param {object} schemeValue Внутренняя материализованная схема.
+ * @returns {object} incoming_scheme без служебных линий ECOsmart.
+ */
 const getPublicIncomingScheme = (schemeValue) => {
     if (!schemeValue || typeof schemeValue !== 'object') return schemeValue;
     const { ecosmart_bl2: rootEcosmartBl2, ...publicScheme } = schemeValue;
@@ -315,6 +339,17 @@ const getWirelessLineGap = (controllerType, moduleHeightValue) => (
 const getWirelessSlotY = (controllerType, slotHeight, moduleHeightValue) => (
     -getWirelessLineGap(controllerType, moduleHeightValue) - slotHeight
 );
+/**
+ * Вычисляет Y беспроводного слота с учетом контроллера и предыдущих устройств.
+ * @param {Array<object>} devices Устройства беспроводной линии.
+ * @param {number} index Индекс рассчитываемого слота.
+ * @param {boolean} showEmptySlots Включен ли режим пустых слотов.
+ * @param {string} controllerType Тип контроллера.
+ * @param {number} moduleHeightValue Базовая высота контроллера.
+ * @param {number} indentSize Шаг сетки.
+ * @param {number} slotHeight Высота текущего слота.
+ * @returns {number} Координата Y.
+ */
 const getWirelessSlotYByIndex = (devices, index, showEmptySlots, controllerType, moduleHeightValue, indentSize, slotHeight) => {
     if (controllerType !== 'ecosmart') return getWirelessSlotY(controllerType, slotHeight, moduleHeightValue);
     const getSlotHeight = (device) => {
@@ -331,6 +366,15 @@ const getWirelessSlotYByIndex = (devices, index, showEmptySlots, controllerType,
     }
     return y;
 };
+/**
+ * Находит верхнюю границу беспроводной линии для общего информационного блока.
+ * @param {Array<object>} devices Устройства линии.
+ * @param {boolean} showEmptySlots Учитывать ли слот добавления.
+ * @param {string} controllerType Тип контроллера.
+ * @param {number} moduleHeightValue Высота контроллера.
+ * @param {number} indentSize Шаг сетки.
+ * @returns {number} Минимальная координата Y линии.
+ */
 const getWirelessLineTop = (devices, showEmptySlots, controllerType, moduleHeightValue, indentSize) => {
     const slotTops = (Array.isArray(devices) ? devices : []).map((device, index) => {
         const hasFloorSensor = Array.isArray(device?.additions) && device.additions.length > 0;
@@ -349,6 +393,16 @@ const getWirelessLineTop = (devices, showEmptySlots, controllerType, moduleHeigh
 const getWirelessInfoBlockY = (wirelessLineTop) => (
     wirelessLineTop - WIRELESS_INFOBLOCK_BOTTOM_GAP - WIRELESS_INFOBLOCK_HEIGHT
 );
+/**
+ * Вычисляет X беспроводного слота по ширинам предшествующих устройств.
+ * @param {Array<object>} devices Устройства линии.
+ * @param {number} index Индекс слота.
+ * @param {boolean} showEmptySlots Включен ли режим пустых слотов.
+ * @param {?string} controllerType Тип контроллера.
+ * @param {number} indentSize Шаг сетки.
+ * @param {?number} slotWidth Рассчитанная ширина текущего слота.
+ * @returns {number} Координата X.
+ */
 const getWirelessSlotX = (devices, index, showEmptySlots, controllerType = null, indentSize = 8, slotWidth = null) => {
     if (controllerType === 'ecosmart') {
         const width = slotWidth ?? getWirelessSlotWidth(devices[index] || null, showEmptySlots);
@@ -478,10 +532,16 @@ const CONTROLLER_KIT_SENSOR_LIMITS = {
     go: { wall: 1 },
     'go+': { wireless: 1 },
 };
+const CONTROLLER_KIT_SENSOR_PRODUCTS = {
+    wall: 'Датчик температуры настенный проводной',
+    flask: 'Датчик температуры в колбе проводной',
+    ntc: 'Датчик температуры в колбе NTC 10K',
+    wireless: 'Радиодатчик температуры и влажности комнатный',
+};
 const getControllerKitSensorBucket = (controllerType, type) => {
     if (controllerType === 'pro') {
         if (type === 'wall-digital-sensor') return 'wall';
-        if (['flask-sensor-temperature', 'flask-sensor-gvs-boiler', 'flask-sensor-strategy', 'flask-sensor-mixing-unit', 'flask-sensor-stupid-boiler'].includes(type)) return 'flask';
+        if (['flask-sensor', 'flask-sensor-temperature', 'flask-sensor-gvs-boiler', 'flask-sensor-strategy', 'flask-sensor-mixing-unit', 'flask-sensor-stupid-boiler'].includes(type)) return 'flask';
     }
     if ((controllerType === 'smart2' || controllerType === 'go') && type === 'wall-digital-sensor') return 'wall';
     if (controllerType === 'ecosmart' && ['ntc-sensor', 'mixing-ntc-sensor', 'flask-sensor-gvs-boiler', 'flask-sensor-strategy'].includes(type)) return 'ntc';
@@ -491,7 +551,7 @@ const getControllerKitSensorBucket = (controllerType, type) => {
 const getSensorIdentity = (device) => (
     device?.id != null ? `${canonicalDeviceType(device.type)}:${device.id}` : null
 );
-const getBundledSensorDevices = (scheme, controllerType) => {
+const getControllerKitSensorState = (scheme, controllerType) => {
     const limits = CONTROLLER_KIT_SENSOR_LIMITS[controllerType] || {};
     const remaining = { ...limits };
     const controller = scheme?.controller || {};
@@ -512,7 +572,7 @@ const getBundledSensorDevices = (scheme, controllerType) => {
         if (identity) bundled.add(identity);
         remaining[bucket] -= 1;
     });
-    return bundled;
+    return { bundled, remaining };
 };
 const isBundledSensorDevice = (bundledSensors, device) => (
     bundledSensors.has(device) || bundledSensors.has(getSensorIdentity(device))
@@ -655,6 +715,9 @@ const getInstallationDeviceLabel = (device, fallback = 'Подключение')
 };
 const getInstallationItemLabel = (item) => {
     if (!item) return null;
+    if (typeof item.installationLabel === 'string' && item.installationLabel.trim()) {
+        return item.installationLabel.trim();
+    }
     const type = canonicalDeviceType(item.type);
     if (item.key === 'controller') return INSTALLATION_DEVICE_TYPE_TITLES[type] || String(item.type || 'Контроллер').toUpperCase();
     return getInstallationDeviceLabel(item.data, INSTALLATION_DEVICE_TYPE_TITLES[type] || type || 'Модуль');
@@ -683,6 +746,11 @@ const ONE_WIRE_SLOT_FAKE_PORTS = [
     { name: '1-WIRE-GND', x: 24, y: 72 },
 ];
 
+/**
+ * Выбирает безопасный уровень ортогонального изгиба 1-wire линии.
+ * @param {object} options Геометрия соединения: границы слота, отступ и координаты концов.
+ * @returns {number} Координата Y изгиба.
+ */
 const getOneWireBendY = ({ slotTop, slotHeight, offset, fromY, toY, isTargetThermostat = false, sourceMinBendY = null }) => {
     const minBendY = Math.max(fromY, toY) + offset;
     if (isTargetThermostat) {
@@ -729,10 +797,32 @@ const getOneWirePortColor = (name) => {
     return '#212121';
 };
 
+/**
+ * Подбирает цвет монтажного провода по имени терминала и типу владельца порта.
+ * @param {string} name Имя SVG-порта с семантическими тегами.
+ * @param {object} item Элемент монтажной схемы.
+ * @returns {string} CSS-цвет линии.
+ */
 const getInstallationPortLineColor = (name, item) => {
     const [terminal, ...tags] = String(name || '').toUpperCase().trim().split(/\s+/);
     const tag = tags.join(' ');
     const itemType = canonicalDeviceType(item?.type || item?.data?.type);
+
+    if (itemType === 'io4') {
+        if (/^CHANNEL-\d+-\d+-V\+$/.test(terminal)) return '#d32f2f';
+        if (/^CHANNEL-\d+-\d+-GND$/.test(terminal)) return '#212121';
+        const channelMatch = /^CHANNEL-IN-(\d+)$/.exec(terminal);
+        if (channelMatch) {
+            const channelIndex = Number(channelMatch[1]) - 1;
+            const data = item?.data && typeof item.data === 'object' ? item.data : {};
+            const device = (Array.isArray(data.channel_devices) ? data.channel_devices[channelIndex] : null)
+                || (Array.isArray(data.devices_420) ? data.devices_420[channelIndex] : null)
+                || (Array.isArray(data.ai_devices) ? data.ai_devices[channelIndex] : null);
+            const type = canonicalDeviceType(device?.type);
+            const connectionTypes = String(device?.connection_type || '').toLowerCase().split('|').map((value) => value.trim());
+            return type === 'pressure-sensor' || connectionTypes.includes('4-20') ? '#f57c00' : '#1565c0';
+        }
+    }
 
     if (itemType === 'ecosmart') {
         if (/^NTC-\d+-A$/.test(terminal)) return '#212121';
@@ -755,6 +845,8 @@ const getInstallationPortLineColor = (name, item) => {
     if (terminal === '1-WIRE-V+') return '#d32f2f';
     if (terminal === '1-WIRE-DAT') return '#fbc02d';
     if (terminal === '1-WIRE-GND') return '#212121';
+    if (/^EXT-(?:IN-|OUT-)?A$/.test(terminal)) return '#fbc02d';
+    if (/^EXT-(?:IN-|OUT-)?B$/.test(terminal)) return '#2e7d32';
     if (/^NTC-\d+-A$/.test(terminal)) return '#212121';
     if (/^NTC-\d+-B$/.test(terminal)) return '#464EE3';
     if (/^4-20.*-V\+$/.test(terminal)) return '#d32f2f';
@@ -776,6 +868,11 @@ const getInstallationPortLineColor = (name, item) => {
 // Экзотические/составные имена (ecosmart-оверлеи, силовые L/N и т.п.) не
 // распознаются и намеренно считаются «занятыми», чтобы не терять хвостики
 // в кейсах, которые эта эвристика не покрывает.
+/**
+ * Разбирает имя физического SVG-порта в логическую линию и индекс устройства.
+ * @param {string} name Полное имя порта.
+ * @returns {?object} Описание линии либо null.
+ */
 const parseInstallationPortSlot = (name) => {
     // Имя класса порта может нести семантические теги через пробел
     // (напр. «RELAY-2-A 220PUMP», «NTC-1-A CASCADE», «RELAY-S-1-A VALVE» у ecosmart).
@@ -842,6 +939,47 @@ const parseInstallationPortSlot = (name) => {
     return null;
 };
 
+const getIo4SharedTerminalDevices = (data, indexes, portName) => {
+    const normalizedPortName = String(portName || '').toUpperCase();
+    const devices = indexes
+        .map((index) => (
+            (Array.isArray(data?.channel_devices) ? data.channel_devices[index] : null)
+            || (Array.isArray(data?.devices_420) ? data.devices_420[index] : null)
+            || (Array.isArray(data?.ai_devices) ? data.ai_devices[index] : null)
+        ))
+        .filter(Boolean);
+    const uniqueDevices = devices.filter((device, index, items) => items.findIndex((candidate) => (
+        candidate === device
+        || (candidate?.id != null && device?.id != null && candidate.id === device.id)
+    )) === index);
+
+    return uniqueDevices.filter((device) => {
+        const type = canonicalDeviceType(device?.type);
+        const connectionTypes = String(device?.connection_type || '')
+            .toLowerCase()
+            .split('|')
+            .map((value) => value.trim());
+        if (normalizedPortName.endsWith('-V+')) {
+            return type === 'pressure-sensor' || connectionTypes.includes('4-20');
+        }
+        if (normalizedPortName.endsWith('-GND')) {
+            return type === 'ntc-sensor'
+                || type === 'boiler-ntc-sensor'
+                || type === 'mixing-ntc-sensor'
+                || type === '010pump'
+                || type === '010servo'
+                || connectionTypes.includes('ntc');
+        }
+        return true;
+    });
+};
+
+/**
+ * Проверяет, занят ли физический порт в режиме монтажной схемы.
+ * @param {object} item Монтажный элемент с данными устройства.
+ * @param {object} port Разобранный SVG-порт.
+ * @returns {boolean} Нужно ли рисовать подключение.
+ */
 const isInstallationPortOccupied = (item, port) => {
     const slot = parseInstallationPortSlot(port?.name);
     // DI-линии коммутации ИБП с контроллером подключены всегда.
@@ -885,7 +1023,12 @@ const isInstallationPortOccupied = (item, port) => {
         return Array.isArray(item?.upsDiPortIndexes) && item.upsDiPortIndexes.includes(slot.index);
     }
     if (slot.line === 'channel') return hasAtIndex(data.channel_devices, slot.index) || hasAtIndex(data.devices_420, slot.index) || hasAtIndex(data.ai_devices, slot.index);
-    if (slot.line === 'channelRange') return slot.indexes.some((index) => hasAtIndex(data.channel_devices, index) || hasAtIndex(data.devices_420, index) || hasAtIndex(data.ai_devices, index));
+    if (slot.line === 'channelRange') {
+        if (canonicalDeviceType(item?.type) === 'io4') {
+            return getIo4SharedTerminalDevices(data, slot.indexes, port?.name).length > 0;
+        }
+        return slot.indexes.some((index) => hasAtIndex(data.channel_devices, index) || hasAtIndex(data.devices_420, index) || hasAtIndex(data.ai_devices, index));
+    }
     if (slot.line === '420') return hasAtIndex(data.devices_420, slot.index) || hasAtIndex(data.devices420, slot.index);
     if (slot.line === 'ai') return hasAtIndex(data.ai_devices, slot.index);
     if (slot.line === 'modbus') return hasAtIndex(data.modbus_devices, null);
@@ -911,6 +1054,13 @@ const INSTALLATION_CONTROLLERS = new Set(['go', 'go+', 'smart2', 'pro', 'ecosmar
 // блоком слева от щитка, а не в ряду рейки.
 const INSTALLATION_LEFT_CONTROLLERS = new Set(['go', 'go+', 'ecosmart']);
 
+/**
+ * Возвращает подпись устройства или соседнего модуля на другом конце порта.
+ * @param {object} item Монтажный элемент.
+ * @param {object} port SVG-порт элемента.
+ * @param {object} options Подписи соседей в цепях EXT, 1-wire, питания и UPS.
+ * @returns {?string} Текст подключения либо null.
+ */
 const getInstallationPortConnectionLabel = (item, port, options = {}) => {
     const slot = parseInstallationPortSlot(port?.name);
     const data = item?.data;
@@ -988,6 +1138,17 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
             || getLabel(getAtIndex(data.ai_devices, slot.index), 'AI');
     }
     if (slot.line === 'channelRange') {
+        if (canonicalDeviceType(item?.type) === 'io4') {
+            const connections = slot.indexes.flatMap((index) => (
+                getIo4SharedTerminalDevices(data, [index], port?.name)
+                    .map((device) => ({ device, channel: index + 1 }))
+            ));
+            const labels = connections.map(({ device, channel }) => {
+                const label = getInstallationDeviceLabel(device, 'Канал');
+                return connections.length > 1 ? `CH${channel}: ${label}` : label;
+            });
+            return labels.join(' / ') || null;
+        }
         const device = slot.indexes
             .map((index) => getAtIndex(data.channel_devices, index) || getAtIndex(data.devices_420, index) || getAtIndex(data.ai_devices, index))
             .find(Boolean);
@@ -1031,6 +1192,11 @@ const getOtherEquipmentExitDirection = (device, imageKey) => {
     if (device?.port_side === 'right') return 1;
     return 0;
 };
+/**
+ * Строит точки relay-линии к устройству с учетом стороны его входного порта.
+ * @param {object} geometry Координаты концов, изгиба, устройство и шаг сетки.
+ * @returns {number[]} Точки для Konva Line.
+ */
 const getRelayLinkPointsToDevice = ({ fromX, fromY, bendY, toX, toY, device, imageKey, indentSize }) => {
     const exitDirection = getOtherEquipmentExitDirection(device, imageKey);
     if (!exitDirection) return getOrthogonalLinkPoints(fromX, fromY, bendY, toX, toY);
@@ -1042,6 +1208,12 @@ const getRelayLinkPointsFromDevice = ({ fromX, fromY, toX, toY, device, imageKey
 };
 const snapToGrid = (value, step) => Math.round(value / step) * step;
 const NTC_LINE_SLOTS_COUNT = 3;
+/**
+ * Извлекает конфигурацию обычных relay-слотов из SVG-портов контроллера.
+ * @param {string} controllerType Тип контроллера.
+ * @param {Array<object>} portsList Порты изображения контроллера.
+ * @returns {object} Геометрия и емкость relay-линии.
+ */
 const getRelayLineConfig = (controllerType, portsList) => {
     if (!Array.isArray(portsList)) return [];
     if (controllerType === 'ecosmart') {
@@ -1171,6 +1343,11 @@ const getOfferTemperatureProduct = (type, controllerType) => {
     return null;
 };
 
+/**
+ * Собирает позиции коммерческого предложения из всего дерева схемы.
+ * @param {object} scheme Полная внутренняя схема.
+ * @returns {Array<object>} Непустые разделы КП.
+ */
 const getSchemeOfferSections = (scheme) => {
     const rowsBySection = { controller: [], modules: [], equipment: [] };
     const counts = new Map();
@@ -1338,12 +1515,31 @@ const App = () => {
     const zoomLastDrawAtRef = useRef(0);
     const gestureZoomRef = useRef(null);
 
+    // Один раз подписывается на resize окна и не чаще кадра синхронизирует размер Stage;
+    // cleanup снимает обработчик и отменяет незавершенный animation frame.
     useEffect(() => {
-        const handleResize = () => setCanvasSize(getCanvasSize());
+        let frameId = null;
+        const handleResize = () => {
+            if (frameId !== null) return;
+            frameId = window.requestAnimationFrame(() => {
+                frameId = null;
+                const nextSize = getCanvasSize();
+                setCanvasSize((currentSize) => (
+                    currentSize.width === nextSize.width && currentSize.height === nextSize.height
+                        ? currentSize
+                        : nextSize
+                ));
+            });
+        };
         window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            if (frameId !== null) window.cancelAnimationFrame(frameId);
+        };
     }, []);
 
+    // Один раз подключает нативные Safari gesture-события к контейнеру Konva;
+    // cleanup удаляет все три обработчика масштабирования.
     useEffect(() => {
         const stage = stageRef.current;
         const container = stage?.container();
@@ -1384,6 +1580,8 @@ const App = () => {
         };
     }, []);
 
+    // При смене id маршрута загружает схему, если сервер не внедрил ее в страницу;
+    // cleanup отменяет незавершенный запрос через AbortController.
     useEffect(() => {
         if (!routeSchemeId) return undefined;
         if (initialSchemeRecord?.incoming_scheme) return undefined;
@@ -1427,16 +1625,30 @@ const App = () => {
         return () => controller.abort();
     }, [routeSchemeId, initialSchemeRecord]);
 
+    // При смене контроллера загружает его SVG и координаты портов;
+    // cleanup не дает устаревшей загрузке перезаписать новый контроллер.
     useEffect(() => {
         const path = controllerImagePaths[controllerType];
         if (!path) return;
+        let cancelled = false;
         setPorts([]);
         const img = new window.Image();
-        img.onload = () => setControllerImage(img);
+        img.onload = () => {
+            if (!cancelled) setControllerImage(img);
+        };
         img.src = path;
-        parsePorts(path).then(setPorts).catch(() => {});
+        parsePorts(path)
+            .then((nextPorts) => {
+                if (!cancelled) setPorts(nextPorts);
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+            img.onload = null;
+        };
     }, [controllerType]);
 
+    // Один раз предзагружает изображения всех типов устройств и разбирает их SVG-порты.
     useEffect(() => {
         Object.entries(wirelessDeviceImagePaths).forEach(([type, path]) => {
             const img = new window.Image();
@@ -1452,24 +1664,28 @@ const App = () => {
         });
     }, []);
 
+    // Один раз загружает изображение общей радиоантенны.
     useEffect(() => {
         const img = new window.Image();
         img.onload = () => setAerialImage(img);
         img.src = aerialImagePath;
     }, []);
 
+    // Один раз загружает отдельное изображение радиоантенны контроллера GO.
     useEffect(() => {
         const img = new window.Image();
         img.onload = () => setGoAerialImage(img);
         img.src = goAerialImagePath;
     }, []);
 
+    // Один раз загружает иконку существующего комментария для информационных блоков.
     useEffect(() => {
         const img = new window.Image();
         img.onload = () => setCommentIconImage(img);
         img.src = commentIconPath;
     }, []);
 
+    // Один раз загружает иконку добавления комментария для информационных блоков.
     useEffect(() => {
         const img = new window.Image();
         img.onload = () => setCommentAddIconImage(img);
@@ -1487,7 +1703,7 @@ const App = () => {
                 gridLayer.visible(false);
             }
             commentIconNodes.forEach((node) => node.visible(false));
-            stage.batchDraw();
+            stage.draw();
             const { downloadStagePdf } = await import('./scheme/export/pdfExport');
             downloadStagePdf(stage);
         } catch (error) {
@@ -1518,16 +1734,22 @@ const App = () => {
         }
     };
 
+    // При изменении схемы обновляет текст JSON только когда панель открыта
+    // и пользователь еще не начал ручное редактирование текста.
     useEffect(() => {
-        if (schemeJsonDirty) return;
+        if (schemeJsonDirty || !showIncomingScheme) return;
         setSchemeJsonText(JSON.stringify(getPublicIncomingScheme(scheme), null, 2));
-    }, [scheme, schemeJsonDirty]);
+    }, [scheme, schemeJsonDirty, showIncomingScheme]);
 
     const closeHelpModal = () => {
         window.localStorage?.setItem(HELP_MODAL_STORAGE_KEY, '1');
         setShowHelpModal(false);
     };
 
+    /**
+     * Переключает обычный и монтажный режимы, подготавливая morph-анимацию.
+     * @param {boolean} enabled Требуемое состояние монтажного режима.
+     */
     const setInstallationModeEnabled = (enabled) => {
         if (enabled && !canUseInstallationMode) return;
         const stage = stageRef.current;
@@ -1557,6 +1779,8 @@ const App = () => {
         }
     };
 
+    // После переключения режима, но до показа кадра, сопоставляет старые и новые
+    // изображения по morph-ключам и подготавливает параметры анимации.
     useLayoutEffect(() => {
         const pendingMorph = pendingMorphRef.current;
         const stage = stageRef.current;
@@ -1584,6 +1808,8 @@ const App = () => {
         if (nextMorphImages.length > 0) setMorphImages(nextMorphImages);
     }, [installationMode]);
 
+    // При появлении подготовленных morph-элементов запускает Konva Tween;
+    // cleanup уничтожает анимации при новом переключении или размонтировании.
     useEffect(() => {
         if (morphImages.length === 0) return undefined;
         let completedTweens = 0;
@@ -1826,6 +2052,15 @@ const App = () => {
         return !!current[ntcSlotIndex];
     };
 
+    /**
+     * Добавляет или удаляет NTC-маркер в модуле ntc-1-wire независимо от места хранения.
+     * @param {object} currentScheme Изменяемая схема.
+     * @param {object} target Целевой модуль.
+     * @param {number} ntcSlotIndex Индекс NTC-входа.
+     * @param {string} lineKey Имя внутренней NTC-линии.
+     * @param {boolean} mark Добавить маркер; false удаляет его.
+     * @returns {object} Новая схема.
+     */
     const patchNtcSlotMarkerInOneWire = (currentScheme, target, ntcSlotIndex, lineKey = 'ntc1_devices', mark = true) => {
         const targetId = target?.id;
         const patchCollection = (collection) => {
@@ -1997,6 +2232,11 @@ const App = () => {
         ? currentScheme.sensors.filter(isNumberedNtcSensor)
         : []);
 
+    /**
+     * Собирает NTC-датчики из контроллера и модулей в порядке экранной нумерации.
+     * @param {object} currentScheme Текущая схема.
+     * @returns {Array<object>} Упорядоченные датчики.
+     */
     const getNtcSensorNumberingDevices = (currentScheme) => {
         const fromModuleDevice = (device) => (
             canonicalDeviceType(device?.type) === 'ntc-1-wire'
@@ -2141,6 +2381,14 @@ const App = () => {
         return candidate.id === target.id && canonicalDeviceType(candidate.type) === canonicalDeviceType(target.type);
     };
 
+    /**
+     * Рекурсивно обновляет поле выбранного устройства во всем дереве схемы.
+     * @param {*} value Текущий узел дерева.
+     * @param {object} target Искомое устройство.
+     * @param {string} fieldName Изменяемое поле.
+     * @param {*} fieldValue Новое значение; пустое значение удаляет поле.
+     * @returns {*} Узел с сохранением ссылок неизмененных ветвей.
+     */
     const updateDeviceFieldInValue = (value, target, fieldName, fieldValue) => {
         if (Array.isArray(value)) {
             let changed = false;
@@ -2255,6 +2503,11 @@ const App = () => {
         closeCommentEditor();
     };
 
+    /**
+     * Рисует редактируемый информационный блок устройства на Konva-сцене.
+     * @param {object} options Устройство, подпись, координаты, размеры и оформление.
+     * @returns {React.ReactNode} Группа Konva с текстом и кнопкой комментария.
+     */
     const renderInfoBlock = ({
         device,
         title,
@@ -2608,6 +2861,14 @@ const App = () => {
         return Array.isArray(fallback) ? fallback : [];
     };
 
+    /**
+     * Иммутабельно обновляет указанную линию EXT-модуля.
+     * @param {object} currentScheme Текущая схема.
+     * @param {number} moduleIndex Индекс EXT-модуля.
+     * @param {string} lineKey Имя массива устройств.
+     * @param {Function} updater Преобразователь текущего массива.
+     * @returns {object} Новая схема.
+     */
     const patchExtModuleLine = (currentScheme, moduleIndex, lineKey, updater) => {
         const extModules = Array.isArray(currentScheme.ext_modules) ? currentScheme.ext_modules : [];
         return {
@@ -2624,6 +2885,14 @@ const App = () => {
         };
     };
 
+    /**
+     * Иммутабельно обновляет линию DI-модуля и сохраняет обязательные поля.
+     * @param {object} currentScheme Текущая схема.
+     * @param {number} moduleIndex Индекс DI-модуля.
+     * @param {string} lineKey Имя массива устройств.
+     * @param {Function} updater Преобразователь текущего массива.
+     * @returns {object} Новая схема.
+     */
     const patchDiModuleLine = (currentScheme, moduleIndex, lineKey, updater) => {
         const diModules = Array.isArray(currentScheme.di_modules) ? currentScheme.di_modules : [];
         return {
@@ -3363,6 +3632,18 @@ const App = () => {
         return result;
     };
 
+    /**
+     * Строит геометрический индекс занятых областей для проверки drag-коллизий.
+     * @param {?HTMLImageElement} controllerImg Изображение контроллера.
+     * @param {object} currentScheme Текущая схема.
+     * @param {boolean} showEmpty Учитывать пустые слоты.
+     * @param {object} wirelessOffsets Смещения беспроводных устройств.
+     * @param {object} oneWireOffsets Смещения 1-wire устройств.
+     * @param {object} extOffsets Смещения EXT-модулей.
+     * @param {object} diOffsets Смещения DI-модулей.
+     * @param {?object} effectiveExtOneWireByModuleIndex Материализованные EXT 1-wire линии.
+     * @returns {Array<object>} Прямоугольники с идентификаторами элементов.
+     */
     const getAllOccupiedRects = (
         controllerImg,
         currentScheme,
@@ -3657,11 +3938,23 @@ const App = () => {
         return { rects, controllerRect };
     };
 
+    /**
+     * Проверяет пересечение перемещаемого прямоугольника с контроллером и другими элементами.
+     * @param {string} targetId Идентификатор перемещаемого элемента.
+     * @param {object} targetRect Его прямоугольник.
+     * @param {Array<object>} allRects Все занятые области.
+     * @param {object} controllerRect Область контроллера.
+     * @returns {boolean} Есть ли недопустимое пересечение.
+     */
     const hasCollisionFor = (targetId, targetRect, allRects, controllerRect) => {
         if (rectsOverlap(targetRect, controllerRect)) return true;
         return allRects.some((rect) => rect.id !== targetId && rectsOverlap(targetRect, rect));
     };
 
+    /**
+     * Начинает панорамирование сцены, игнорируя интерактивные элементы.
+     * @param {object} event Событие указателя Konva.
+     */
     const startStagePan = (event) => {
         if (event?.evt?.type?.startsWith('mouse') && event.evt.button !== 0) return;
         const stage = stageRef.current;
@@ -3679,6 +3972,10 @@ const App = () => {
         panStartStageRef.current = { x: stage.x(), y: stage.y() };
     };
 
+    /**
+     * Перемещает сцену относительно сохраненной точки начала панорамирования.
+     * @param {object} event Текущее событие указателя Konva.
+     */
     const moveStagePan = (event) => {
         if (!isPanningRef.current) return;
         const stage = stageRef.current;
@@ -3693,12 +3990,15 @@ const App = () => {
     };
 
     const memoExtModules = useMemo(() => getExtModules(scheme), [scheme]);
-    const schemeOfferSections = useMemo(() => getSchemeOfferSections(scheme), [scheme]);
+    const schemeOfferSections = useMemo(
+        () => (showOfferModal ? getSchemeOfferSections(scheme) : []),
+        [scheme, showOfferModal],
+    );
     const memoControllerExtDevices = useMemo(() => getControllerExtDevices(scheme), [scheme]);
     const memoRawOneWireDevices = useMemo(() => getOneWireDevicesFromScheme(scheme), [scheme]);
     const memoBalancedOneWire = useMemo(
-        () => balanceOneWireDevices(scheme, memoExtModules),
-        [scheme, memoExtModules],
+        () => (useInitialOneWireBalance ? balanceOneWireDevices(scheme, memoExtModules) : null),
+        [scheme, memoExtModules, useInitialOneWireBalance],
     );
     const memoOneWireDevices = useInitialOneWireBalance ? memoBalancedOneWire.controllerDevices : memoRawOneWireDevices;
     const memoExtLineThermostatDevices = useInitialOneWireBalance
@@ -3708,10 +4008,18 @@ const App = () => {
         () => (Array.isArray(scheme.wireless_devices) ? scheme.wireless_devices : []),
         [scheme.wireless_devices],
     );
-    const memoBundledSensorDevices = useMemo(
-        () => getBundledSensorDevices(scheme, getControllerType(scheme)),
+    const memoControllerKitSensorState = useMemo(
+        () => getControllerKitSensorState(scheme, getControllerType(scheme)),
         [scheme],
     );
+    const memoBundledSensorDevices = memoControllerKitSensorState.bundled;
+    const memoUnusedBundledSensorCards = Object.entries(memoControllerKitSensorState.remaining)
+        .filter(([, count]) => count > 0)
+        .map(([bucket, count]) => ({
+            bucket,
+            count,
+            label: CONTROLLER_KIT_SENSOR_PRODUCTS[bucket] || bucket,
+        }));
     const memoWirelessSlotX = useMemo(
         () => memoWirelessDevices.map((device, idx) => getWirelessSlotX(
             memoWirelessDevices,
@@ -3740,12 +4048,26 @@ const App = () => {
     );
 
     const installationItems = useMemo(() => {
+        if (!installationMode) return [];
         const powerModuleTypes = new Set(['circuit-breaker', 'power-unit', 'ups']);
         const expansionModuleTypes = new Set([...EXT_MODULE_TYPES, ...DI_MODULE_TYPES, 'ntc-1-wire', 'rdt2', 'ecosmartbl2']);
         const getItemType = (item) => canonicalDeviceType(typeof item === 'string' ? item : item?.type);
         const getItemKey = (item, fallback) => {
             if (item?.id != null) return `${fallback}:${item.id}`;
             return `${fallback}:${JSON.stringify(item)}`;
+        };
+        const getChainLabelInfo = (chain, index, fallback = 'Модуль') => {
+            const device = chain[index];
+            const type = getItemType(device);
+            const baseLabel = getInstallationDeviceLabel(device, INSTALLATION_DEVICE_TYPE_TITLES[type] || fallback);
+            const sameTypeBefore = chain
+                .slice(0, index)
+                .filter((candidate) => getItemType(candidate) === type)
+                .length;
+            const sameTypeTotal = chain.filter((candidate) => getItemType(candidate) === type).length;
+            return {
+                label: sameTypeTotal > 1 ? `${baseLabel} #${sameTypeBefore + 1}` : baseLabel,
+            };
         };
         const addUnique = (items, seen, item, source, extra = {}) => {
             const type = getItemType(item);
@@ -3776,18 +4098,18 @@ const App = () => {
                 return {
                     powerPreviousLabel: chainIndex === poweredModuleChain.length - 1
                         ? smart2PowerSourceLabel
-                        : getInstallationDeviceLabel(poweredModuleChain[chainIndex + 1]),
+                        : getChainLabelInfo(poweredModuleChain, chainIndex + 1).label,
                     powerNextLabel: chainIndex > 0
-                        ? getInstallationDeviceLabel(poweredModuleChain[chainIndex - 1])
+                        ? getChainLabelInfo(poweredModuleChain, chainIndex - 1).label
                         : controllerInstallationLabel,
                 };
             }
             return {
                 powerPreviousLabel: chainIndex === 0
                     ? controllerInstallationLabel
-                    : getInstallationDeviceLabel(poweredModuleChain[chainIndex - 1]),
+                    : getChainLabelInfo(poweredModuleChain, chainIndex - 1).label,
                 powerNextLabel: poweredModuleChain[chainIndex + 1]
-                    ? getInstallationDeviceLabel(poweredModuleChain[chainIndex + 1])
+                    ? getChainLabelInfo(poweredModuleChain, chainIndex + 1).label
                     : null,
             };
         };
@@ -3816,52 +4138,68 @@ const App = () => {
                     data: item,
                     powerPreviousLabel: type === 'ups' ? POWER_UNIT_LABEL : null,
                     powerNextLabel: type === 'power-unit'
-                        ? (hasUpsPowerModule ? 'UPS' : (isSmart2Installation && lastPoweredModule ? getInstallationDeviceLabel(lastPoweredModule) : controllerInstallationLabel))
-                        : (type === 'ups' ? (isSmart2Installation && lastPoweredModule ? getInstallationDeviceLabel(lastPoweredModule) : controllerInstallationLabel) : null),
+                        ? (hasUpsPowerModule ? 'UPS' : (isSmart2Installation && lastPoweredModule ? getChainLabelInfo(poweredModuleChain, poweredModuleChain.length - 1).label : controllerInstallationLabel))
+                        : (type === 'ups' ? (isSmart2Installation && lastPoweredModule ? getChainLabelInfo(poweredModuleChain, poweredModuleChain.length - 1).label : controllerInstallationLabel) : null),
                     ...(type === 'ups' ? { upsDiTargetLabel: controllerInstallationLabel } : {}),
                 });
             });
 
-        memoExtModules.forEach((item, index) => addUnique(items, seen, item, `ext:${index}`, {
+        memoExtModules.forEach((item, index) => {
+            const labelInfo = getChainLabelInfo(memoExtModules, index);
+            addUnique(items, seen, item, `ext:${index}`, {
+            installationLabel: labelInfo.label,
             modulePreviousLabel: index === 0
                 ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
-                : getInstallationDeviceLabel(memoExtModules[index - 1]),
+                : getChainLabelInfo(memoExtModules, index - 1).label,
             // После последнего EXT-модуля цепочка может продолжаться EXT-термостатами:
             // их подключение выходит из EXT-OUT этого модуля.
             moduleNextLabel: memoExtModules[index + 1]
-                ? getInstallationDeviceLabel(memoExtModules[index + 1])
+                ? getChainLabelInfo(memoExtModules, index + 1).label
                 : (memoExtLineThermostatDevices[0]
                     ? getInstallationDeviceLabel(memoExtLineThermostatDevices[0], 'Термостат')
                     : null),
             ...getPowerLabelsForModule(item),
-        }));
-        diModuleItems.forEach((item, index, modules) => addUnique(items, seen, item, `di:${index}`, {
+            });
+        });
+        diModuleItems.forEach((item, index, modules) => {
+            const labelInfo = getChainLabelInfo(modules, index);
+            addUnique(items, seen, item, `di:${index}`, {
+            installationLabel: labelInfo.label,
             modulePreviousLabel: index === 0
                 ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
-                : getInstallationDeviceLabel(modules[index - 1]),
+                : getChainLabelInfo(modules, index - 1).label,
             moduleNextLabel: modules[index + 1]
-                ? getInstallationDeviceLabel(modules[index + 1])
+                ? getChainLabelInfo(modules, index + 1).label
                 : null,
             ...getPowerLabelsForModule(item),
-        }));
+            });
+        });
         const standaloneOneWireModules = Array.isArray(scheme?.one_wire_modules) ? scheme.one_wire_modules : [];
-        standaloneOneWireModules.forEach((item, index) => addUnique(items, seen, item, `onewire:${index}`, {
+        standaloneOneWireModules.forEach((item, index) => {
+            const labelInfo = getChainLabelInfo(standaloneOneWireModules, index);
+            addUnique(items, seen, item, `onewire:${index}`, {
+            installationLabel: labelInfo.label,
             oneWirePreviousLabel: index === 0
                 ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
-                : getInstallationDeviceLabel(standaloneOneWireModules[index - 1]),
+                : getChainLabelInfo(standaloneOneWireModules, index - 1).label,
             oneWireNextLabel: standaloneOneWireModules[index + 1]
-                ? getInstallationDeviceLabel(standaloneOneWireModules[index + 1])
+                ? getChainLabelInfo(standaloneOneWireModules, index + 1).label
                 : null,
-        }));
+            });
+        });
         const controllerOneWireDevices = Array.isArray(scheme?.controller?.one_wire_devices) ? scheme.controller.one_wire_devices : [];
-        controllerOneWireDevices.forEach((item, index) => addUnique(items, seen, item, `controller-onewire:${index}`, {
+        controllerOneWireDevices.forEach((item, index) => {
+            const labelInfo = getChainLabelInfo(controllerOneWireDevices, index);
+            addUnique(items, seen, item, `controller-onewire:${index}`, {
+            installationLabel: labelInfo.label,
             oneWirePreviousLabel: index === 0
                 ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
-                : getInstallationDeviceLabel(controllerOneWireDevices[index - 1]),
+                : getChainLabelInfo(controllerOneWireDevices, index - 1).label,
             oneWireNextLabel: controllerOneWireDevices[index + 1]
-                ? getInstallationDeviceLabel(controllerOneWireDevices[index + 1])
+                ? getChainLabelInfo(controllerOneWireDevices, index + 1).label
                 : null,
-        }));
+            });
+        });
         (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [])
             .flatMap((moduleItem, moduleIndex) => (Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : []).map((item, itemIndex, lineItems) => ({
                 item,
@@ -3870,17 +4208,21 @@ const App = () => {
                 itemIndex,
                 lineItems,
             })))
-            .forEach(({ item, moduleItem, moduleIndex, itemIndex, lineItems }) => addUnique(items, seen, item, `ext-onewire:${moduleIndex}:${itemIndex}`, {
+            .forEach(({ item, moduleItem, moduleIndex, itemIndex, lineItems }) => {
+                const labelInfo = getChainLabelInfo(lineItems, itemIndex);
+                addUnique(items, seen, item, `ext-onewire:${moduleIndex}:${itemIndex}`, {
+                installationLabel: labelInfo.label,
                 oneWirePreviousLabel: itemIndex === 0
-                    ? getInstallationDeviceLabel(moduleItem)
-                    : getInstallationDeviceLabel(lineItems[itemIndex - 1]),
+                    ? getChainLabelInfo(memoExtModules, moduleIndex).label
+                    : getChainLabelInfo(lineItems, itemIndex - 1).label,
                 oneWireNextLabel: lineItems[itemIndex + 1]
-                    ? getInstallationDeviceLabel(lineItems[itemIndex + 1])
+                    ? getChainLabelInfo(lineItems, itemIndex + 1).label
                     : null,
-            }));
+                });
+            });
 
         return items;
-    }, [scheme, memoExtModules, memoExtLineThermostatDevices]);
+    }, [installationMode, scheme, memoExtModules, memoExtLineThermostatDevices]);
 
     return (
         <main className="spa-page">
@@ -4060,6 +4402,21 @@ const App = () => {
                     >
                         &#9998;
                     </button>
+                </div>
+                <div className="spa-unused-kit-sensors">
+                    <span className="spa-unused-kit-sensors-label">Незадействованные комплектные датчики</span>
+                    {memoUnusedBundledSensorCards.length > 0 ? (
+                        <div className="spa-unused-kit-sensors-list">
+                            {memoUnusedBundledSensorCards.map((card) => (
+                                <div className="spa-unused-kit-sensor-card" key={card.bucket}>
+                                    <span>{card.label}</span>
+                                    {card.count > 1 && <strong>×{card.count}</strong>}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <span className="spa-unused-kit-sensors-empty">Все комплектные датчики задействованы</span>
+                    )}
                 </div>
             </div>
             {schemeLoadError && (
@@ -11450,10 +11807,11 @@ const App = () => {
                                                                      || slotDevicePorts.find((port) => port.name === '4-20-IN-IN')
                                                                      || slotDevicePorts.find((port) => port.name === '4-20-IN-V+')
                                                                     || null)
-                                                                : isNtcLikeChannelSensor
-                                                                    ? ((getPortsByClassToken(slotDevicePorts, 'NTC') || [])[0]
-                                                                        || slotDevicePorts.find((port) => String(port?.name || '').startsWith('NTC-'))
-                                                                        || null)
+                                                                 : isNtcLikeChannelSensor
+                                                                     ? (slotDevicePorts.find((port) => port.name === 'NTC-B')
+                                                                         || (getPortsByClassToken(slotDevicePorts, 'NTC') || [])[0]
+                                                                         || slotDevicePorts.find((port) => String(port?.name || '').startsWith('NTC-'))
+                                                                         || null)
                                                                 : slotDeviceType === '010servo'
                                                                     ? (slotDevicePorts.find((port) => port.name === 'CHANNEL-IN') || (getPortsByClassToken(slotDevicePorts, 'CHANNEL-IN') || [])[0] || null)
                                                                     : ((getPortsByClassToken(slotDevicePorts, 'DI-IN') || [])[0] || null);
@@ -11464,10 +11822,10 @@ const App = () => {
                                                                 : null;
                                                             const moduleChannelGndPortName = channelIndex < 2 ? 'CHANNEL-1-2-GND' : 'CHANNEL-3-4-GND';
                                                             const moduleChannelGndPort = extPorts.find((port) => port.name === moduleChannelGndPortName);
-                                                            const slotDeviceGndPort = isNtcLikeChannelSensor
-                                                                ? (slotDevicePorts.find((port) => port.name === 'NTC-B')
-                                                                    || slotDevicePorts.find((port) => port.name === 'NTC-A')
-                                                                    || (getPortsByClassToken(slotDevicePorts, 'NTC') || [])[0]
+                                                             const slotDeviceGndPort = isNtcLikeChannelSensor
+                                                                 ? (slotDevicePorts.find((port) => port.name === 'NTC-A')
+                                                                     || slotDevicePorts.find((port) => port.name === 'NTC-B')
+                                                                     || (getPortsByClassToken(slotDevicePorts, 'NTC') || [])[0]
                                                                     || null)
                                                                 : null;
                                                             const visualSlotWidth = slotDeviceType === 'pressure-sensor'
@@ -11518,9 +11876,9 @@ const App = () => {
                                                                                 targetX,
                                                                                 targetY,
                                                                             ]}
-                                                                            stroke={slotDeviceType === 'pressure-sensor'
-                                                                                ? '#f57c00'
-                                                                                : (isNtcLikeChannelSensor ? '#212121' : '#1565c0')}
+                                                                             stroke={slotDeviceType === 'pressure-sensor'
+                                                                                 ? '#f57c00'
+                                                                                 : '#1565c0'}
                                                                             strokeWidth={1}
                                                                             lineCap="round"
                                                                             lineJoin="round"
@@ -11554,7 +11912,7 @@ const App = () => {
                                                                                 targetGndX,
                                                                                 targetGndY,
                                                                             ]}
-                                                                            stroke="#1565c0"
+                                                                             stroke="#212121"
                                                                             strokeWidth={1}
                                                                             lineCap="round"
                                                                             lineJoin="round"
@@ -14298,6 +14656,11 @@ const App = () => {
                                 const hasInstallationUps = installationModuleItems.some((item) => item.type === 'ups');
                                 const poweredInstallationModules = installationModuleItems.filter((item) => !powerTypes.has(item.type));
                                 const firstPoweredModule = poweredInstallationModules[0] || null;
+                                const firstExtInstallationModule = installationModuleItems.find((item) => (
+                                    memoExtModules[0]
+                                    && (item.data === memoExtModules[0]
+                                        || (item.data?.id != null && item.data.id === memoExtModules[0]?.id))
+                                )) || null;
                                 const isSmart2Installation = controllerType === 'smart2';
                                 const powerOrder = { 'circuit-breaker': 0, 'power-unit': 1, ups: 2 };
                                 const installationPowerItems = installationModuleItems
@@ -14314,8 +14677,8 @@ const App = () => {
                                         // первая пара DI-OUT у smart2).
                                         upsDiPortIndexes: hasInstallationUps ? [0, 1] : null,
                                         // EXT-цепочка контроллера: сначала EXT-модули, после них EXT-термостаты.
-                                        moduleNextLabel: memoExtModules[0]
-                                            ? getInstallationDeviceLabel(memoExtModules[0])
+                                        moduleNextLabel: firstExtInstallationModule
+                                            ? getInstallationItemLabel(firstExtInstallationModule)
                                             : (memoExtLineThermostatDevices[0]
                                                 ? getInstallationDeviceLabel(memoExtLineThermostatDevices[0], 'Термостат')
                                                 : null),
@@ -15014,9 +15377,15 @@ const App = () => {
                         </div>
                         <div
                             className="ctx-menu-item"
-                            onClick={() => addOneWireDeviceAtSlot({ id: Date.now(), type: 'flask-sensor', connection_type: '1-wire', additions: [] })}
+                            onClick={() => addOneWireDeviceAtSlot({ id: Date.now(), device_type: 'sensor', type: 'flask-sensor-temperature', connection_type: '1-wire', additions: [] })}
                         >
-                            Проводной датчик (flaskSensor)
+                            Датчик температуры в колбе проводной
+                        </div>
+                        <div
+                            className="ctx-menu-item"
+                            onClick={() => addOneWireDeviceAtSlot({ id: Date.now(), device_type: 'sensor', type: 'wall-digital-sensor', connection_type: '1-wire' })}
+                        >
+                            Настенный проводной датчик
                         </div>
                         <div
                             className="ctx-menu-item"
@@ -15277,7 +15646,8 @@ const App = () => {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="ctx-menu-item" onClick={() => addExtOneWireDeviceAtSlot(extOneWireMenuPos.moduleIndex, extOneWireMenuPos.slotIndex, { id: Date.now(), type: 'thermostat', connection_type: '1-wire', color: 'black', additions: [] })}>Проводной термостат</div>
-                        <div className="ctx-menu-item" onClick={() => addExtOneWireDeviceAtSlot(extOneWireMenuPos.moduleIndex, extOneWireMenuPos.slotIndex, { id: Date.now(), type: 'flask-sensor', connection_type: '1-wire', additions: [] })}>Проводной датчик (flaskSensor)</div>
+                        <div className="ctx-menu-item" onClick={() => addExtOneWireDeviceAtSlot(extOneWireMenuPos.moduleIndex, extOneWireMenuPos.slotIndex, { id: Date.now(), device_type: 'sensor', type: 'flask-sensor-temperature', connection_type: '1-wire', additions: [] })}>Датчик температуры в колбе проводной</div>
+                        <div className="ctx-menu-item" onClick={() => addExtOneWireDeviceAtSlot(extOneWireMenuPos.moduleIndex, extOneWireMenuPos.slotIndex, { id: Date.now(), device_type: 'sensor', type: 'wall-digital-sensor', connection_type: '1-wire' })}>Настенный проводной датчик</div>
                         <div className="ctx-menu-item" onClick={() => addExtOneWireDeviceAtSlot(extOneWireMenuPos.moduleIndex, extOneWireMenuPos.slotIndex, { id: Date.now(), type: 'ntc-1-wire', connection_type: '1-wire' })}>Модуль NTC-1-wire</div>
                         <div className="ctx-menu-item" onClick={() => addExtOneWireDeviceAtSlot(extOneWireMenuPos.moduleIndex, extOneWireMenuPos.slotIndex, { id: Date.now(), type: 'rdt2', connection_type: '1-wire' })}>Модуль RDT2</div>
                         <div className="ctx-menu-sep" />
