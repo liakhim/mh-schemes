@@ -13,7 +13,7 @@ import { controllerImagePaths, wirelessDeviceImagePaths, getWirelessDeviceImageK
 import { getOneWireDirectionForDevice, getOneWireLineGeometry } from './scheme/layout/oneWireLayout';
 import { parsePorts, withFallbackPorts, getPortsByClassToken } from './scheme/layout/portParsing';
 import { getOneWirePortByRole, getPortPosition } from './scheme/layout/ports';
-import { Line, snapPixel } from './scheme/rendering/SharpLine';
+import { Line, RealisticConnectionLines, snapPixel } from './scheme/rendering/SharpLine';
 import EquipmentOfferModal from './components/EquipmentOfferModal';
 import commentIconPath from '../assets/icons/comment-icon.svg';
 import commentAddIconPath from '../assets/icons/comment-add-icon.svg';
@@ -1481,6 +1481,10 @@ const App = () => {
     const relayDragStartOffsetsRef = useRef({});
     const controller420DragStartOffsetRef = useRef({ x: 0, y: 0 });
     const extOneWireDragStartOffsetsRef = useRef({});
+    const oneWireDragStartPointerRef = useRef({});
+    const oneWireDragDraftOffsetsRef = useRef({});
+    const oneWireDragFrameRef = useRef(null);
+    const oneWireDragNodeRefs = useRef({});
     const pendingMorphRef = useRef(null);
     const morphImageRefs = useRef(new Map());
     const morphTweensRef = useRef([]);
@@ -4731,6 +4735,7 @@ const App = () => {
                         </Layer>
                     )}
                     {!installationMode && (
+                    <RealisticConnectionLines>
                     <Layer>
                         {controllerImage && (
                             (() => {
@@ -13599,55 +13604,77 @@ const App = () => {
                                                         return (
                                                             <Group
                                                                 key={`one-wire-slot-${slotIndex}`}
+                                                                ref={(node) => {
+                                                                    if (node) oneWireDragNodeRefs.current[slotIndex] = node;
+                                                                    else delete oneWireDragNodeRefs.current[slotIndex];
+                                                                }}
                                                                 draggable
-                                                                onDragStart={() => {
+                                                                dragBoundFunc={() => {
+                                                                    const node = oneWireDragNodeRefs.current[slotIndex];
+                                                                    const parent = node?.getParent();
+                                                                    return parent
+                                                                        ? parent.getAbsoluteTransform().point({ x: 0, y: 0 })
+                                                                        : (node?.getAbsolutePosition() || { x: 0, y: 0 });
+                                                                }}
+                                                                onDragStart={(event) => {
                                                                     oneWireDragStartOffsetsRef.current[slotIndex] = oneWireSlotOffsets[slotIndex] || { x: 0, y: 0 };
+                                                                    oneWireDragStartPointerRef.current[slotIndex] = event.target.getStage()?.getPointerPosition() || { x: 0, y: 0 };
+                                                                    oneWireDragDraftOffsetsRef.current[slotIndex] = oneWireSlotOffsets[slotIndex] || { x: 0, y: 0 };
                                                                     setInvalidOneWireDragMap((prev) => ({ ...prev, [slotIndex]: false }));
                                                                 }}
                                                                 onMouseEnter={() => setHoveredOneWireSlotIndex(slotIndex)}
                                                                 onMouseLeave={() => setHoveredOneWireSlotIndex(null)}
                                                                 onDragMove={(event) => {
-                                                                    const position = event.target.position();
+                                                                    const stage = event.target.getStage();
+                                                                    const pointer = stage?.getPointerPosition();
+                                                                    if (!stage || !pointer) return;
+                                                                    const startPointer = oneWireDragStartPointerRef.current[slotIndex] || pointer;
                                                                     const startOffset = oneWireDragStartOffsetsRef.current[slotIndex] || { x: 0, y: 0 };
+                                                                    const stageScale = stage.scaleX() || 1;
                                                                     const draftOffset = {
-                                                                        x: startOffset.x + position.x,
-                                                                        y: startOffset.y + position.y,
+                                                                        x: startOffset.x + (pointer.x - startPointer.x) / stageScale,
+                                                                        y: startOffset.y + (pointer.y - startPointer.y) / stageScale,
                                                                     };
-                                                                    const draftOffsets = {
-                                                                        ...oneWireSlotOffsets,
-                                                                        [slotIndex]: draftOffset,
-                                                                    };
-                                                                    setOneWireSlotOffsets((prev) => ({
-                                                                        ...prev,
-                                                                        [slotIndex]: draftOffset,
-                                                                    }));
-                                                                    const collisionData = getAllOccupiedRects(
-                                                                        controllerImage,
-                                                                        scheme,
-                                                                        showEmptySlots,
-                                                                        memoWirelessOffsetsByLine,
-                                                                        draftOffsets,
-                                                                        extSlotOffsets,
-                                                                        diSlotOffsets,
-                                                                        useInitialOneWireBalance ? memoBalancedOneWire.extDevicesByModuleIndex : null,
-                                                                    );
-                                                                    const slotPosDraft = getSlotPositionByOffsets(slotIndex, draftOffsets);
-                                                                    const targetRect = {
-                                                                        left: slotPosDraft.x,
-                                                                        top: slotPosDraft.y,
-                                                                        right: slotPosDraft.x + slotWidth,
-                                                                        bottom: slotPosDraft.y + slotHeight,
-                                                                    };
-                                                                    const collides = Boolean(collisionData) && (
-                                                                        rectsOverlap(targetRect, collisionData.controllerRect)
-                                                                        || collisionData.rects.some((rect) => rect.id !== `onewire:${slotIndex}` && rectsOverlap(targetRect, rect))
-                                                                    );
-                                                                    setInvalidOneWireDragMap((prev) => ({ ...prev, [slotIndex]: collides }));
-                                                                    event.target.position({ x: 0, y: 0 });
+                                                                    oneWireDragDraftOffsetsRef.current[slotIndex] = draftOffset;
+                                                                    if (oneWireDragFrameRef.current !== null) return;
+                                                                    oneWireDragFrameRef.current = window.requestAnimationFrame(() => {
+                                                                        oneWireDragFrameRef.current = null;
+                                                                        const latestDraftOffset = oneWireDragDraftOffsetsRef.current[slotIndex] || draftOffset;
+                                                                        setOneWireSlotOffsets((prev) => ({ ...prev, [slotIndex]: latestDraftOffset }));
+                                                                        const draftOffsets = { ...oneWireSlotOffsets, [slotIndex]: latestDraftOffset };
+                                                                        const collisionData = getAllOccupiedRects(
+                                                                            controllerImage,
+                                                                            scheme,
+                                                                            showEmptySlots,
+                                                                            memoWirelessOffsetsByLine,
+                                                                            draftOffsets,
+                                                                            extSlotOffsets,
+                                                                            diSlotOffsets,
+                                                                            useInitialOneWireBalance ? memoBalancedOneWire.extDevicesByModuleIndex : null,
+                                                                        );
+                                                                        const slotPosDraft = getSlotPositionByOffsets(slotIndex, draftOffsets);
+                                                                        const targetRect = {
+                                                                            left: slotPosDraft.x,
+                                                                            top: slotPosDraft.y,
+                                                                            right: slotPosDraft.x + slotWidth,
+                                                                            bottom: slotPosDraft.y + slotHeight,
+                                                                        };
+                                                                        const collides = Boolean(collisionData) && (
+                                                                            rectsOverlap(targetRect, collisionData.controllerRect)
+                                                                            || collisionData.rects.some((rect) => rect.id !== `onewire:${slotIndex}` && rectsOverlap(targetRect, rect))
+                                                                        );
+                                                                        setInvalidOneWireDragMap((prev) => (
+                                                                            prev[slotIndex] === collides ? prev : { ...prev, [slotIndex]: collides }
+                                                                        ));
+                                                                    });
                                                                 }}
                                                                 onDragEnd={(event) => {
+                                                                    if (oneWireDragFrameRef.current !== null) {
+                                                                        window.cancelAnimationFrame(oneWireDragFrameRef.current);
+                                                                        oneWireDragFrameRef.current = null;
+                                                                    }
                                                                     const startOffset = oneWireDragStartOffsetsRef.current[slotIndex] || { x: 0, y: 0 };
-                                                                    const nextOffset = oneWireSlotOffsets[slotIndex] || { x: 0, y: 0 };
+                                                                    const nextOffset = oneWireDragDraftOffsetsRef.current[slotIndex] || startOffset;
                                                                     const nextOffsets = { ...oneWireSlotOffsets, [slotIndex]: nextOffset };
                                                                     const collisionData = getAllOccupiedRects(
                                                                         controllerImage,
@@ -13665,11 +13692,16 @@ const App = () => {
                                                                         event.target.getLayer()?.batchDraw();
                                                                         setInvalidOneWireDragMap((prev) => ({ ...prev, [slotIndex]: false }));
                                                                         delete oneWireDragStartOffsetsRef.current[slotIndex];
+                                                                        delete oneWireDragStartPointerRef.current[slotIndex];
+                                                                        delete oneWireDragDraftOffsetsRef.current[slotIndex];
                                                                         event.target.position({ x: 0, y: 0 });
                                                                         return;
                                                                     }
+                                                                    setOneWireSlotOffsets((prev) => ({ ...prev, [slotIndex]: nextOffset }));
                                                                     setInvalidOneWireDragMap((prev) => ({ ...prev, [slotIndex]: false }));
                                                                     delete oneWireDragStartOffsetsRef.current[slotIndex];
+                                                                    delete oneWireDragStartPointerRef.current[slotIndex];
+                                                                    delete oneWireDragDraftOffsetsRef.current[slotIndex];
                                                                     event.target.position({ x: 0, y: 0 });
                                                                 }}
                                                             >
@@ -14634,6 +14666,7 @@ const App = () => {
                             })()
                         )}
                     </Layer>
+                    </RealisticConnectionLines>
                     )}
                     {installationMode && (
                         <Layer>
