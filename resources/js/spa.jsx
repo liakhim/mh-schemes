@@ -8641,7 +8641,7 @@ const App = () => {
                                                                         listening={false}
                                                                     />
                                                                 )}
-                                                                {!isRelayOccupied && controllerType === 'pro' && relayLine?.bPortName && (() => {
+                                                                {!isRelayOccupied && (controllerType === 'pro' || controllerType === 'smart2') && relayLine?.bPortName && (() => {
                                                                     const relayBPort = ports.find((port) => port.name === relayLine.bPortName);
                                                                     if (!relayBPort) return null;
                                                                     const slotCenterY = relaySlotRenderYOffset + relayVisualSlotHeight / 2;
