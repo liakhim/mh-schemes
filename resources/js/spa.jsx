@@ -15279,16 +15279,27 @@ const App = () => {
                                             cornerRadius={5}
                                             fillLinearGradientStartPoint={{ x: 0, y: 0 }}
                                             fillLinearGradientEndPoint={{ x: resizeHandleSize, y: resizeHandleSize }}
-                                            fillLinearGradientColorStops={[0, '#f7943e', 1, '#c85e18']}
-                                            stroke="#a4491a"
+                                            fillLinearGradientColorStops={installationItemsLocked
+                                                ? [0, '#d1d5db', 1, '#9ca3af']
+                                                : [0, '#f7943e', 1, '#c85e18']}
+                                            stroke={installationItemsLocked ? '#7b8494' : '#a4491a'}
                                             strokeWidth={1}
                                             shadowColor="rgba(15, 23, 42, 0.32)"
-                                            shadowBlur={4}
+                                            shadowBlur={installationItemsLocked ? 0 : 4}
                                             shadowOffsetY={2}
                                             shadowForStrokeEnabled={false}
                                             perfectDrawEnabled={false}
-                                            draggable
+                                            draggable={!installationItemsLocked}
+                                            onMouseEnter={(event) => {
+                                                const stage = event.target.getStage();
+                                                if (stage) stage.container().style.cursor = installationItemsLocked ? 'not-allowed' : 'nwse-resize';
+                                            }}
+                                            onMouseLeave={(event) => {
+                                                const stage = event.target.getStage();
+                                                if (stage) stage.container().style.cursor = 'default';
+                                            }}
                                             onDragMove={(event) => {
+                                                if (installationItemsLocked) return;
                                                 const node = event.target;
                                                 // Ширина/высота теперь абсолютный размер панели (от её левого верхнего
                                                 // угла до хендла), а не добавка к автоматически считаемому размеру —
@@ -15314,9 +15325,9 @@ const App = () => {
                                             const hy = panelY + panelHeight - resizeHandleSize / 2;
                                             return (
                                                 <Line
-                                                    key={`installation-resize-grip-${lineIndex}`}
-                                                    points={[hx + inset, hy + resizeHandleSize - 2, hx + resizeHandleSize - 2, hy + inset]}
-                                                    stroke="rgba(255, 255, 255, 0.75)"
+                                                     key={`installation-resize-grip-${lineIndex}`}
+                                                     points={[hx + inset, hy + resizeHandleSize - 2, hx + resizeHandleSize - 2, hy + inset]}
+                                                     stroke={installationItemsLocked ? 'rgba(75, 85, 99, 0.55)' : 'rgba(255, 255, 255, 0.75)'}
                                                     strokeWidth={1}
                                                     listening={false}
                                                 />
