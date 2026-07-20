@@ -583,6 +583,27 @@ const KitBadge = ({ x, y }) => (
         <Text x={x} y={y + 1} width={38} height={7} padding={0} text="Комплектный" fontSize={4.2} fill="#2e7d32" align="center" verticalAlign="middle" listening={false} />
     </>
 );
+const NtcDeleteButton = ({ x, y, onRemove }) => (
+    <Group
+        x={x}
+        y={y}
+        onClick={onRemove}
+        onTap={onRemove}
+        onMouseEnter={(event) => {
+            const stage = event.target.getStage();
+            if (stage) stage.container().style.cursor = 'pointer';
+        }}
+        onMouseLeave={(event) => {
+            const stage = event.target.getStage();
+            if (stage) stage.container().style.cursor = 'default';
+        }}
+    >
+        <KonvaCircle radius={14} fill="rgba(0, 0, 0, 0.001)" />
+        <KonvaCircle radius={8} fill="rgba(217, 83, 79, 0.78)" />
+        <Line points={[-3.5, -3.5, 3.5, 3.5]} stroke="white" strokeWidth={1.4} lineCap="round" listening={false} />
+        <Line points={[3.5, -3.5, -3.5, 3.5]} stroke="white" strokeWidth={1.4} lineCap="round" listening={false} />
+    </Group>
+);
 const EXT_SLOT_SIZE = 80;
 const EXT_SLOT_MIN_GAP_MULTIPLIER = 4;
 const EXT_MODULE_TYPES = ['bl2', 'rl6', 'rl6s', 'io4', 'di6'];
@@ -8568,11 +8589,14 @@ const App = () => {
                                                         }}
                                                     >
                                                         {relayLine?.aPortName && isRelayOccupied && !isDualRelayOccupancyDevice && (() => {
-                                                            const aPort = ports.find((port) => port.name === relayLine.aPortName);
-                                                            if (!aPort) return null;
-                                                            const fromX = aPort.x * controllerImage.width;
-                                                            const fromY = aPort.y * controllerImage.height;
-                                                            const endY = controllerImage.height + (controllerType === 'pro' ? 5 : 3) * indentSize;
+                                                             const aPort = ports.find((port) => port.name === relayLine.aPortName);
+                                                             if (!aPort) return null;
+                                                             const fromX = aPort.x * controllerImage.width;
+                                                             const fromY = aPort.y * controllerImage.height;
+                                                             const feedIndent = controllerType === 'pro'
+                                                                 ? 5
+                                                                 : (controllerType === 'go' || controllerType === 'go+' ? 2 : 3);
+                                                             const endY = controllerImage.height + feedIndent * indentSize;
                                                             return (
                                                                 <Group>
                                                                     <Line points={[fromX, fromY, fromX, endY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
@@ -12654,7 +12678,11 @@ const App = () => {
                                                                             const modulePortA = owPorts.find((port) => port.name === `NTC-${ntcChannel}-A`);
                                                                             const modulePortB = owPorts.find((port) => port.name === `NTC-${ntcChannel}-B`);
                                                                             return (
-                                                                                <Group key={`ext-ntc1-slot-${slotIndex}-${extOneWireIndex}-${ntcIndex}`}>
+                                                                                <Group
+                                                                                    key={`ext-ntc1-slot-${slotIndex}-${extOneWireIndex}-${ntcIndex}`}
+                                                                                    onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
+                                                                                    onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
+                                                                                >
                                                                                     {sensor && modulePortA && (
                                                                                         <Line
                                                                                             points={[
@@ -12698,8 +12726,6 @@ const App = () => {
                                                                                         fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'}
                                                                                         stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                                         strokeWidth={1.2}
-                                                                                        onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
-                                                                                        onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
                                                                                     />
                                                                                     {sensor && ntcSensorImage && (() => {
                                                                                         const size = sensorRenderSize;
@@ -12732,30 +12758,11 @@ const App = () => {
                                                                                         </>
                                                                                     )}
                                                                                     {sensor && isNtcHovered && (
-                                                                                        <>
-                                                                                            <Circle
-                                                                                                x={slotX + ntcSlotWidth - 2.5}
-                                                                                                y={slotY + 1.5}
-                                                                                                radius={6}
-                                                                                                fill="rgba(217, 83, 79, 0.55)"
-                                                                                                onClick={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex)}
-                                                                                                onTap={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex)}
-                                                                                            />
-                                                                                            <Line
-                                                                                                points={[slotX + ntcSlotWidth - 5, slotY - 1, slotX + ntcSlotWidth, slotY + 4]}
-                                                                                                stroke="white"
-                                                                                                strokeWidth={1}
-                                                                                                lineCap="round"
-                                                                                                listening={false}
-                                                                                            />
-                                                                                            <Line
-                                                                                                points={[slotX + ntcSlotWidth, slotY - 1, slotX + ntcSlotWidth - 5, slotY + 4]}
-                                                                                                stroke="white"
-                                                                                                strokeWidth={1}
-                                                                                                lineCap="round"
-                                                                                                listening={false}
-                                                                                            />
-                                                                                        </>
+                                                                                        <NtcDeleteButton
+                                                                                            x={slotX + ntcSlotWidth - 2.5}
+                                                                                            y={slotY + 1.5}
+                                                                                            onRemove={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex)}
+                                                                                        />
                                                                                     )}
                                                                                      {!sensor && showEmptySlots && (
                                                                                          <>
@@ -12823,14 +12830,18 @@ const App = () => {
                                                                             const modulePortA = owPorts.find((port) => port.name === `NTC-${ntcChannel}-A`);
                                                                             const modulePortB = owPorts.find((port) => port.name === `NTC-${ntcChannel}-B`);
                                                                             return (
-                                                                                <Group key={`ext-ntc2-slot-${slotIndex}-${extOneWireIndex}-${ntcIndex}`}>
+                                                                                <Group
+                                                                                    key={`ext-ntc2-slot-${slotIndex}-${extOneWireIndex}-${ntcIndex}`}
+                                                                                    onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
+                                                                                    onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
+                                                                                >
                                                                                     {sensor && modulePortA && <Line points={[sensorPortAX, sensorPortAY, owX + modulePortA.x * owWidth, sensorPortAY, owX + modulePortA.x * owWidth, owY + modulePortA.y * owHeight]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
                                                                                     {sensor && modulePortB && <Line points={[sensorPortBX, sensorPortBY, owX + modulePortB.x * owWidth, sensorPortBY, owX + modulePortB.x * owWidth, owY + modulePortB.y * owHeight]} stroke="#464EE3" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
-                                                                                    <Rect x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)} onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))} />
+                                                                                    <Rect x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} />
                                                                                     {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
                                                                                     {showPorts && sensor && ntcSensorPorts.map((port) => <Circle key={`ext-ntc2-port-${slotIndex}-${extOneWireIndex}-${ntcIndex}-${port.name}`} x={sensorRenderX + port.x * sensorRenderSize.width} y={sensorRenderY + port.y * sensorRenderSize.height} radius={2.5} fill="red" listening={false} />)}
                                                                                     {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}
-                                                                                    {sensor && isNtcHovered && <><Circle x={slotX + ntcSlotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} onTap={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} /><Line points={[slotX + ntcSlotWidth - 5, slotY - 1, slotX + ntcSlotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} /><Line points={[slotX + ntcSlotWidth, slotY - 1, slotX + ntcSlotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} /></>}
+                                                                                    {sensor && isNtcHovered && <NtcDeleteButton x={slotX + ntcSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} />}
                                                                                     {!sensor && showEmptySlots && <><EditableInfoTitle x={slotX + ntcSlotWidth - 13} y={slotY + 2} width={10} height={10} text={String(ntcChannel)} fontSize={7} fill="#7b8494" align="right" listening={false} /><Circle x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} radius={10} fill="#1565c0" onClick={() => addExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} onTap={() => addExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} /><Text x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} text="+" fontSize={15} fill="#fff" offsetX={4.5} offsetY={6} listening={false} /></>}
                                                                                 </Group>
                                                                             );
@@ -13810,7 +13821,11 @@ const App = () => {
                                                                         const modulePortA = modulePorts.find((port) => port.name === `NTC-${ntcChannel}-A`);
                                                                         const modulePortB = modulePorts.find((port) => port.name === `NTC-${ntcChannel}-B`);
                                                                         return (
-                                                                            <Group key={`onewire-ntc1-slot-${slotIndex}-${ntcIndex}`}>
+                                                                            <Group
+                                                                                key={`onewire-ntc1-slot-${slotIndex}-${ntcIndex}`}
+                                                                                onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
+                                                                                onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
+                                                                            >
                                                                                 {sensor && modulePortA && (
                                                                                     <Line
                                                                                         points={[
@@ -13854,8 +13869,6 @@ const App = () => {
                                                                                     fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'}
                                                                                     stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                                     strokeWidth={1.2}
-                                                                                    onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
-                                                                                    onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
                                                                                 />
                                                                                 {sensor && ntcSensorImage && (() => {
                                                                                     const size = sensorRenderSize;
@@ -13889,30 +13902,11 @@ const App = () => {
                                                                                     </>
                                                                                 )}
                                                                                 {sensor && isNtcHovered && (
-                                                                                    <>
-                                                                                        <Circle
-                                                                                            x={slotX + ntcSlotWidth - 2.5}
-                                                                                            y={slotY + 1.5}
-                                                                                            radius={6}
-                                                                                            fill="rgba(217, 83, 79, 0.55)"
-                                                                                            onClick={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex)}
-                                                                                            onTap={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex)}
-                                                                                        />
-                                                                                        <Line
-                                                                                            points={[slotX + ntcSlotWidth - 5, slotY - 1, slotX + ntcSlotWidth, slotY + 4]}
-                                                                                            stroke="white"
-                                                                                            strokeWidth={1}
-                                                                                            lineCap="round"
-                                                                                            listening={false}
-                                                                                        />
-                                                                                        <Line
-                                                                                            points={[slotX + ntcSlotWidth, slotY - 1, slotX + ntcSlotWidth - 5, slotY + 4]}
-                                                                                            stroke="white"
-                                                                                            strokeWidth={1}
-                                                                                            lineCap="round"
-                                                                                            listening={false}
-                                                                                        />
-                                                                                    </>
+                                                                                    <NtcDeleteButton
+                                                                                        x={slotX + ntcSlotWidth - 2.5}
+                                                                                        y={slotY + 1.5}
+                                                                                        onRemove={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex)}
+                                                                                    />
                                                                                 )}
                                                                                  {!sensor && showEmptySlots && (
                                                                                      <>
@@ -13981,14 +13975,18 @@ const App = () => {
                                                                         const modulePortA = modulePorts.find((port) => port.name === `NTC-${ntcChannel}-A`);
                                                                         const modulePortB = modulePorts.find((port) => port.name === `NTC-${ntcChannel}-B`);
                                                                         return (
-                                                                            <Group key={`onewire-ntc2-slot-${slotIndex}-${ntcIndex}`}>
+                                                                            <Group
+                                                                                key={`onewire-ntc2-slot-${slotIndex}-${ntcIndex}`}
+                                                                                onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
+                                                                                onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
+                                                                            >
                                                                                 {sensor && modulePortA && <Line points={[sensorPortAX, sensorPortAY, slotPos.x + modulePortA.x * slotWidth, sensorPortAY, slotPos.x + modulePortA.x * slotWidth, slotPos.y + modulePortA.y * slotHeight]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
                                                                                 {sensor && modulePortB && <Line points={[sensorPortBX, sensorPortBY, slotPos.x + modulePortB.x * slotWidth, sensorPortBY, slotPos.x + modulePortB.x * slotWidth, slotPos.y + modulePortB.y * slotHeight]} stroke="#464EE3" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
-                                                                                <Rect x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)} onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))} />
+                                                                                <Rect x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} />
                                                                                 {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
                                                                                 {showPorts && sensor && ntcSensorPorts.map((port) => <Circle key={`onewire-ntc2-port-${slotIndex}-${ntcIndex}-${port.name}`} x={sensorRenderX + port.x * sensorRenderSize.width} y={sensorRenderY + port.y * sensorRenderSize.height} radius={2.5} fill="red" listening={false} />)}
                                                                                 {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}
-                                                                                {sensor && isNtcHovered && <><Circle x={slotX + ntcSlotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} onTap={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} /><Line points={[slotX + ntcSlotWidth - 5, slotY - 1, slotX + ntcSlotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} /><Line points={[slotX + ntcSlotWidth, slotY - 1, slotX + ntcSlotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} /></>}
+                                                                                {sensor && isNtcHovered && <NtcDeleteButton x={slotX + ntcSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} />}
                                                                                 {!sensor && showEmptySlots && <><EditableInfoTitle x={slotX + ntcSlotWidth - 13} y={slotY + 2} width={10} height={10} text={String(ntcChannel)} fontSize={7} fill="#7b8494" align="right" listening={false} /><Circle x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} radius={10} fill="#1565c0" onClick={() => addOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} onTap={() => addOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} /><Text x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} text="+" fontSize={15} fill="#fff" offsetX={4.5} offsetY={6} listening={false} /></>}
                                                                             </Group>
                                                                         );
