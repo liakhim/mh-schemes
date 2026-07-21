@@ -136,6 +136,7 @@ Route::post('/api/boilers/search', function (Request $request) use ($integration
             ],
         ]);
 
+
     return response($response->body(), $response->status())
         ->header('Content-Type', 'application/json');
 })->name('boilers.search');
