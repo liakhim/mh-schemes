@@ -33,6 +33,84 @@ const GRID_MIN = -4000;
 const GRID_MAX = 4000;
 const GRID_STROKE = 'rgba(154, 160, 166, 0.22)';
 const HELP_MODAL_STORAGE_KEY = 'mh-schemes-help-seen';
+const INSTALLATION_LAYOUT_VERSION = 1;
+const INSTALLATION_PANEL_PADDING_X = 16;
+
+const getInstallationLayoutMetrics = () => {
+    const indentSize = parseInt(indent, 10) || 8;
+    const dinSize = parseInt(din, 10) || 40;
+    const rowSlotHeight = parseInt(module_height, 10) || 200;
+    const panelPaddingY = 8 * indentSize;
+    const rowGap = 17 * indentSize;
+    return {
+        dinSize,
+        rowSlotHeight,
+        panelPaddingY,
+        rowGap,
+        rowStep: rowSlotHeight + rowGap,
+    };
+};
+
+const getInstallationLayoutItemKey = (category, item, type, fallback) => {
+    if (category === 'controller') return `controller:${type}`;
+    if (item && typeof item === 'object' && item.id != null) return `${category}:${type}:id:${item.id}`;
+    if (category === 'power') return `power:${type}`;
+    return `${category}:${type}:index:${fallback}`;
+};
+
+const readInstallationLayout = (sourceScheme) => {
+    const layout = sourceScheme?.installation_layout;
+    const controllerType = canonicalDeviceType(
+        typeof sourceScheme?.controller === 'string' ? sourceScheme.controller : sourceScheme?.controller?.type,
+    );
+    if (!layout || layout.version !== INSTALLATION_LAYOUT_VERSION) return { panelSize: null, itemOffsets: {} };
+    if (layout.controller_type && canonicalDeviceType(layout.controller_type) !== controllerType) {
+        return { panelSize: null, itemOffsets: {} };
+    }
+
+    const { dinSize, rowSlotHeight, panelPaddingY, rowGap, rowStep } = getInstallationLayoutMetrics();
+    const columns = Math.max(1, Math.round(Number(layout.panel?.columns) || 0));
+    const rows = Math.max(1, Math.round(Number(layout.panel?.rows) || 0));
+    const hasPanel = Number(layout.panel?.columns) > 0 && Number(layout.panel?.rows) > 0;
+    const itemOffsets = {};
+    (Array.isArray(layout.items) ? layout.items : []).forEach((item) => {
+        if (!item || typeof item.key !== 'string' || !item.key) return;
+        const column = Math.max(0, Math.round(Number(item.column) || 0));
+        const row = Math.max(0, Math.round(Number(item.row) || 0));
+        itemOffsets[item.key] = { x: column * dinSize, y: row * rowStep };
+    });
+
+    return {
+        panelSize: hasPanel ? {
+            width: columns * dinSize + INSTALLATION_PANEL_PADDING_X * 2,
+            height: panelPaddingY * 2 + rows * rowSlotHeight + (rows - 1) * rowGap,
+        } : null,
+        itemOffsets,
+    };
+};
+
+const writeInstallationLayout = (controllerType, panelSize, itemOffsets) => {
+    const entries = Object.entries(itemOffsets || {});
+    if (!panelSize && entries.length === 0) return null;
+    const { dinSize, rowSlotHeight, panelPaddingY, rowGap, rowStep } = getInstallationLayoutMetrics();
+    const columns = panelSize
+        ? Math.max(1, Math.round((panelSize.width - INSTALLATION_PANEL_PADDING_X * 2) / dinSize))
+        : null;
+    const rows = panelSize
+        ? Math.max(1, Math.round((Math.max(0, panelSize.height - panelPaddingY * 2) + rowGap) / (rowSlotHeight + rowGap)))
+        : null;
+
+    return {
+        version: INSTALLATION_LAYOUT_VERSION,
+        controller_type: controllerType,
+        ...(columns && rows ? { panel: { columns, rows } } : {}),
+        items: entries.map(([key, position]) => ({
+            key,
+            column: Math.max(0, Math.round((position?.x || 0) / dinSize)),
+            row: Math.max(0, Math.round((position?.y || 0) / rowStep)),
+        })),
+    };
+};
 
 const isPortDotCircle = ({ fill, radius, listening }) => (
     fill === 'red'
@@ -182,7 +260,11 @@ const buildSchemeFromIncoming = (sourceScheme) => {
         };
     };
     const legacyEcosmartBl2 = Array.isArray(sourceScheme?.ecosmart_bl2) ? sourceScheme.ecosmart_bl2 : null;
-    const { ecosmart_bl2: removedEcosmartBl2, ...schemeWithoutLegacyEcosmartBl2 } = sourceScheme || {};
+    const {
+        ecosmart_bl2: removedEcosmartBl2,
+        installation_layout: removedInstallationLayout,
+        ...schemeWithoutLegacyEcosmartBl2
+    } = sourceScheme || {};
     const controller = schemeWithoutLegacyEcosmartBl2.controller;
     const normalizedController = controller && typeof controller === 'object'
         ? controller
@@ -1460,8 +1542,12 @@ const App = () => {
     const [showOfferModal, setShowOfferModal] = useState(false);
     const [installationMode, setInstallationMode] = useState(true);
     const [morphImages, setMorphImages] = useState([]);
-    const [installationPanelSize, setInstallationPanelSize] = useState(null);
-    const [installationItemOffsets, setInstallationItemOffsets] = useState({});
+    const [installationPanelSize, setInstallationPanelSize] = useState(() => (
+        readInstallationLayout(getInitialSchemeRecord()?.incoming_scheme || incomingScheme).panelSize
+    ));
+    const [installationItemOffsets, setInstallationItemOffsets] = useState(() => (
+        readInstallationLayout(getInitialSchemeRecord()?.incoming_scheme || incomingScheme).itemOffsets
+    ));
     const [installationItemsLocked, setInstallationItemsLocked] = useState(true);
     const [slotMenuPos, setSlotMenuPos] = useState(null);
     const [oneWireMenuPos, setOneWireMenuPos] = useState(null);
@@ -1532,6 +1618,18 @@ const App = () => {
     const [commentViewer, setCommentViewer] = useState(null);
     const controllerType = getControllerType(scheme);
     const canUseInstallationMode = INSTALLATION_CONTROLLERS.has(controllerType);
+    const applyInstallationLayout = (sourceScheme) => {
+        const layout = readInstallationLayout(sourceScheme);
+        setInstallationPanelSize(layout.panelSize);
+        setInstallationItemOffsets(layout.itemOffsets);
+    };
+    const getPersistedIncomingScheme = () => {
+        const publicScheme = getPublicIncomingScheme(scheme);
+        const layout = writeInstallationLayout(controllerType, installationPanelSize, installationItemOffsets);
+        if (layout) return { ...publicScheme, installation_layout: layout };
+        const { installation_layout: removedInstallationLayout, ...schemeWithoutInstallationLayout } = publicScheme;
+        return schemeWithoutInstallationLayout;
+    };
     const isPanningRef = useRef(false);
     const panStartPointerRef = useRef({ x: 0, y: 0 });
     const panStartStageRef = useRef({ x: 0, y: 0 });
@@ -1627,6 +1725,7 @@ const App = () => {
                     throw new Error(`Scheme ${routeSchemeId} has invalid incoming_scheme`);
                 }
                 setScheme(buildSchemeFromIncoming(payload.incoming_scheme));
+                applyInstallationLayout(payload.incoming_scheme);
                 setSchemeJsonText(JSON.stringify(payload.incoming_scheme, null, 2));
                 setSchemeJsonDirty(false);
                 setSchemeJsonError(null);
@@ -1751,6 +1850,8 @@ const App = () => {
         setRelaySlotOffsets({});
         setController420SlotOffset({ x: 0, y: 0 });
         setExtOneWireOffsets({});
+        setInstallationPanelSize(null);
+        setInstallationItemOffsets({});
         const stage = stageRef.current;
         if (stage) {
             stage.position({ x: 0, y: 0 });
@@ -1763,8 +1864,8 @@ const App = () => {
     // и пользователь еще не начал ручное редактирование текста.
     useEffect(() => {
         if (schemeJsonDirty || !showIncomingScheme) return;
-        setSchemeJsonText(JSON.stringify(getPublicIncomingScheme(scheme), null, 2));
-    }, [scheme, schemeJsonDirty, showIncomingScheme]);
+        setSchemeJsonText(JSON.stringify(getPersistedIncomingScheme(), null, 2));
+    }, [scheme, schemeJsonDirty, showIncomingScheme, installationPanelSize, installationItemOffsets]);
 
     const closeHelpModal = () => {
         window.localStorage?.setItem(HELP_MODAL_STORAGE_KEY, '1');
@@ -1884,6 +1985,7 @@ const App = () => {
             }
             const nextScheme = buildSchemeFromIncoming(parsed);
             setScheme(nextScheme);
+            applyInstallationLayout(parsed);
             setSchemeJsonText(JSON.stringify(parsed, null, 2));
             setSchemeJsonDirty(false);
             setSchemeJsonError(null);
@@ -1922,7 +2024,7 @@ const App = () => {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken,
             },
-            body: JSON.stringify({ incoming_scheme: getPublicIncomingScheme(scheme) }),
+            body: JSON.stringify({ incoming_scheme: getPersistedIncomingScheme() }),
         })
             .then((response) => {
                 if (!response.ok) {
@@ -2014,7 +2116,7 @@ const App = () => {
             body: JSON.stringify({
                 name: name.trim(),
                 description: `Копия схемы: ${schemeName}`,
-                incoming_scheme: getPublicIncomingScheme(scheme),
+                incoming_scheme: getPersistedIncomingScheme(),
             }),
         })
             .then((response) => {
@@ -4073,7 +4175,6 @@ const App = () => {
     );
 
     const installationItems = useMemo(() => {
-        if (!installationMode) return [];
         const powerModuleTypes = new Set(['circuit-breaker', 'power-unit', 'ups']);
         const expansionModuleTypes = new Set([...EXT_MODULE_TYPES, ...DI_MODULE_TYPES, 'ntc-1-wire', 'rdt2', 'ecosmartbl2']);
         const getItemType = (item) => canonicalDeviceType(typeof item === 'string' ? item : item?.type);
@@ -4159,6 +4260,7 @@ const App = () => {
                 seen.add(key);
                 items.push({
                     key,
+                    layoutKey: getInstallationLayoutItemKey('power', item, type, index),
                     type,
                     data: item,
                     powerPreviousLabel: type === 'ups' ? POWER_UNIT_LABEL : null,
@@ -4172,6 +4274,7 @@ const App = () => {
         memoExtModules.forEach((item, index) => {
             const labelInfo = getChainLabelInfo(memoExtModules, index);
             addUnique(items, seen, item, `ext:${index}`, {
+            layoutKey: getInstallationLayoutItemKey('ext', item, getItemType(item), index),
             installationLabel: labelInfo.label,
             modulePreviousLabel: index === 0
                 ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
@@ -4189,6 +4292,7 @@ const App = () => {
         diModuleItems.forEach((item, index, modules) => {
             const labelInfo = getChainLabelInfo(modules, index);
             addUnique(items, seen, item, `di:${index}`, {
+            layoutKey: getInstallationLayoutItemKey('di', item, getItemType(item), index),
             installationLabel: labelInfo.label,
             modulePreviousLabel: index === 0
                 ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
@@ -4203,6 +4307,7 @@ const App = () => {
         standaloneOneWireModules.forEach((item, index) => {
             const labelInfo = getChainLabelInfo(standaloneOneWireModules, index);
             addUnique(items, seen, item, `onewire:${index}`, {
+            layoutKey: getInstallationLayoutItemKey('one-wire', item, getItemType(item), index),
             installationLabel: labelInfo.label,
             oneWirePreviousLabel: index === 0
                 ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
@@ -4216,6 +4321,7 @@ const App = () => {
         controllerOneWireDevices.forEach((item, index) => {
             const labelInfo = getChainLabelInfo(controllerOneWireDevices, index);
             addUnique(items, seen, item, `controller-onewire:${index}`, {
+            layoutKey: getInstallationLayoutItemKey('one-wire', item, getItemType(item), index),
             installationLabel: labelInfo.label,
             oneWirePreviousLabel: index === 0
                 ? getInstallationItemLabel({ key: 'controller', type: getControllerType(scheme), data: scheme?.controller })
@@ -4236,6 +4342,7 @@ const App = () => {
             .forEach(({ item, moduleItem, moduleIndex, itemIndex, lineItems }) => {
                 const labelInfo = getChainLabelInfo(lineItems, itemIndex);
                 addUnique(items, seen, item, `ext-onewire:${moduleIndex}:${itemIndex}`, {
+                layoutKey: getInstallationLayoutItemKey('one-wire', item, getItemType(item), `${moduleIndex}:${itemIndex}`),
                 installationLabel: labelInfo.label,
                 oneWirePreviousLabel: itemIndex === 0
                     ? getChainLabelInfo(memoExtModules, moduleIndex).label
@@ -4247,7 +4354,18 @@ const App = () => {
             });
 
         return items;
-    }, [installationMode, scheme, memoExtModules, memoExtLineThermostatDevices]);
+    }, [scheme, memoExtModules, memoExtLineThermostatDevices]);
+
+    useEffect(() => {
+        const activeKeys = new Set([
+            getInstallationLayoutItemKey('controller', scheme?.controller, controllerType, 0),
+            ...installationItems.map((item) => item.layoutKey || item.key),
+        ]);
+        setInstallationItemOffsets((current) => {
+            const next = Object.fromEntries(Object.entries(current).filter(([key]) => activeKeys.has(key)));
+            return Object.keys(next).length === Object.keys(current).length ? current : next;
+        });
+    }, [controllerType, installationItems]);
 
     return (
         <main className="spa-page">
@@ -14701,9 +14819,10 @@ const App = () => {
                                     .sort((a, b) => (powerOrder[a.type] ?? 99) - (powerOrder[b.type] ?? 99));
                                 const items = [
                                     ...installationPowerItems,
-                                    controllerImage ? {
-                                        key: 'controller',
-                                        type: controllerType,
+                                     controllerImage ? {
+                                         key: 'controller',
+                                         layoutKey: getInstallationLayoutItemKey('controller', scheme?.controller, controllerType, 0),
+                                         type: controllerType,
                                         image: controllerImage,
                                         data: scheme?.controller,
                                         // DI-входы контроллера, занятые линиями коммутации ИБП (DI-IN-1/2 у pro,
@@ -14742,17 +14861,63 @@ const App = () => {
                                 // Панель — независимый холст фиксированного размера. Пока пользователь ни
                                 // разу не менял размер вручную, он подгоняется под текущий набор
                                 // оборудования в один ряд (чтобы сразу было куда всё поместить). После
-                                // первого ручного resize размер полностью в руках пользователя и больше не
-                                // пересчитывается от состава/расположения оборудования — раньше перенос
-                                // устройства в другой ряд или добавление модуля сам двигал границы щита,
-                                // что выглядело как "щит сам подстраивается". Сначала меняют размер
-                                // руками, потом внутри него располагают оборудование.
+                                // первого ручного resize заданный размер сохраняется. Если новые модули
+                                // перестают помещаться, ниже добавляется только необходимый DIN-ряд:
+                                // оборудование не должно выходить за щит или оказываться между рейками.
                                 const defaultContentWidth = items.reduce((sum, item) => sum + (isLeftControllerItem(item) ? 0 : getInstallationItemWidth(item)), 0) + gap * Math.max(0, items.length - 1);
                                 const defaultPanelWidth = defaultContentWidth + panelPaddingX * 2;
                                 const defaultPanelHeight = rowSlotHeight + panelPaddingY * 2;
-                                const panelWidth = installationPanelSize?.width ?? defaultPanelWidth;
-                                const panelHeight = installationPanelSize?.height ?? defaultPanelHeight;
+                                const requestedPanelWidth = installationPanelSize?.width ?? defaultPanelWidth;
+                                const requestedPanelHeight = installationPanelSize?.height ?? defaultPanelHeight;
+                                const widestDinItem = items.reduce((width, item) => (
+                                    isLeftControllerItem(item) ? width : Math.max(width, getInstallationItemWidth(item))
+                                ), dinSize);
+                                const panelWidth = Math.max(requestedPanelWidth, widestDinItem + panelPaddingX * 2);
+                                const innerPanelWidth = Math.max(dinSize, panelWidth - panelPaddingX * 2);
+                                const requestedRowCount = Math.max(1, Math.floor((Math.max(0, requestedPanelHeight - panelPaddingY * 2) + rowGap) / rowStep));
+                                const rowOccupancy = Array.from({ length: requestedRowCount }, () => []);
+                                const installationPositionsByKey = {};
+                                const dinItems = items.filter((item) => !isLeftControllerItem(item));
+                                const getLayoutStateKey = (item) => item.layoutKey || item.key;
+                                const hasManualPosition = (item) => Object.prototype.hasOwnProperty.call(installationItemOffsets, getLayoutStateKey(item));
+                                const ensureRow = (row) => {
+                                    while (rowOccupancy.length <= row) rowOccupancy.push([]);
+                                };
+                                const reservePosition = (item, row, localX) => {
+                                    const width = getInstallationItemWidth(item);
+                                    ensureRow(row);
+                                    installationPositionsByKey[item.key] = { row, x: localX };
+                                    rowOccupancy[row].push({ left: localX, right: localX + width });
+                                };
+                                const findFreePosition = (item) => {
+                                    const width = getInstallationItemWidth(item);
+                                    const maxX = Math.max(0, innerPanelWidth - width);
+                                    for (let row = 0; row < rowOccupancy.length; row += 1) {
+                                        for (let localX = 0; localX <= maxX; localX += dinSize) {
+                                            const overlaps = rowOccupancy[row].some((box) => localX < box.right && localX + width > box.left);
+                                            if (!overlaps) return { row, x: localX };
+                                        }
+                                    }
+                                    return { row: rowOccupancy.length, x: 0 };
+                                };
 
+                                // Ручные позиции закреплены относительно внутренней области щита, поэтому
+                                // добавление модулей перед ними больше не сдвигает их вдоль DIN-рейки.
+                                dinItems.filter(hasManualPosition).forEach((item) => {
+                                    const position = installationItemOffsets[getLayoutStateKey(item)] || { x: 0, y: 0 };
+                                    const width = getInstallationItemWidth(item);
+                                    const row = Math.max(0, Math.round((position.y || 0) / rowStep));
+                                    const localX = Math.max(0, Math.min(innerPanelWidth - width, Math.round((position.x || 0) / dinSize) * dinSize));
+                                    reservePosition(item, row, localX);
+                                });
+                                dinItems.filter((item) => !hasManualPosition(item)).forEach((item) => {
+                                    const position = findFreePosition(item);
+                                    reservePosition(item, position.row, position.x);
+                                });
+
+                                const rowCount = Math.max(1, rowOccupancy.length);
+                                const requiredPanelHeight = panelPaddingY * 2 + rowCount * rowSlotHeight + (rowCount - 1) * rowGap;
+                                const panelHeight = Math.max(requestedPanelHeight, requiredPanelHeight);
                                 const panelX = Math.round(Math.max(2 * indentSize - panelPaddingX, canvasSize.width / 2 - panelWidth / 2) / indentSize) * indentSize;
                                 const panelY = Math.round(Math.max(2 * indentSize - panelPaddingY, canvasSize.height / 2 - panelHeight / 2) / indentSize) * indentSize;
                                 const startX = panelX + panelPaddingX;
@@ -14773,7 +14938,6 @@ const App = () => {
                                         ? panelY + panelHeight / 2 - leftControllerItem.image.height / 2
                                         : canvasSize.height / 2 - leftControllerItem.image.height / 2)
                                     : 0;
-                                const rowCount = Math.max(1, Math.floor((Math.max(0, panelHeight - panelPaddingY * 2) + rowGap) / rowStep));
                                 const railHeight = 24;
                                 const railY = startY + rowSlotHeight * 0.45 - railHeight / 2;
                                 const railX = panelX + innerPanelInset;
@@ -14786,22 +14950,15 @@ const App = () => {
                                 let minPanelWidth = dinSize * 2;
                                 let occupiedRowCount = 1;
                                 const itemBoxesByKey = {};
-                                {
-                                    let boundsCursorX = startX;
-                                    items.forEach((item) => {
-                                        if (isLeftControllerItem(item)) return; // вынесен слева, не на рейке
-                                        const itemBaseX = boundsCursorX;
-                                        const itemOffset = installationItemOffsets[item.key] || { x: 0, y: 0 };
-                                        const itemRow = rowStep ? Math.max(0, Math.round(itemOffset.y / rowStep)) : 0;
-                                        const itemWidth = getInstallationItemWidth(item);
-                                        const left = itemBaseX + itemOffset.x;
-                                        const right = left + itemWidth;
-                                        occupiedRowCount = Math.max(occupiedRowCount, itemRow + 1);
-                                        itemBoxesByKey[item.key] = { row: itemRow, left, right };
-                                        minPanelWidth = Math.max(minPanelWidth, right - panelX + panelPaddingX);
-                                        boundsCursorX += itemWidth + gap;
-                                    });
-                                }
+                                dinItems.forEach((item) => {
+                                    const position = installationPositionsByKey[item.key];
+                                    const itemWidth = getInstallationItemWidth(item);
+                                    const left = startX + position.x;
+                                    const right = left + itemWidth;
+                                    occupiedRowCount = Math.max(occupiedRowCount, position.row + 1);
+                                    itemBoxesByKey[item.key] = { row: position.row, left, right };
+                                    minPanelWidth = Math.max(minPanelWidth, position.x + itemWidth + panelPaddingX * 2);
+                                });
                                 const minInnerWidth = Math.max(0, minPanelWidth - panelPaddingX * 2);
 
                                 const resolveInstallationRowX = (itemKey, itemWidth, row, candidateAbsX, minAbsX, maxAbsX) => {
@@ -14833,7 +14990,6 @@ const App = () => {
                                     return best ? minAbsX + best.gridIndex * dinSize : null;
                                 };
 
-                                let currentX = startX;
                                 const getInstallationPorts = (item) => {
                                     const sourcePorts = item.key === 'controller' ? ports : (wirelessPortsByType[item.type] || []);
                                     const filtered = sourcePorts.filter((port) => {
@@ -14993,17 +15149,17 @@ const App = () => {
                                             const previousItem = items[itemIndex - 1] || null;
                                             const nextItem = items[itemIndex + 1] || null;
                                             const previousInstallationLabel = item.oneWirePreviousLabel || item.modulePreviousLabel || getInstallationItemLabel(previousItem);
-                                            const nextInstallationLabel = item.oneWireNextLabel || item.moduleNextLabel || getInstallationItemLabel(nextItem);
-                                            const itemWidth = getInstallationItemWidth(item);
-                                            const isLeftController = isLeftControllerItem(item);
-                                            const baseX = isLeftController ? leftControllerBaseX : currentX;
-                                            const baseY = isLeftController
-                                                ? leftControllerBaseY
-                                                : startY + (rowSlotHeight - item.image.height) / 2;
-                                            const offset = isLeftController ? { x: 0, y: 0 } : (installationItemOffsets[item.key] || { x: 0, y: 0 });
-                                            const x = baseX + offset.x;
-                                            const y = baseY + offset.y;
-                                            if (!isLeftController) currentX += itemWidth + gap;
+                                             const nextInstallationLabel = item.oneWireNextLabel || item.moduleNextLabel || getInstallationItemLabel(nextItem);
+                                             const itemWidth = getInstallationItemWidth(item);
+                                             const isLeftController = isLeftControllerItem(item);
+                                             const rackPosition = installationPositionsByKey[item.key] || { row: 0, x: 0 };
+                                             const rackBaseY = startY + (rowSlotHeight - item.image.height) / 2;
+                                             const baseX = isLeftController ? leftControllerBaseX : startX + rackPosition.x;
+                                             const baseY = isLeftController
+                                                 ? leftControllerBaseY
+                                                 : rackBaseY + rackPosition.row * rowStep;
+                                             const x = baseX;
+                                             const y = baseY;
                                             return (
                                                 <Group
                                                     key={`installation-${item.key}`}
@@ -15016,20 +15172,20 @@ const App = () => {
                                                         const node = event.target;
                                                         const minAbsX = panelX + panelPaddingX;
                                                         const maxAbsX = panelX + panelWidth - panelPaddingX - itemWidth;
-                                                        const currentRow = Math.max(0, Math.min(rowCount - 1, Math.round((node.y() - baseY) / rowStep)));
-                                                        const snappedAbsX = resolveInstallationRowX(item.key, itemWidth, currentRow, node.x(), minAbsX, maxAbsX);
+                                                         const currentRow = Math.max(0, Math.min(rowCount - 1, Math.round((node.y() - rackBaseY) / rowStep)));
+                                                         const snappedAbsX = resolveInstallationRowX(item.key, itemWidth, currentRow, node.x(), minAbsX, maxAbsX);
                                                         if (snappedAbsX == null) {
                                                             node.position({ x, y });
                                                             node.getLayer()?.batchDraw();
                                                             return;
                                                         }
-                                                        const snappedX = snappedAbsX - baseX;
-                                                        const snappedY = currentRow * rowStep;
-                                                        setInstallationItemOffsets((prev) => ({
-                                                            ...prev,
-                                                            [item.key]: { x: snappedX, y: snappedY },
-                                                        }));
-                                                        node.position({ x: baseX + snappedX, y: baseY + snappedY });
+                                                         const snappedX = snappedAbsX - startX;
+                                                         const snappedY = currentRow * rowStep;
+                                                         setInstallationItemOffsets((prev) => ({
+                                                             ...prev,
+                                                             [getLayoutStateKey(item)]: { x: snappedX, y: snappedY },
+                                                         }));
+                                                         node.position({ x: snappedAbsX, y: rackBaseY + snappedY });
                                                         node.getLayer()?.batchDraw();
                                                     }}
                                                 >

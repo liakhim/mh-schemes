@@ -19,8 +19,35 @@ const incomingScheme = {
     one_wire_modules: [],
     power_modules: ['circuit-breaker', 'power-unit'],
     wifi_modules: [],
+    installation_layout: null,
 };
 ```
+
+## Монтажная раскладка
+
+Поле `installation_layout` хранит размер щита и вручную закреплённые позиции модулей на DIN-рейках:
+
+```js
+installation_layout: {
+    version: 1,
+    controller_type: 'pro',
+    panel: {
+        columns: 12,
+        rows: 2,
+    },
+    items: [
+        { key: 'controller:pro', column: 0, row: 0 },
+        { key: 'ext:io4:id:42', column: 3, row: 1 },
+    ],
+}
+```
+
+- `columns` измеряется в шагах DIN, `rows` — в DIN-рейках.
+- `column` и `row` начинаются с нуля.
+- В `items` сохраняются вручную перемещённые элементы; остальные позиции восстанавливаются автоматической раскладкой по свободным местам.
+- `controller_type` защищает от применения раскладки к другому типу контроллера.
+- Старые схемы без `installation_layout` используют автоматическую раскладку.
+- Поле хранится внутри `incoming_scheme`; отдельная таблица или миграция БД не требуется.
 
 ## Контроллер
 
