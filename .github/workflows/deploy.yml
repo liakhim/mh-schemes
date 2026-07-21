@@ -1,0 +1,75 @@
+name: Deploy to Beget
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run frontend tests
+        run: npm run test:js
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.BEGET_SSH_KEY }}
+          SSH_HOST: ${{ secrets.BEGET_HOST }}
+          SSH_PORT: ${{ secrets.BEGET_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Update application
+        env:
+          SSH_HOST: ${{ secrets.BEGET_HOST }}
+          SSH_PORT: ${{ secrets.BEGET_PORT }}
+          SSH_USER: ${{ secrets.BEGET_USER }}
+          APP_PATH: ${{ secrets.BEGET_PATH }}
+        run: |
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "cd '$APP_PATH' &&
+             git pull --ff-only &&
+             composer install --no-dev --optimize-autoloader &&
+             php8.5 artisan migrate --force &&
+             php8.5 artisan config:cache &&
+             php8.5 artisan route:cache &&
+             php8.5 artisan view:cache"
+
+      - name: Upload frontend build
+        env:
+          SSH_HOST: ${{ secrets.BEGET_HOST }}
+          SSH_PORT: ${{ secrets.BEGET_PORT }}
+          SSH_USER: ${{ secrets.BEGET_USER }}
+          APP_PATH: ${{ secrets.BEGET_PATH }}
+        run: |
+          rsync -az --delete \
+            -e "ssh -p $SSH_PORT" \
+            public/build/ \
+            "$SSH_USER@$SSH_HOST:$APP_PATH/public/build/"

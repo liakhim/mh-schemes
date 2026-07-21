@@ -15036,7 +15036,7 @@ const App = () => {
                                                         image={item.image}
                                                         width={itemWidth}
                                                         height={item.image.height}
-                                                        {...(isLeftController ? {
+                                                        {...(isLeftController && !['go', 'go+'].includes(controllerType) ? {
                                                             shadowColor: 'rgba(15, 23, 42, 0.32)',
                                                             shadowBlur: 18,
                                                             shadowOffsetY: 10,
