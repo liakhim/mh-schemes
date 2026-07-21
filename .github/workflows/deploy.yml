@@ -39,7 +39,7 @@ jobs:
         env:
           SSH_KEY: ${{ secrets.BEGET_SSH_KEY }}
           SSH_HOST: ${{ secrets.BEGET_HOST }}
-          SSH_PORT: ${{ secrets.BEGET_PORT }}
+          SSH_PORT: ${{ secrets.BEGET_PORT || '22' }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
@@ -49,7 +49,7 @@ jobs:
       - name: Update application
         env:
           SSH_HOST: ${{ secrets.BEGET_HOST }}
-          SSH_PORT: ${{ secrets.BEGET_PORT }}
+          SSH_PORT: ${{ secrets.BEGET_PORT || '22' }}
           SSH_USER: ${{ secrets.BEGET_USER }}
           APP_PATH: ${{ secrets.BEGET_PATH }}
         run: |
@@ -65,7 +65,7 @@ jobs:
       - name: Upload frontend build
         env:
           SSH_HOST: ${{ secrets.BEGET_HOST }}
-          SSH_PORT: ${{ secrets.BEGET_PORT }}
+          SSH_PORT: ${{ secrets.BEGET_PORT || '22' }}
           SSH_USER: ${{ secrets.BEGET_USER }}
           APP_PATH: ${{ secrets.BEGET_PATH }}
         run: |
