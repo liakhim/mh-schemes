@@ -10228,7 +10228,13 @@ const App = () => {
                                                                                const routeY = isDoubleRelayDevice && relayType === 'valve' && sourceRelaySlotIndex === 0
                                                                                   ? relayInPortY - 3 * indentSize
                                                                                    : relayInPortY;
-                                                                               const relayStroke = relayType === '220servo' ? '#d32f2f' : '#212121';
+                                                                               const relayStroke = relayType === '220servo'
+                                                                                   || relayType === 'boiler-pump'
+                                                                                   || relayType === 'pump-220v'
+                                                                                   || relayType === 'zoneServo'
+                                                                                   || isOtherEquipmentType(relayType)
+                                                                                   ? '#d32f2f'
+                                                                                   : '#212121';
                                                                                return (
                                                                                    <Line points={[relayInPortX, relayInPortY, relayInPortX, routeY, moduleBPortX, routeY, moduleBPortX, moduleBPortY]} stroke={relayStroke} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                                                );
@@ -10497,6 +10503,14 @@ const App = () => {
                                                                     const infoBlockY = sourceRelaySlotY - infoBlockHeight - 8;
                                                                    const relayHoverKey = `rl2s:${slotIndex}:${sourceRelaySlotIndex}`;
                                                                    const isRelayHovered = hoveredRelaySlotIndex === relayHoverKey;
+                                                                   const relayStroke = relayType === '220servo'
+                                                                       || relayType === 'valve'
+                                                                       || relayType === 'boiler-pump'
+                                                                       || relayType === 'pump-220v'
+                                                                       || relayType === 'zoneServo'
+                                                                       || isOtherEquipmentType(relayType)
+                                                                       ? '#d32f2f'
+                                                                       : '#212121';
 
                                                                    return (
                                                                        <Group
@@ -10505,7 +10519,7 @@ const App = () => {
                                                                            onMouseLeave={() => setHoveredRelaySlotIndex((prev) => (prev === relayHoverKey ? null : prev))}
                                                                        >
                                                                            {relayDevice && relayType !== 'valve' && !isStupidBoilerType(relayType) && bPort && relayInPort && (
-                                                                                <Line points={[relayInPortX, relayInPortY, moduleBPortX, relayInPortY, moduleBPortX, moduleBPortY]} stroke={relayType === '220servo' || relayType === 'valve' ? '#d32f2f' : '#212121'} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                 <Line points={[relayInPortX, relayInPortY, moduleBPortX, relayInPortY, moduleBPortX, moduleBPortY]} stroke={relayStroke} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                                            )}
                                                                           {!relayDevice && bPort && moduleBPortX !== null && moduleBPortY !== null && (
                                                                               <Line
