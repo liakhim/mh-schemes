@@ -12486,16 +12486,6 @@ const App = () => {
                                                                     stroke={bl2Boiler ? 'rgba(0,0,0,0)' : '#d7dbe4'}
                                                                     strokeWidth={1.5}
                                                                 />
-                                                                  {bl2Boiler && bl2BoilerImage && (
-                                                                      <Image
-                                                                          image={bl2BoilerImage}
-                                                                          x={bl2BusSlotX}
-                                                                          y={bl2BusSlotY}
-                                                                      />
-                                                                  )}
-                                                                  {hasBl2RinnaiAdapter && bl2RinnaiAdapterImage && (
-                                                                      <Image image={bl2RinnaiAdapterImage} x={bl2RinnaiAdapterX} y={bl2RinnaiAdapterY} width={bl2RinnaiAdapterWidth} height={bl2RinnaiAdapterHeight} listening={false} />
-                                                                  )}
                                                                  {!bl2Boiler && showEmptySlots && (
                                                                      <>
                                                                          <Circle
@@ -12523,7 +12513,7 @@ const App = () => {
                                                                          />
                                                                      </>
                                                                  )}
-                                                                 {bl2Boiler && (() => {
+                                                                  {bl2Boiler && (() => {
                                                                     const links = [
                                                                         { controllerPort: 'BUS-A', boilerPort: 'BUS-A', offset: 1 * indentSize, color: '#2e7d32' },
                                                                         { controllerPort: 'BUS-B', boilerPort: 'BUS-B', offset: 2 * indentSize, color: '#2e7d32' },
@@ -12571,9 +12561,39 @@ const App = () => {
                                                                                 listening={false}
                                                                             />
                                                                         );
-                                                                     });
-                                                                 })()}
-                                                                 {bl2Boiler && isHovered && (
+                                                                      });
+                                                                  })()}
+                                                                  {!bl2Boiler && showEmptySlots && (() => {
+                                                                      return ['BUS-A', 'BUS-B'].map((portName) => {
+                                                                          const fromPort = extPorts.find((port) => port.name === portName);
+                                                                          if (!fromPort) return null;
+                                                                          const fromX = slotX + fromPort.x * slotWidth;
+                                                                          const fromY = slotY + fromPort.y * slotHeight;
+                                                                          const toY = bl2BusSlotY + bl2BoilerHeight;
+                                                                          return (
+                                                                              <Line
+                                                                                  key={`bl2-empty-bus-link-${slotIndex}-${portName}`}
+                                                                                  points={[fromX, fromY, fromX, toY]}
+                                                                                  stroke="#2e7d32"
+                                                                                  strokeWidth={1}
+                                                                                  lineCap="round"
+                                                                                  lineJoin="round"
+                                                                                  listening={false}
+                                                                              />
+                                                                          );
+                                                                      });
+                                                                  })()}
+                                                                  {bl2Boiler && bl2BoilerImage && (
+                                                                      <Image
+                                                                          image={bl2BoilerImage}
+                                                                          x={bl2BusSlotX}
+                                                                          y={bl2BusSlotY}
+                                                                      />
+                                                                  )}
+                                                                  {hasBl2RinnaiAdapter && bl2RinnaiAdapterImage && (
+                                                                      <Image image={bl2RinnaiAdapterImage} x={bl2RinnaiAdapterX} y={bl2RinnaiAdapterY} width={bl2RinnaiAdapterWidth} height={bl2RinnaiAdapterHeight} listening={false} />
+                                                                  )}
+                                                                  {bl2Boiler && isHovered && (
                                                                      <>
                                                                          <Circle
                                                                              x={bl2BusSlotX + bl2BoilerWidth - 2.5}
@@ -13194,8 +13214,9 @@ const App = () => {
                                                                  ? slotX
                                                                  : slotX + targetPort.x * slotWidth;
                                                              const toY = slotY + targetPort.y * slotHeight;
-                                                            let fromX;
-                                                            let fromY;
+                                                             let fromX;
+                                                             let fromY;
+                                                             let sourceDeviceBottomY = controllerImage.height;
 
                                                             if (slotIndex === 0) {
                                                                 const controllerPort = findPortByNames(ports, link.controllerFrom);
@@ -13211,10 +13232,11 @@ const App = () => {
                                                                 if (!previousPort) return null;
                                                                 const previousSize = getExtModuleSize(previousDevice);
                                                                 const previousSlotPos = getExtSlotPosition(slotIndex - 1);
-                                                                const previousSlotX = previousSlotPos.x;
-                                                                const previousSlotY = previousSlotPos.y;
-                                                                fromX = previousSlotX + previousPort.x * previousSize.width;
-                                                                fromY = previousSlotY + previousPort.y * previousSize.height;
+                                                                 const previousSlotX = previousSlotPos.x;
+                                                                 const previousSlotY = previousSlotPos.y;
+                                                                 fromX = previousSlotX + previousPort.x * previousSize.width;
+                                                                 fromY = previousSlotY + previousPort.y * previousSize.height;
+                                                                 sourceDeviceBottomY = previousSlotY + previousSize.height;
                                                             }
 
                                                             const ecosmartThermostatControllerRoute = isEcosmartThermostatExtLine && slotIndex === 0 && extNormalizedType === 'thermostat'
@@ -13284,7 +13306,10 @@ const App = () => {
                                                                 baseSourceHopBendY = previousBasePos.y + previousSize.height + (link.moduleHopBendIndent * indentSize);
                                                             }
                                                               const minAllowedBendY = Math.max(baseDefaultBendY, baseHopBendY, baseSourceHopBendY);
-                                                              const clampedBendY = Math.max(bendY, minAllowedBendY);
+                                                              const isEmptyProExtBLink = isProExtAddSlot && link.moduleTo === 'EXT-IN-B';
+                                                              const clampedBendY = isEmptyProExtBLink
+                                                                  ? sourceDeviceBottomY + 3 * indentSize
+                                                                  : Math.max(bendY, minAllowedBendY);
                                                               const previousExtNormalizedType = slotIndex > 0
                                                                   ? canonicalDeviceType(extModules[slotIndex - 1]?.type)
                                                                   : null;
