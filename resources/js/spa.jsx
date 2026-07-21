@@ -10927,7 +10927,7 @@ const App = () => {
                                             y: isInitialPosition ? snapToGrid(baseY, indentSize) : baseY + offset.y,
                                         };
                                     };
-                                    const extLinks = [
+                                     const extLinks = [
                                         {
                                             color: '#d32f2f',
                                             controllerFrom: ['12VDC-OUT-V+', '12VDC-IN-V+'],
@@ -10959,8 +10959,14 @@ const App = () => {
                                             moduleTo: 'EXT-IN-B',
                                             firstHopBendIndent: 5,
                                             moduleHopBendIndent: 3,
-                                        },
-                                    ];
+                                         },
+                                     ];
+                                     const emptyExtSlotInputPorts = {
+                                         '12VDC-IN-V+': { x: 7.25 / EXT_SLOT_SIZE, y: 1 },
+                                         '12VDC-IN-GND': { x: 16 / EXT_SLOT_SIZE, y: 1 },
+                                         'EXT-IN-A': { x: 24.75 / EXT_SLOT_SIZE, y: 1 },
+                                         'EXT-IN-B': { x: 33.25 / EXT_SLOT_SIZE, y: 1 },
+                                     };
                                      const findPortByNames = (portsList, names) => {
                                          for (let i = 0; i < names.length; i += 1) {
                                              const found = portsList.find((port) => port.name === names[i]);
@@ -11011,8 +11017,12 @@ const App = () => {
                                              {Array.from({ length: extSlotsCount }).map((_, slotIndex) => {
                                                  const device = extModules[slotIndex] || null;
                                                  const isEcosmartExtThermostatAddSlot = !device && showEcosmartExtThermostatAddSlot && slotIndex === extModules.length;
-                                                 const renderDevice = device || (isEcosmartExtThermostatAddSlot ? ecosmartExtThermostatPlaceholder : null);
-                                                 const isOccupied = !!device;
+                                                  const renderDevice = device || (isEcosmartExtThermostatAddSlot ? ecosmartExtThermostatPlaceholder : null);
+                                                  const isOccupied = !!device;
+                                                  const isProExtAddSlot = controllerType === 'pro'
+                                                      && !isOccupied
+                                                      && showExtAddSlot
+                                                      && slotIndex === extModules.length;
                                                  const imageKey = renderDevice ? getWirelessDeviceImageKey(renderDevice) : null;
                                                  const image = imageKey ? wirelessImages[imageKey] : null;
                                                  const extPorts = imageKey ? (wirelessPortsByType[imageKey] || []) : [];
@@ -13170,8 +13180,10 @@ const App = () => {
                                                                 />
                                                             </>
                                                         )}
-                                                          {renderDevice && extLinks.map((link, linkIndex) => {
-                                                              const targetPort = findExtDevicePort(renderDevice, extPorts, link.moduleTo);
+                                                          {(renderDevice || isProExtAddSlot) && extLinks.map((link, linkIndex) => {
+                                                              const targetPort = renderDevice
+                                                                  ? findExtDevicePort(renderDevice, extPorts, link.moduleTo)
+                                                                  : emptyExtSlotInputPorts[link.moduleTo];
                                                              if (!targetPort) return null;
                                                              const toX = controllerType === 'ecosmart' && !isOccupied
                                                                  ? slotX
