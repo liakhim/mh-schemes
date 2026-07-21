@@ -9615,10 +9615,15 @@ const App = () => {
                                                             />
                                                         ))}
                                                         {!isOccupied && (controllerType === 'smart2' || controllerType === 'pro' || controllerType === 'go' || controllerType === 'go+') && (() => {
-                                                            const emptyLinks = [
-                                                                { controllerPort: 'BUS-A', slotX: slotX + slotWidth * 0.4, offset: 1 * indentSize },
-                                                                { controllerPort: 'BUS-B', slotX: slotX + slotWidth * 0.6, offset: 2 * indentSize },
-                                                            ];
+                                                            const emptyLinks = controllerType === 'pro'
+                                                                ? [
+                                                                    { controllerPort: 'BUS-B', slotX: slotX + slotWidth * 0.4, offset: 2 * indentSize },
+                                                                    { controllerPort: 'BUS-A', slotX: slotX + slotWidth * 0.6, offset: 1 * indentSize },
+                                                                ]
+                                                                : [
+                                                                    { controllerPort: 'BUS-A', slotX: slotX + slotWidth * 0.4, offset: 1 * indentSize },
+                                                                    { controllerPort: 'BUS-B', slotX: slotX + slotWidth * 0.6, offset: 2 * indentSize },
+                                                                ];
                                                             return emptyLinks.map((link) => {
                                                                 const fromPort = ports.find((port) => port.name === link.controllerPort);
                                                                 if (!fromPort) return null;
