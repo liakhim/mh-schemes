@@ -1540,6 +1540,53 @@ const getCsrfToken = () => document.querySelector('meta[name="csrf-token"]')?.ge
 
 const BOILER_SEARCH_ENDPOINT = '/api/integration';
 const BOILER_SEARCH_DEBOUNCE_MS = 400;
+const SELECTION_DRAFT_STORAGE_KEY = 'mh-schemes-selection-draft';
+const SELECTION_DRAFT_VERSION = 1;
+
+const createInitialSelectionScheme = () => ({
+    controller: { type: 'go', relay_devices: [], one_wire_devices: [], bus_devices: [] },
+});
+
+const hasSelectedArrayItems = (value) => {
+    if (Array.isArray(value)) return value.some(Boolean);
+    if (!value || typeof value !== 'object') return false;
+    return Object.values(value).some(hasSelectedArrayItems);
+};
+
+const isSelectionDraftMeaningful = (scheme, upsRequested) => (
+    canonicalType(typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type) !== 'go'
+    || upsRequested === true
+    || scheme?.unified_leak_loop === true
+    || hasSelectedArrayItems(scheme)
+);
+
+const readSelectionDraft = () => {
+    try {
+        const raw = window.localStorage?.getItem(SELECTION_DRAFT_STORAGE_KEY);
+        if (!raw) return null;
+        const draft = JSON.parse(raw);
+        if (draft?.version !== SELECTION_DRAFT_VERSION || !draft.incomingScheme || typeof draft.incomingScheme !== 'object') return null;
+        return isSelectionDraftMeaningful(draft.incomingScheme, draft.upsRequested) ? draft : null;
+    } catch {
+        return null;
+    }
+};
+
+const removeSelectionDraft = () => {
+    try {
+        window.localStorage?.removeItem(SELECTION_DRAFT_STORAGE_KEY);
+    } catch {
+        // localStorage can be unavailable in private browsing or restricted contexts.
+    }
+};
+
+const writeSelectionDraft = (draft) => {
+    try {
+        window.localStorage?.setItem(SELECTION_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    } catch {
+        // Selection remains usable when storage quota or browser policy blocks persistence.
+    }
+};
 
 const makeBoilerSearchPayload = (query) => ({
     action: 'getNames',
@@ -2570,9 +2617,8 @@ const MYHEAT_PRICES = {
 const RADIO_MODULE_ACTIVATION_LABEL = 'Активация радиомодуля';
 
 const SelectionApp = () => {
-    const [incomingScheme, setIncomingScheme] = useState({
-        controller: { type: 'go', relay_devices: [], one_wire_devices: [], bus_devices: [] },
-    });
+    const [pendingDraft, setPendingDraft] = useState(readSelectionDraft);
+    const [incomingScheme, setIncomingScheme] = useState(createInitialSelectionScheme);
     const [showJsonDetails, setShowJsonDetails] = useState(false);
     const [wiredThermostatColor, setWiredThermostatColor] = useState('black');
     const [wiredThermostatHasFloorSensor, setWiredThermostatHasFloorSensor] = useState(false);
@@ -2594,6 +2640,40 @@ const SelectionApp = () => {
     const controllerCardRefs = useRef([]);
     const stickyTopRef = useRef(null);
     const [isControllerBarStuck, setIsControllerBarStuck] = useState(false);
+    const startSelectionFromScratch = useCallback(() => {
+        removeSelectionDraft();
+        upsRequestSourceRef.current = null;
+        upsRequestedRef.current = false;
+        setUpsRequested(false);
+        setIncomingScheme(createInitialSelectionScheme());
+        setWiredThermostatColor('black');
+        setWiredThermostatHasFloorSensor(false);
+        setWirelessThermostatColor('black');
+        setWirelessThermostatHasFloorSensor(false);
+        setWiredTemperatureSensorKey('wired-wall-digital');
+        setWirelessTemperatureSensorKey('wireless-outdoor');
+        setBuildSchemeError('');
+        setPendingDraft(null);
+    }, []);
+    const continueSelectionDraft = useCallback(() => {
+        if (!pendingDraft) return;
+        const requested = pendingDraft.upsRequested === true;
+        const requestSource = pendingDraft.upsRequestSource === 'manual' || pendingDraft.upsRequestSource === 'go+'
+            ? pendingDraft.upsRequestSource
+            : null;
+        const editor = pendingDraft.editor && typeof pendingDraft.editor === 'object' ? pendingDraft.editor : {};
+        upsRequestSourceRef.current = requestSource;
+        upsRequestedRef.current = requested;
+        setUpsRequested(requested);
+        setIncomingScheme(pendingDraft.incomingScheme);
+        setWiredThermostatColor(editor.wiredThermostatColor || 'black');
+        setWiredThermostatHasFloorSensor(editor.wiredThermostatHasFloorSensor === true);
+        setWirelessThermostatColor(editor.wirelessThermostatColor || 'black');
+        setWirelessThermostatHasFloorSensor(editor.wirelessThermostatHasFloorSensor === true);
+        setWiredTemperatureSensorKey(editor.wiredTemperatureSensorKey || 'wired-wall-digital');
+        setWirelessTemperatureSensorKey(editor.wirelessTemperatureSensorKey || 'wireless-outdoor');
+        setPendingDraft(null);
+    }, [pendingDraft]);
     const resolveSelectionScheme = useCallback(
         (scheme, requested = upsRequestedRef.current) => resolveControllerAndRequiredModules(scheme, requested),
         [],
@@ -2620,6 +2700,38 @@ const SelectionApp = () => {
         setUpsRequested(false);
         setIncomingScheme((prev) => resolveSelectionScheme(prev, false));
     }, [controllerType, resolveSelectionScheme]);
+    useEffect(() => {
+        if (pendingDraft) return;
+        if (!isSelectionDraftMeaningful(incomingScheme, upsRequested)) {
+            removeSelectionDraft();
+            return;
+        }
+        writeSelectionDraft({
+            version: SELECTION_DRAFT_VERSION,
+            savedAt: Date.now(),
+            incomingScheme,
+            upsRequested,
+            upsRequestSource: upsRequestSourceRef.current,
+            editor: {
+                wiredThermostatColor,
+                wiredThermostatHasFloorSensor,
+                wirelessThermostatColor,
+                wirelessThermostatHasFloorSensor,
+                wiredTemperatureSensorKey,
+                wirelessTemperatureSensorKey,
+            },
+        });
+    }, [
+        pendingDraft,
+        incomingScheme,
+        upsRequested,
+        wiredThermostatColor,
+        wiredThermostatHasFloorSensor,
+        wirelessThermostatColor,
+        wirelessThermostatHasFloorSensor,
+        wiredTemperatureSensorKey,
+        wirelessTemperatureSensorKey,
+    ]);
     const unifiedLeakLoop = incomingScheme.unified_leak_loop === true;
     const leakSensorCount = [
         ...(Array.isArray(incomingScheme.sensors) ? incomingScheme.sensors : []),
@@ -3020,14 +3132,8 @@ const SelectionApp = () => {
     }, [resolveSelectionScheme]);
 
     const clearScheme = useCallback(() => {
-        upsRequestSourceRef.current = null;
-        upsRequestedRef.current = false;
-        setUpsRequested(false);
-        setIncomingScheme({
-            controller: { type: 'go', relay_devices: [], one_wire_devices: [], bus_devices: [] },
-        });
-        setBuildSchemeError('');
-    }, []);
+        startSelectionFromScratch();
+    }, [startSelectionFromScratch]);
 
     /** Сохраняет согласованную схему и открывает ее редактор в новой вкладке. */
     const buildScheme = useCallback(async () => {
@@ -3068,6 +3174,7 @@ const SelectionApp = () => {
             }
 
             const schemeRecord = await response.json();
+            removeSelectionDraft();
             if (newTab) {
                 newTab.location.href = `/scheme/${schemeRecord.id}`;
             } else {
@@ -3086,6 +3193,31 @@ const SelectionApp = () => {
             className={showJsonDetails ? 'selection-page selection-show-json' : 'selection-page selection-hide-json'}
             style={{ padding: 24, width: 'min(1120px, 100%)', margin: '0 auto' }}
         >
+            {pendingDraft && (
+                <div className="selection-draft-backdrop">
+                    <div
+                        className="selection-draft-modal"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="selection-draft-title"
+                    >
+                        <h2 id="selection-draft-title">Незаконченная схема</h2>
+                        <p>У вас есть незаконченная схема, продолжить или начать составлять подбор заново?</p>
+                        <div className="selection-draft-actions">
+                            <button
+                                type="button"
+                                className="selection-secondary-button"
+                                onClick={startSelectionFromScratch}
+                            >
+                                Начать заново
+                            </button>
+                            <button type="button" onClick={continueSelectionDraft} autoFocus>
+                                Продолжить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {controllerCompatibilityIssues.length > 0 && (
                 <div
                     style={{

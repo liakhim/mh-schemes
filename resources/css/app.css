@@ -375,6 +375,73 @@ body {
     background: rgba(15, 23, 42, 0.55);
 }
 
+.selection-draft-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.58);
+}
+
+.selection-draft-modal {
+    width: min(520px, 100%);
+    padding: 28px;
+    border: 1px solid #d7dbe4;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.38);
+}
+
+.selection-draft-modal h2 {
+    margin: 0 0 12px;
+    color: #1f2937;
+    font-size: 22px;
+}
+
+.selection-draft-modal p {
+    margin: 0;
+    color: #475569;
+    font-size: 15px;
+    line-height: 1.55;
+}
+
+.selection-draft-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.selection-draft-actions button {
+    padding: 10px 16px;
+    border: 1px solid #c85e18;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+@media (max-width: 560px) {
+    .selection-draft-backdrop {
+        padding: 16px;
+    }
+
+    .selection-draft-modal {
+        padding: 22px;
+    }
+
+    .selection-draft-actions {
+        flex-direction: column-reverse;
+    }
+
+    .selection-draft-actions button {
+        width: 100%;
+    }
+}
+
 .equipment-offer-modal {
     width: min(560px, 100%);
     max-height: 85vh;
