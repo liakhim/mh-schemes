@@ -1792,7 +1792,7 @@ const MIXING_TEMPLATES = [
         wiredDevice: {
             id: 13,
             device_type: 'equipment',
-            type: '010pump',
+            type: '010servo',
             connection_type: 'di',
             additions: [
                 { id: 1, device_type: 'sensor', type: 'mixing-ntc-sensor', connection_type: 'ntc' },

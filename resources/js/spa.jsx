@@ -11863,7 +11863,9 @@ const App = () => {
                                                             const visualSlotHeight = slotDeviceType === 'pressure-sensor'
                                                                 ? 2 * indentSize
                                                                 : (slotDeviceType === '010pump' || slotDeviceType === '010servo' ? 8 * indentSize : channelSlotHeight);
-                                                            const imageBoxWidth = slotDeviceType === 'leak-sensor' ? visualSlotWidth * CHANNEL_LEAK_SENSOR_IMAGE_SCALE : visualSlotWidth;
+                                                            const imageBoxWidth = slotDeviceType === 'leak-sensor'
+                                                                ? visualSlotWidth * CHANNEL_LEAK_SENSOR_IMAGE_SCALE
+                                                                : (slotDeviceType === '010servo' ? visualSlotWidth - indentSize : visualSlotWidth);
                                                             const imageBoxHeight = slotDeviceType === 'leak-sensor' ? visualSlotHeight * CHANNEL_LEAK_SENSOR_IMAGE_SCALE : visualSlotHeight;
                                                             const renderSize = (hasDevice && slotDeviceImage)
                                                                 ? getContainSize(slotDeviceImage, imageBoxWidth, imageBoxHeight)

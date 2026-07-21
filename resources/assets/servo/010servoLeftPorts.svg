@@ -1,14 +1,14 @@
-<svg width="70" height="65" viewBox="0 0 70 65" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="71" height="65" viewBox="0 0 71 65" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M13.1833 53.4999L1.48242 47" stroke="black" stroke-linecap="round"/>
 <path d="M13.1831 53.4999L1.68335 59.4999" stroke="#CFF400" stroke-linecap="round"/>
 <path d="M13.1831 53.4999L1.48242 53.4999" stroke="#464EE3" stroke-linecap="round"/>
 <g clip-path="url(#clip0_1081_79)">
-<mask id="mask0_1081_79" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="70" height="60">
-<path d="M70 0H0V60H70V0Z" fill="#D9D9D9"/>
+<mask id="mask0_1081_79" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="71" height="60">
+<path d="M71 0H0V60H71V0Z" fill="#D9D9D9"/>
 </mask>
 <g mask="url(#mask0_1081_79)">
-<mask id="mask1_1081_79" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="70" height="61">
-<path d="M70 0.830566H0V60.1526H70V0.830566Z" fill="white"/>
+<mask id="mask1_1081_79" style="mask-type:luminance" maskUnits="userSpaceOnUse" x="0" y="0" width="71" height="61">
+<path d="M71 0.830566H0V60.1526H71V0.830566Z" fill="white"/>
 </mask>
 <g mask="url(#mask1_1081_79)">
 <path d="M11 42.2241V2.98713C11 1.88317 11.882 1 12.9846 1H68.1182C69.2207 1 70.1027 1.88317 70.1027 2.98713V42.2241C70.1027 43.3281 69.2207 44.2113 68.1182 44.2113H12.9917C11.8891 44.2113 11.0071 43.3281 11.0071 42.2241H11Z" fill="#B3B2B2" stroke="#010101" stroke-miterlimit="10"/>
@@ -32,7 +32,7 @@
 <rect class="CHANNEL-IN" x="1" y="53" width="1" height="1" rx="0.5" fill="transparent"/>
 <defs>
 <clipPath id="clip0_1081_79">
-<rect width="70" height="60" fill="white"/>
+<rect width="71" height="60" fill="white"/>
 </clipPath>
 </defs>
 </svg>
