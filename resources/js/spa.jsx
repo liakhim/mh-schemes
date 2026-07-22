@@ -9,6 +9,7 @@ import { getInitialWirelessDevices, getOneWireDevicesFromScheme } from './scheme
 import { balanceOneWireDevices } from './scheme/domain/oneWireBalancer';
 import { materializeBalancedOneWireScheme } from './scheme/domain/oneWireMaterializer';
 import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './scheme/domain/oneWireMutations';
+import { buildSmart2InstallationDiConnections } from './scheme/domain/installationDi';
 import { controllerImagePaths, wirelessDeviceImagePaths, getWirelessDeviceImageKey, aerialImagePath, goAerialImagePath } from './scheme/assets/imageRegistry';
 import { getOneWireDirectionForDevice, getOneWireLineGeometry } from './scheme/layout/oneWireLayout';
 import { parsePorts, withFallbackPorts, getPortsByClassToken } from './scheme/layout/portParsing';
@@ -1085,6 +1086,11 @@ const getIo4SharedTerminalDevices = (data, indexes, portName) => {
  */
 const isInstallationPortOccupied = (item, port) => {
     const slot = parseInstallationPortSlot(port?.name);
+    if (slot?.line === 'di'
+        && item?.installationDiPortLabels
+        && Object.prototype.hasOwnProperty.call(item.installationDiPortLabels, slot.index)) {
+        return true;
+    }
     // DI-линии коммутации ИБП с контроллером подключены всегда.
     if (slot && slot.line === 'di' && canonicalDeviceType(item?.type) === 'ups') return true;
     if (!slot) {
@@ -1168,6 +1174,11 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
     const slot = parseInstallationPortSlot(port?.name);
     const data = item?.data;
     const normalizedPortName = String(port?.name || '').toUpperCase();
+    if (slot?.line === 'di'
+        && item?.installationDiPortLabels
+        && Object.prototype.hasOwnProperty.call(item.installationDiPortLabels, slot.index)) {
+        return item.installationDiPortLabels[slot.index] || null;
+    }
     // DI-линии коммутации ИБП идут на DI-входы контроллера.
     if (slot && slot.line === 'di' && canonicalDeviceType(item?.type) === 'ups') {
         return options.upsDiTargetLabel || 'DI контроллера';
@@ -14856,11 +14867,31 @@ const App = () => {
                             />
                             {(() => {
                                 const powerTypes = new Set(['circuit-breaker', 'power-unit', 'ups']);
-                                const installationModuleItems = installationItems.map((item) => ({
+                                const baseInstallationModuleItems = installationItems.map((item) => ({
                                     ...item,
                                     image: wirelessImages[item.type] || null,
                                 }));
-                                const hasInstallationUps = installationModuleItems.some((item) => item.type === 'ups');
+                                const hasInstallationUps = baseInstallationModuleItems.some((item) => item.type === 'ups');
+                                const isSmart2Installation = controllerType === 'smart2';
+                                const smart2DiModules = baseInstallationModuleItems.filter((item) => DI_MODULE_TYPES.includes(item.type));
+                                const smart2DiConnections = isSmart2Installation
+                                    ? buildSmart2InstallationDiConnections({
+                                        hasUps: hasInstallationUps,
+                                        moduleLabels: smart2DiModules.map((item) => getInstallationItemLabel(item)),
+                                        controllerLabel: getInstallationItemLabel({ key: 'controller', type: controllerType, data: scheme?.controller }),
+                                    })
+                                    : null;
+                                let smart2DiModuleIndex = 0;
+                                const installationModuleItems = baseInstallationModuleItems.map((item) => {
+                                    if (!smart2DiConnections) return item;
+                                    if (item.type === 'ups') {
+                                        return { ...item, installationDiPortLabels: smart2DiConnections.upsPortLabels };
+                                    }
+                                    if (!DI_MODULE_TYPES.includes(item.type)) return item;
+                                    const installationDiPortLabels = smart2DiConnections.modulePortLabels[smart2DiModuleIndex] || {};
+                                    smart2DiModuleIndex += 1;
+                                    return { ...item, installationDiPortLabels };
+                                });
                                 const poweredInstallationModules = installationModuleItems.filter((item) => !powerTypes.has(item.type));
                                 const firstPoweredModule = poweredInstallationModules[0] || null;
                                 const firstExtInstallationModule = installationModuleItems.find((item) => (
@@ -14868,7 +14899,6 @@ const App = () => {
                                     && (item.data === memoExtModules[0]
                                         || (item.data?.id != null && item.data.id === memoExtModules[0]?.id))
                                 )) || null;
-                                const isSmart2Installation = controllerType === 'smart2';
                                 const powerOrder = { 'circuit-breaker': 0, 'power-unit': 1, ups: 2 };
                                 const installationPowerItems = installationModuleItems
                                     .filter((item) => powerTypes.has(item.type))
@@ -14881,6 +14911,7 @@ const App = () => {
                                          type: controllerType,
                                         image: controllerImage,
                                         data: scheme?.controller,
+                                        ...(smart2DiConnections ? { installationDiPortLabels: smart2DiConnections.controllerPortLabels } : {}),
                                         // DI-входы контроллера, занятые линиями коммутации ИБП (DI-IN-1/2 у pro,
                                         // первая пара DI-OUT у smart2).
                                         upsDiPortIndexes: hasInstallationUps ? [0, 1] : null,
