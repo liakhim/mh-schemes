@@ -10,6 +10,7 @@ import { balanceOneWireDevices } from './scheme/domain/oneWireBalancer';
 import { materializeBalancedOneWireScheme } from './scheme/domain/oneWireMaterializer';
 import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './scheme/domain/oneWireMutations';
 import { buildSmart2InstallationDiConnections } from './scheme/domain/installationDi';
+import { translateRect, unionRects } from './scheme/domain/collisionGeometry';
 import { controllerImagePaths, wirelessDeviceImagePaths, getWirelessDeviceImageKey, aerialImagePath, goAerialImagePath } from './scheme/assets/imageRegistry';
 import { getOneWireDirectionForDevice, getOneWireLineGeometry } from './scheme/layout/oneWireLayout';
 import { parsePorts, withFallbackPorts, getPortsByClassToken } from './scheme/layout/portParsing';
@@ -1595,6 +1596,7 @@ const App = () => {
     const oneWireDragStartOffsetsRef = useRef({});
     const extDragStartOffsetsRef = useRef({});
     const diDragStartOffsetsRef = useRef({});
+    const moduleCollisionNodeRefs = useRef({});
     const busDragStartOffsetsRef = useRef({});
     const relayDragStartOffsetsRef = useRef({});
     const controller420DragStartOffsetRef = useRef({ x: 0, y: 0 });
@@ -3762,6 +3764,26 @@ const App = () => {
         a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom
     );
 
+    const getModuleObjectFootprint = (moduleId, renderedBodyRect, targetBodyRect = renderedBodyRect) => {
+        const moduleNode = moduleCollisionNodeRefs.current[moduleId];
+        if (!moduleNode) return targetBodyRect;
+        const imageRects = moduleNode.find('Image').map((imageNode) => {
+            const rect = imageNode.getClientRect({ relativeTo: moduleNode, skipShadow: true, skipStroke: true });
+            return {
+                left: rect.x,
+                top: rect.y,
+                right: rect.x + rect.width,
+                bottom: rect.y + rect.height,
+            };
+        });
+        const footprint = unionRects([renderedBodyRect, ...imageRects]) || renderedBodyRect;
+        return translateRect(
+            footprint,
+            targetBodyRect.left - renderedBodyRect.left,
+            targetBodyRect.top - renderedBodyRect.top,
+        );
+    };
+
     const buildWirelessOffsetsForLine = (devices, lineOffset = { x: 0, y: 0 }) => {
         const result = {};
         devices.forEach((device, idx) => {
@@ -4073,7 +4095,14 @@ const App = () => {
             });
         }
 
-        return { rects, controllerRect };
+        return {
+            rects: rects.map((rect) => (
+                rect.kind === 'ext' || rect.kind === 'di'
+                    ? { ...rect, ...getModuleObjectFootprint(rect.id, rect) }
+                    : rect
+            )),
+            controllerRect,
+        };
     };
 
     /**
@@ -9815,6 +9844,10 @@ const App = () => {
                                                 return (
                                                     <Group
                                                         key={`di-slot-${slotIndex}`}
+                                                        ref={(node) => {
+                                                            if (node) moduleCollisionNodeRefs.current[`di:${slotIndex}`] = node;
+                                                            else delete moduleCollisionNodeRefs.current[`di:${slotIndex}`];
+                                                        }}
                                                         draggable={isOccupied}
                                                         onMouseEnter={() => setHoveredExtSlotIndex(`di:${slotIndex}`)}
                                                         onMouseLeave={() => setHoveredExtSlotIndex(null)}
@@ -9846,12 +9879,18 @@ const App = () => {
                                                                 useInitialOneWireBalance ? memoBalancedOneWire.extDevicesByModuleIndex : null,
                                                             );
                                                             const draftPos = getDiSlotPositionByOffsets(slotIndex, draftOffsets);
-                                                            const targetRect = {
+                                                            const targetBodyRect = {
                                                                 left: draftPos.x,
                                                                 top: draftPos.y,
                                                                 right: draftPos.x + size.width,
                                                                 bottom: draftPos.y + size.height,
                                                             };
+                                                            const targetRect = getModuleObjectFootprint(`di:${slotIndex}`, {
+                                                                left: slotX,
+                                                                top: slotY,
+                                                                right: slotX + size.width,
+                                                                bottom: slotY + size.height,
+                                                            }, targetBodyRect);
                                                             const collides = Boolean(collisionData) && (
                                                                 rectsOverlap(targetRect, collisionData.controllerRect)
                                                                 || collisionData.rects.some((rect) => rect.id !== `di:${slotIndex}` && rectsOverlap(targetRect, rect))
@@ -9875,12 +9914,18 @@ const App = () => {
                                                                 useInitialOneWireBalance ? memoBalancedOneWire.extDevicesByModuleIndex : null,
                                                             );
                                                             const nextPos = getDiSlotPositionByOffsets(slotIndex, nextOffsets);
-                                                            const targetRect = {
+                                                            const targetBodyRect = {
                                                                 left: nextPos.x,
                                                                 top: nextPos.y,
                                                                 right: nextPos.x + size.width,
                                                                 bottom: nextPos.y + size.height,
                                                             };
+                                                            const targetRect = getModuleObjectFootprint(`di:${slotIndex}`, {
+                                                                left: slotX,
+                                                                top: slotY,
+                                                                right: slotX + size.width,
+                                                                bottom: slotY + size.height,
+                                                            }, targetBodyRect);
                                                             const collides = Boolean(collisionData) && (
                                                                 rectsOverlap(targetRect, collisionData.controllerRect)
                                                                 || collisionData.rects.some((rect) => rect.id !== `di:${slotIndex}` && rectsOverlap(targetRect, rect))
@@ -11303,6 +11348,10 @@ const App = () => {
                                                 return (
                                                     <Group
                                                         key={`ext-slot-${slotIndex}`}
+                                                        ref={(node) => {
+                                                            if (node) moduleCollisionNodeRefs.current[`ext:${slotIndex}`] = node;
+                                                            else delete moduleCollisionNodeRefs.current[`ext:${slotIndex}`];
+                                                        }}
                                                         draggable
                                                         onDragStart={() => {
                                                             extDragStartOffsetsRef.current[slotIndex] = extSlotOffsets[slotIndex] || { x: 0, y: 0 };
@@ -11337,12 +11386,18 @@ const App = () => {
                                                             );
                                                               const layoutWidth = getExtModuleLayoutWidth(device);
                                                               const baseSlotPos = getExtBaseSlotPosition(slotIndex);
-                                                              const targetRect = {
-                                                                  left: baseSlotPos.x + draftOffset.x,
-                                                                  top: baseSlotPos.y + draftOffset.y,
-                                                                  right: baseSlotPos.x + draftOffset.x + layoutWidth,
-                                                                  bottom: baseSlotPos.y + draftOffset.y + slotHeight,
-                                                              };
+                                                              const targetBodyRect = {
+                                                                   left: baseSlotPos.x + draftOffset.x,
+                                                                   top: baseSlotPos.y + draftOffset.y,
+                                                                   right: baseSlotPos.x + draftOffset.x + layoutWidth,
+                                                                   bottom: baseSlotPos.y + draftOffset.y + slotHeight,
+                                                               };
+                                                              const targetRect = getModuleObjectFootprint(`ext:${slotIndex}`, {
+                                                                  left: slotX,
+                                                                  top: slotY,
+                                                                  right: slotX + layoutWidth,
+                                                                  bottom: slotY + slotHeight,
+                                                              }, targetBodyRect);
                                                             const collides = Boolean(collisionData) && (
                                                                 rectsOverlap(targetRect, collisionData.controllerRect)
                                                                 || collisionData.rects.some((rect) => rect.id !== `ext:${slotIndex}` && rectsOverlap(targetRect, rect))
@@ -11366,12 +11421,18 @@ const App = () => {
                                                             );
                                                               const layoutWidth = getExtModuleLayoutWidth(device);
                                                               const baseSlotPos = getExtBaseSlotPosition(slotIndex);
-                                                              const targetRect = {
-                                                                  left: baseSlotPos.x + nextOffset.x,
-                                                                  top: baseSlotPos.y + nextOffset.y,
-                                                                  right: baseSlotPos.x + nextOffset.x + layoutWidth,
-                                                                  bottom: baseSlotPos.y + nextOffset.y + slotHeight,
-                                                              };
+                                                              const targetBodyRect = {
+                                                                   left: baseSlotPos.x + nextOffset.x,
+                                                                   top: baseSlotPos.y + nextOffset.y,
+                                                                   right: baseSlotPos.x + nextOffset.x + layoutWidth,
+                                                                   bottom: baseSlotPos.y + nextOffset.y + slotHeight,
+                                                               };
+                                                              const targetRect = getModuleObjectFootprint(`ext:${slotIndex}`, {
+                                                                  left: slotX,
+                                                                  top: slotY,
+                                                                  right: slotX + layoutWidth,
+                                                                  bottom: slotY + slotHeight,
+                                                              }, targetBodyRect);
                                                             const collides = Boolean(collisionData) && (
                                                                 rectsOverlap(targetRect, collisionData.controllerRect)
                                                                 || collisionData.rects.some((rect) => rect.id !== `ext:${slotIndex}` && rectsOverlap(targetRect, rect))
