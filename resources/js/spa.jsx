@@ -11,6 +11,7 @@ import { materializeBalancedOneWireScheme } from './scheme/domain/oneWireMateria
 import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './scheme/domain/oneWireMutations';
 import { buildSmart2InstallationDiConnections } from './scheme/domain/installationDi';
 import { translateRect, unionRects } from './scheme/domain/collisionGeometry';
+import { getInstallationDinTotal } from './scheme/domain/installationDin';
 import { controllerImagePaths, wirelessDeviceImagePaths, getWirelessDeviceImageKey, aerialImagePath, goAerialImagePath } from './scheme/assets/imageRegistry';
 import { getOneWireDirectionForDevice, getOneWireLineGeometry } from './scheme/layout/oneWireLayout';
 import { parsePorts, withFallbackPorts, getPortsByClassToken } from './scheme/layout/portParsing';
@@ -4396,6 +4397,19 @@ const App = () => {
         return items;
     }, [scheme, memoExtModules, memoExtLineThermostatDevices]);
 
+    const installationDinTotal = useMemo(() => {
+        if (!canUseInstallationMode) return null;
+        const moduleWidths = installationItems.map((item) => wirelessImages[item.type]?.width || 0);
+        const controllerOnRail = !INSTALLATION_LEFT_CONTROLLERS.has(controllerType);
+        if (moduleWidths.some((width) => width <= 0) || (controllerOnRail && !controllerImage?.width)) return null;
+        return getInstallationDinTotal({
+            controllerWidth: controllerImage?.width || 0,
+            controllerOnRail,
+            moduleWidths,
+            dinSize,
+        });
+    }, [canUseInstallationMode, controllerImage, controllerType, dinSize, installationItems, wirelessImages]);
+
     useEffect(() => {
         const activeKeys = new Set([
             getInstallationLayoutItemKey('controller', scheme?.controller, controllerType, 0),
@@ -4420,19 +4434,6 @@ const App = () => {
                 <div className="spa-navbar-actions">
                     <button type="button" className="spa-reset-button" onClick={handleResetPositions}>
                         Сброс позиций
-                    </button>
-                    <label className="spa-installation-switch" title={canUseInstallationMode ? 'Режим инсталляции' : 'Режим инсталляции доступен для GO, GO+, Smart2, PRO и ECOsmart'}>
-                        <span>Инсталляция</span>
-                        <input
-                            type="checkbox"
-                            checked={installationMode}
-                            disabled={!canUseInstallationMode}
-                            onChange={(event) => setInstallationModeEnabled(event.target.checked)}
-                        />
-                        <span className="scheme-settings-switch" aria-hidden="true" />
-                    </label>
-                    <button type="button" onClick={() => setShowOfferModal(true)}>
-                        КП
                     </button>
                     <button type="button" onClick={() => setShowSettingsModal(true)}>
                         Настройки
@@ -4601,6 +4602,26 @@ const App = () => {
                         <span className="spa-unused-kit-sensors-empty">Все комплектные датчики задействованы</span>
                     )}
                 </div>
+                <div className="spa-installation-summary">
+                    <span className="spa-unused-kit-sensors-label">Монтажная схема</span>
+                    <label className="spa-installation-switch" title={canUseInstallationMode ? 'Режим инсталляции' : 'Режим инсталляции доступен для GO, GO+, Smart2, PRO и ECOsmart'}>
+                        <span>Режим инсталляции</span>
+                        <input
+                            type="checkbox"
+                            checked={installationMode}
+                            disabled={!canUseInstallationMode}
+                            onChange={(event) => setInstallationModeEnabled(event.target.checked)}
+                        />
+                        <span className="scheme-settings-switch" aria-hidden="true" />
+                    </label>
+                    <div className="spa-installation-din-card">
+                        <span>Занято на DIN-рейке</span>
+                        <strong>{installationDinTotal == null ? '—' : `${installationDinTotal} DIN`}</strong>
+                    </div>
+                </div>
+                <button type="button" className="spa-offer-button" onClick={() => setShowOfferModal(true)}>
+                    Коммерческое предложение
+                </button>
             </div>
             {schemeLoadError && (
                 <div style={{ position: 'fixed', top: 72, right: 16, zIndex: 60, color: '#d32f2f', background: '#fff', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>
@@ -4789,21 +4810,7 @@ const App = () => {
                 </div>
             )}
             {showIncomingScheme && (
-                <div
-                    style={{
-                        width: 380,
-                        height: 600,
-                        position: 'fixed',
-                        left: 10,
-                        top: 136,
-                        background: '#fff',
-                        zIndex: 50,
-                        border: '1px solid #d7dbe4',
-                        borderRadius: 8,
-                        padding: 10,
-                        overflow: 'auto',
-                    }}
-                >
+                <div className="spa-debug-panel">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                         <strong style={{ fontSize: 14 }}>incomingScheme</strong>
                         {schemeJsonDirty && <span style={{ color: '#b26a00', fontSize: 12 }}>изменено</span>}

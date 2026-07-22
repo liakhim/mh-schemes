@@ -203,6 +203,78 @@ body {
     line-height: 1.3;
 }
 
+.spa-installation-summary {
+    margin-top: 9px;
+    padding-top: 8px;
+    border-top: 1px solid #dbe7d7;
+}
+
+.spa-installation-summary .spa-installation-switch {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.spa-installation-din-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid #b8d6aa;
+    border-radius: 6px;
+    color: #31543a;
+    background: #f3faef;
+    font-size: 11px;
+    line-height: 1.25;
+}
+
+.spa-installation-din-card strong {
+    flex: 0 0 auto;
+    color: #2e7d32;
+    font-size: 12px;
+}
+
+.spa-offer-button {
+    width: 100%;
+    margin-top: 9px;
+    padding: 8px 10px;
+    border: 1px solid #2e7d32;
+    border-radius: 6px;
+    color: #fff;
+    background: #2e7d32;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.spa-offer-button:hover {
+    background: #256b2a;
+}
+
+.spa-offer-button:focus-visible {
+    outline: 3px solid rgba(46, 125, 50, 0.2);
+    outline-offset: 2px;
+}
+
+.spa-debug-panel {
+    position: fixed;
+    top: 78px;
+    right: 10px;
+    z-index: 70;
+    box-sizing: border-box;
+    width: 380px;
+    max-width: calc(100vw - 20px);
+    height: min(600px, calc(100vh - 88px));
+    padding: 10px;
+    overflow: auto;
+    border: 1px solid #d7dbe4;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
 .spa-scheme-title-edit {
     width: 24px;
     height: 24px;
