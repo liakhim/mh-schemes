@@ -1,4 +1,4 @@
-import { canonicalDeviceType } from './deviceTypes';
+import { canonicalDeviceType } from './deviceTypes.js';
 
 const wirelessDeviceNames = {
     thermostat: 'Беспроводной термостат',

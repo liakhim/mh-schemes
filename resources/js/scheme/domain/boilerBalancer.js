@@ -1,4 +1,4 @@
-import { canonicalDeviceType } from './deviceTypes';
+import { canonicalDeviceType } from './deviceTypes.js';
 
 const RELAY_LINE_CAPACITY = 6;
 const BUS_LINE_CAPACITY = 1;

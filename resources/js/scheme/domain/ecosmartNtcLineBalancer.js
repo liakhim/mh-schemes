@@ -1,4 +1,4 @@
-import { canonicalDeviceType } from './deviceTypes';
+import { canonicalDeviceType } from './deviceTypes.js';
 
 const getControllerType = (scheme) => canonicalDeviceType(
     typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type,

@@ -1,5 +1,11 @@
-import { canonicalDeviceType } from './deviceTypes';
-import { getAllOneWireDevicesForBalancing } from './initialState';
+import { canonicalDeviceType } from './deviceTypes.js';
+import { getAllOneWireDevicesForBalancing } from './initialState.js';
+import {
+    CONTROLLER_MIXING_OWNER,
+    getExtMixingOwner,
+    isMixingUnitSensor,
+    MIXING_OWNER_FIELD,
+} from './mixingUnitOwnership.js';
 
 const LINE_CAPACITY = 6;
 const EXT_LINE_CAPACITY = 12;
@@ -21,11 +27,11 @@ const getControllerExtThermostatCount = (scheme) => {
 };
 
 const getPotentialOneWireLines = (scheme, extModules) => {
-    const lines = [{ kind: 'controller', moduleIndex: null }];
+    const lines = [{ kind: 'controller', moduleIndex: null, ownerKey: CONTROLLER_MIXING_OWNER }];
     (Array.isArray(extModules) ? extModules : []).forEach((moduleItem, moduleIndex) => {
         const type = canonicalDeviceType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type);
         if (type === 'rl6' || type === 'rl6s') {
-            lines.push({ kind: 'ext', moduleIndex });
+            lines.push({ kind: 'ext', moduleIndex, ownerKey: getExtMixingOwner(moduleItem, moduleIndex) });
         }
     });
     return lines;
@@ -165,11 +171,17 @@ export const balanceOneWireDevices = (scheme, extModules) => {
         : 0;
     const cursorRef = { value: 1 };
     const ntcRoundRobinRef = { value: 0 };
+    const placePinnedDevice = (device) => {
+        const ownerKey = device?.[MIXING_OWNER_FIELD];
+        const lineIndex = lines.findIndex((line) => line.ownerKey === ownerKey);
+        return lineIndex >= 0 && tryPushGroupToLine(lineBuckets, lineIndex, [device]);
+    };
     rdtModules.forEach((device) => {
         placeGroupPreferController(lineBuckets, [device], cursorRef);
     });
 
-    ntcModules.forEach((device) => {
+    ntcModules.filter((device) => device?.[MIXING_OWNER_FIELD]).forEach(placePinnedDevice);
+    ntcModules.filter((device) => !device?.[MIXING_OWNER_FIELD]).forEach((device) => {
         placeGroupRoundRobin(lineBuckets, [device], ntcRoundRobinRef);
     });
 
@@ -191,7 +203,8 @@ export const balanceOneWireDevices = (scheme, extModules) => {
     });
 
     const oneWireRoundRobinRef = { value: 0 };
-    sortedRemaining.forEach((device) => {
+    sortedRemaining.filter((device) => device?.[MIXING_OWNER_FIELD]).forEach(placePinnedDevice);
+    sortedRemaining.filter((device) => !device?.[MIXING_OWNER_FIELD] && !isMixingUnitSensor(device)).forEach((device) => {
         placeGroupRoundRobin(lineBuckets, [device], oneWireRoundRobinRef);
     });
 

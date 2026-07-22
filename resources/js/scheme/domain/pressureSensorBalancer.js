@@ -1,4 +1,4 @@
-import { canonicalDeviceType } from './deviceTypes';
+import { canonicalDeviceType } from './deviceTypes.js';
 
 const CONTROLLER_420_CAPACITY = 1;
 const IO4_CHANNEL_CAPACITY = 4;

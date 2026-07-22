@@ -1,4 +1,10 @@
-import { canonicalDeviceType } from './deviceTypes';
+import { canonicalDeviceType } from './deviceTypes.js';
+import {
+    CONTROLLER_MIXING_OWNER,
+    getExtMixingOwner,
+    getMixingUnitKey,
+    MIXING_OWNER_FIELD,
+} from './mixingUnitOwnership.js';
 
 const RELAY_LINE_CAPACITY = 6;
 const PRO_CONTROLLER_RELAY_CAPACITY = 4;
@@ -104,11 +110,11 @@ export const balanceServos = (scheme) => {
     const lines = [
         { devices: controller['220_servo_devices'], capacity: controllerType === 'ecosmart' ? 2 : 0, capacityMode: 'device', onlyTypes: new Set(['220servo']) },
         { devices: controller.relay_s_valve_devices, capacity: controllerType === 'ecosmart' ? 1 : 0, capacityMode: 'device', onlyTypes: new Set(['valve']) },
-        { devices: controller.relay_s_devices, capacity: getControllerRelaySCapacity(controllerType), onlyTypes: new Set(['220servo']) },
+        { devices: controller.relay_s_devices, capacity: getControllerRelaySCapacity(controllerType), onlyTypes: new Set(['220servo']), ownerKey: CONTROLLER_MIXING_OWNER },
         { devices: controller.relay_devices, capacity: getControllerRelayCapacity(controllerType), onlyTypes: new Set(['valve']) },
         ...extModules
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6s')
-            .map((moduleItem) => ({ devices: moduleItem.relay_s_devices, capacity: RELAY_LINE_CAPACITY, onlyTypes: new Set(['220servo']) })),
+            .map((moduleItem) => ({ devices: moduleItem.relay_s_devices, capacity: RELAY_LINE_CAPACITY, onlyTypes: new Set(['220servo']), ownerKey: getExtMixingOwner(moduleItem, extModules.indexOf(moduleItem)) })),
         ...extModules
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6')
             .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: RELAY_LINE_CAPACITY, onlyTypes: new Set(['valve']) })),
@@ -121,6 +127,21 @@ export const balanceServos = (scheme) => {
     ].filter((line) => line.capacity > 0);
 
     const placedKeys = new Set();
+    const mixingOwnersByUnitKey = new Map();
+    lines.forEach((line) => {
+        if (!line.ownerKey) return;
+        line.devices = line.devices.map((device) => {
+            if (canonicalDeviceType(device?.type) !== '220servo') return device;
+            const unitKey = getMixingUnitKey(device);
+            if (unitKey != null) mixingOwnersByUnitKey.set(unitKey, line.ownerKey);
+            return { ...device, [MIXING_OWNER_FIELD]: line.ownerKey };
+        });
+        if (line.ownerKey === CONTROLLER_MIXING_OWNER) controller.relay_s_devices = line.devices;
+        else {
+            const extModule = extModules.find((moduleItem, moduleIndex) => getExtMixingOwner(moduleItem, moduleIndex) === line.ownerKey);
+            if (extModule) extModule.relay_s_devices = line.devices;
+        }
+    });
     const doubleRelayEntries = [
         ...legacyRelaySValveDevices.map((device, index) => ({ device, index, legacy: true })),
         ...(Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [])
@@ -129,7 +150,17 @@ export const balanceServos = (scheme) => {
     doubleRelayEntries.forEach(({ device, index, legacy }) => {
         if (!isDoubleRelayEquipment(device)) return;
         const normalizedDevice = normalizeDoubleRelayEquipment(device, index);
-        const placed = lines.some((line) => pushDoubleRelayEquipmentToLine(line, normalizedDevice));
+        const targetLine = lines.find((line) => pushDoubleRelayEquipmentToLine(
+            line,
+            line.ownerKey && canonicalDeviceType(normalizedDevice.type) === '220servo'
+                ? { ...normalizedDevice, [MIXING_OWNER_FIELD]: line.ownerKey }
+                : normalizedDevice,
+        ));
+        const placed = Boolean(targetLine);
+        const unitKey = getMixingUnitKey(normalizedDevice);
+        if (placed && targetLine?.ownerKey && unitKey != null) {
+            mixingOwnersByUnitKey.set(unitKey, targetLine.ownerKey);
+        }
         if (placed && !legacy) placedKeys.add(getDeviceKey(device, index));
     });
 
@@ -138,6 +169,12 @@ export const balanceServos = (scheme) => {
         controller,
         ext_modules: extModules,
         di_modules: diModules,
+        sensors: Array.isArray(scheme?.sensors)
+            ? scheme.sensors.map((sensor) => {
+                const ownerKey = mixingOwnersByUnitKey.get(getMixingUnitKey(sensor));
+                return ownerKey ? { ...sensor, [MIXING_OWNER_FIELD]: ownerKey } : sensor;
+            })
+            : scheme?.sensors,
         wired_devices: Array.isArray(scheme?.wired_devices)
             ? scheme.wired_devices.filter((device, index) => !placedKeys.has(getDeviceKey(device, index)))
             : scheme?.wired_devices,

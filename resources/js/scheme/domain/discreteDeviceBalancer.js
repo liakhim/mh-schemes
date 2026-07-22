@@ -1,4 +1,4 @@
-import { canonicalDeviceType } from './deviceTypes';
+import { canonicalDeviceType } from './deviceTypes.js';
 
 const CONTROLLER_DI_CAPACITY = 2;
 const SMART2_CONTROLLER_DI_CAPACITY = 4;

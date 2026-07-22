@@ -1,4 +1,4 @@
-import { canonicalDeviceType } from './deviceTypes';
+import { canonicalDeviceType } from './deviceTypes.js';
 
 const hasConnectionType = (device, connectionType) => String(device?.connection_type || '')
     .toLowerCase()

@@ -8,12 +8,17 @@ use Illuminate\Support\Facades\Route;
 Route::redirect('/', '/selection');
 Route::view('/admin', 'admin', ['data' => 'test'])->name('admin');
 
-Route::get('/schemes', function () {
+Route::get('/schemes', function (Request $request) {
+    $search = trim((string) $request->query('search', ''));
+
     return view('schemes', [
         'schemes' => Scheme::query()
+            ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"))
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
-            ->paginate(20),
+            ->paginate(20)
+            ->withQueryString(),
+        'search' => $search,
     ]);
 })->name('schemes.index');
 
@@ -66,6 +71,7 @@ Route::patch('/api/schemes/{scheme}', function (Request $request, Scheme $scheme
     $validated = $request->validate([
         'name' => ['sometimes', 'required', 'string', 'max:255'],
         'description' => ['sometimes', 'nullable', 'string', 'max:65535'],
+        'system_device_id' => ['sometimes', 'nullable', 'integer'],
         'incoming_scheme' => ['sometimes', 'required', 'array'],
     ]);
 
@@ -74,6 +80,9 @@ Route::patch('/api/schemes/{scheme}', function (Request $request, Scheme $scheme
     }
     if (array_key_exists('description', $validated)) {
         $scheme->description = $validated['description'];
+    }
+    if (array_key_exists('system_device_id', $validated)) {
+        $scheme->system_device_id = $validated['system_device_id'];
     }
     if (array_key_exists('incoming_scheme', $validated)) {
         $scheme->incoming_scheme = $validated['incoming_scheme'];
@@ -84,6 +93,8 @@ Route::patch('/api/schemes/{scheme}', function (Request $request, Scheme $scheme
         'id' => $scheme->id,
         'name' => $scheme->name,
         'description' => $scheme->description,
+        'system_device_id' => $scheme->system_device_id,
+        'updated_at' => $scheme->updated_at?->format('Y-m-d H:i'),
         'incoming_scheme' => $scheme->incoming_scheme,
     ]);
 })->whereNumber('scheme')->name('schemes.update');
@@ -142,6 +153,8 @@ Route::post('/api/boilers/search', function (Request $request) use ($integration
 })->name('boilers.search');
 
 Route::view('/svg-editor', 'svg-editor')->name('svg-editor');
+
+Route::view('/learning', 'learning')->name('learning');
 
 Route::view('/selection', 'selection')->name('selection');
 Route::view('/selection-old', 'selection-old')->name('selection-old');

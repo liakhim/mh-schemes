@@ -1,4 +1,10 @@
-import { canonicalDeviceType } from './deviceTypes';
+import { canonicalDeviceType } from './deviceTypes.js';
+import {
+    CONTROLLER_MIXING_OWNER,
+    getExtMixingOwner,
+    isMixingUnitSensor,
+    MIXING_OWNER_FIELD,
+} from './mixingUnitOwnership.js';
 
 const NTC_LINE_KEYS = ['ntc1_devices', 'ntc2_devices'];
 const NTC_LINE_CAPACITY = 3;
@@ -48,12 +54,12 @@ const assignSensorToModule = (device, sensor) => {
 const collectNtcModuleRefs = (controllerDevices, extModules) => {
     const refs = [];
     controllerDevices.forEach((device, deviceIndex) => {
-        if (isNtcModule(device)) refs.push({ kind: 'controller', deviceIndex });
+        if (isNtcModule(device)) refs.push({ kind: 'controller', deviceIndex, ownerKey: CONTROLLER_MIXING_OWNER });
     });
     extModules.forEach((moduleItem, moduleIndex) => {
         const oneWireDevices = Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : [];
         oneWireDevices.forEach((device, deviceIndex) => {
-            if (isNtcModule(device)) refs.push({ kind: 'ext', moduleIndex, deviceIndex });
+            if (isNtcModule(device)) refs.push({ kind: 'ext', moduleIndex, deviceIndex, ownerKey: getExtMixingOwner(moduleItem, moduleIndex) });
         });
     });
     return refs;
@@ -72,13 +78,14 @@ const setDeviceByRef = (controllerDevices, extModules, ref, device) => {
     extModules[ref.moduleIndex].one_wire_devices[ref.deviceIndex] = device;
 };
 
-const findBestModuleRef = (controllerDevices, extModules, refs, startIndex) => {
+const findBestModuleRef = (controllerDevices, extModules, refs, startIndex, ownerKey = null) => {
     let best = null;
     let bestOccupancy = Infinity;
 
     refs.forEach((_, offset) => {
         const refIndex = (startIndex + offset) % refs.length;
         const ref = refs[refIndex];
+        if (ownerKey && ref.ownerKey !== ownerKey) return;
         const device = getDeviceByRef(controllerDevices, extModules, ref);
         const occupancy = getModuleOccupancy(device);
         if (occupancy >= NTC_LINE_KEYS.length * NTC_LINE_CAPACITY) return;
@@ -95,7 +102,10 @@ export const balanceNtcSensors = (scheme) => {
     const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
     const ntcSensors = sensors
         .map((sensor, index) => ({ sensor, index }))
-        .filter(({ sensor }) => isNtcSensor(sensor));
+        .filter(({ sensor }) => (
+            isNtcSensor(sensor)
+            && (!isMixingUnitSensor(sensor) || sensor?.[MIXING_OWNER_FIELD])
+        ));
     if (ntcSensors.length === 0) return scheme;
 
     const controllerDevices = Array.isArray(scheme?.controller?.one_wire_devices) ? [...scheme.controller.one_wire_devices] : [];
@@ -109,8 +119,11 @@ export const balanceNtcSensors = (scheme) => {
     const assignedSensorIndexes = new Set();
     let cursor = 0;
 
-    ntcSensors.forEach(({ sensor, index }) => {
-        const best = findBestModuleRef(controllerDevices, extModules, refs, cursor);
+    const orderedNtcSensors = [...ntcSensors].sort((a, b) => (
+        Number(Boolean(b.sensor?.[MIXING_OWNER_FIELD])) - Number(Boolean(a.sensor?.[MIXING_OWNER_FIELD]))
+    ));
+    orderedNtcSensors.forEach(({ sensor, index }) => {
+        const best = findBestModuleRef(controllerDevices, extModules, refs, cursor, sensor?.[MIXING_OWNER_FIELD] || null);
         if (!best) return;
 
         const device = getDeviceByRef(controllerDevices, extModules, best.ref);

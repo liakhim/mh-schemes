@@ -10,10 +10,11 @@ import { balanceOneWireDevices } from './scheme/domain/oneWireBalancer';
 import { materializeBalancedOneWireScheme } from './scheme/domain/oneWireMaterializer';
 import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './scheme/domain/oneWireMutations';
 import { buildSmart2InstallationDiConnections } from './scheme/domain/installationDi';
-import { translateRect, unionRects } from './scheme/domain/collisionGeometry';
+import { shouldIncludeCollisionSlot, translateRect, unionRects } from './scheme/domain/collisionGeometry';
 import { getInstallationDinTotal } from './scheme/domain/installationDin';
+import { buildControllerOnlyScheme, isControllerOnlyScheme } from './scheme/domain/controllerOnlyScheme';
 import { controllerImagePaths, wirelessDeviceImagePaths, getWirelessDeviceImageKey, aerialImagePath, goAerialImagePath } from './scheme/assets/imageRegistry';
-import { getOneWireDirectionForDevice, getOneWireLineGeometry } from './scheme/layout/oneWireLayout';
+import { getOneWireDirectionForDevice, getOneWireLineGeometry, getOneWireSlotPosition } from './scheme/layout/oneWireLayout';
 import { parsePorts, withFallbackPorts, getPortsByClassToken } from './scheme/layout/portParsing';
 import { getOneWirePortByRole, getPortPosition } from './scheme/layout/ports';
 import { Line, RealisticConnectionLines, snapPixel } from './scheme/rendering/SharpLine';
@@ -38,6 +39,19 @@ const GRID_STROKE = 'rgba(154, 160, 166, 0.22)';
 const HELP_MODAL_STORAGE_KEY = 'mh-schemes-help-seen';
 const INSTALLATION_LAYOUT_VERSION = 1;
 const INSTALLATION_PANEL_PADDING_X = 16;
+
+const getRuntimeOffsetKey = (item, index, prefix) => (
+    item && typeof item === 'object' && item.id != null
+        ? `${prefix}:id:${item.id}`
+        : `${prefix}:index:${index}`
+);
+
+const getOneWireOffsetKey = (device, slotIndex) => getRuntimeOffsetKey(device, slotIndex, 'onewire');
+const getExtOffsetKey = (device, slotIndex) => getRuntimeOffsetKey(device, slotIndex, 'ext');
+const getDiOffsetKey = (device, slotIndex) => getRuntimeOffsetKey(device, slotIndex, 'di');
+const getExtOneWireOffsetKey = (moduleDevice, moduleIndex, device, slotIndex) => (
+    `${getExtOffsetKey(moduleDevice, moduleIndex)}/${getRuntimeOffsetKey(device, slotIndex, 'onewire')}`
+);
 
 const getInstallationLayoutMetrics = () => {
     const indentSize = parseInt(indent, 10) || 8;
@@ -1533,7 +1547,17 @@ const getSchemeOfferSections = (scheme) => {
     ].filter((section) => section.rows.length > 0);
 };
 
+const getRequestedControllerOnlyScheme = () => {
+    if (getRouteSchemeId()) return null;
+    return buildControllerOnlyScheme(new URLSearchParams(window.location.search).get('controller'));
+};
+
 const App = () => {
+    const routeSchemeId = getRouteSchemeId();
+    const initialSchemeRecord = getInitialSchemeRecord();
+    const requestedControllerOnlyScheme = getRequestedControllerOnlyScheme();
+    const initialIncomingScheme = initialSchemeRecord?.incoming_scheme
+        || (routeSchemeId ? {} : (requestedControllerOnlyScheme || incomingScheme));
     const stageRef = useRef(null);
     const gridLayerRef = useRef(null);
     const [canvasSize, setCanvasSize] = useState(getCanvasSize);
@@ -1553,13 +1577,13 @@ const App = () => {
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(() => window.localStorage?.getItem(HELP_MODAL_STORAGE_KEY) !== '1');
     const [showOfferModal, setShowOfferModal] = useState(false);
-    const [installationMode, setInstallationMode] = useState(true);
+    const [installationMode, setInstallationMode] = useState(!requestedControllerOnlyScheme);
     const [morphImages, setMorphImages] = useState([]);
     const [installationPanelSize, setInstallationPanelSize] = useState(() => (
-        readInstallationLayout(getInitialSchemeRecord()?.incoming_scheme || incomingScheme).panelSize
+        readInstallationLayout(initialIncomingScheme).panelSize
     ));
     const [installationItemOffsets, setInstallationItemOffsets] = useState(() => (
-        readInstallationLayout(getInitialSchemeRecord()?.incoming_scheme || incomingScheme).itemOffsets
+        readInstallationLayout(initialIncomingScheme).itemOffsets
     ));
     const [installationItemsLocked, setInstallationItemsLocked] = useState(true);
     const [slotMenuPos, setSlotMenuPos] = useState(null);
@@ -1613,16 +1637,14 @@ const App = () => {
     const moduleHeightValue = parseInt(module_height, 10) || 200;
     const dinSize = parseInt(din, 10) || 40;
     const gridPatternImage = useMemo(() => createGridPatternImage(indentSize), [indentSize]);
-    const routeSchemeId = getRouteSchemeId();
-    const initialSchemeRecord = getInitialSchemeRecord();
-    const [schemeName, setSchemeName] = useState(initialSchemeRecord?.name || 'Hardcoded scheme');
+    const [schemeName, setSchemeName] = useState(initialSchemeRecord?.name || (requestedControllerOnlyScheme ? 'Новая схема' : 'Hardcoded scheme'));
     const [schemeDescription, setSchemeDescription] = useState(initialSchemeRecord?.description || '');
-    const [schemeLoadState, setSchemeLoadState] = useState(routeSchemeId ? (initialSchemeRecord ? 'loaded' : 'loading') : 'hardcoded');
+    const [schemeLoadState, setSchemeLoadState] = useState(routeSchemeId ? (initialSchemeRecord?.incoming_scheme ? 'loaded' : 'loading') : 'hardcoded');
     const [schemeLoadError, setSchemeLoadError] = useState(null);
     const [schemeSaveState, setSchemeSaveState] = useState('idle');
     const [schemeCreateState, setSchemeCreateState] = useState('idle');
-    const [scheme, setScheme] = useState(() => buildSchemeFromIncoming(initialSchemeRecord?.incoming_scheme || incomingScheme));
-    const [schemeJsonText, setSchemeJsonText] = useState(() => JSON.stringify(initialSchemeRecord?.incoming_scheme || incomingScheme, null, 2));
+    const [scheme, setScheme] = useState(() => buildSchemeFromIncoming(initialIncomingScheme));
+    const [schemeJsonText, setSchemeJsonText] = useState(() => JSON.stringify(initialIncomingScheme, null, 2));
     const [schemeJsonDirty, setSchemeJsonDirty] = useState(false);
     const [schemeJsonError, setSchemeJsonError] = useState(null);
     const [schemeNameEditor, setSchemeNameEditor] = useState(null);
@@ -1630,6 +1652,9 @@ const App = () => {
     const [titleEditor, setTitleEditor] = useState(null);
     const [commentEditor, setCommentEditor] = useState(null);
     const [commentViewer, setCommentViewer] = useState(null);
+    const schemeRevisionRef = useRef(0);
+    const saveRequestIdRef = useRef(0);
+    const saveSuccessTimerRef = useRef(null);
     const controllerType = getControllerType(scheme);
     const canUseInstallationMode = INSTALLATION_CONTROLLERS.has(controllerType);
     const applyInstallationLayout = (sourceScheme) => {
@@ -1644,6 +1669,25 @@ const App = () => {
         const { installation_layout: removedInstallationLayout, ...schemeWithoutInstallationLayout } = publicScheme;
         return schemeWithoutInstallationLayout;
     };
+
+    useEffect(() => {
+        schemeRevisionRef.current += 1;
+        setSchemeSaveState((current) => {
+            if (current !== 'saved') return current;
+            if (saveSuccessTimerRef.current !== null) {
+                window.clearTimeout(saveSuccessTimerRef.current);
+                saveSuccessTimerRef.current = null;
+            }
+            return 'idle';
+        });
+    }, [scheme, installationPanelSize, installationItemOffsets]);
+
+    useEffect(() => () => {
+        saveRequestIdRef.current += 1;
+        if (saveSuccessTimerRef.current !== null) {
+            window.clearTimeout(saveSuccessTimerRef.current);
+        }
+    }, []);
     const isPanningRef = useRef(false);
     const panStartPointerRef = useRef({ x: 0, y: 0 });
     const panStartStageRef = useRef({ x: 0, y: 0 });
@@ -1752,6 +1796,7 @@ const App = () => {
                 setRelaySlotOffsets({});
                 setController420SlotOffset({ x: 0, y: 0 });
                 setExtOneWireOffsets({});
+                setSchemeSaveState('idle');
                 setSchemeLoadState('loaded');
             })
             .catch((error) => {
@@ -2027,9 +2072,16 @@ const App = () => {
     };
 
     const handleSaveScheme = () => {
-        if (!routeSchemeId || schemeSaveState === 'saving') return;
+        if (!routeSchemeId || schemeLoadState !== 'loaded' || schemeSaveState === 'saving') return;
 
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const requestId = saveRequestIdRef.current + 1;
+        const savedRevision = schemeRevisionRef.current;
+        saveRequestIdRef.current = requestId;
+        if (saveSuccessTimerRef.current !== null) {
+            window.clearTimeout(saveSuccessTimerRef.current);
+            saveSuccessTimerRef.current = null;
+        }
         setSchemeSaveState('saving');
 
         fetch(`/api/schemes/${routeSchemeId}`, {
@@ -2047,11 +2099,19 @@ const App = () => {
                 return response.json();
             })
             .then(() => {
+                if (saveRequestIdRef.current !== requestId) return;
+                if (schemeRevisionRef.current !== savedRevision) {
+                    setSchemeSaveState('idle');
+                    return;
+                }
                 setSchemeSaveState('saved');
-                window.setTimeout(() => setSchemeSaveState('idle'), 1800);
+                saveSuccessTimerRef.current = window.setTimeout(() => {
+                    if (saveRequestIdRef.current === requestId) setSchemeSaveState('idle');
+                    saveSuccessTimerRef.current = null;
+                }, 1800);
             })
             .catch(() => {
-                setSchemeSaveState('error');
+                if (saveRequestIdRef.current === requestId) setSchemeSaveState('error');
             });
     };
 
@@ -2112,7 +2172,7 @@ const App = () => {
     };
 
     const handleSaveAsNewScheme = () => {
-        if (schemeCreateState === 'saving') return;
+        if ((routeSchemeId && schemeLoadState !== 'loaded') || schemeCreateState === 'saving') return;
 
         const name = window.prompt('Название новой схемы', `${schemeName} копия`);
         if (!name?.trim()) return;
@@ -3406,8 +3466,6 @@ const App = () => {
         });
     };
 
-    const getExtOneWireOffsetKey = (moduleIndex, slotIndex) => `${moduleIndex}:${slotIndex}`;
-
     const addExtOneWireDeviceAtSlot = (moduleIndex, slotIndex, devicePayload) => {
         setUseInitialOneWireBalance(false);
         setScheme((s) => {
@@ -3765,24 +3823,37 @@ const App = () => {
         a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom
     );
 
-    const getModuleObjectFootprint = (moduleId, renderedBodyRect, targetBodyRect = renderedBodyRect) => {
+    const getModuleObjectCollisionRects = (
+        moduleId,
+        renderedBodyRect,
+        targetBodyRect = renderedBodyRect,
+        includeEmptySlots = showEmptySlots,
+        excludedCollisionKey = null,
+    ) => {
         const moduleNode = moduleCollisionNodeRefs.current[moduleId];
-        if (!moduleNode) return targetBodyRect;
-        const imageRects = moduleNode.find('Image').map((imageNode) => {
-            const rect = imageNode.getClientRect({ relativeTo: moduleNode, skipShadow: true, skipStroke: true });
-            return {
-                left: rect.x,
-                top: rect.y,
-                right: rect.x + rect.width,
-                bottom: rect.y + rect.height,
-            };
-        });
-        const footprint = unionRects([renderedBodyRect, ...imageRects]) || renderedBodyRect;
-        return translateRect(
-            footprint,
-            targetBodyRect.left - renderedBodyRect.left,
-            targetBodyRect.top - renderedBodyRect.top,
-        );
+        if (!moduleNode) return [targetBodyRect];
+        const offsetX = targetBodyRect.left - renderedBodyRect.left;
+        const offsetY = targetBodyRect.top - renderedBodyRect.top;
+        const deviceSlotRects = moduleNode.find('.module-device-slot')
+            .filter((slotNode) => shouldIncludeCollisionSlot({
+                occupied: Boolean(slotNode.getAttr('collisionOccupied')),
+                collisionKey: slotNode.getAttr('collisionKey'),
+            }, includeEmptySlots, excludedCollisionKey))
+            .map((slotNode) => {
+                const rect = slotNode.getClientRect({ relativeTo: moduleNode, skipShadow: true, skipStroke: true });
+                return {
+                    left: rect.x,
+                    top: rect.y,
+                    right: rect.x + rect.width,
+                    bottom: rect.y + rect.height,
+                };
+            });
+        return [targetBodyRect, ...deviceSlotRects.map((rect) => translateRect(rect, offsetX, offsetY))];
+    };
+
+    const getModuleObjectFootprint = (...args) => {
+        const collisionRects = getModuleObjectCollisionRects(...args);
+        return unionRects(collisionRects) || collisionRects[0];
     };
 
     const buildWirelessOffsetsForLine = (devices, lineOffset = { x: 0, y: 0 }) => {
@@ -3856,8 +3927,7 @@ const App = () => {
         );
         if (oneWireGeometry) {
             const oneWireDevices = getOneWireDevicesFromScheme(currentScheme);
-            const oneWireGap = 2 * (parseInt(indent, 10) || 8);
-            const ntcSideExtraGap = 10 * (parseInt(indent, 10) || 8);
+            const indentValue = parseInt(indent, 10) || 8;
             const getOneWireSlotDimensions = (slotDevice) => {
                 if (!slotDevice) return { width: ONE_WIRE_SLOT_SIZE, height: ONE_WIRE_SLOT_SIZE };
                 const slotType = canonicalDeviceType(slotDevice.type);
@@ -3872,43 +3942,28 @@ const App = () => {
                 return { width: slotImage.width, height: slotImage.height };
             };
             const getOneWireSlotPosByOffsets = (slotIndex, offsets) => {
-                const baseOffset = offsets[0] || { x: 0, y: 0 };
-                let x = oneWireGeometry.firstSlotX + baseOffset.x;
-                let y = oneWireGeometry.firstSlotY + baseOffset.y;
-                if (currentControllerType === 'ecosmart') {
-                    y += 5 * (parseInt(indent, 10) || 8);
-                }
                 const firstDevice = oneWireDevices[0] || null;
-                if (currentControllerType === 'ecosmart') {
-                    y += getEcosmartFirstOneWireExtraDown(firstDevice) * (parseInt(indent, 10) || 8);
-                }
-                if (canonicalDeviceType(firstDevice?.type) === 'ntc-1-wire') {
-                    x += ntcSideExtraGap;
-                }
-                if (slotIndex === 0) return { x, y };
-                for (let i = 1; i <= slotIndex; i += 1) {
-                    const prevDevice = oneWireDevices[i - 1] || null;
-                    const currentDevice = oneWireDevices[i] || null;
-                    const prevSize = getOneWireSlotDimensions(prevDevice);
-                    const currentOffset = offsets[i] || { x: 0, y: 0 };
-                    const prevType = canonicalDeviceType(prevDevice?.type);
-                    const currentType = canonicalDeviceType(currentDevice?.type);
-                    const isPrevModule = prevType === 'ntc-1-wire' || prevType === 'rdt2';
-                    const stepY = (parseInt(module_height, 10) || 200) * 0.25;
-                    const defaultVerticalGap = prevSize.height + 3 * (parseInt(indent, 10) || 8) + stepY;
-                    const moduleVerticalGap = prevSize.height + stepY;
-                    const prevNtcRightGap = prevType === 'ntc-1-wire' ? ntcSideExtraGap : 0;
-                    const currentNtcLeftGap = currentType === 'ntc-1-wire' ? ntcSideExtraGap : 0;
-                    x += prevSize.width + oneWireGap + prevNtcRightGap + currentNtcLeftGap + currentOffset.x;
-                    y += (isPrevModule ? moduleVerticalGap : defaultVerticalGap) + currentOffset.y;
-                }
-                return { x, y };
+                return getOneWireSlotPosition({
+                    slotIndex,
+                    devices: oneWireDevices,
+                    offsets,
+                    getDeviceSize: getOneWireSlotDimensions,
+                    getOffsetKey: getOneWireOffsetKey,
+                    firstSlotX: oneWireGeometry.firstSlotX,
+                    firstSlotY: oneWireGeometry.firstSlotY,
+                    firstSlotExtraY: currentControllerType === 'ecosmart'
+                        ? (5 + getEcosmartFirstOneWireExtraDown(firstDevice)) * indentValue
+                        : 0,
+                    indentSize: indentValue,
+                    moduleHeightValue: currentModuleHeightValue,
+                });
             };
             oneWireDevices.forEach((device, slotIndex) => {
                 const pos = getOneWireSlotPosByOffsets(slotIndex, oneWireOffsets);
                 const size = getOneWireSlotDimensions(device);
+                const offsetKey = getOneWireOffsetKey(device, slotIndex);
                 rects.push({
-                    id: `onewire:${slotIndex}`,
+                    id: `onewire:${offsetKey}`,
                     kind: 'onewire',
                     left: pos.x,
                     top: pos.y,
@@ -4031,7 +4086,8 @@ const App = () => {
             extModules.forEach((device, slotIndex) => {
                 const size = getExtModuleSize(device);
                 const layoutWidth = getExtModuleLayoutWidth(device);
-                const offset = extOffsets?.[slotIndex] || { x: 0, y: 0 };
+                const offsetKey = getExtOffsetKey(device, slotIndex);
+                const offset = extOffsets?.[offsetKey] || { x: 0, y: 0 };
                 const baseX = getExtSlotX(slotIndex);
                 const baseY = isEcosmartThermostatExtLine
                     ? -2.25 * currentModuleHeightValue - 5 * indentValue + slotIndex * 9 * indentValue
@@ -4044,7 +4100,7 @@ const App = () => {
                     ? snapToGrid(baseY, parseInt(indent, 10) || 8)
                     : baseY + offset.y;
                 rects.push({
-                    id: `ext:${slotIndex}`,
+                    id: `ext:${offsetKey}`,
                     kind: 'ext',
                     left: x,
                     top: y,
@@ -4079,14 +4135,15 @@ const App = () => {
             };
             diModules.forEach((device, slotIndex) => {
                 const size = getDiModuleSize(device);
-                const offset = diOffsets?.[slotIndex] || { x: 0, y: 0 };
+                const offsetKey = getDiOffsetKey(device, slotIndex);
+                const offset = diOffsets?.[offsetKey] || { x: 0, y: 0 };
                 const baseX = getDiSlotX(slotIndex);
                 const baseY = controllerImg.height - size.height;
                 const isInitialPosition = offset.x === 0 && offset.y === 0;
                 const x = isInitialPosition ? snapToGrid(baseX, indentValue) : baseX + offset.x;
                 const y = isInitialPosition ? snapToGrid(baseY, indentValue) : baseY + offset.y;
                 rects.push({
-                    id: `di:${slotIndex}`,
+                    id: `di:${offsetKey}`,
                     kind: 'di',
                     left: x,
                     top: y,
@@ -4096,10 +4153,63 @@ const App = () => {
             });
         }
 
+        if (currentControllerType === 'pro' || currentControllerType === 'smart2') {
+            const powerIndentValue = parseInt(indent, 10) || 8;
+            const rawPowerModules = Array.isArray(currentScheme.power_modules) ? currentScheme.power_modules : [];
+            const upsModules = rawPowerModules
+                .map((item, index) => ({
+                    id: typeof item === 'object' && item?.id ? item.id : `ups-${index}`,
+                    type: normalizePowerModuleType(typeof item === 'string' ? item : item?.type),
+                }))
+                .filter((item) => item.type === 'ups');
+            const powerModules = [
+                ...upsModules,
+                { id: 'required-power-unit', type: 'power-unit' },
+                { id: 'required-circuit-breaker', type: 'circuit-breaker' },
+            ];
+            const getPowerSize = (moduleDevice) => {
+                const imageKey = getWirelessDeviceImageKey(moduleDevice);
+                const image = imageKey ? wirelessImages[imageKey] : null;
+                return image?.width && image?.height
+                    ? { width: image.width, height: image.height }
+                    : { width: 80, height: 80 };
+            };
+            const powerPlacements = [];
+            let cursorX = -4 * powerIndentValue;
+            powerModules.forEach((moduleDevice, index) => {
+                const size = getPowerSize(moduleDevice);
+                cursorX -= size.width;
+                powerPlacements.push({ moduleDevice, index, x: cursorX, y: controllerImg.height - size.height, ...size });
+                cursorX -= 4 * powerIndentValue;
+            });
+            const upsPlacement = powerPlacements.find((item) => item.moduleDevice.type === 'ups');
+            if (upsPlacement) {
+                const battery = { id: 'required-battery', type: 'battery' };
+                const size = getPowerSize(battery);
+                powerPlacements.push({
+                    moduleDevice: battery,
+                    index: powerPlacements.length,
+                    x: upsPlacement.x + (upsPlacement.width - size.width) / 2,
+                    y: upsPlacement.y + upsPlacement.height + 11 * powerIndentValue,
+                    ...size,
+                });
+            }
+            powerPlacements.forEach((placement) => {
+                rects.push({
+                    id: `power:${placement.moduleDevice.id}:${placement.index}`,
+                    kind: 'power',
+                    left: placement.x,
+                    top: placement.y,
+                    right: placement.x + placement.width,
+                    bottom: placement.y + placement.height,
+                });
+            });
+        }
+
         return {
             rects: rects.map((rect) => (
-                rect.kind === 'ext' || rect.kind === 'di'
-                    ? { ...rect, ...getModuleObjectFootprint(rect.id, rect) }
+                rect.kind === 'ext' || rect.kind === 'di' || rect.kind === 'onewire'
+                    ? { ...rect, ...getModuleObjectFootprint(rect.id, rect, rect, showEmpty) }
                     : rect
             )),
             controllerRect,
@@ -4284,7 +4394,7 @@ const App = () => {
             .map((item) => normalizePowerModuleType(typeof item === 'string' ? item : item?.type));
         const powerModules = [
             ...rawPowerModules,
-            ...(['smart2', 'pro'].includes(controllerTypeForInstallation)
+            ...(['smart2', 'pro'].includes(controllerTypeForInstallation) && !isControllerOnlyScheme(scheme)
                 ? [
                     ...(normalizedPowerModuleTypes.includes('power-unit') ? [] : ['power-unit']),
                     ...(normalizedPowerModuleTypes.includes('circuit-breaker') ? [] : ['circuit-breaker']),
@@ -4421,6 +4531,18 @@ const App = () => {
         });
     }, [controllerType, installationItems]);
 
+    if (routeSchemeId && schemeLoadState !== 'loaded') {
+        return (
+            <main className="spa-page">
+                <div style={{ padding: 32, fontFamily: 'Arial, sans-serif' }}>
+                    {schemeLoadState === 'error'
+                        ? `Не удалось загрузить схему: ${schemeLoadError || 'неизвестная ошибка'}`
+                        : 'Загрузка схемы...'}
+                </div>
+            </main>
+        );
+    }
+
     return (
         <main className="spa-page">
             <nav className="spa-navbar">
@@ -4523,7 +4645,7 @@ const App = () => {
                                 type="button"
                                 className="scheme-settings-save-button"
                                 onClick={handleSaveAsNewScheme}
-                                disabled={schemeCreateState === 'saving'}
+                                disabled={(routeSchemeId && schemeLoadState !== 'loaded') || schemeCreateState === 'saving'}
                                 style={{
                                     background: schemeCreateState === 'error' ? '#c62828' : undefined,
                                     borderColor: schemeCreateState === 'error' ? '#c62828' : undefined,
@@ -4539,7 +4661,7 @@ const App = () => {
                                 type="button"
                                 className="scheme-settings-save-button"
                                 onClick={handleSaveScheme}
-                                disabled={!routeSchemeId || schemeLoadState === 'loading' || schemeSaveState === 'saving'}
+                                disabled={!routeSchemeId || schemeLoadState !== 'loaded' || schemeSaveState === 'saving'}
                                 style={{
                                     background: schemeSaveState === 'error' ? '#c62828' : undefined,
                                     borderColor: schemeSaveState === 'error' ? '#c62828' : undefined,
@@ -7362,7 +7484,7 @@ const App = () => {
                                     );
                                 })()}
                                 {(() => {
-                                    const supportsPowerLine = controllerType === 'pro' || controllerType === 'smart2';
+                                    const supportsPowerLine = (controllerType === 'pro' || controllerType === 'smart2') && !isControllerOnlyScheme(scheme);
                                     if (!supportsPowerLine) return null;
 
                                     const rawPowerModules = Array.isArray(scheme.power_modules) ? scheme.power_modules : [];
@@ -7678,7 +7800,7 @@ const App = () => {
                                                 const getDiSlotPosition = (slotIndex) => {
                                                     const device = diModules[slotIndex] || null;
                                                     const size = device ? getDiModuleSize(device) : { width: DI_SLOT_SIZE, height: DI_SLOT_SIZE };
-                                                    const offset = diSlotOffsets[slotIndex] || { x: 0, y: 0 };
+                                                    const offset = diSlotOffsets[getDiOffsetKey(device, slotIndex)] || { x: 0, y: 0 };
                                                     const baseX = getDiSlotX(slotIndex);
                                                     const baseY = controllerImage.height - size.height;
                                                     const isInitialPosition = offset.x === 0 && offset.y === 0;
@@ -7856,7 +7978,7 @@ const App = () => {
                                                 const getDiSlotPosition = (slotIndex) => {
                                                     const device = diModules[slotIndex] || null;
                                                     const size = device ? getDiModuleSize(device) : { width: DI_SLOT_SIZE, height: DI_SLOT_SIZE };
-                                                    const offset = diSlotOffsets[slotIndex] || { x: 0, y: 0 };
+                                                    const offset = diSlotOffsets[getDiOffsetKey(device, slotIndex)] || { x: 0, y: 0 };
                                                     const baseX = getDiSlotX(slotIndex);
                                                     const baseY = controllerImage.height - size.height;
                                                     const isInitialPosition = offset.x === 0 && offset.y === 0;
@@ -9782,7 +9904,7 @@ const App = () => {
                                     const getDiSlotPosition = (slotIndex) => {
                                         const device = diModules[slotIndex] || null;
                                         const size = device ? getDiModuleSize(device) : { width: DI_SLOT_SIZE, height: DI_SLOT_SIZE };
-                                        const offset = diSlotOffsets[slotIndex] || { x: 0, y: 0 };
+                                        const offset = diSlotOffsets[getDiOffsetKey(device, slotIndex)] || { x: 0, y: 0 };
                                         const baseX = getDiSlotX(slotIndex);
                                         const baseY = controllerImage.height - size.height;
                                         const isInitialPosition = offset.x === 0 && offset.y === 0;
@@ -9794,7 +9916,7 @@ const App = () => {
                                     const getDiSlotPositionByOffsets = (slotIndex, offsets) => {
                                         const device = diModules[slotIndex] || null;
                                         const size = device ? getDiModuleSize(device) : { width: DI_SLOT_SIZE, height: DI_SLOT_SIZE };
-                                        const offset = offsets[slotIndex] || { x: 0, y: 0 };
+                                        const offset = offsets[getDiOffsetKey(device, slotIndex)] || { x: 0, y: 0 };
                                         const baseX = getDiSlotX(slotIndex);
                                         const baseY = controllerImage.height - size.height;
                                         const isInitialPosition = offset.x === 0 && offset.y === 0;
@@ -9840,6 +9962,8 @@ const App = () => {
                                             })()}
                                             {Array.from({ length: diSlotsCount }).map((_, slotIndex) => {
                                                 const device = diModules[slotIndex] || null;
+                                                const offsetKey = getDiOffsetKey(device, slotIndex);
+                                                const collisionId = `di:${offsetKey}`;
                                                 const isOccupied = !!device;
                                                 const imageKey = device ? getWirelessDeviceImageKey(device) : null;
                                                 const image = imageKey ? wirelessImages[imageKey] : null;
@@ -9852,29 +9976,29 @@ const App = () => {
                                                     <Group
                                                         key={`di-slot-${slotIndex}`}
                                                         ref={(node) => {
-                                                            if (node) moduleCollisionNodeRefs.current[`di:${slotIndex}`] = node;
-                                                            else delete moduleCollisionNodeRefs.current[`di:${slotIndex}`];
+                                                            if (node) moduleCollisionNodeRefs.current[collisionId] = node;
+                                                            else delete moduleCollisionNodeRefs.current[collisionId];
                                                         }}
                                                         draggable={isOccupied}
                                                         onMouseEnter={() => setHoveredExtSlotIndex(`di:${slotIndex}`)}
                                                         onMouseLeave={() => setHoveredExtSlotIndex(null)}
                                                         onDragStart={() => {
-                                                            diDragStartOffsetsRef.current[slotIndex] = diSlotOffsets[slotIndex] || { x: 0, y: 0 };
-                                                            setInvalidDiDragMap((prev) => ({ ...prev, [slotIndex]: false }));
+                                                            diDragStartOffsetsRef.current[offsetKey] = diSlotOffsets[offsetKey] || { x: 0, y: 0 };
+                                                            setInvalidDiDragMap((prev) => ({ ...prev, [offsetKey]: false }));
                                                         }}
                                                         onDragMove={(event) => {
                                                             if (!isOccupied) return;
                                                             const position = event.target.position();
-                                                            const startOffset = diDragStartOffsetsRef.current[slotIndex] || { x: 0, y: 0 };
+                                                            const startOffset = diDragStartOffsetsRef.current[offsetKey] || { x: 0, y: 0 };
                                                             const draftOffset = {
                                                                 x: startOffset.x + position.x,
                                                                 y: startOffset.y + position.y,
                                                             };
                                                             const draftOffsets = {
                                                                 ...diSlotOffsets,
-                                                                [slotIndex]: draftOffset,
+                                                                [offsetKey]: draftOffset,
                                                             };
-                                                            setDiSlotOffsets((prev) => ({ ...prev, [slotIndex]: draftOffset }));
+                                                            setDiSlotOffsets((prev) => ({ ...prev, [offsetKey]: draftOffset }));
                                                              const collisionData = getAllOccupiedRects(
                                                                  controllerImage,
                                                                 scheme,
@@ -9892,7 +10016,7 @@ const App = () => {
                                                                 right: draftPos.x + size.width,
                                                                 bottom: draftPos.y + size.height,
                                                             };
-                                                            const targetRect = getModuleObjectFootprint(`di:${slotIndex}`, {
+                                                            const targetRect = getModuleObjectFootprint(collisionId, {
                                                                 left: slotX,
                                                                 top: slotY,
                                                                 right: slotX + size.width,
@@ -9900,16 +10024,16 @@ const App = () => {
                                                             }, targetBodyRect);
                                                             const collides = Boolean(collisionData) && (
                                                                 rectsOverlap(targetRect, collisionData.controllerRect)
-                                                                || collisionData.rects.some((rect) => rect.id !== `di:${slotIndex}` && rectsOverlap(targetRect, rect))
+                                                                || collisionData.rects.some((rect) => rect.id !== collisionId && rectsOverlap(targetRect, rect))
                                                             );
-                                                            setInvalidDiDragMap((prev) => ({ ...prev, [slotIndex]: collides }));
+                                                            setInvalidDiDragMap((prev) => ({ ...prev, [offsetKey]: collides }));
                                                             event.target.position({ x: 0, y: 0 });
                                                         }}
                                                         onDragEnd={(event) => {
                                                             if (!isOccupied) return;
-                                                            const startOffset = diDragStartOffsetsRef.current[slotIndex] || { x: 0, y: 0 };
-                                                            const nextOffset = diSlotOffsets[slotIndex] || { x: 0, y: 0 };
-                                                            const nextOffsets = { ...diSlotOffsets, [slotIndex]: nextOffset };
+                                                            const startOffset = diDragStartOffsetsRef.current[offsetKey] || { x: 0, y: 0 };
+                                                            const nextOffset = diSlotOffsets[offsetKey] || { x: 0, y: 0 };
+                                                            const nextOffsets = { ...diSlotOffsets, [offsetKey]: nextOffset };
                                                             const collisionData = getAllOccupiedRects(
                                                                 controllerImage,
                                                                 scheme,
@@ -9927,7 +10051,7 @@ const App = () => {
                                                                 right: nextPos.x + size.width,
                                                                 bottom: nextPos.y + size.height,
                                                             };
-                                                            const targetRect = getModuleObjectFootprint(`di:${slotIndex}`, {
+                                                            const targetRect = getModuleObjectFootprint(collisionId, {
                                                                 left: slotX,
                                                                 top: slotY,
                                                                 right: slotX + size.width,
@@ -9935,13 +10059,13 @@ const App = () => {
                                                             }, targetBodyRect);
                                                             const collides = Boolean(collisionData) && (
                                                                 rectsOverlap(targetRect, collisionData.controllerRect)
-                                                                || collisionData.rects.some((rect) => rect.id !== `di:${slotIndex}` && rectsOverlap(targetRect, rect))
+                                                                || collisionData.rects.some((rect) => rect.id !== collisionId && rectsOverlap(targetRect, rect))
                                                             );
                                                             if (collides) {
-                                                                setDiSlotOffsets((prev) => ({ ...prev, [slotIndex]: startOffset }));
+                                                                setDiSlotOffsets((prev) => ({ ...prev, [offsetKey]: startOffset }));
                                                             }
-                                                            setInvalidDiDragMap((prev) => ({ ...prev, [slotIndex]: false }));
-                                                            delete diDragStartOffsetsRef.current[slotIndex];
+                                                            setInvalidDiDragMap((prev) => ({ ...prev, [offsetKey]: false }));
+                                                            delete diDragStartOffsetsRef.current[offsetKey];
                                                             event.target.position({ x: 0, y: 0 });
                                                         }}
                                                     >
@@ -9951,8 +10075,8 @@ const App = () => {
                                                             width={size.width}
                                                             height={size.height}
                                                             cornerRadius={10}
-                                                            fill={invalidDiDragMap[slotIndex] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5')}
-                                                            stroke={invalidDiDragMap[slotIndex] ? '#d32f2f' : (isOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4')}
+                                                            fill={invalidDiDragMap[offsetKey] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5')}
+                                                            stroke={invalidDiDragMap[offsetKey] ? '#d32f2f' : (isOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4')}
                                                             strokeWidth={1.5}
                                                         />
                                                           {isOccupied && image && (
@@ -10314,6 +10438,8 @@ const App = () => {
                                                                           )}
                                                                            {!slotState?.covered && (
                                                                                <Rect
+                                                                                   name="module-device-slot"
+                                                                                   collisionOccupied={Boolean(relayDevice)}
                                                                                    x={relaySlotX}
                                                                                    y={relaySlotY}
                                                                                     width={relayVisualSlotWidth}
@@ -10595,8 +10721,10 @@ const App = () => {
                                                                               />
                                                                           )}
                                                                            {!slotState?.covered && (
-                                                                           <Rect
-                                                                              x={relaySlotX}
+                                                                               <Rect
+                                                                                   name="module-device-slot"
+                                                                                   collisionOccupied={Boolean(relayDevice)}
+                                                                                   x={relaySlotX}
                                                                               y={relaySlotY}
                                                                               width={relayVisualSlotWidth}
                                                                               height={relayVisualSlotHeight}
@@ -10954,7 +11082,7 @@ const App = () => {
                                     const getExtOccupiedSlotPosition = (slotIndex) => {
                                         const slotDevice = extModules[slotIndex] || null;
                                         const slotSize = slotDevice ? getExtModuleSize(slotDevice) : { width: EXT_SLOT_SIZE, height: EXT_SLOT_SIZE };
-                                        const offset = extSlotOffsets[slotIndex] || { x: 0, y: 0 };
+                                        const offset = extSlotOffsets[getExtOffsetKey(slotDevice, slotIndex)] || { x: 0, y: 0 };
                                         const baseX = getExtSlotX(slotIndex);
                                           const baseY = isEcosmartThermostatExtLine
                                                ? -2.25 * moduleHeightValue - 5 * indentSize + slotIndex * 10 * indentSize
@@ -10998,7 +11126,7 @@ const App = () => {
                                                   y: lastPos.y + (lastSize.height - slotSize.height) + (isEcosmartThermostatExtLine ? 10 * indentSize : 0),
                                              };
                                         }
-                                        const offset = extSlotOffsets[slotIndex] || { x: 0, y: 0 };
+                                        const offset = extSlotOffsets[getExtOffsetKey(slotDevice, slotIndex)] || { x: 0, y: 0 };
                                         const baseX = getExtSlotX(slotIndex);
                                          const baseY = isEcosmartThermostatExtLine
                                                ? -2.25 * moduleHeightValue - 5 * indentSize + slotIndex * 10 * indentSize
@@ -11098,6 +11226,8 @@ const App = () => {
                                             })()}
                                              {Array.from({ length: extSlotsCount }).map((_, slotIndex) => {
                                                  const device = extModules[slotIndex] || null;
+                                                 const offsetKey = getExtOffsetKey(device, slotIndex);
+                                                 const collisionId = `ext:${offsetKey}`;
                                                  const isEcosmartExtThermostatAddSlot = !device && showEcosmartExtThermostatAddSlot && slotIndex === extModules.length;
                                                   const renderDevice = device || (isEcosmartExtThermostatAddSlot ? ecosmartExtThermostatPlaceholder : null);
                                                   const isOccupied = !!device;
@@ -11268,7 +11398,7 @@ const App = () => {
                                                         y += extNtcTopExtraOffset;
                                                     }
                                                     if (owIndex === 0) {
-                                                        const key = getExtOneWireOffsetKey(slotIndex, owIndex);
+                                                        const key = getExtOneWireOffsetKey(device, slotIndex, extOneWireDevices[owIndex] || null, owIndex);
                                                         const offset = extOneWireOffsets[key] || { x: 0, y: 0 };
                                                         return { x: x + offset.x, y: y + offset.y };
                                                     }
@@ -11288,7 +11418,7 @@ const App = () => {
                                                         x += prevSize.width + extOneWireGap + prevNtcRightGap + currentNtcLeftGap;
                                                         y += (isPrevModule ? moduleVerticalGap : defaultVerticalGap) + currentNtcTopOffset;
                                                     }
-                                                    const key = getExtOneWireOffsetKey(slotIndex, owIndex);
+                                                    const key = getExtOneWireOffsetKey(device, slotIndex, extOneWireDevices[owIndex] || null, owIndex);
                                                     const offset = extOneWireOffsets[key] || { x: 0, y: 0 };
                                                     return { x: x + offset.x, y: y + offset.y };
                                                 };
@@ -11313,7 +11443,7 @@ const App = () => {
                                                         y += extNtcTopExtraOffset;
                                                     }
                                                     if (owIndex === 0) {
-                                                        const key = getExtOneWireOffsetKey(slotIndex, owIndex);
+                                                        const key = getExtOneWireOffsetKey(device, slotIndex, extOneWireDevices[owIndex] || null, owIndex);
                                                         const offset = offsetsMap[key] || { x: 0, y: 0 };
                                                         return { x: x + offset.x, y: y + offset.y };
                                                     }
@@ -11333,7 +11463,7 @@ const App = () => {
                                                         x += prevSize.width + extOneWireGap + prevNtcRightGap + currentNtcLeftGap;
                                                         y += (isPrevModule ? moduleVerticalGap : defaultVerticalGap) + currentNtcTopOffset;
                                                     }
-                                                    const key = getExtOneWireOffsetKey(slotIndex, owIndex);
+                                                    const key = getExtOneWireOffsetKey(device, slotIndex, extOneWireDevices[owIndex] || null, owIndex);
                                                     const offset = offsetsMap[key] || { x: 0, y: 0 };
                                                     return { x: x + offset.x, y: y + offset.y };
                                                 };
@@ -11354,32 +11484,32 @@ const App = () => {
                                                 ];
                                                 return (
                                                     <Group
-                                                        key={`ext-slot-${slotIndex}`}
+                                                        key={`ext-slot-${offsetKey}`}
                                                         ref={(node) => {
-                                                            if (node) moduleCollisionNodeRefs.current[`ext:${slotIndex}`] = node;
-                                                            else delete moduleCollisionNodeRefs.current[`ext:${slotIndex}`];
+                                                            if (node) moduleCollisionNodeRefs.current[collisionId] = node;
+                                                            else delete moduleCollisionNodeRefs.current[collisionId];
                                                         }}
                                                         draggable
                                                         onDragStart={() => {
-                                                            extDragStartOffsetsRef.current[slotIndex] = extSlotOffsets[slotIndex] || { x: 0, y: 0 };
-                                                            setInvalidExtDragMap((prev) => ({ ...prev, [slotIndex]: false }));
+                                                            extDragStartOffsetsRef.current[offsetKey] = extSlotOffsets[offsetKey] || { x: 0, y: 0 };
+                                                            setInvalidExtDragMap((prev) => ({ ...prev, [offsetKey]: false }));
                                                         }}
                                                         onMouseEnter={() => setHoveredExtSlotIndex(slotIndex)}
                                                         onMouseLeave={() => setHoveredExtSlotIndex(null)}
                                                         onDragMove={(event) => {
                                                             const position = event.target.position();
-                                                            const startOffset = extDragStartOffsetsRef.current[slotIndex] || { x: 0, y: 0 };
+                                                            const startOffset = extDragStartOffsetsRef.current[offsetKey] || { x: 0, y: 0 };
                                                             const draftOffset = {
                                                                 x: startOffset.x + position.x,
                                                                 y: startOffset.y + position.y,
                                                             };
                                                             const draftOffsets = {
                                                                 ...extSlotOffsets,
-                                                                [slotIndex]: draftOffset,
+                                                                [offsetKey]: draftOffset,
                                                             };
                                                             setExtSlotOffsets((prev) => ({
                                                                 ...prev,
-                                                                [slotIndex]: draftOffset,
+                                                                [offsetKey]: draftOffset,
                                                             }));
                                                             const collisionData = getAllOccupiedRects(
                                                                 controllerImage,
@@ -11399,7 +11529,7 @@ const App = () => {
                                                                    right: baseSlotPos.x + draftOffset.x + layoutWidth,
                                                                    bottom: baseSlotPos.y + draftOffset.y + slotHeight,
                                                                };
-                                                              const targetRect = getModuleObjectFootprint(`ext:${slotIndex}`, {
+                                                              const targetRect = getModuleObjectFootprint(collisionId, {
                                                                   left: slotX,
                                                                   top: slotY,
                                                                   right: slotX + layoutWidth,
@@ -11407,15 +11537,15 @@ const App = () => {
                                                               }, targetBodyRect);
                                                             const collides = Boolean(collisionData) && (
                                                                 rectsOverlap(targetRect, collisionData.controllerRect)
-                                                                || collisionData.rects.some((rect) => rect.id !== `ext:${slotIndex}` && rectsOverlap(targetRect, rect))
+                                                                || collisionData.rects.some((rect) => rect.id !== collisionId && rectsOverlap(targetRect, rect))
                                                             );
-                                                            setInvalidExtDragMap((prev) => ({ ...prev, [slotIndex]: collides }));
+                                                            setInvalidExtDragMap((prev) => ({ ...prev, [offsetKey]: collides }));
                                                             event.target.position({ x: 0, y: 0 });
                                                         }}
                                                         onDragEnd={(event) => {
-                                                            const startOffset = extDragStartOffsetsRef.current[slotIndex] || { x: 0, y: 0 };
-                                                            const nextOffset = extSlotOffsets[slotIndex] || { x: 0, y: 0 };
-                                                            const nextOffsets = { ...extSlotOffsets, [slotIndex]: nextOffset };
+                                                            const startOffset = extDragStartOffsetsRef.current[offsetKey] || { x: 0, y: 0 };
+                                                            const nextOffset = extSlotOffsets[offsetKey] || { x: 0, y: 0 };
+                                                            const nextOffsets = { ...extSlotOffsets, [offsetKey]: nextOffset };
                                                              const collisionData = getAllOccupiedRects(
                                                                  controllerImage,
                                                                 scheme,
@@ -11434,7 +11564,7 @@ const App = () => {
                                                                    right: baseSlotPos.x + nextOffset.x + layoutWidth,
                                                                    bottom: baseSlotPos.y + nextOffset.y + slotHeight,
                                                                };
-                                                              const targetRect = getModuleObjectFootprint(`ext:${slotIndex}`, {
+                                                              const targetRect = getModuleObjectFootprint(collisionId, {
                                                                   left: slotX,
                                                                   top: slotY,
                                                                   right: slotX + layoutWidth,
@@ -11442,15 +11572,15 @@ const App = () => {
                                                               }, targetBodyRect);
                                                             const collides = Boolean(collisionData) && (
                                                                 rectsOverlap(targetRect, collisionData.controllerRect)
-                                                                || collisionData.rects.some((rect) => rect.id !== `ext:${slotIndex}` && rectsOverlap(targetRect, rect))
+                                                                || collisionData.rects.some((rect) => rect.id !== collisionId && rectsOverlap(targetRect, rect))
                                                             );
                                                             if (collides) {
-                                                                setExtSlotOffsets((prev) => ({ ...prev, [slotIndex]: startOffset }));
+                                                                setExtSlotOffsets((prev) => ({ ...prev, [offsetKey]: startOffset }));
                                                                 event.target.position(startOffset);
                                                                 event.target.getLayer()?.batchDraw();
                                                             }
-                                                            setInvalidExtDragMap((prev) => ({ ...prev, [slotIndex]: false }));
-                                                            delete extDragStartOffsetsRef.current[slotIndex];
+                                                            setInvalidExtDragMap((prev) => ({ ...prev, [offsetKey]: false }));
+                                                            delete extDragStartOffsetsRef.current[offsetKey];
                                                             event.target.position({ x: 0, y: 0 });
                                                         }}
                                                     >
@@ -11460,8 +11590,8 @@ const App = () => {
                                                             width={slotWidth}
                                                             height={slotHeight}
                                                             cornerRadius={10}
-                                                            fill={invalidExtDragMap[slotIndex] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5')}
-                                                            stroke={invalidExtDragMap[slotIndex] ? '#d32f2f' : (isOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4')}
+                                                            fill={invalidExtDragMap[offsetKey] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5')}
+                                                            stroke={invalidExtDragMap[offsetKey] ? '#d32f2f' : (isOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4')}
                                                             strokeWidth={1.5}
                                                         />
                                                          {isOccupied && image && (
@@ -11491,8 +11621,10 @@ const App = () => {
                                                                   <>
                                                                       {!floorSensor && showEmptySlots && (
                                                                           <>
-                                                                              <Rect
-                                                                                  x={floorSlotX}
+                                                                               <Rect
+                                                                                   name="module-device-slot"
+                                                                                   collisionOccupied={false}
+                                                                                   x={floorSlotX}
                                                                                   y={floorSlotY}
                                                                                   width={floorSlotSize}
                                                                                   height={floorSlotSize}
@@ -11514,8 +11646,20 @@ const App = () => {
                                                                               <Text x={floorSlotX + floorSlotSize / 2} y={floorSlotY + floorSlotSize / 2} text="+" fontSize={15} fill="#fff" offsetX={4.5} offsetY={6} listening={false} />
                                                                           </>
                                                                       )}
-                                                                     {floorSensor && floorSensorImage && (
-                                                                         <Image image={floorSensorImage} x={floorSlotX} y={floorSlotY} width={floorSlotSize} height={floorSlotSize} listening={false} />
+                                                                      {floorSensor && (
+                                                                          <Rect
+                                                                              name="module-device-slot"
+                                                                              collisionOccupied
+                                                                              x={floorSlotX}
+                                                                              y={floorSlotY}
+                                                                              width={floorSlotSize}
+                                                                              height={floorSlotSize}
+                                                                              fill="rgba(0,0,0,0)"
+                                                                              listening={false}
+                                                                          />
+                                                                      )}
+                                                                      {floorSensor && floorSensorImage && (
+                                                                          <Image image={floorSensorImage} x={floorSlotX} y={floorSlotY} width={floorSlotSize} height={floorSlotSize} listening={false} />
                                                                      )}
                                                                      {floorSensor && (() => {
                                                                          const thermostatGnd = getPortPosition(extPorts, '1-WIRE-GND', slotX, slotY, slotWidth, slotHeight);
@@ -11785,6 +11929,8 @@ const App = () => {
                                                                         onMouseLeave={() => setHoveredRelaySlotIndex((prev) => (prev === `rl6:${slotIndex}:${relayIndex}` ? null : prev))}
                                                                     >
                                                                         <Rect
+                                                                            name="module-device-slot"
+                                                                            collisionOccupied={Boolean(relayDevice)}
                                                                             x={slotRelayX}
                                                                             y={slotRelayY}
                                                                             width={slotSize.width}
@@ -12177,6 +12323,8 @@ const App = () => {
                                                                         />
                                                                     )}
                                                                     <Rect
+                                                                        name="module-device-slot"
+                                                                        collisionOccupied={Boolean(hasDevice)}
                                                                         x={slotRenderX}
                                                                         y={slotRenderY}
                                                                         width={visualSlotWidth}
@@ -12454,6 +12602,8 @@ const App = () => {
                                                                             />
                                                                         )}
                                                                         <Rect
+                                                                            name="module-device-slot"
+                                                                            collisionOccupied={Boolean(hasDevice)}
                                                                             x={lineX}
                                                                             y={slotYLine}
                                                                             width={di6SlotWidth}
@@ -12570,6 +12720,8 @@ const App = () => {
                                                                     </>
                                                                 )}
                                                                 <Rect
+                                                                    name="module-device-slot"
+                                                                    collisionOccupied={Boolean(bl2Boiler)}
                                                                     x={bl2BusSlotX}
                                                                     y={bl2BusSlotY}
                                                                     width={bl2BoilerWidth}
@@ -12757,7 +12909,7 @@ const App = () => {
                                                             const owPos = getExtOneWireSlotPosition(extOneWireIndex);
                                                             const owX = owPos.x;
                                                             const owY = owPos.y;
-                                                            const extOwKey = getExtOneWireOffsetKey(slotIndex, extOneWireIndex);
+                                                            const extOwKey = getExtOneWireOffsetKey(device, slotIndex, owDevice, extOneWireIndex);
                                                             const isOwHovered = hoveredExtOneWireKey === extOwKey;
                                                             const owPorts = getExtOwPorts(owDevice);
                                                             const owPortMap = getExtOwPortMap(
@@ -12767,7 +12919,7 @@ const App = () => {
                                                             );
                                                             return (
                                                                 <Group
-                                                                    key={`ext-ow-${slotIndex}-${extOneWireIndex}`}
+                                                                    key={`ext-ow-${extOwKey}`}
                                                                     draggable
                                                                     onMouseDown={(event) => {
                                                                         event.cancelBubble = true;
@@ -12819,16 +12971,31 @@ const App = () => {
                                                                                 const pos = getExtOneWireSlotPositionByOffsets(idx, draftOffsets);
                                                                                 const size = getExtOneWireSlotSize(item);
                                                                                 return {
-                                                                                    id: getExtOneWireOffsetKey(slotIndex, idx),
+                                                                                    id: getExtOneWireOffsetKey(device, slotIndex, item, idx),
                                                                                     left: pos.x,
                                                                                     top: pos.y,
                                                                                     right: pos.x + size.width,
                                                                                     bottom: pos.y + size.height,
                                                                                 };
                                                                             });
+                                                                        const parentModuleId = collisionId;
+                                                                        const parentBodyRect = {
+                                                                            left: slotX,
+                                                                            top: slotY,
+                                                                            right: slotX + slotWidth,
+                                                                            bottom: slotY + slotHeight,
+                                                                        };
+                                                                        const parentCollisionRects = getModuleObjectCollisionRects(
+                                                                            parentModuleId,
+                                                                            parentBodyRect,
+                                                                            parentBodyRect,
+                                                                            showEmptySlots,
+                                                                            extOwKey,
+                                                                        );
                                                                         const collides = Boolean(collisionData) && (
                                                                             rectsOverlap(targetRect, collisionData.controllerRect)
-                                                                            || collisionData.rects.some((rect) => rectsOverlap(targetRect, rect))
+                                                                            || collisionData.rects.some((rect) => rect.id !== parentModuleId && rectsOverlap(targetRect, rect))
+                                                                            || parentCollisionRects.some((rect) => rectsOverlap(targetRect, rect))
                                                                             || siblingRects.some((rect) => rect.id !== extOwKey && rectsOverlap(targetRect, rect))
                                                                         );
                                                                         setInvalidExtOneWireDragMap((prev) => ({ ...prev, [extOwKey]: collides }));
@@ -12861,16 +13028,31 @@ const App = () => {
                                                                                 const pos = getExtOneWireSlotPositionByOffsets(idx, nextOffsets);
                                                                                 const size = getExtOneWireSlotSize(item);
                                                                                 return {
-                                                                                    id: getExtOneWireOffsetKey(slotIndex, idx),
+                                                                                    id: getExtOneWireOffsetKey(device, slotIndex, item, idx),
                                                                                     left: pos.x,
                                                                                     top: pos.y,
                                                                                     right: pos.x + size.width,
                                                                                     bottom: pos.y + size.height,
                                                                                 };
                                                                             });
+                                                                        const parentModuleId = collisionId;
+                                                                        const parentBodyRect = {
+                                                                            left: slotX,
+                                                                            top: slotY,
+                                                                            right: slotX + slotWidth,
+                                                                            bottom: slotY + slotHeight,
+                                                                        };
+                                                                        const parentCollisionRects = getModuleObjectCollisionRects(
+                                                                            parentModuleId,
+                                                                            parentBodyRect,
+                                                                            parentBodyRect,
+                                                                            showEmptySlots,
+                                                                            extOwKey,
+                                                                        );
                                                                         const collides = Boolean(collisionData) && (
                                                                             rectsOverlap(targetRect, collisionData.controllerRect)
-                                                                            || collisionData.rects.some((rect) => rectsOverlap(targetRect, rect))
+                                                                            || collisionData.rects.some((rect) => rect.id !== parentModuleId && rectsOverlap(targetRect, rect))
+                                                                            || parentCollisionRects.some((rect) => rectsOverlap(targetRect, rect))
                                                                             || siblingRects.some((rect) => rect.id !== extOwKey && rectsOverlap(targetRect, rect))
                                                                         );
                                                                         if (collides) {
@@ -12882,6 +13064,9 @@ const App = () => {
                                                                     }}
                                                                 >
                                                                     <Rect
+                                                                        name="module-device-slot"
+                                                                        collisionOccupied={Boolean(owDevice)}
+                                                                        collisionKey={extOwKey}
                                                                         x={owX}
                                                                         y={owY}
                                                                         width={owWidth}
@@ -12966,6 +13151,8 @@ const App = () => {
                                                                                         />
                                                                                     )}
                                                                                     <Rect
+                                                                                        name="module-device-slot"
+                                                                                        collisionOccupied={Boolean(sensor)}
                                                                                         x={slotX}
                                                                                         y={slotY}
                                                                                         width={ntcSlotWidth}
@@ -13085,7 +13272,7 @@ const App = () => {
                                                                                 >
                                                                                     {sensor && modulePortA && <Line points={[sensorPortAX, sensorPortAY, owX + modulePortA.x * owWidth, sensorPortAY, owX + modulePortA.x * owWidth, owY + modulePortA.y * owHeight]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
                                                                                     {sensor && modulePortB && <Line points={[sensorPortBX, sensorPortBY, owX + modulePortB.x * owWidth, sensorPortBY, owX + modulePortB.x * owWidth, owY + modulePortB.y * owHeight]} stroke="#464EE3" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
-                                                                                    <Rect x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} />
+                                                                                    <Rect name="module-device-slot" collisionOccupied={Boolean(sensor)} x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} />
                                                                                     {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
                                                                                     {showPorts && sensor && ntcSensorPorts.map((port) => <Circle key={`ext-ntc2-port-${slotIndex}-${extOneWireIndex}-${ntcIndex}-${port.name}`} x={sensorRenderX + port.x * sensorRenderSize.width} y={sensorRenderY + port.y * sensorRenderSize.height} radius={2.5} fill="red" listening={false} />)}
                                                                                     {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}
@@ -13547,9 +13734,6 @@ const App = () => {
                                       const oneWireDevices = memoOneWireDevices;
                                       const smart2DiModulesCount = controllerType === 'smart2' ? getDiModules(scheme).length : 0;
                                        const oneWireMaxDevices = 6;
-                                    const oneWireGap = 2 * indentSize;
-                                    const ntcTopExtraOffset = 12 * indentSize;
-                                    const ntcSideExtraGap = 10 * indentSize;
                                     // Route the first controller 1-wire links below every visible PRO slot.
                                     const getProFirstOneWireMinBendY = () => {
                                         if (controllerType !== 'pro') return null;
@@ -13638,7 +13822,8 @@ const App = () => {
                                             const size = getExtModuleSize(extModules[slotIndex]);
                                             const baseY = snapToGrid(controllerBottom - size.height, indentSize);
                                             if (useBasePosition) return baseY;
-                                            const offset = extSlotOffsets[slotIndex] || { x: 0, y: 0 };
+                                            const device = extModules[slotIndex] || null;
+                                            const offset = extSlotOffsets[getExtOffsetKey(device, slotIndex)] || { x: 0, y: 0 };
                                             return offset.x === 0 && offset.y === 0 ? baseY : controllerBottom - size.height + offset.y;
                                         };
                                         const extLinks = [
@@ -13720,86 +13905,24 @@ const App = () => {
                                         }
                                         return { width: slotImage.width, height: slotImage.height };
                                     };
-                                    const getSlotPosition = (slotIndex) => {
-                                        const baseOffset = oneWireSlotOffsets[0] || { x: 0, y: 0 };
-                                         let x = oneWireGeometry.firstSlotX + baseOffset.x;
-                                         let y = oneWireGeometry.firstSlotY + baseOffset.y;
-                                         if (controllerType === 'ecosmart') {
-                                             y += 5 * indentSize;
-                                         }
-                                         const firstDeviceForSideGap = oneWireDevices[0] || null;
-                                         if (canonicalDeviceType(firstDeviceForSideGap?.type) === 'ntc-1-wire') {
-                                             x += ntcSideExtraGap;
-                                         }
-                                         const firstDevice = oneWireDevices[0] || null;
-                                         if (controllerType === 'ecosmart') {
-                                             y += getEcosmartFirstOneWireExtraDown(firstDevice) * indentSize;
-                                         }
-                                         if (slotIndex >= 0 && canonicalDeviceType(firstDevice?.type) === 'ntc-1-wire') {
-                                             y += ntcTopExtraOffset;
-                                         }
-                                        if (slotIndex === 0) return { x, y };
-
-                                        for (let i = 1; i <= slotIndex; i += 1) {
-                                            const prevDevice = oneWireDevices[i - 1] || null;
-                                            const prevSize = getOneWireSlotDimensions(prevDevice);
-                                            const currentOffset = oneWireSlotOffsets[i] || { x: 0, y: 0 };
-                                            const prevType = canonicalDeviceType(prevDevice?.type);
-                                            const currentDevice = oneWireDevices[i] || null;
-                                            const currentType = canonicalDeviceType(currentDevice?.type);
-                                            const isPrevModule = prevType === 'ntc-1-wire' || prevType === 'rdt2';
-                                            const stepY = moduleHeightValue * 0.25;
-                                            const defaultVerticalGap = prevSize.height + 3 * indentSize + stepY;
-                                            const moduleVerticalGap = prevSize.height + stepY;
-                                            const currentNtcTopOffset = currentType === 'ntc-1-wire' ? ntcTopExtraOffset : 0;
-                                            const prevNtcRightGap = prevType === 'ntc-1-wire' ? ntcSideExtraGap : 0;
-                                            const currentNtcLeftGap = currentType === 'ntc-1-wire' ? ntcSideExtraGap : 0;
-                                            x += prevSize.width + oneWireGap + prevNtcRightGap + currentNtcLeftGap + currentOffset.x;
-                                            y += (isPrevModule ? moduleVerticalGap : defaultVerticalGap) + currentNtcTopOffset + currentOffset.y;
-                                        }
-
-                                        return { x, y };
-                                    };
                                     const getSlotPositionByOffsets = (slotIndex, offsets) => {
-                                        const baseOffset = offsets[0] || { x: 0, y: 0 };
-                                         let x = oneWireGeometry.firstSlotX + baseOffset.x;
-                                         let y = oneWireGeometry.firstSlotY + baseOffset.y;
-                                         if (controllerType === 'ecosmart') {
-                                             y += 5 * indentSize;
-                                         }
-                                         const firstDeviceForSideGap = oneWireDevices[0] || null;
-                                         if (canonicalDeviceType(firstDeviceForSideGap?.type) === 'ntc-1-wire') {
-                                             x += ntcSideExtraGap;
-                                         }
-                                         const firstDevice = oneWireDevices[0] || null;
-                                         if (controllerType === 'ecosmart') {
-                                             y += getEcosmartFirstOneWireExtraDown(firstDevice) * indentSize;
-                                         }
-                                         if (slotIndex >= 0 && canonicalDeviceType(firstDevice?.type) === 'ntc-1-wire') {
-                                             y += ntcTopExtraOffset;
-                                         }
-                                        if (slotIndex === 0) return { x, y };
-
-                                        for (let i = 1; i <= slotIndex; i += 1) {
-                                            const prevDevice = oneWireDevices[i - 1] || null;
-                                            const prevSize = getOneWireSlotDimensions(prevDevice);
-                                            const currentOffset = offsets[i] || { x: 0, y: 0 };
-                                            const prevType = canonicalDeviceType(prevDevice?.type);
-                                            const currentDevice = oneWireDevices[i] || null;
-                                            const currentType = canonicalDeviceType(currentDevice?.type);
-                                            const isPrevModule = prevType === 'ntc-1-wire' || prevType === 'rdt2';
-                                            const stepY = moduleHeightValue * 0.25;
-                                            const defaultVerticalGap = prevSize.height + 3 * indentSize + stepY;
-                                            const moduleVerticalGap = prevSize.height + stepY;
-                                            const currentNtcTopOffset = currentType === 'ntc-1-wire' ? ntcTopExtraOffset : 0;
-                                            const prevNtcRightGap = prevType === 'ntc-1-wire' ? ntcSideExtraGap : 0;
-                                            const currentNtcLeftGap = currentType === 'ntc-1-wire' ? ntcSideExtraGap : 0;
-                                            x += prevSize.width + oneWireGap + prevNtcRightGap + currentNtcLeftGap + currentOffset.x;
-                                            y += (isPrevModule ? moduleVerticalGap : defaultVerticalGap) + currentNtcTopOffset + currentOffset.y;
-                                        }
-
-                                        return { x, y };
+                                        const firstDevice = oneWireDevices[0] || null;
+                                        return getOneWireSlotPosition({
+                                            slotIndex,
+                                            devices: oneWireDevices,
+                                            offsets,
+                                            getDeviceSize: getOneWireSlotDimensions,
+                                            getOffsetKey: getOneWireOffsetKey,
+                                            firstSlotX: oneWireGeometry.firstSlotX,
+                                            firstSlotY: oneWireGeometry.firstSlotY,
+                                            firstSlotExtraY: controllerType === 'ecosmart'
+                                                ? (5 + getEcosmartFirstOneWireExtraDown(firstDevice)) * indentSize
+                                                : 0,
+                                            indentSize,
+                                            moduleHeightValue,
+                                        });
                                     };
+                                    const getSlotPosition = (slotIndex) => getSlotPositionByOffsets(slotIndex, oneWireSlotOffsets);
                                     const getDevicePorts = (device) => {
                                         if (!device) return ONE_WIRE_SLOT_FAKE_PORTS;
                                         const imageKey = getWirelessDeviceImageKey(device);
@@ -13843,6 +13966,8 @@ const App = () => {
                                                 <>
                                                     {Array.from({ length: slotsToRenderCount }).map((_, slotIndex) => {
                                                         const device = oneWireDevices[slotIndex] || null;
+                                                        const offsetKey = getOneWireOffsetKey(device, slotIndex);
+                                                        const collisionId = `onewire:${offsetKey}`;
                                                         const isOccupied = !!device;
                                                         const normalizedOneWireType = canonicalDeviceType(device?.type);
                                                         const slotPos = getSlotPosition(slotIndex);
@@ -13869,24 +13994,29 @@ const App = () => {
                                                         );
                                                         return (
                                                             <Group
-                                                                key={`one-wire-slot-${slotIndex}`}
+                                                                key={`one-wire-slot-${offsetKey}`}
                                                                 ref={(node) => {
-                                                                    if (node) oneWireDragNodeRefs.current[slotIndex] = node;
-                                                                    else delete oneWireDragNodeRefs.current[slotIndex];
+                                                                    if (node) {
+                                                                        oneWireDragNodeRefs.current[offsetKey] = node;
+                                                                        moduleCollisionNodeRefs.current[collisionId] = node;
+                                                                    } else {
+                                                                        delete oneWireDragNodeRefs.current[offsetKey];
+                                                                        delete moduleCollisionNodeRefs.current[collisionId];
+                                                                    }
                                                                 }}
                                                                 draggable
                                                                 dragBoundFunc={() => {
-                                                                    const node = oneWireDragNodeRefs.current[slotIndex];
+                                                                    const node = oneWireDragNodeRefs.current[offsetKey];
                                                                     const parent = node?.getParent();
                                                                     return parent
                                                                         ? parent.getAbsoluteTransform().point({ x: 0, y: 0 })
                                                                         : (node?.getAbsolutePosition() || { x: 0, y: 0 });
                                                                 }}
                                                                 onDragStart={(event) => {
-                                                                    oneWireDragStartOffsetsRef.current[slotIndex] = oneWireSlotOffsets[slotIndex] || { x: 0, y: 0 };
-                                                                    oneWireDragStartPointerRef.current[slotIndex] = event.target.getStage()?.getPointerPosition() || { x: 0, y: 0 };
-                                                                    oneWireDragDraftOffsetsRef.current[slotIndex] = oneWireSlotOffsets[slotIndex] || { x: 0, y: 0 };
-                                                                    setInvalidOneWireDragMap((prev) => ({ ...prev, [slotIndex]: false }));
+                                                                    oneWireDragStartOffsetsRef.current[offsetKey] = oneWireSlotOffsets[offsetKey] || { x: 0, y: 0 };
+                                                                    oneWireDragStartPointerRef.current[offsetKey] = event.target.getStage()?.getPointerPosition() || { x: 0, y: 0 };
+                                                                    oneWireDragDraftOffsetsRef.current[offsetKey] = oneWireSlotOffsets[offsetKey] || { x: 0, y: 0 };
+                                                                    setInvalidOneWireDragMap((prev) => ({ ...prev, [offsetKey]: false }));
                                                                 }}
                                                                 onMouseEnter={() => setHoveredOneWireSlotIndex(slotIndex)}
                                                                 onMouseLeave={() => setHoveredOneWireSlotIndex(null)}
@@ -13894,20 +14024,20 @@ const App = () => {
                                                                     const stage = event.target.getStage();
                                                                     const pointer = stage?.getPointerPosition();
                                                                     if (!stage || !pointer) return;
-                                                                    const startPointer = oneWireDragStartPointerRef.current[slotIndex] || pointer;
-                                                                    const startOffset = oneWireDragStartOffsetsRef.current[slotIndex] || { x: 0, y: 0 };
+                                                                    const startPointer = oneWireDragStartPointerRef.current[offsetKey] || pointer;
+                                                                    const startOffset = oneWireDragStartOffsetsRef.current[offsetKey] || { x: 0, y: 0 };
                                                                     const stageScale = stage.scaleX() || 1;
                                                                     const draftOffset = {
                                                                         x: startOffset.x + (pointer.x - startPointer.x) / stageScale,
                                                                         y: startOffset.y + (pointer.y - startPointer.y) / stageScale,
                                                                     };
-                                                                    oneWireDragDraftOffsetsRef.current[slotIndex] = draftOffset;
+                                                                    oneWireDragDraftOffsetsRef.current[offsetKey] = draftOffset;
                                                                     if (oneWireDragFrameRef.current !== null) return;
                                                                     oneWireDragFrameRef.current = window.requestAnimationFrame(() => {
                                                                         oneWireDragFrameRef.current = null;
-                                                                        const latestDraftOffset = oneWireDragDraftOffsetsRef.current[slotIndex] || draftOffset;
-                                                                        setOneWireSlotOffsets((prev) => ({ ...prev, [slotIndex]: latestDraftOffset }));
-                                                                        const draftOffsets = { ...oneWireSlotOffsets, [slotIndex]: latestDraftOffset };
+                                                                        const latestDraftOffset = oneWireDragDraftOffsetsRef.current[offsetKey] || draftOffset;
+                                                                        setOneWireSlotOffsets((prev) => ({ ...prev, [offsetKey]: latestDraftOffset }));
+                                                                        const draftOffsets = { ...oneWireSlotOffsets, [offsetKey]: latestDraftOffset };
                                                                         const collisionData = getAllOccupiedRects(
                                                                             controllerImage,
                                                                             scheme,
@@ -13919,18 +14049,24 @@ const App = () => {
                                                                             useInitialOneWireBalance ? memoBalancedOneWire.extDevicesByModuleIndex : null,
                                                                         );
                                                                         const slotPosDraft = getSlotPositionByOffsets(slotIndex, draftOffsets);
-                                                                        const targetRect = {
+                                                                        const targetBodyRect = {
                                                                             left: slotPosDraft.x,
                                                                             top: slotPosDraft.y,
                                                                             right: slotPosDraft.x + slotWidth,
                                                                             bottom: slotPosDraft.y + slotHeight,
                                                                         };
+                                                                        const targetRect = getModuleObjectFootprint(collisionId, {
+                                                                            left: slotPos.x,
+                                                                            top: slotPos.y,
+                                                                            right: slotPos.x + slotWidth,
+                                                                            bottom: slotPos.y + slotHeight,
+                                                                        }, targetBodyRect, showEmptySlots);
                                                                         const collides = Boolean(collisionData) && (
                                                                             rectsOverlap(targetRect, collisionData.controllerRect)
-                                                                            || collisionData.rects.some((rect) => rect.id !== `onewire:${slotIndex}` && rectsOverlap(targetRect, rect))
+                                                                            || collisionData.rects.some((rect) => rect.id !== collisionId && rectsOverlap(targetRect, rect))
                                                                         );
                                                                         setInvalidOneWireDragMap((prev) => (
-                                                                            prev[slotIndex] === collides ? prev : { ...prev, [slotIndex]: collides }
+                                                                            prev[offsetKey] === collides ? prev : { ...prev, [offsetKey]: collides }
                                                                         ));
                                                                     });
                                                                 }}
@@ -13939,9 +14075,9 @@ const App = () => {
                                                                         window.cancelAnimationFrame(oneWireDragFrameRef.current);
                                                                         oneWireDragFrameRef.current = null;
                                                                     }
-                                                                    const startOffset = oneWireDragStartOffsetsRef.current[slotIndex] || { x: 0, y: 0 };
-                                                                    const nextOffset = oneWireDragDraftOffsetsRef.current[slotIndex] || startOffset;
-                                                                    const nextOffsets = { ...oneWireSlotOffsets, [slotIndex]: nextOffset };
+                                                                    const startOffset = oneWireDragStartOffsetsRef.current[offsetKey] || { x: 0, y: 0 };
+                                                                    const nextOffset = oneWireDragDraftOffsetsRef.current[offsetKey] || startOffset;
+                                                                    const nextOffsets = { ...oneWireSlotOffsets, [offsetKey]: nextOffset };
                                                                     const collisionData = getAllOccupiedRects(
                                                                         controllerImage,
                                                                         scheme,
@@ -13952,22 +14088,22 @@ const App = () => {
                                                                         diSlotOffsets,
                                                                         useInitialOneWireBalance ? memoBalancedOneWire.extDevicesByModuleIndex : null,
                                                                     );
-                                                                    const targetRect = collisionData?.rects?.find((r) => r.id === `onewire:${slotIndex}`);
+                                                                    const targetRect = collisionData?.rects?.find((r) => r.id === collisionId);
                                                                     if (collisionData && targetRect && hasCollisionFor(targetRect.id, targetRect, collisionData.rects, collisionData.controllerRect)) {
-                                                                        setOneWireSlotOffsets((prev) => ({ ...prev, [slotIndex]: startOffset }));
+                                                                        setOneWireSlotOffsets((prev) => ({ ...prev, [offsetKey]: startOffset }));
                                                                         event.target.getLayer()?.batchDraw();
-                                                                        setInvalidOneWireDragMap((prev) => ({ ...prev, [slotIndex]: false }));
-                                                                        delete oneWireDragStartOffsetsRef.current[slotIndex];
-                                                                        delete oneWireDragStartPointerRef.current[slotIndex];
-                                                                        delete oneWireDragDraftOffsetsRef.current[slotIndex];
+                                                                        setInvalidOneWireDragMap((prev) => ({ ...prev, [offsetKey]: false }));
+                                                                        delete oneWireDragStartOffsetsRef.current[offsetKey];
+                                                                        delete oneWireDragStartPointerRef.current[offsetKey];
+                                                                        delete oneWireDragDraftOffsetsRef.current[offsetKey];
                                                                         event.target.position({ x: 0, y: 0 });
                                                                         return;
                                                                     }
-                                                                    setOneWireSlotOffsets((prev) => ({ ...prev, [slotIndex]: nextOffset }));
-                                                                    setInvalidOneWireDragMap((prev) => ({ ...prev, [slotIndex]: false }));
-                                                                    delete oneWireDragStartOffsetsRef.current[slotIndex];
-                                                                    delete oneWireDragStartPointerRef.current[slotIndex];
-                                                                    delete oneWireDragDraftOffsetsRef.current[slotIndex];
+                                                                    setOneWireSlotOffsets((prev) => ({ ...prev, [offsetKey]: nextOffset }));
+                                                                    setInvalidOneWireDragMap((prev) => ({ ...prev, [offsetKey]: false }));
+                                                                    delete oneWireDragStartOffsetsRef.current[offsetKey];
+                                                                    delete oneWireDragStartPointerRef.current[offsetKey];
+                                                                    delete oneWireDragDraftOffsetsRef.current[offsetKey];
                                                                     event.target.position({ x: 0, y: 0 });
                                                                 }}
                                                             >
@@ -14004,8 +14140,8 @@ const App = () => {
                                                                     width={slotWidth}
                                                                     height={slotHeight}
                                                                     cornerRadius={10}
-                                                                    fill={invalidOneWireDragMap[slotIndex] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5')}
-                                                                    stroke={invalidOneWireDragMap[slotIndex] ? '#d32f2f' : (isOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4')}
+                                                                    fill={invalidOneWireDragMap[offsetKey] ? 'rgba(211, 47, 47, 0.08)' : (isOccupied ? 'rgba(0,0,0,0)' : '#f0f0f5')}
+                                                                    stroke={invalidOneWireDragMap[offsetKey] ? '#d32f2f' : (isOccupied ? 'rgba(0,0,0,0)' : '#d7dbe4')}
                                                                     strokeWidth={1.5}
                                                                 />
                                                                  {image && (
@@ -14115,8 +14251,10 @@ const App = () => {
                                                                                         listening={false}
                                                                                     />
                                                                                 )}
-                                                                                <Rect
-                                                                                    x={slotX}
+                                                                                    <Rect
+                                                                                        name="module-device-slot"
+                                                                                        collisionOccupied={Boolean(sensor)}
+                                                                                        x={slotX}
                                                                                     y={slotY}
                                                                                     width={ntcSlotWidth}
                                                                                     height={ntcSlotHeight}
@@ -14237,7 +14375,7 @@ const App = () => {
                                                                             >
                                                                                 {sensor && modulePortA && <Line points={[sensorPortAX, sensorPortAY, slotPos.x + modulePortA.x * slotWidth, sensorPortAY, slotPos.x + modulePortA.x * slotWidth, slotPos.y + modulePortA.y * slotHeight]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
                                                                                 {sensor && modulePortB && <Line points={[sensorPortBX, sensorPortBY, slotPos.x + modulePortB.x * slotWidth, sensorPortBY, slotPos.x + modulePortB.x * slotWidth, slotPos.y + modulePortB.y * slotHeight]} stroke="#464EE3" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
-                                                                                <Rect x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} />
+                                                                                <Rect name="module-device-slot" collisionOccupied={Boolean(sensor)} x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.2} />
                                                                                 {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
                                                                                 {showPorts && sensor && ntcSensorPorts.map((port) => <Circle key={`onewire-ntc2-port-${slotIndex}-${ntcIndex}-${port.name}`} x={sensorRenderX + port.x * sensorRenderSize.width} y={sensorRenderY + port.y * sensorRenderSize.height} radius={2.5} fill="red" listening={false} />)}
                                                                                 {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}

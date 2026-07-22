@@ -1,5 +1,5 @@
-import { canonicalDeviceType } from './deviceTypes';
-import { getOneWireDevicesFromScheme } from './initialState';
+import { canonicalDeviceType } from './deviceTypes.js';
+import { getOneWireDevicesFromScheme } from './initialState.js';
 
 const ONE_WIRE_MODULE_TYPES = new Set(['ntc-1-wire', 'rdt2']);
 

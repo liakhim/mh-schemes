@@ -2948,11 +2948,24 @@ const SelectionApp = () => {
         setIncomingScheme((prev) => {
             const unitUid = uid();
             const wiredDevices = Array.isArray(prev.wired_devices) ? [...prev.wired_devices] : [];
-            wiredDevices.push({ ...template.wiredDevice, id: generateId(), _uid: unitUid, _group: group, _label: template.label });
+            wiredDevices.push({
+                ...template.wiredDevice,
+                id: generateId(),
+                _uid: unitUid,
+                mixing_unit_id: unitUid,
+                _group: group,
+                _label: template.label,
+                additions: (Array.isArray(template.wiredDevice?.additions) ? template.wiredDevice.additions : []).map((addition) => ({
+                    ...addition,
+                    id: generateId(),
+                    _uid: unitUid,
+                    mixing_unit_id: unitUid,
+                })),
+            });
 
             const sensors = Array.isArray(prev.sensors) ? [...prev.sensors] : [];
             template.sensors.forEach((s) => {
-                sensors.push({ ...s, id: generateId(), _uid: unitUid, _group: group, _label: template.label });
+                sensors.push({ ...s, id: generateId(), _uid: unitUid, mixing_unit_id: unitUid, _group: group, _label: template.label });
             });
 
             return resolveSelectionScheme({ ...prev, wired_devices: wiredDevices, sensors });

@@ -21,3 +21,7 @@ export const translateRect = (rect, x, y) => ({
     right: rect.right + x,
     bottom: rect.bottom + y,
 });
+
+export const shouldIncludeCollisionSlot = ({ occupied, collisionKey }, includeEmptySlots, excludedCollisionKey = null) => (
+    collisionKey !== excludedCollisionKey && (includeEmptySlots || occupied)
+);

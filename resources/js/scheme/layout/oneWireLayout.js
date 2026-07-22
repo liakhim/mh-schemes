@@ -1,4 +1,4 @@
-import { canonicalDeviceType } from '../domain/deviceTypes';
+import { canonicalDeviceType } from '../domain/deviceTypes.js';
 
 export const getOneWireDirectionForDevice = (device, role) => {
     const normalizedType = canonicalDeviceType(device?.type);
@@ -47,4 +47,53 @@ export const getOneWireLineGeometry = (controllerType, controllerImage, controll
         firstSlotX,
         firstSlotY,
     };
+};
+
+export const getOneWireSlotPosition = ({
+    slotIndex,
+    devices,
+    offsets,
+    getDeviceSize,
+    getOffsetKey,
+    firstSlotX,
+    firstSlotY,
+    firstSlotExtraY = 0,
+    indentSize,
+    moduleHeightValue,
+}) => {
+    const firstDevice = devices[0] || null;
+    const firstOffset = offsets[getOffsetKey(firstDevice, 0)] || { x: 0, y: 0 };
+    const sideGap = 10 * indentSize;
+    const ntcTopOffset = 12 * indentSize;
+    let x = firstSlotX + firstOffset.x;
+    let y = firstSlotY + firstSlotExtraY + firstOffset.y;
+
+    if (canonicalDeviceType(firstDevice?.type) === 'ntc-1-wire') {
+        x += sideGap;
+        y += ntcTopOffset;
+    }
+
+    for (let index = 1; index <= slotIndex; index += 1) {
+        const previousDevice = devices[index - 1] || null;
+        const currentDevice = devices[index] || null;
+        const previousType = canonicalDeviceType(previousDevice?.type);
+        const currentType = canonicalDeviceType(currentDevice?.type);
+        const previousSize = getDeviceSize(previousDevice);
+        const currentOffset = offsets[getOffsetKey(currentDevice, index)] || { x: 0, y: 0 };
+        const previousIsModule = previousType === 'ntc-1-wire' || previousType === 'rdt2';
+        const verticalGap = previousSize.height
+            + moduleHeightValue * 0.25
+            + (previousIsModule ? 0 : 3 * indentSize);
+
+        x += previousSize.width
+            + 2 * indentSize
+            + (previousType === 'ntc-1-wire' ? sideGap : 0)
+            + (currentType === 'ntc-1-wire' ? sideGap : 0)
+            + currentOffset.x;
+        y += verticalGap
+            + (currentType === 'ntc-1-wire' ? ntcTopOffset : 0)
+            + currentOffset.y;
+    }
+
+    return { x, y };
 };

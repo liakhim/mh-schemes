@@ -1,14 +1,20 @@
-import { canonicalDeviceType } from './deviceTypes';
-import { assignMaterializedDeviceTitles } from './deviceTitles';
-import { balanceBoilers } from './boilerBalancer';
-import { balanceRelayDevices } from './relayDeviceBalancer';
-import { balanceServos } from './servoBalancer';
-import { balance010Servos } from './servo010Balancer';
-import { balancePressureSensors } from './pressureSensorBalancer';
-import { balanceDiscreteDevices } from './discreteDeviceBalancer';
-import { balanceEcosmartNtcLines } from './ecosmartNtcLineBalancer';
-import { balanceOneWireDevices } from './oneWireBalancer';
-import { balanceNtcSensors } from './ntcSensorBalancer';
+import { canonicalDeviceType } from './deviceTypes.js';
+import { assignMaterializedDeviceTitles } from './deviceTitles.js';
+import { balanceBoilers } from './boilerBalancer.js';
+import { balanceRelayDevices } from './relayDeviceBalancer.js';
+import { balanceServos } from './servoBalancer.js';
+import { balance010Servos } from './servo010Balancer.js';
+import { balancePressureSensors } from './pressureSensorBalancer.js';
+import { balanceDiscreteDevices } from './discreteDeviceBalancer.js';
+import { balanceEcosmartNtcLines } from './ecosmartNtcLineBalancer.js';
+import { balanceOneWireDevices } from './oneWireBalancer.js';
+import { balanceNtcSensors } from './ntcSensorBalancer.js';
+import {
+    CONTROLLER_MIXING_OWNER,
+    getExtMixingOwner,
+    isMixingUnitSensor,
+    MIXING_OWNER_FIELD,
+} from './mixingUnitOwnership.js';
 
 const EXT_MODULE_TYPES = ['bl2', 'rl6', 'rl6s', 'io4', 'di6'];
 const NTC_MODULE_CAPACITY = 6;
@@ -181,7 +187,8 @@ const compactEcosmartNtcOneWireModules = (scheme) => {
 };
 
 const ensureNtcOneWireModules = (scheme) => {
-    const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
+    const sensors = (Array.isArray(scheme?.sensors) ? scheme.sensors : [])
+        .filter((sensor) => !isMixingUnitSensor(sensor) || sensor?.[MIXING_OWNER_FIELD]);
     const ntcSensorCount = sensors.filter(isDirectNtcSensor).length;
     if (ntcSensorCount === 0) return scheme;
 
@@ -197,6 +204,77 @@ const ensureNtcOneWireModules = (scheme) => {
             ...Array.from({ length: modulesToAdd }, (_, index) => makeAutoNtcOneWireModule(oneWireModules.length + index + 1)),
         ],
     };
+};
+
+const ensureOwnedNtcOneWireModules = (scheme) => {
+    const requiredByOwner = new Map();
+    (Array.isArray(scheme?.sensors) ? scheme.sensors : [])
+        .filter(isDirectNtcSensor)
+        .forEach((sensor) => {
+            const ownerKey = sensor?.[MIXING_OWNER_FIELD];
+            if (ownerKey) requiredByOwner.set(ownerKey, (requiredByOwner.get(ownerKey) || 0) + 1);
+        });
+    if (requiredByOwner.size === 0) return scheme;
+
+    const controller = scheme?.controller && typeof scheme.controller === 'object'
+        ? { ...scheme.controller }
+        : { type: getControllerType(scheme) };
+    controller.one_wire_devices = (Array.isArray(controller.one_wire_devices) ? controller.one_wire_devices : [])
+        .map((device) => (canonicalDeviceType(device?.type) === 'ntc-1-wire'
+            ? { ...device, [MIXING_OWNER_FIELD]: device?.[MIXING_OWNER_FIELD] || CONTROLLER_MIXING_OWNER }
+            : device));
+    const extModules = (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : []).map((moduleItem, moduleIndex) => {
+        const ownerKey = getExtMixingOwner(moduleItem, moduleIndex);
+        return {
+            ...moduleItem,
+            one_wire_devices: (Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : [])
+                .map((device) => (canonicalDeviceType(device?.type) === 'ntc-1-wire'
+                    ? { ...device, [MIXING_OWNER_FIELD]: device?.[MIXING_OWNER_FIELD] || ownerKey }
+                    : device)),
+        };
+    });
+    const oneWireModules = (Array.isArray(scheme?.one_wire_modules) ? scheme.one_wire_modules : []).map((device, index) => (
+        typeof device === 'string' ? { id: `one-wire-${index}`, type: canonicalDeviceType(device) } : { ...device }
+    ));
+
+    const getOwnedCapacity = (ownerKey) => {
+        const controllerCapacity = ownerKey === CONTROLLER_MIXING_OWNER
+            ? controller.one_wire_devices
+                .filter((device) => canonicalDeviceType(device?.type) === 'ntc-1-wire')
+                .reduce((sum, device) => sum + getNtcModuleFreeSlots(device), 0)
+            : 0;
+        const extCapacity = extModules.reduce((sum, moduleItem, moduleIndex) => (
+            getExtMixingOwner(moduleItem, moduleIndex) === ownerKey
+                ? sum + moduleItem.one_wire_devices
+                    .filter((device) => canonicalDeviceType(device?.type) === 'ntc-1-wire')
+                    .reduce((moduleSum, device) => moduleSum + getNtcModuleFreeSlots(device), 0)
+                : sum
+        ), 0);
+        const stagedCapacity = oneWireModules
+            .filter((device) => canonicalDeviceType(device?.type) === 'ntc-1-wire' && device?.[MIXING_OWNER_FIELD] === ownerKey)
+            .reduce((sum, device) => sum + getNtcModuleFreeSlots(device), 0);
+        return controllerCapacity + extCapacity + stagedCapacity;
+    };
+
+    requiredByOwner.forEach((requiredCount, ownerKey) => {
+        let deficit = requiredCount - getOwnedCapacity(ownerKey);
+        if (deficit <= 0) return;
+        oneWireModules.forEach((device, index) => {
+            if (deficit <= 0 || canonicalDeviceType(device?.type) !== 'ntc-1-wire' || device?.[MIXING_OWNER_FIELD]) return;
+            oneWireModules[index] = { ...device, [MIXING_OWNER_FIELD]: ownerKey };
+            deficit -= getNtcModuleFreeSlots(oneWireModules[index]);
+        });
+        while (deficit > 0) {
+            const moduleIndex = oneWireModules.length + 1;
+            oneWireModules.push({
+                ...makeAutoNtcOneWireModule(moduleIndex),
+                [MIXING_OWNER_FIELD]: ownerKey,
+            });
+            deficit -= NTC_MODULE_CAPACITY;
+        }
+    });
+
+    return { ...scheme, controller, ext_modules: extModules, one_wire_modules: oneWireModules };
 };
 
 const getPlacedOneWireKeyCounts = (controllerDevices, extDevicesByModuleIndex) => {
@@ -261,7 +339,8 @@ export const materializeBalancedOneWireScheme = (scheme) => {
     const pressureBalancedScheme = balancePressureSensors(servo010BalancedScheme);
     const discreteBalancedScheme = balanceDiscreteDevices(pressureBalancedScheme);
     const ecosmartNtcBalancedScheme = balanceEcosmartNtcLines(discreteBalancedScheme);
-    const ntcModuleBalancedScheme = ensureNtcOneWireModules(ecosmartNtcBalancedScheme);
+    const ownedNtcModuleScheme = ensureOwnedNtcOneWireModules(ecosmartNtcBalancedScheme);
+    const ntcModuleBalancedScheme = ensureNtcOneWireModules(ownedNtcModuleScheme);
     const extModules = (Array.isArray(ntcModuleBalancedScheme?.ext_modules) ? ntcModuleBalancedScheme.ext_modules : [])
         .map((item, index) => normalizeExtModule(item, index))
         .filter(Boolean);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { translateRect, unionRects } from './collisionGeometry.js';
+import { shouldIncludeCollisionSlot, translateRect, unionRects } from './collisionGeometry.js';
 
 test('builds a module footprint from its body and connected devices', () => {
     assert.deepEqual(unionRects([
@@ -26,4 +26,14 @@ test('moves the complete footprint with its module', () => {
         right: 292,
         bottom: 292,
     });
+});
+
+test('includes occupied slots always and empty slots only when displayed', () => {
+    assert.equal(shouldIncludeCollisionSlot({ occupied: true }, false), true);
+    assert.equal(shouldIncludeCollisionSlot({ occupied: false }, false), false);
+    assert.equal(shouldIncludeCollisionSlot({ occupied: false }, true), true);
+});
+
+test('can exclude a nested slot from its parent during drag', () => {
+    assert.equal(shouldIncludeCollisionSlot({ occupied: true, collisionKey: 'ow:1' }, true, 'ow:1'), false);
 });
