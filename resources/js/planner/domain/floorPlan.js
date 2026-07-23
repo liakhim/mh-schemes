@@ -12,6 +12,13 @@ export const DEFAULT_LEVEL_HEIGHT = 3.0;
 // Grid snap step in metres.
 export const SNAP_STEP = 0.1;
 
+// While drawing, the wall direction snaps to the nearest multiple of this angle (degrees),
+// so walls come out straight (0/90 for orthogonal rooms, plus common diagonals).
+export const ANGLE_SNAP_STEP = 15;
+
+// Cursor snaps to an existing wall endpoint within this distance (metres) — lets rooms close cleanly.
+export const VERTEX_SNAP_DIST = 0.35;
+
 export const PLAN_VERSION = 1;
 
 export const uid = (prefix = 'id') => {

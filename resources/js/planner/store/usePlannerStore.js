@@ -6,8 +6,22 @@ import {
     normalizePlan,
     recomputeElevations,
     DEFAULT_LEVEL_HEIGHT,
+    SNAP_STEP,
+    ANGLE_SNAP_STEP,
+    VERTEX_SNAP_DIST,
 } from '../domain/floorPlan';
-import { distance2D } from '../domain/geometry';
+import {
+    distance2D,
+    snap,
+    snapPoint,
+    planAngle,
+    snapAngleRad,
+    pointFromAnchor,
+    unitDir,
+    samePoint,
+    nearestVertex,
+    degToRad,
+} from '../domain/geometry';
 import { readLocalPlan, writeLocalPlan, savePlanToServer } from '../persistence/storage';
 
 // Tools the user can be in.
@@ -16,6 +30,18 @@ export const CAMERA = { PERSPECTIVE: 'perspective', TOP: 'top' };
 export const BG = { LIGHT: 'light', DARK: 'dark' };
 
 const findLevel = (plan, levelId) => plan.levels.find((l) => l.id === levelId);
+
+// Moves every wall endpoint that coincides with `oldPoint` to `newPoint` (except `exceptId`),
+// so shared corners stay welded together when one wall is reshaped.
+const weldVertices = (walls, oldPoint, newPoint, exceptId) =>
+    walls.map((wall) => {
+        if (wall.id === exceptId) return wall;
+        const a = samePoint(wall.a, oldPoint) ? { x: newPoint.x, y: newPoint.y } : wall.a;
+        const b = samePoint(wall.b, oldPoint) ? { x: newPoint.x, y: newPoint.y } : wall.b;
+        return a === wall.a && b === wall.b ? wall : { ...wall, a, b };
+    });
+
+const ANGLE_STEP_RAD = degToRad(ANGLE_SNAP_STEP);
 
 export const usePlannerStore = create((set, get) => {
     // Mutates the active level via `updater(level) => newLevel`, marks dirty and persists locally.
@@ -35,6 +61,31 @@ export const usePlannerStore = create((set, get) => {
         set({ plan, dirty: true });
     };
 
+    // Resolves a raw floor point into the snapped point used for drawing:
+    // 1) snap onto a nearby existing endpoint (so rooms close cleanly),
+    // 2) else, while chaining, lock the direction to the angle step and the length to the grid,
+    // 3) else snap to the grid, 4) else raw.
+    const resolveDrawPoint = (raw) => {
+        const state = get();
+        const level = findLevel(state.plan, state.activeLevelId);
+        const walls = level?.walls ?? [];
+
+        const vertex = nearestVertex(walls, raw, VERTEX_SNAP_DIST, state.drawAnchor);
+        if (vertex) return vertex;
+
+        if (state.drawAnchor && state.angleSnapEnabled) {
+            const anchor = state.drawAnchor;
+            let length = distance2D(anchor, raw);
+            if (length < 1e-6) return { x: anchor.x, y: anchor.y };
+            const theta = snapAngleRad(planAngle(anchor, raw), ANGLE_STEP_RAD);
+            if (state.snapEnabled) length = Math.max(SNAP_STEP, snap(length, SNAP_STEP));
+            return pointFromAnchor(anchor, theta, length);
+        }
+
+        if (state.snapEnabled) return snapPoint(raw, SNAP_STEP);
+        return raw;
+    };
+
     return {
         // ---- lifecycle ----
         ready: false,
@@ -51,7 +102,8 @@ export const usePlannerStore = create((set, get) => {
         selectedWallId: null,
         drawAnchor: null, // last committed plan point of the wall chain being drawn
         hoverPoint: null, // snapped cursor position on the floor plane
-        snapEnabled: true,
+        snapEnabled: true, // grid snap (0.1 m)
+        angleSnapEnabled: true, // lock wall direction to the angle step (straight walls)
 
         // ---- save state ----
         saving: false,
@@ -78,6 +130,7 @@ export const usePlannerStore = create((set, get) => {
         setCameraMode: (cameraMode) => set({ cameraMode }),
         setBgMode: (bgMode) => set({ bgMode }),
         toggleSnap: () => set((s) => ({ snapEnabled: !s.snapEnabled })),
+        toggleAngleSnap: () => set((s) => ({ angleSnapEnabled: !s.angleSnapEnabled })),
 
         // ---- levels ----
         getActiveLevel: () => findLevel(get().plan, get().activeLevelId),
@@ -118,9 +171,12 @@ export const usePlannerStore = create((set, get) => {
         },
 
         // ---- wall drawing ----
-        setHoverPoint: (point) => set({ hoverPoint: point }),
+        // GroundPlane passes the raw floor point; snapping is resolved centrally here so the
+        // hover preview and the committed wall use identical logic.
+        setHoverPoint: (raw) => set({ hoverPoint: raw ? resolveDrawPoint(raw) : null }),
 
-        addDrawPoint: (point) => {
+        addDrawPoint: (raw) => {
+            const point = resolveDrawPoint(raw);
             const { drawAnchor } = get();
             if (!drawAnchor) {
                 set({ drawAnchor: point });
@@ -143,6 +199,65 @@ export const usePlannerStore = create((set, get) => {
                 ...level,
                 walls: level.walls.map((w) => (w.id === wallId ? { ...w, ...patch } : w)),
             }));
+        },
+
+        // Sets the exact wall length: keeps endpoint `a`, moves `b` along the current direction,
+        // and welds any shared corner so the room stays connected.
+        setWallLength: (wallId, length) => {
+            const target = Math.max(0.05, Number(length) || 0.05);
+            mutateActiveLevel((level) => {
+                const wall = level.walls.find((w) => w.id === wallId);
+                if (!wall) return level;
+                const dir = unitDir(wall.a, wall.b);
+                const oldB = wall.b;
+                const newB = { x: wall.a.x + dir.x * target, y: wall.a.y + dir.y * target };
+                const walls = weldVertices(
+                    level.walls.map((w) => (w.id === wallId ? { ...w, b: newB } : w)),
+                    oldB,
+                    newB,
+                    wallId
+                );
+                return { ...level, walls };
+            });
+        },
+
+        // Sets the exact wall angle (degrees): keeps `a` and length, rotates `b`, welds the corner.
+        setWallAngle: (wallId, deg) => {
+            const rad = degToRad(Number(deg) || 0);
+            mutateActiveLevel((level) => {
+                const wall = level.walls.find((w) => w.id === wallId);
+                if (!wall) return level;
+                const length = distance2D(wall.a, wall.b) || SNAP_STEP;
+                const oldB = wall.b;
+                const newB = pointFromAnchor(wall.a, rad, length);
+                const walls = weldVertices(
+                    level.walls.map((w) => (w.id === wallId ? { ...w, b: newB } : w)),
+                    oldB,
+                    newB,
+                    wallId
+                );
+                return { ...level, walls };
+            });
+        },
+
+        // Snaps a crooked wall to the nearest angle step, keeping its length; welds the corner.
+        straightenWall: (wallId) => {
+            mutateActiveLevel((level) => {
+                const wall = level.walls.find((w) => w.id === wallId);
+                if (!wall) return level;
+                const length = distance2D(wall.a, wall.b);
+                if (length < 1e-6) return level;
+                const theta = snapAngleRad(planAngle(wall.a, wall.b), ANGLE_STEP_RAD);
+                const oldB = wall.b;
+                const newB = pointFromAnchor(wall.a, theta, length);
+                const walls = weldVertices(
+                    level.walls.map((w) => (w.id === wallId ? { ...w, b: newB } : w)),
+                    oldB,
+                    newB,
+                    wallId
+                );
+                return { ...level, walls };
+            });
         },
 
         deleteWall: (wallId) => {

@@ -1,8 +1,6 @@
 import React from 'react';
 import { Grid } from '@react-three/drei';
 import { usePlannerStore, TOOLS } from '../store/usePlannerStore';
-import { snapPoint } from '../domain/geometry';
-import { SNAP_STEP } from '../domain/floorPlan';
 import { getSceneTheme } from '../domain/theme';
 
 // The floor of the active level: a visual grid plus an invisible plane that
@@ -11,7 +9,6 @@ export default function GroundPlane() {
     const plan = usePlannerStore((s) => s.plan);
     const activeLevelId = usePlannerStore((s) => s.activeLevelId);
     const tool = usePlannerStore((s) => s.tool);
-    const snapEnabled = usePlannerStore((s) => s.snapEnabled);
     const setHoverPoint = usePlannerStore((s) => s.setHoverPoint);
     const addDrawPoint = usePlannerStore((s) => s.addDrawPoint);
     const finishDraw = usePlannerStore((s) => s.finishDraw);
@@ -23,11 +20,9 @@ export default function GroundPlane() {
     const elevation = level?.elevation ?? 0;
     const drawing = tool === TOOLS.DRAW_WALL;
 
-    // Convert a scene intersection point to a snapped plan point (world XZ → plan XY).
-    const toPlanPoint = (e) => {
-        const point = { x: e.point.x, y: e.point.z };
-        return snapEnabled ? snapPoint(point, SNAP_STEP) : point;
-    };
+    // Convert a scene intersection point to a raw plan point (world XZ → plan XY).
+    // Snapping (grid / angle / vertex) is applied centrally in the store.
+    const toPlanPoint = (e) => ({ x: e.point.x, y: e.point.z });
 
     return (
         <group>
@@ -74,7 +69,8 @@ export default function GroundPlane() {
                         : undefined
                 }
             >
-                <planeGeometry args={[400, 400]} />
+                {/* Large enough that pointer rays always hit it, even at steep viewing angles. */}
+                <planeGeometry args={[20000, 20000]} />
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
         </group>

@@ -28,3 +28,48 @@ export const wallTransform = (wall, elevation) => {
 };
 
 export const formatMeters = (value) => `${(Math.round(value * 100) / 100).toFixed(2)} м`;
+
+export const radToDeg = (rad) => (rad * 180) / Math.PI;
+
+export const degToRad = (deg) => (deg * Math.PI) / 180;
+
+// Normalises an angle in degrees to the [0, 360) range for display.
+export const normalizeDeg = (deg) => ((deg % 360) + 360) % 360;
+
+// Unit direction from a to b; falls back to +X for a degenerate (zero-length) segment.
+export const unitDir = (a, b) => {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-9) return { x: 1, y: 0 };
+    return { x: dx / len, y: dy / len };
+};
+
+export const samePoint = (a, b, eps = 1e-4) => Math.abs(a.x - b.x) < eps && Math.abs(a.y - b.y) < eps;
+
+// Snaps an angle (radians) to the nearest multiple of step (radians).
+export const snapAngleRad = (theta, step) => Math.round(theta / step) * step;
+
+// Point at a given angle (radians) and length from an anchor.
+export const pointFromAnchor = (anchor, theta, length) => ({
+    x: anchor.x + Math.cos(theta) * length,
+    y: anchor.y + Math.sin(theta) * length,
+});
+
+// Nearest wall endpoint to `point` within `maxDist`, ignoring any vertex that
+// coincides with `exclude` (used to skip the current drawing anchor). Returns null if none.
+export const nearestVertex = (walls, point, maxDist, exclude) => {
+    let best = null;
+    let bestDist = maxDist;
+    for (const wall of walls) {
+        for (const p of [wall.a, wall.b]) {
+            if (exclude && samePoint(p, exclude)) continue;
+            const d = Math.hypot(p.x - point.x, p.y - point.y);
+            if (d <= bestDist) {
+                bestDist = d;
+                best = { x: p.x, y: p.y };
+            }
+        }
+    }
+    return best;
+};

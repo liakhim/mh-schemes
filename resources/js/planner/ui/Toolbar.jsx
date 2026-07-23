@@ -12,6 +12,8 @@ export default function Toolbar() {
     const setBgMode = usePlannerStore((s) => s.setBgMode);
     const snapEnabled = usePlannerStore((s) => s.snapEnabled);
     const toggleSnap = usePlannerStore((s) => s.toggleSnap);
+    const angleSnapEnabled = usePlannerStore((s) => s.angleSnapEnabled);
+    const toggleAngleSnap = usePlannerStore((s) => s.toggleAngleSnap);
     const save = usePlannerStore((s) => s.save);
     const saving = usePlannerStore((s) => s.saving);
     const dirty = usePlannerStore((s) => s.dirty);
@@ -55,6 +57,9 @@ export default function Toolbar() {
             <div className="planner-group">
                 <button className={cls(snapEnabled)} onClick={toggleSnap} title="Привязка к сетке 0.1 м">
                     Сетка
+                </button>
+                <button className={cls(angleSnapEnabled)} onClick={toggleAngleSnap} title="Прямые стены: привязка направления к углу 15°">
+                    Угол
                 </button>
             </div>
 
