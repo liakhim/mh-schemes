@@ -13,6 +13,7 @@ import { readLocalPlan, writeLocalPlan, savePlanToServer } from '../persistence/
 // Tools the user can be in.
 export const TOOLS = { SELECT: 'select', DRAW_WALL: 'draw-wall' };
 export const CAMERA = { PERSPECTIVE: 'perspective', TOP: 'top' };
+export const BG = { LIGHT: 'light', DARK: 'dark' };
 
 const findLevel = (plan, levelId) => plan.levels.find((l) => l.id === levelId);
 
@@ -46,6 +47,7 @@ export const usePlannerStore = create((set, get) => {
         // ---- editor state ----
         tool: TOOLS.SELECT,
         cameraMode: CAMERA.PERSPECTIVE,
+        bgMode: BG.LIGHT,
         selectedWallId: null,
         drawAnchor: null, // last committed plan point of the wall chain being drawn
         hoverPoint: null, // snapped cursor position on the floor plane
@@ -74,6 +76,7 @@ export const usePlannerStore = create((set, get) => {
         // ---- tools / view ----
         setTool: (tool) => set({ tool, drawAnchor: null, hoverPoint: null }),
         setCameraMode: (cameraMode) => set({ cameraMode }),
+        setBgMode: (bgMode) => set({ bgMode }),
         toggleSnap: () => set((s) => ({ snapEnabled: !s.snapEnabled })),
 
         // ---- levels ----

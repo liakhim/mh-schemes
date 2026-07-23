@@ -1,5 +1,5 @@
 import React from 'react';
-import { usePlannerStore, TOOLS, CAMERA } from '../store/usePlannerStore';
+import { usePlannerStore, TOOLS, CAMERA, BG } from '../store/usePlannerStore';
 
 const cls = (active) => `planner-btn${active ? ' planner-btn-active' : ''}`;
 
@@ -8,6 +8,8 @@ export default function Toolbar() {
     const setTool = usePlannerStore((s) => s.setTool);
     const cameraMode = usePlannerStore((s) => s.cameraMode);
     const setCameraMode = usePlannerStore((s) => s.setCameraMode);
+    const bgMode = usePlannerStore((s) => s.bgMode);
+    const setBgMode = usePlannerStore((s) => s.setBgMode);
     const snapEnabled = usePlannerStore((s) => s.snapEnabled);
     const toggleSnap = usePlannerStore((s) => s.toggleSnap);
     const save = usePlannerStore((s) => s.save);
@@ -38,6 +40,15 @@ export default function Toolbar() {
                 </button>
                 <button className={cls(cameraMode === CAMERA.TOP)} onClick={() => setCameraMode(CAMERA.TOP)}>
                     Сверху
+                </button>
+            </div>
+
+            <div className="planner-group" title="Фон сцены">
+                <button className={cls(bgMode === BG.LIGHT)} onClick={() => setBgMode(BG.LIGHT)}>
+                    Белый фон
+                </button>
+                <button className={cls(bgMode === BG.DARK)} onClick={() => setBgMode(BG.DARK)}>
+                    Тёмный
                 </button>
             </div>
 

@@ -1,12 +1,17 @@
 :root {
-    --planner-bg: #0f1115;
-    --planner-panel: rgba(24, 27, 34, 0.92);
-    --planner-panel-border: #2c3038;
-    --planner-text: #e6e8ee;
-    --planner-muted: #9aa0ac;
-    --planner-accent: #4f9dff;
-    --planner-accent-dim: #2b5fa0;
-    --planner-danger: #e5544b;
+    --planner-bg: #f5f5f6;
+    --planner-panel: #ffffff;
+    --planner-panel-border: #e4e4e7;
+    --planner-panel-shadow: 0 4px 18px rgba(20, 20, 20, 0.1);
+    --planner-text: #141414;
+    --planner-muted: #6b6b70;
+    --planner-accent: #ff6a00;
+    --planner-accent-weak: #fff2e8;
+    --planner-danger: #d63b2f;
+    --planner-input-bg: #ffffff;
+    --planner-input-border: #dcdce0;
+    --planner-btn-bg: #ffffff;
+    --planner-btn-hover: #f2f2f4;
 }
 
 * {
@@ -52,12 +57,13 @@ body {
     right: 12px;
     display: flex;
     align-items: center;
-    gap: 14px;
+    flex-wrap: wrap;
+    gap: 8px 14px;
     padding: 8px 12px;
     background: var(--planner-panel);
     border: 1px solid var(--planner-panel-border);
     border-radius: 12px;
-    backdrop-filter: blur(8px);
+    box-shadow: var(--planner-panel-shadow);
     z-index: 10;
 }
 
@@ -66,11 +72,13 @@ body {
     flex-direction: column;
     line-height: 1.15;
     padding-right: 6px;
+    border-right: 1px solid var(--planner-panel-border);
 }
 
 .planner-brand-title {
-    font-weight: 600;
+    font-weight: 700;
     font-size: 14px;
+    color: var(--planner-accent);
 }
 
 .planner-brand-sub {
@@ -94,31 +102,39 @@ body {
 
 .planner-btn {
     appearance: none;
-    border: 1px solid var(--planner-panel-border);
-    background: #22262e;
+    border: 1px solid var(--planner-input-border);
+    background: var(--planner-btn-bg);
     color: var(--planner-text);
     padding: 7px 12px;
     border-radius: 8px;
     font-size: 13px;
     cursor: pointer;
-    transition: background 0.12s ease, border-color 0.12s ease;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
 .planner-btn:hover {
-    background: #2b303a;
+    background: var(--planner-btn-hover);
 }
 
 .planner-btn-active {
-    background: var(--planner-accent-dim);
+    background: var(--planner-accent);
     border-color: var(--planner-accent);
-    color: #fff;
+    color: #ffffff;
+}
+
+.planner-btn-active:hover {
+    background: #f26100;
 }
 
 .planner-btn-primary {
     background: var(--planner-accent);
     border-color: var(--planner-accent);
-    color: #fff;
+    color: #ffffff;
     font-weight: 600;
+}
+
+.planner-btn-primary:hover {
+    background: #f26100;
 }
 
 .planner-btn-primary:disabled {
@@ -133,7 +149,7 @@ body {
 }
 
 .planner-btn-danger:hover {
-    background: rgba(229, 84, 75, 0.12);
+    background: rgba(214, 59, 47, 0.1);
 }
 
 .planner-btn-wide {
@@ -152,7 +168,7 @@ body {
     background: var(--planner-panel);
     border: 1px solid var(--planner-panel-border);
     border-radius: 12px;
-    backdrop-filter: blur(8px);
+    box-shadow: var(--planner-panel-shadow);
     padding: 12px;
     z-index: 9;
     width: 240px;
@@ -190,12 +206,12 @@ body {
     border-radius: 8px;
     padding: 7px 8px;
     cursor: pointer;
-    background: #1c2027;
+    background: #fafafa;
 }
 
 .planner-level-active {
     border-color: var(--planner-accent);
-    background: rgba(79, 157, 255, 0.12);
+    background: var(--planner-accent-weak);
 }
 
 .planner-level-name {
@@ -244,7 +260,7 @@ body {
 
 .planner-icon-btn:hover {
     color: var(--planner-danger);
-    background: rgba(229, 84, 75, 0.12);
+    background: rgba(214, 59, 47, 0.1);
 }
 
 /* ---- Properties ---- */
@@ -267,7 +283,7 @@ body {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--planner-muted);
+    color: var(--planner-accent);
 }
 
 .planner-field {
@@ -289,8 +305,8 @@ body {
 /* number/text inputs */
 .planner-panel input[type='number'],
 .planner-field input {
-    background: #14171d;
-    border: 1px solid var(--planner-panel-border);
+    background: var(--planner-input-bg);
+    border: 1px solid var(--planner-input-border);
     color: var(--planner-text);
     border-radius: 6px;
     padding: 5px 7px;
@@ -315,7 +331,7 @@ body {
     font-size: 12.5px;
     color: var(--planner-text);
     z-index: 9;
-    backdrop-filter: blur(8px);
+    box-shadow: var(--planner-panel-shadow);
 }
 
 .planner-help b {
