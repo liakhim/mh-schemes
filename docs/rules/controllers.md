@@ -25,6 +25,7 @@
 ## Ecosmart BL2 Overlay
 
 - Правило действует только для controller `ecosmart`.
+- Обычный EXT-модуль `bl2` для `ecosmart` запрещён и не даёт дополнительную BUS-ёмкость. Если такой legacy/повреждённый модуль присутствует во входе, он сохраняется как данные, но BUS-котлы на него не назначаются; переполнение двух controller BUS-слотов остаётся в публичном `boilers`.
 - Если во внутреннем состоянии `controller.ecosmart_bl2` есть модуль, отрисовывается `resources/assets/modules/bl2/ecosmartbl2.svg` поверх изображения controller.
 - `controller.ecosmart_bl2` является внутренним render-полем и не должен попадать в публичный `incomingScheme` при показе JSON или сохранении.
 - Корневое legacy-поле `ecosmart_bl2` при загрузке переносится в `controller.ecosmart_bl2`; новый код использует только поле controller.

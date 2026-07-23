@@ -9,6 +9,7 @@ const normalizeExtModule = (moduleItem, index) => {
     return {
         ...base,
         id: base.id ?? `${type}-${index}`,
+        ...(base.id == null ? { connectionAssignmentGeneratedId: true } : {}),
         type,
         connection_type: base.connection_type ?? 'EXT',
         one_wire_devices: Array.isArray(base.one_wire_devices) ? base.one_wire_devices : [],
@@ -51,6 +52,7 @@ const pushToIo4 = (extModules, device) => {
             channelDevices.push({
                 ...sensor,
                 id: sensor?.id ?? `${device?.id ?? moduleIndex}-io4-ntc-${sensorIndex}`,
+                ...(sensor?.id == null ? { connectionAssignmentGeneratedId: true } : {}),
                 type: canonicalDeviceType(sensor?.type),
                 connection_type: 'ntc',
                 ownerServo010Id: device?.id ?? null,
@@ -63,16 +65,22 @@ const pushToIo4 = (extModules, device) => {
 };
 
 export const balance010Servos = (scheme) => {
+    const controllerType = canonicalDeviceType(
+        typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type,
+    );
     const wiredDevices = Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [];
-    const extModules = (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : []).map(normalizeExtModule).filter(Boolean);
+    const extModules = controllerType === 'pro' || controllerType === 'ecosmart'
+        ? (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : []).map(normalizeExtModule).filter(Boolean)
+        : scheme?.ext_modules;
     const placedKeys = new Set();
 
     wiredDevices.forEach((device, index) => {
         if (!isIo4OnlyDevice(device)) return;
         const type = canonicalDeviceType(device?.type);
-        const placed = pushToIo4(extModules, {
+        const placed = pushToIo4(controllerType === 'pro' || controllerType === 'ecosmart' ? extModules : [], {
             ...device,
             id: device?.id ?? `${type}-${index}`,
+            ...(device?.id == null ? { connectionAssignmentGeneratedId: true } : {}),
             type,
             connection_type: 'di',
         });

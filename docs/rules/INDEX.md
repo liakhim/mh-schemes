@@ -40,6 +40,12 @@
 - Основная реализация: `resources/js/spa.jsx`, `imageRegistry.js`
 - Assets: `resources/assets/controllers/*`, `resources/assets/other/go-aerial.svg`
 
+## Connection Layout
+
+- Файл правил: `docs/rules/connection-layout.md`
+- Сбор и восстановление: `resources/js/scheme/domain/connectionAssignments.js`
+- Интеграция: `resources/js/scheme/publicSchemeSerializer.js`, `resources/js/scheme/domain/oneWireMaterializer.js`
+
 ## Full Source
 
 - Полный журнал: `JOURNAL.md`

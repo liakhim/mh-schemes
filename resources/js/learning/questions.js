@@ -192,6 +192,9 @@ export const QUESTIONS = [
                 label: 'Датчик пола',
                 imagePath: wirelessDeviceImagePaths['floor-sensor-thermostat-ext'],
                 ports: ['1-WIRE-V+', '1-WIRE-DAT', '1-WIRE-GND'],
+                heightScale: 0.38,
+                anchor: 'top',
+                topOffset: 36,
             },
         ],
         pairs: [
@@ -222,6 +225,9 @@ export const QUESTIONS = [
                 label: 'Датчик пола',
                 imagePath: wirelessDeviceImagePaths['floor-sensor-thermostat-ext'],
                 ports: ['1-WIRE-V+', '1-WIRE-DAT', '1-WIRE-GND'],
+                heightScale: 0.38,
+                anchor: 'top',
+                topOffset: 36,
             },
         ],
         pairs: [
@@ -266,13 +272,8 @@ export const QUESTIONS = [
         decorativeDevices: [
             {
                 key: 'thermostat-black',
-                label: 'Термостат (чёрный)',
+                label: 'Термостат беспроводной',
                 imagePath: wirelessDeviceImagePaths['thermostat:black'],
-            },
-            {
-                key: 'floor-sensor-thermostat-ext',
-                label: 'Датчик пола',
-                imagePath: wirelessDeviceImagePaths['floor-sensor-thermostat-ext'],
             },
             {
                 key: 'outdoor-temperature-sensor',
@@ -293,19 +294,25 @@ export const QUESTIONS = [
                 ports: ['EXT-OUT-A', 'EXT-OUT-B', '12VDC-OUT-V+', '12VDC-OUT-GND'],
                 // Ecosmart's board is far denser (many relay/NTC/indicator ports) than the
                 // other module-style devices, so it needs extra size to stay legible.
-                heightScale: 1.7,
+                heightScale: 1.75,
             },
             {
                 key: 'thermostat-black',
                 label: 'Термостат (чёрный)',
                 imagePath: wirelessDeviceImagePaths['thermostat:black'],
                 ports: ['EXT-A', 'EXT-B', '1-WIRE-V+', '1-WIRE-DAT', '1-WIRE-GND'],
+                // These are small wall-mounted devices next to ecosmart's big board (1.7x)
+                // - shrink them so the row stays proportionate instead of looking oversized.
+                heightScale: 0.675,
             },
             {
                 key: 'floor-sensor-thermostat-ext',
                 label: 'Датчик пола',
                 imagePath: wirelessDeviceImagePaths['floor-sensor-thermostat-ext'],
                 ports: ['1-WIRE-V+', '1-WIRE-DAT', '1-WIRE-GND'],
+                heightScale: 0.45,
+                anchor: 'top',
+                topOffset: -160,
             },
         ],
         pairs: [

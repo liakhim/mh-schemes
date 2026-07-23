@@ -1,4 +1,5 @@
 import { canonicalDeviceType } from './deviceTypes.js';
+import { CONTROLLER_MIXING_OWNER, getMixingUnitKey, MIXING_OWNER_FIELD } from './mixingUnitOwnership.js';
 
 const getControllerType = (scheme) => canonicalDeviceType(
     typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type,
@@ -83,13 +84,19 @@ export const balanceEcosmartNtcLines = (scheme) => {
     }
 
     const mixingNtcDevices = Array.isArray(controller.mixing_ntc_devices) ? [...controller.mixing_ntc_devices] : [];
+    const placedMixingUnitKeys = new Set((Array.isArray(controller['220_servo_devices']) ? controller['220_servo_devices'] : [])
+        .map(getMixingUnitKey)
+        .filter((key) => key != null));
     const assignedAdditions = new Set();
     const assignedAdditionKeys = new Set();
-    const assignMixingSensor = (device) => {
+    const assignMixingSensor = (device, parentUnitKey = null) => {
         if (mixingNtcDevices.filter(Boolean).length >= 2) return false;
         if (!isMixingNtcSensor(device)) return false;
+        const unitKey = getMixingUnitKey(device) ?? parentUnitKey;
+        if (unitKey == null || !placedMixingUnitKeys.has(unitKey)) return false;
+        if (device?.[MIXING_OWNER_FIELD] && device[MIXING_OWNER_FIELD] !== CONTROLLER_MIXING_OWNER) return false;
         const slotIndex = mixingNtcDevices[0] ? 1 : 0;
-        mixingNtcDevices[slotIndex] = normalizeNtcConnection(device);
+        mixingNtcDevices[slotIndex] = normalizeNtcConnection({ ...device, mixing_unit_id: unitKey });
         return true;
     };
     const collectMixingSensors = (device) => {
@@ -100,7 +107,7 @@ export const balanceEcosmartNtcLines = (scheme) => {
             const key = getDeviceIdKey(addition);
             if (key && assignedAdditionKeys.has(key)) return;
             if (!key && assignedAdditions.has(addition)) return;
-            if (!assignMixingSensor(addition)) return;
+            if (!assignMixingSensor(addition, getMixingUnitKey(device))) return;
             assignedAdditions.add(addition);
             if (key) assignedAdditionKeys.add(key);
         });
@@ -113,16 +120,9 @@ export const balanceEcosmartNtcLines = (scheme) => {
             assignedSensorKeys.add(getDeviceKey(sensor, index));
         });
 
-    (Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : []).forEach(collectMixingSensors);
-    [controller.relay_devices, controller.relay_s_devices]
+    [controller['220_servo_devices']]
         .filter(Array.isArray)
         .flat()
-        .forEach(collectMixingSensors);
-    (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [])
-        .flatMap((moduleItem) => [
-            ...(Array.isArray(moduleItem?.relay_devices) ? moduleItem.relay_devices : []),
-            ...(Array.isArray(moduleItem?.relay_s_devices) ? moduleItem.relay_s_devices : []),
-        ])
         .forEach(collectMixingSensors);
 
     return {

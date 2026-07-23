@@ -82,6 +82,42 @@ test('keeps digital mixing sensors on the servo owner one-wire line', () => {
     assert.deepEqual(result.ext_modules[0].one_wire_devices.map((device) => device.mixing_unit_id), ['mix-3']);
 });
 
+test('keeps Smart2 mixing sensors on the controller one-wire line for servos already placed on RL2S', () => {
+    const result = materializeBalancedOneWireScheme({
+        controller: { type: 'smart2', relay_devices: [], one_wire_devices: [] },
+        di_modules: [
+            { id: 'rl2s-1', type: 'rl2s', relay_devices: [], relay_s_devices: [makeServo(1)] },
+            { id: 'rl2s-2', type: 'rl2s', relay_devices: [], relay_s_devices: [makeServo(2)] },
+        ],
+        ext_modules: [],
+        wired_devices: [],
+        sensors: [makeSensor(1), makeSensor(2, '1-wire')],
+        one_wire_modules: [],
+    });
+
+    assert.deepEqual(
+        result.di_modules.map((moduleItem) => moduleItem.relay_s_devices[0]?.[MIXING_OWNER_FIELD]),
+        ['controller', 'controller'],
+    );
+    assert.deepEqual(result.controller.one_wire_devices.map((device) => device.type), [
+        'ntc-1-wire',
+        'flask-sensor-mixing-unit',
+    ]);
+    assert.deepEqual(Object.fromEntries(collectNtcSensorOwners(result)), { 'mix-1': 'controller' });
+    assert.equal(result.controller.one_wire_devices[1].mixing_unit_id, 'mix-2');
+    assert.equal(result.sensors.length, 0);
+    assert.equal(result.one_wire_modules.length, 0);
+
+    const repeated = materializeBalancedOneWireScheme(result);
+    assert.deepEqual(
+        repeated.controller.one_wire_devices.map((device) => device.type),
+        result.controller.one_wire_devices.map((device) => device.type),
+    );
+    assert.deepEqual(Object.fromEntries(collectNtcSensorOwners(repeated)), { 'mix-1': 'controller' });
+    assert.equal(repeated.controller.one_wire_devices[1].mixing_unit_id, 'mix-2');
+    assert.deepEqual(repeated.di_modules, result.di_modules);
+});
+
 test('does not place a linked sensor when its servo has no owner capacity', () => {
     const scheme = makeProScheme([makeSensor(1), makeSensor(2), makeSensor(3), makeSensor(4)]);
     scheme.wired_devices.push(makeServo(4), makeServo(5), makeServo(6));

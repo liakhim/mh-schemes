@@ -3,6 +3,14 @@ import { createRoot } from 'react-dom/client';
 import EquipmentOfferModal from './components/EquipmentOfferModal';
 import { getAllOneWireDevicesForBalancing } from './scheme/domain/initialState';
 import { materializePowerModules } from './scheme/domain/powerModules';
+import { countRinnaiAdapters, RINNAI_ADAPTER_LABEL, RINNAI_ADAPTER_PRICE, withRinnaiAdapter } from './scheme/domain/rinnaiAdapter';
+import {
+    calculateSelectionMixedIoModules,
+    getProExtPortUsage,
+    hasProExtPortCapacity,
+    PRO_EXT_DEVICE_CAPACITY,
+    reconcileSelectionStupidBoilerSensors,
+} from './selectionMixedIoCapacity';
 
 const controllerImagePaths = {
     go: new URL('../assets/controllers/go/go.svg', import.meta.url).href,
@@ -100,12 +108,16 @@ const generateId = () => Date.now() + Math.floor(Math.random() * 1000);
 let _uidCounter = 0;
 const uid = () => (++_uidCounter) + Date.now();
 
-const makeStupidBoilerSensor = () => ({
+const STUPID_BOILER_SENSOR_AUTO_SOURCE = 'selection-stupid-boiler';
+
+const makeStupidBoilerSensor = (boiler) => ({
     id: generateId(),
     device_type: 'sensor',
     type: 'flask-sensor-stupid-boiler',
     connection_type: '1-wire',
     title: 'Датчик котла',
+    boiler_id: boiler?.id,
+    _auto_source: STUPID_BOILER_SENSOR_AUTO_SOURCE,
 });
 
 /**
@@ -119,7 +131,51 @@ const withStupidBoilerSensor = (scheme, boiler) => {
     const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
     return {
         ...scheme,
-        sensors: [...sensors, makeStupidBoilerSensor()],
+        sensors: [...sensors, makeStupidBoilerSensor(boiler)],
+    };
+};
+
+/** Removes exactly the sensor linked to a boiler, or one unlinked legacy sensor. */
+const withoutStupidBoilerSensor = (scheme, boiler) => {
+    if (canonicalType(boiler?.type) !== 'stupid') return scheme;
+    const isBoilerSensor = (device) => canonicalType(device?.type) === 'flask-sensor-stupid-boiler';
+    const isLinkedSensor = (device) => isBoilerSensor(device)
+        && boiler?.id != null
+        && String(device?.boiler_id) === String(boiler.id);
+    const controller = scheme?.controller && typeof scheme.controller === 'object' ? scheme.controller : null;
+    const extModules = Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [];
+    const allSensors = [
+        ...(Array.isArray(scheme?.sensors) ? scheme.sensors : []),
+        ...(Array.isArray(controller?.one_wire_devices) ? controller.one_wire_devices : []),
+        ...extModules.flatMap((moduleItem) => (Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : [])),
+    ];
+    const hasLinkedSensor = allSensors.some(isLinkedSensor);
+    let removed = false;
+    const removeOne = (devices) => (Array.isArray(devices) ? devices.filter((device) => {
+        if (removed) return true;
+        const matches = hasLinkedSensor
+            ? isLinkedSensor(device)
+            : isBoilerSensor(device) && device?.boiler_id == null;
+        if (!matches) return true;
+        removed = true;
+        return false;
+    }) : devices);
+
+    const sensors = removeOne(scheme?.sensors);
+    const nextController = controller && Array.isArray(controller.one_wire_devices)
+        ? { ...controller, one_wire_devices: removeOne(controller.one_wire_devices) }
+        : controller;
+    const nextExtModules = extModules.map((moduleItem) => (
+        moduleItem && typeof moduleItem === 'object' && Array.isArray(moduleItem.one_wire_devices)
+            ? { ...moduleItem, one_wire_devices: removeOne(moduleItem.one_wire_devices) }
+            : moduleItem
+    ));
+    if (!removed) return scheme;
+    return {
+        ...scheme,
+        ...(Array.isArray(scheme?.sensors) ? { sensors } : {}),
+        ...(nextController ? { controller: nextController } : {}),
+        ...(Array.isArray(scheme?.ext_modules) ? { ext_modules: nextExtModules } : {}),
     };
 };
 
@@ -133,7 +189,6 @@ const CONTROLLER_LIMITS = {
 
 const GO_ONE_WIRE_THERMOSTAT_LIMIT = 2;
 const ECOSMART_EXT_DEVICE_CAPACITY = 12;
-const PRO_EXT_DEVICE_CAPACITY = 12;
 const AUTO_REQUIRED_MODULE_SOURCE = 'selection-required-module';
 
 const CONTROLLER_LABELS = {
@@ -340,7 +395,8 @@ const getOneWireCapacityUsage = (scheme, controllerType) => {
     if (controllerType !== 'pro') return devices.length;
 
     const extDevices = Array.isArray(scheme?.controller?.ext_devices) ? scheme.controller.ext_devices : [];
-    let freeExtSlots = Math.max(0, PRO_EXT_DEVICE_CAPACITY - extDevices.length);
+    const extModules = Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [];
+    let freeExtSlots = Math.max(0, PRO_EXT_DEVICE_CAPACITY - extDevices.length - extModules.length);
     const movedDeviceIndexes = new Set();
     const thermostatGroups = new Map();
 
@@ -543,6 +599,9 @@ const getCompatibilityStats = (scheme, controllerTypeOverride = null) => {
     const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
     const boilers = Array.isArray(scheme?.boilers) ? scheme.boilers : [];
     const controller = scheme?.controller && typeof scheme.controller === 'object' ? scheme.controller : {};
+    const io4ChannelDevices = (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [])
+        .filter((moduleItem) => canonicalType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type) === 'io4')
+        .flatMap((moduleItem) => (Array.isArray(moduleItem?.channel_devices) ? moduleItem.channel_devices : []));
 
     const controllerOneWireDevices = Array.isArray(controller.one_wire_devices) ? controller.one_wire_devices : [];
     const oneWireThermostats = wiredDevices.filter(isOneWireThermostat).length
@@ -559,14 +618,67 @@ const getCompatibilityStats = (scheme, controllerTypeOverride = null) => {
     const { relay, relayS } = getRelayStatsForLimits(scheme, relayLimits);
 
     const diFromController = Array.isArray(controller.di_devices) ? controller.di_devices.length : 0;
-    const diFromWired = wiredDevices.filter((device) => hasConnectionType(device, 'di')).length;
+    const diFromWired = wiredDevices.filter((device) => (
+        hasConnectionType(device, 'di') && countIo4OnlyDeviceSlots(device) === 0
+    )).length;
     const diFromSensors = sensors.filter((sensor) => hasConnectionType(sensor, 'di')).length;
-    const di = diFromController + diFromWired + diFromSensors;
-    const io4Only = wiredDevices.reduce((sum, device) => sum + countIo4OnlyDeviceSlots(device), 0);
-    const analog420 = sensors.filter((sensor) => hasConnectionType(sensor, '4-20')).length;
+    const diFromIo4 = io4ChannelDevices.filter((device) => (
+        hasConnectionType(device, 'di') && countIo4OnlyDeviceSlots(device) === 0
+    )).length;
+    const di = diFromController + diFromWired + diFromSensors + diFromIo4;
+    const placedIo4Only = io4ChannelDevices.filter((device) => {
+        const type = canonicalType(device?.type);
+        return type === '010pump' || type === '010servo' || type === 'mixing-ntc-sensor';
+    }).length;
+    const io4Only = wiredDevices.reduce((sum, device) => sum + countIo4OnlyDeviceSlots(device), placedIo4Only);
+    const controller420Key = Object.prototype.hasOwnProperty.call(controller, 'devices420')
+        ? 'devices420'
+        : 'devices_420';
+    const controller420Devices = Array.isArray(controller[controller420Key]) ? controller[controller420Key] : [];
+    const analog420 = sensors.filter((sensor) => hasConnectionType(sensor, '4-20')).length
+        + controller420Devices.filter((sensor) => hasConnectionType(sensor, '4-20')).length
+        + io4ChannelDevices.filter((sensor) => hasConnectionType(sensor, '4-20')).length;
     const ups = Array.isArray(scheme?.power_modules) && scheme.power_modules.includes('ups') ? 1 : 0;
 
     return { oneWire, oneWireThermostats, bus, relay, relayS, di, io4Only, analog420, ups, requiredNtcModules, totalNtcModules, requiredNtcOneWireLines, oneWireLines, requiredRdt2Modules };
+};
+
+const getSelectionMixedIoPlan = (scheme, stats, controllerType) => {
+    const baseLimits = CONTROLLER_LIMITS[controllerType] || {};
+    const controllerDiCapacity = controllerType === 'pro' && stats.ups > 0 ? 0 : (baseLimits.di || 0);
+    const controller = scheme?.controller && typeof scheme.controller === 'object' ? scheme.controller : {};
+    const controller420Key = Object.prototype.hasOwnProperty.call(controller, 'devices420')
+        ? 'devices420'
+        : 'devices_420';
+    const controller420Devices = Array.isArray(controller[controller420Key]) ? controller[controller420Key] : [];
+    const extModules = Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [];
+    const io4Modules = extModules.filter((moduleItem) => (
+        canonicalType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type) === 'io4'
+    ));
+    const di6Modules = extModules.filter((moduleItem) => (
+        canonicalType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type) === 'di6'
+    ));
+    const wiredDevices = Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [];
+    const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
+    return calculateSelectionMixedIoModules({
+        unplacedIo4ChannelGroups: wiredDevices
+            .map(countIo4OnlyDeviceSlots)
+            .filter((count) => count > 0),
+        unplacedAnalog420Devices: sensors.filter((sensor) => hasConnectionType(sensor, '4-20')).length,
+        unplacedGeneralDiDevices: wiredDevices.filter((device) => (
+            hasConnectionType(device, 'di') && countIo4OnlyDeviceSlots(device) === 0
+        )).length + sensors.filter((sensor) => hasConnectionType(sensor, 'di')).length,
+        controllerAnalog420Capacity: baseLimits.analog420 || 0,
+        controllerAnalog420Occupied: controller420Devices.length,
+        controllerDiCapacity,
+        controllerDiOccupied: Array.isArray(controller.di_devices) ? controller.di_devices.length : 0,
+        existingIo4ChannelLengths: io4Modules.map((moduleItem) => (
+            Array.isArray(moduleItem?.channel_devices) ? moduleItem.channel_devices.length : 0
+        )),
+        existingDi6ChannelLengths: di6Modules.map((moduleItem) => (
+            Array.isArray(moduleItem?.channel_devices) ? moduleItem.channel_devices.length : 0
+        )),
+    });
 };
 
 const getPreferredGoControllerType = (scheme, upsRequested = false) => (
@@ -626,7 +738,7 @@ const isEcosmartIdentified = (scheme) => {
     const boilers = Array.isArray(scheme?.boilers) ? scheme.boilers : [];
 
     const smartBoilers = boilers.filter((boiler) => canonicalType(boiler?.type) === 'smart' && hasConnectionType(boiler, 'bus')).length;
-    const stupidBoilers = boilers.filter((boiler) => canonicalType(boiler?.type) === 'stupid').length;
+    const relayBoilers = boilers.filter((boiler) => hasConnectionType(boiler, 'relay')).length;
     const boilerGvs = wiredDevices.filter((device) => canonicalType(device?.type) === 'boiler-pump').length;
     const mixing220 = wiredDevices.filter((device) => canonicalType(device?.type) === '220servo' && hasConnectionType(device, 'double_relay')).length;
     const pumps220 = wiredDevices.filter((device) => canonicalType(device?.type) === 'pump-220v').length;
@@ -642,7 +754,7 @@ const isEcosmartIdentified = (scheme) => {
     }).length;
 
     return smartBoilers <= 2
-        && stupidBoilers <= 1
+        && relayBoilers <= 1
         && boilerGvs <= 1
         && mixing220 <= 2
         && pumps220 <= 3
@@ -698,6 +810,13 @@ const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null,
     const stats = getCompatibilityStats(scheme, controllerType);
     const issues = [];
 
+    if (controllerType === 'pro') {
+        const extPortUsage = getProExtPortUsage(scheme);
+        if (extPortUsage > PRO_EXT_DEVICE_CAPACITY) {
+            issues.push(`EXT-порты PRO: требуется ${extPortUsage}, доступно ${PRO_EXT_DEVICE_CAPACITY}.`);
+        }
+    }
+
     // У ecosmart relay-линия — не единый пул слотов, а фиксированные
     // per-role пары пинов (смеситель, насос, клапан, ГВС и т.д.),
     // поэтому общая числовая проверка relay/relay-S к ней неприменима.
@@ -728,15 +847,27 @@ const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null,
     if (stats.io4Only > 0 && controllerType !== 'pro' && controllerType !== 'ecosmart') {
         issues.push('0-10V устройства требуют io4, доступный только для pro или ecosmart.');
     }
-    addCapacityIssue('DI-входы', stats.di, limits.di);
+    if (controllerType === 'pro') {
+        const mixedIoPlan = getSelectionMixedIoPlan(scheme, stats, controllerType);
+        if (mixedIoPlan.additionalIo4Modules > 0) {
+            issues.push(`Общие каналы IO4: требуется еще модулей ${mixedIoPlan.additionalIo4Modules}.`);
+        }
+        if (mixedIoPlan.additionalDi6Modules > 0) {
+            issues.push(`DI-входы: требуется еще модулей DI6 ${mixedIoPlan.additionalDi6Modules}.`);
+        }
+    } else {
+        addCapacityIssue('DI-входы', stats.di, limits.di);
+    }
     if (controllerType === 'smart2') {
         const usedDiPorts = getSmart2UsedDiPorts(scheme, stats);
         if (usedDiPorts > 4) {
             issues.push(`DI-порты smart2: требуется ${usedDiPorts}, доступно 4.`);
         }
     }
-    addCapacityIssue('io4 channel-слоты для 0-10V устройств', stats.io4Only, limits.io4Channels);
-    addCapacityIssue('4-20 входы', stats.analog420, limits.analog420);
+    if (controllerType !== 'pro') {
+        addCapacityIssue('io4 channel-слоты для 0-10V устройств', stats.io4Only, limits.io4Channels);
+        addCapacityIssue('4-20 входы', stats.analog420, limits.analog420);
+    }
     if (stats.ups > 0 && !limits.power) {
         issues.push('UPS требует контроллер с power-линией: smart2 или pro.');
     }
@@ -768,6 +899,7 @@ const getControllerRecommendation = (scheme, controllerType, upsRequested = fals
 
     const stats = getCompatibilityStats(candidateScheme, controllerType);
     const modules = [];
+    let additionalProExtModules = 0;
     let limits = { ...baseLimits };
     const addModules = (type, count) => {
         if (count > 0) modules.push(`${type} x${count}`);
@@ -811,6 +943,7 @@ const getControllerRecommendation = (scheme, controllerType, upsRequested = fals
             const bl2Count = busDeficit;
             limits.bus += bl2Count;
             addModules('bl2', bl2Count);
+            additionalProExtModules += bl2Count;
         }
 
         const baseRelayStats = getRelayStatsForLimits(candidateScheme, limits);
@@ -839,22 +972,22 @@ const getControllerRecommendation = (scheme, controllerType, upsRequested = fals
         limits.relay += oneWireModuleCount * 6;
         addModules('rl6', relayModuleCount + oneWireModuleCount);
         addModules('rl6s', relaySModuleCount);
+        if (controllerType === 'pro') {
+            additionalProExtModules += relayModuleCount + relaySModuleCount + oneWireModuleCount;
+        }
 
-        const analogDeficit = Math.max(0, stats.analog420 - limits.analog420);
-        const io4OnlyDeficit = Math.max(0, stats.io4Only - limits.io4Channels);
-        const io4Count = Math.max(
-            Math.ceil(analogDeficit / 4),
-            Math.ceil(io4OnlyDeficit / 4),
-        );
+        const mixedIoPlan = getSelectionMixedIoPlan(candidateScheme, stats, controllerType);
+        const io4Count = mixedIoPlan.additionalIo4Modules;
         limits.analog420 += io4Count * 4;
         limits.io4Channels += io4Count * 4;
         limits.di += io4Count * 4;
         addModules('io4', io4Count);
+        if (controllerType === 'pro') additionalProExtModules += io4Count;
 
-        const diDeficit = Math.max(0, stats.di - limits.di);
-        const di6Count = Math.ceil(diDeficit / 6);
+        const di6Count = mixedIoPlan.additionalDi6Modules;
         limits.di += di6Count * 6;
         addModules('di6', di6Count);
+        if (controllerType === 'pro') additionalProExtModules += di6Count;
     }
 
     const finalRelayStats = getRelayStatsForLimits(candidateScheme, limits);
@@ -867,9 +1000,12 @@ const getControllerRecommendation = (scheme, controllerType, upsRequested = fals
             return match ? sum + Number(match[2]) : sum;
         }, 0)
         && ((controllerType !== 'go' && controllerType !== 'go+') || stats.oneWireThermostats <= GO_ONE_WIRE_THERMOSTAT_LIMIT)
-        && stats.di <= limits.di
-        && stats.io4Only <= limits.io4Channels
-        && stats.analog420 <= limits.analog420
+        && (controllerType === 'pro' || (
+            stats.di <= limits.di
+            && stats.io4Only <= limits.io4Channels
+            && stats.analog420 <= limits.analog420
+        ))
+        && (controllerType !== 'pro' || hasProExtPortCapacity(candidateScheme, additionalProExtModules))
         && (stats.ups === 0 || limits.power);
 
     return { compatible, modules };
@@ -1088,13 +1224,34 @@ const unwindEcosmartInternals = (scheme) => {
         nextScheme = { ...nextScheme, controller: restController };
     }
 
-    const boilers = Array.isArray(nextScheme?.boilers) ? nextScheme.boilers : [];
-    const hasStupidBoiler = boilers.some((boiler) => canonicalType(boiler?.type) === 'stupid');
-    const sensors = Array.isArray(nextScheme?.sensors) ? nextScheme.sensors : [];
-    const hasStupidBoilerSensor = sensors.some((sensor) => canonicalType(sensor?.type) === 'flask-sensor-stupid-boiler');
-    if (hasStupidBoiler && !hasStupidBoilerSensor) {
-        nextScheme = { ...nextScheme, sensors: [...sensors, makeStupidBoilerSensor()] };
-    }
+    const stupidBoilers = (Array.isArray(nextScheme?.boilers) ? nextScheme.boilers : [])
+        .filter((boiler) => canonicalType(boiler?.type) === 'stupid');
+    const currentController = nextScheme?.controller && typeof nextScheme.controller === 'object'
+        ? nextScheme.controller
+        : null;
+    const controllerOneWireDevices = Array.isArray(currentController?.one_wire_devices)
+        ? currentController.one_wire_devices
+        : [];
+    const isStupidBoilerSensor = (sensor) => canonicalType(sensor?.type) === 'flask-sensor-stupid-boiler';
+    const controllerBoilerSensors = controllerOneWireDevices.filter(isStupidBoilerSensor);
+    const sensors = reconcileSelectionStupidBoilerSensors(
+        stupidBoilers,
+        [
+            ...(Array.isArray(nextScheme?.sensors) ? nextScheme.sensors : []),
+            ...controllerBoilerSensors,
+        ],
+        makeStupidBoilerSensor,
+    );
+    nextScheme = {
+        ...nextScheme,
+        sensors,
+        ...(currentController && controllerBoilerSensors.length > 0 ? {
+            controller: {
+                ...currentController,
+                one_wire_devices: controllerOneWireDevices.filter((sensor) => !isStupidBoilerSensor(sensor)),
+            },
+        } : {}),
+    };
 
     return nextScheme;
 };
@@ -1330,12 +1487,8 @@ const withRequiredModules = (scheme) => {
         };
     }
 
-    const analogDeficit = Math.max(0, stats.analog420 - limits.analog420);
-    const io4OnlyDeficit = Math.max(0, stats.io4Only - limits.io4Channels);
-    const io4Count = Math.max(
-        Math.ceil(analogDeficit / 4),
-        Math.ceil(io4OnlyDeficit / 4),
-    );
+    const mixedIoPlan = getSelectionMixedIoPlan(scheme, stats, controllerType);
+    const io4Count = mixedIoPlan.additionalIo4Modules;
     if (io4Count > 0) {
         extModules = [
             ...extModules,
@@ -1350,8 +1503,7 @@ const withRequiredModules = (scheme) => {
         };
     }
 
-    const diDeficit = Math.max(0, stats.di - limits.di);
-    const di6Count = Math.ceil(diDeficit / 6);
+    const di6Count = mixedIoPlan.additionalDi6Modules;
     if (di6Count > 0) {
         extModules = [
             ...extModules,
@@ -1615,12 +1767,6 @@ const normalizeBoilerSearchResults = (data) => {
         name: item.name ?? item.boiler_name,
     })).filter((item) => item.name);
 };
-
-const withRinnaiAdapter = (boiler) => (
-    String(boiler?.name || '').toLowerCase().includes('rinnai')
-        ? { ...boiler, adapter: { ...boiler?.adapter, type: 'rinnai' } }
-        : boiler
-);
 
 const makeSchemeName = () => {
     const now = new Date();
@@ -2515,6 +2661,13 @@ const getEquipmentOfferSections = (incomingSchemeValue, controllerType) => {
             rows: aggregateAddedItems(boilers.map((boiler) => ({ label: `${boiler.name} (${boiler.connection_type})` }))),
         });
     }
+    const rinnaiAdapterCount = countRinnaiAdapters(boilers);
+    if (rinnaiAdapterCount > 0) {
+        sections.push({
+            title: 'Переходники',
+            rows: [{ key: 'rinnai-adapter', label: RINNAI_ADAPTER_LABEL, count: rinnaiAdapterCount, unitPrice: RINNAI_ADAPTER_PRICE }],
+        });
+    }
 
     const groupedRows = (group, templates) => getGroupedDeviceRows(incomingSchemeValue, group, templates);
 
@@ -2609,7 +2762,7 @@ const MYHEAT_PRICES = {
     },
     thermostat: 9490, // Комнатный термостат MyHeat
     pressureSensor: 5990, // Датчик давления 4-20мА
-    leakSensor: 2990, // Датчик протечки Нептун SW 005 (5м)
+    leakSensor: null, // Датчик протечки пока не продается MyHeat.
     ups: 9990, // MyHeat UPS
     radioModuleActivation: 3000,
 };
@@ -2928,8 +3081,9 @@ const SelectionApp = () => {
     const removeBoiler = useCallback((index) => {
         setIncomingScheme((prev) => {
             const boilers = Array.isArray(prev.boilers) ? [...prev.boilers] : [];
-            boilers.splice(index, 1);
-            return resolveSelectionScheme(syncStrategySensorForSmartBoilers({ ...prev, boilers }));
+            const [removedBoiler] = boilers.splice(index, 1);
+            const nextScheme = withoutStupidBoilerSensor({ ...prev, boilers }, removedBoiler);
+            return resolveSelectionScheme(syncStrategySensorForSmartBoilers(nextScheme));
         });
     }, []);
 

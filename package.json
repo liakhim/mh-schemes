@@ -5,7 +5,7 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "test:js": "node --test resources/js/scheme/domain/*.test.js"
+        "test:js": "node --test resources/js/scheme/domain/*.test.js resources/js/scheme/publicSchemeSerializer.test.js resources/js/selectionMixedIoCapacity.unique.test.js"
     },
     "dependencies": {
         "jspdf": "^3.0.3",

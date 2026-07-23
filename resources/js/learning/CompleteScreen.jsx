@@ -1,6 +1,8 @@
 import React from 'react';
 
-const CompleteScreen = ({ solvedCount, solvableCount, onRestart, onReview }) => (
+const CompleteScreen = ({
+    solvedCount, solvableCount, elapsedLabel, onRestart, onReview,
+}) => (
     <div className="learning-cover">
         <div className="learning-cover-card">
             <h1>🎉 Поздравляем!</h1>
@@ -8,6 +10,11 @@ const CompleteScreen = ({ solvedCount, solvableCount, onRestart, onReview }) => 
             <p className="learning-cover-stats">
                 Решено верно: {solvedCount} из {solvableCount}
             </p>
+            {elapsedLabel && (
+                <p className="learning-cover-stats">
+                    Время прохождения: {elapsedLabel}
+                </p>
+            )}
             <div className="learning-cover-actions">
                 <button type="button" className="learning-cover-button" onClick={onRestart}>
                     Пройти заново

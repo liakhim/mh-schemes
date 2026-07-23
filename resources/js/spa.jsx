@@ -13,6 +13,9 @@ import { buildSmart2InstallationDiConnections } from './scheme/domain/installati
 import { shouldIncludeCollisionSlot, translateRect, unionRects } from './scheme/domain/collisionGeometry';
 import { getInstallationDinTotal } from './scheme/domain/installationDin';
 import { buildControllerOnlyScheme, isControllerOnlyScheme } from './scheme/domain/controllerOnlyScheme';
+import { materializePowerModules } from './scheme/domain/powerModules';
+import { getRinnaiBusSlotYOffset, RINNAI_ADAPTER_LABEL, RINNAI_ADAPTER_PRICE, usesRinnaiAdapter, withRinnaiAdapter } from './scheme/domain/rinnaiAdapter';
+import { restorePublicDevicesFromModules, serializePublicScheme } from './scheme/publicSchemeSerializer';
 import { controllerImagePaths, wirelessDeviceImagePaths, getWirelessDeviceImageKey, aerialImagePath, goAerialImagePath } from './scheme/assets/imageRegistry';
 import { getOneWireDirectionForDevice, getOneWireLineGeometry, getOneWireSlotPosition } from './scheme/layout/oneWireLayout';
 import { parsePorts, withFallbackPorts, getPortsByClassToken } from './scheme/layout/portParsing';
@@ -247,11 +250,6 @@ const createGridPatternImage = (step) => {
  * @returns {object} Схема, готовая для отрисовки и ручного редактирования.
  */
 const buildSchemeFromIncoming = (sourceScheme) => {
-    const withRinnaiAdapter = (boiler) => (
-        String(boiler?.name || '').toLowerCase().includes('rinnai')
-            ? { ...boiler, adapter: { ...boiler?.adapter, type: 'rinnai' } }
-            : boiler
-    );
     const normalizeRinnaiAdapters = (schemeValue) => {
         const controller = schemeValue?.controller && typeof schemeValue.controller === 'object'
             ? {
@@ -293,105 +291,19 @@ const buildSchemeFromIncoming = (sourceScheme) => {
             controller: { ...normalizedController, ecosmart_bl2: legacyEcosmartBl2 },
         }
         : schemeWithoutLegacyEcosmartBl2);
+    const controllerType = canonicalDeviceType(
+        typeof normalizedScheme.controller === 'string' ? normalizedScheme.controller : normalizedScheme.controller?.type,
+    );
+    const upsRequested = (Array.isArray(normalizedScheme.power_modules) ? normalizedScheme.power_modules : [])
+        .some((moduleItem) => canonicalDeviceType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type) === 'ups');
+    const powerModules = materializePowerModules(normalizedScheme.power_modules, controllerType, upsRequested);
+    const schemeWithPowerModules = powerModules.length > 0 || Object.prototype.hasOwnProperty.call(normalizedScheme, 'power_modules')
+        ? { ...normalizedScheme, power_modules: powerModules }
+        : normalizedScheme;
 
     return {
-        ...materializeBalancedOneWireScheme(normalizedScheme),
-        wireless_devices: getInitialWirelessDevices(normalizedScheme),
-    };
-};
-
-const INTERNAL_ECOSMART_CONTROLLER_LINE_KEYS = [
-    '220_servo_devices',
-    'relay_s_valve_devices',
-    'relay_boiler_gvs_devices',
-    'relay_220pump_devices',
-    'relay_220pump5_devices',
-    'relay_220pump3_devices',
-    'leak_sensor_devices',
-    'strategy_sensor_devices',
-    'boiler_sensor_devices',
-    'mixing_ntc_devices',
-    'ecosmart_bl2',
-];
-
-const INTERNAL_ECOSMART_WIRED_LINE_KEYS = [
-    '220_servo_devices',
-    'relay_s_valve_devices',
-    'relay_boiler_gvs_devices',
-    'relay_220pump_devices',
-    'relay_220pump5_devices',
-    'relay_220pump3_devices',
-];
-
-const INTERNAL_ECOSMART_SENSOR_LINE_KEYS = [
-    'leak_sensor_devices',
-    'strategy_sensor_devices',
-    'boiler_sensor_devices',
-    'mixing_ntc_devices',
-];
-
-const getPublicDeviceKey = (device) => {
-    if (!device || typeof device !== 'object') return null;
-    const type = canonicalDeviceType(device?.type) || 'unknown';
-    return device.id != null ? `${type}:id:${device.id}` : `${type}:${JSON.stringify(device)}`;
-};
-
-/**
- * Добавляет устройства в массив без повторов по типу и id либо содержимому объекта.
- * @param {Array<object>} items Исходные устройства.
- * @param {Array<object>} devicesToAppend Устройства, которые нужно добавить.
- * @returns {Array<object>} Новый массив без дубликатов.
- */
-const appendUniqueDevices = (items, devicesToAppend) => {
-    const result = Array.isArray(items) ? [...items] : [];
-    const existingKeys = new Set(result.map(getPublicDeviceKey).filter(Boolean));
-    devicesToAppend.filter(Boolean).forEach((device) => {
-        const key = getPublicDeviceKey(device);
-        if (key && existingKeys.has(key)) return;
-        if (key) existingKeys.add(key);
-        result.push(device);
-    });
-    return result;
-};
-
-const normalizePublicEcosmartSensor = (device) => {
-    const type = canonicalDeviceType(device?.type);
-    if (type === 'flask-sensor-strategy' || type === 'flask-sensor-gvs-boiler') {
-        return { ...device, type, connection_type: '1-wire|ntc' };
-    }
-    return { ...device, type };
-};
-
-/**
- * Сворачивает внутренние линии редактора обратно в публичный формат API.
- * @param {object} schemeValue Внутренняя материализованная схема.
- * @returns {object} incoming_scheme без служебных линий ECOsmart.
- */
-const getPublicIncomingScheme = (schemeValue) => {
-    if (!schemeValue || typeof schemeValue !== 'object') return schemeValue;
-    const { ecosmart_bl2: rootEcosmartBl2, ...publicScheme } = schemeValue;
-    if (!publicScheme.controller || typeof publicScheme.controller !== 'object') {
-        return publicScheme;
-    }
-
-    const publicController = { ...publicScheme.controller };
-    const internalWiredDevices = INTERNAL_ECOSMART_WIRED_LINE_KEYS
-        .flatMap((lineKey) => (Array.isArray(publicController[lineKey]) ? publicController[lineKey] : []))
-        .filter(Boolean);
-    const internalSensorDevices = INTERNAL_ECOSMART_SENSOR_LINE_KEYS
-        .flatMap((lineKey) => (Array.isArray(publicController[lineKey]) ? publicController[lineKey] : []))
-        .filter(Boolean)
-        .map(normalizePublicEcosmartSensor);
-
-    INTERNAL_ECOSMART_CONTROLLER_LINE_KEYS.forEach((lineKey) => {
-        delete publicController[lineKey];
-    });
-
-    return {
-        ...publicScheme,
-        controller: publicController,
-        wired_devices: appendUniqueDevices(publicScheme.wired_devices, internalWiredDevices),
-        sensors: appendUniqueDevices(publicScheme.sensors, internalSensorDevices),
+        ...materializeBalancedOneWireScheme(schemeWithPowerModules),
+        wireless_devices: getInitialWirelessDevices(schemeWithPowerModules),
     };
 };
 
@@ -1429,7 +1341,7 @@ const OFFER_PRICES = {
     modules: { rl2: 3890, rl2s: 3890, rl6: 8990, rl6s: 9990, rdt2: 4990, di6: 7990, io4: 7990, 'ntc-1-wire': 4190, bl2: 6990, ecosmartbl2: 6990 },
     thermostat: 9490,
     pressure: 5990,
-    leak: 2990,
+    leak: null,
     ups: 9990,
     'wireless-outdoor': 5890,
     'wireless-wall': 4190,
@@ -1479,7 +1391,7 @@ const getOfferTemperatureProduct = (type, controllerType) => {
  * @returns {Array<object>} Непустые разделы КП.
  */
 const getSchemeOfferSections = (scheme) => {
-    const rowsBySection = { controller: [], modules: [], equipment: [] };
+    const rowsBySection = { controller: [], modules: [], equipment: [], adapters: [] };
     const counts = new Map();
     const add = (section, key, label, price, { count = 1, paidCount = count, badge = null } = {}) => {
         const countKey = `${section}:${key}`;
@@ -1515,6 +1427,7 @@ const getSchemeOfferSections = (scheme) => {
         if (seen.has(value)) return;
         seen.add(value);
         const type = canonicalDeviceType(value.type);
+        if (usesRinnaiAdapter(value)) add('adapters', 'rinnai', RINNAI_ADAPTER_LABEL, RINNAI_ADAPTER_PRICE);
         if (OFFER_PRICES.modules[type] != null) add('modules', type, OFFER_MODULE_LABELS[type], OFFER_PRICES.modules[type]);
         const equipment = {
             thermostat: ['Термостат MyHeat', OFFER_PRICES.thermostat],
@@ -1544,6 +1457,7 @@ const getSchemeOfferSections = (scheme) => {
         { title: 'Контроллер', rows: rowsBySection.controller },
         { title: 'Модули расширения', rows: rowsBySection.modules },
         { title: 'Оборудование MyHeat', rows: rowsBySection.equipment },
+        { title: 'Переходники', rows: rowsBySection.adapters },
     ].filter((section) => section.rows.length > 0);
 };
 
@@ -1663,7 +1577,7 @@ const App = () => {
         setInstallationItemOffsets(layout.itemOffsets);
     };
     const getPersistedIncomingScheme = () => {
-        const publicScheme = getPublicIncomingScheme(scheme);
+        const publicScheme = serializePublicScheme(scheme);
         const layout = writeInstallationLayout(controllerType, installationPanelSize, installationItemOffsets);
         if (layout) return { ...publicScheme, installation_layout: layout };
         const { installation_layout: removedInstallationLayout, ...schemeWithoutInstallationLayout } = publicScheme;
@@ -3223,8 +3137,9 @@ const App = () => {
     const removeExtModuleAtSlot = (slotIndex) => {
         setScheme((s) => {
             const extModules = Array.isArray(s.ext_modules) ? s.ext_modules : [];
+            const schemeWithRestoredDevices = restorePublicDevicesFromModules(s, [extModules[slotIndex]]);
             return {
-                ...s,
+                ...schemeWithRestoredDevices,
                 ext_modules: extModules.filter((_, index) => index !== slotIndex),
             };
         });
@@ -3252,8 +3167,9 @@ const App = () => {
     const removeDiModuleAtSlot = (slotIndex) => {
         setScheme((s) => {
             const diModules = Array.isArray(s.di_modules) ? s.di_modules : [];
+            const schemeWithRestoredDevices = restorePublicDevicesFromModules(s, [diModules[slotIndex]]);
             return {
-                ...s,
+                ...schemeWithRestoredDevices,
                 di_modules: diModules.filter((_, index) => index !== slotIndex),
             };
         });
@@ -9588,13 +9504,13 @@ const App = () => {
                                                  };
                                                  const slotPos = getBusSlotPosition();
                                                  const busOffset = busSlotOffsets[lineIndex] || { x: 0, y: 0 };
-                                                 const hasRinnaiAdapter = busDevice?.adapter?.type === 'rinnai';
+                                                 const hasRinnaiAdapter = usesRinnaiAdapter(busDevice);
                                                  const useEcosmartRinnaiLayout = hasRinnaiAdapter && controllerType === 'ecosmart';
                                                  const slotX = slotPos.x + busOffset.x
                                                      - (hasRinnaiAdapter ? (useEcosmartRinnaiLayout ? 5.5 : 5) * indentSize : 0)
                                                      - (useEcosmartRinnaiLayout && lineIndex === 0 ? indentSize : 0)
                                                      + (useEcosmartRinnaiLayout && lineIndex === 1 ? 6 * indentSize : 0);
-                                                 const slotY = slotPos.y + busOffset.y;
+                                                 const slotY = slotPos.y + busOffset.y + getRinnaiBusSlotYOffset(controllerType, busDevice, indentSize);
                                                  const isOccupied = !!busDevice;
                                                 const rinnaiAdapterImage = hasRinnaiAdapter ? wirelessImages['rinnai-adapter'] : null;
                                                 const rinnaiAdapterPorts = hasRinnaiAdapter ? (wirelessPortsByType['rinnai-adapter'] || []) : [];

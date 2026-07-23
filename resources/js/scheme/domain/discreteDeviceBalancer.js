@@ -25,6 +25,7 @@ const normalizeExtModule = (moduleItem, index) => {
     return {
         ...base,
         id: base.id ?? `${type}-${index}`,
+        ...(base.id == null ? { connectionAssignmentGeneratedId: true } : {}),
         type,
         connection_type: base.connection_type ?? 'EXT',
         one_wire_devices: Array.isArray(base.one_wire_devices) ? base.one_wire_devices : [],
@@ -46,6 +47,7 @@ const isDiscreteDevice = (device) => (
 const normalizeDiscreteDevice = (device, index) => ({
     ...device,
     id: device?.id ?? `discrete-device-${index}`,
+    ...(device?.id == null ? { connectionAssignmentGeneratedId: true } : {}),
     type: canonicalDeviceType(device?.type),
     connection_type: 'di',
 });
@@ -72,9 +74,9 @@ export const balanceDiscreteDevices = (scheme) => {
     const controller = scheme?.controller && typeof scheme.controller === 'object'
         ? { ...scheme.controller }
         : { type: controllerType };
-    const extModules = (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [])
-        .map(normalizeExtModule)
-        .filter(Boolean);
+    const extModules = controllerType === 'pro' || controllerType === 'ecosmart'
+        ? (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : []).map(normalizeExtModule).filter(Boolean)
+        : scheme?.ext_modules;
 
     const controllerDiDevices = Array.isArray(controller.di_devices) ? [...controller.di_devices] : [];
     const retainedControllerDiDevices = controllerType === 'smart2'
@@ -91,7 +93,7 @@ export const balanceDiscreteDevices = (scheme) => {
         { devices: controller.di_devices, capacity: controllerType === 'ecosmart' ? 1 : 0, onlyTypes: DISCRETE_ONLY_TYPES },
         { devices: controller.di_devices, capacity: controllerType === 'pro' && useControllerDi ? CONTROLLER_DI_CAPACITY : 0 },
         { devices: controller.di_devices, capacity: controllerType === 'smart2' ? smart2ControllerDiCapacity : 0 },
-        ...extModules
+        ...(controllerType === 'pro' || controllerType === 'ecosmart' ? extModules : [])
             .map((moduleItem) => {
                 const type = canonicalDeviceType(moduleItem?.type);
                 if (type === 'io4') return { devices: moduleItem.channel_devices, capacity: IO4_CHANNEL_CAPACITY };

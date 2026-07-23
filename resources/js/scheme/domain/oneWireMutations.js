@@ -7,6 +7,23 @@ const isModuleType = (type) => ONE_WIRE_MODULE_TYPES.has(canonicalDeviceType(typ
 const isOneWireThermostat = (type) => canonicalDeviceType(type) === 'thermostat';
 const isOneWireSensor = (type) => !isModuleType(type) && !isOneWireThermostat(type);
 
+const getAssignedNtcSensors = (device) => (
+    canonicalDeviceType(device?.type) === 'ntc-1-wire'
+        ? ['ntc1_devices', 'ntc2_devices']
+            .flatMap((lineKey) => (Array.isArray(device?.[lineKey]) ? device[lineKey] : []))
+            .filter(Boolean)
+        : []
+);
+
+const withRestoredNtcSensors = (scheme, device) => {
+    const assignedSensors = getAssignedNtcSensors(device);
+    if (assignedSensors.length === 0) return scheme;
+    return {
+        ...scheme,
+        sensors: [...(Array.isArray(scheme?.sensors) ? scheme.sensors : []), ...assignedSensors],
+    };
+};
+
 export const addOneWireDeviceToScheme = (scheme, devicePayload, slotIndex, maxDevices = 6) => {
     const current = getOneWireDevicesFromScheme(scheme);
     const insertIndex = Number.isInteger(slotIndex) ? slotIndex : current.length;
@@ -143,26 +160,26 @@ export const removeOneWireDeviceFromScheme = (scheme, slotIndex) => {
     if (!removedDevice) return scheme;
 
     if (Array.isArray(scheme?.controller?.one_wire_devices)) {
-        return {
+        return withRestoredNtcSensors({
             ...scheme,
             controller: {
                 ...scheme.controller,
                 one_wire_devices: scheme.controller.one_wire_devices.filter((_, index) => index !== slotIndex),
             },
             one_wire_modules: [],
-        };
+        }, removedDevice);
     }
 
     if (Array.isArray(scheme.controller_one_wire_devices)) {
         const { controller_one_wire_devices: legacyControllerOneWireDevices, ...schemeWithoutLegacyControllerOneWire } = scheme;
-        return {
+        return withRestoredNtcSensors({
             ...schemeWithoutLegacyControllerOneWire,
             controller: {
                 ...(scheme?.controller && typeof scheme.controller === 'object' ? scheme.controller : { type: scheme?.controller }),
                 one_wire_devices: scheme.controller_one_wire_devices.filter((_, index) => index !== slotIndex),
             },
             one_wire_modules: [],
-        };
+        }, removedDevice);
     }
 
     if (isModuleType(removedDevice?.type)) {
@@ -172,13 +189,13 @@ export const removeOneWireDeviceFromScheme = (scheme, slotIndex) => {
             .filter((item) => isModuleType(item?.type))
             .length - 1;
         if (modulePosition < 0 || modulePosition >= currentModules.length) return scheme;
-        return {
+        return withRestoredNtcSensors({
             ...scheme,
             one_wire_modules: [
                 ...currentModules.slice(0, modulePosition),
                 ...currentModules.slice(modulePosition + 1),
             ],
-        };
+        }, currentModules[modulePosition]);
     }
 
     if (canonicalDeviceType(removedDevice?.type) === 'thermostat') {

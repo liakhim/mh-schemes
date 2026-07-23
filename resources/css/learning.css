@@ -5,6 +5,9 @@
     --learning-text-muted: #667089;
     --learning-accent: #1565c0;
     --learning-solved: #2e8b57;
+    --learning-orange: #ea580c;
+    --learning-orange-dark: #c2410c;
+    --learning-orange-border: #d97706;
 }
 
 * {
@@ -30,6 +33,97 @@ body {
     overflow: hidden;
 }
 
+/* Mirrors the .spa-navbar header used on the Schemes page (logo + alpha-test notice), kept as
+   its own copy here since the learning page doesn't load app.css. */
+.learning-navbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--learning-line);
+    background: #ffffffd9;
+    backdrop-filter: blur(4px);
+}
+
+.learning-navbar-brand {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 12px;
+}
+
+.learning-navbar-logo {
+    display: block;
+    width: auto;
+    height: 28px;
+    flex: 0 0 auto;
+}
+
+.learning-alpha-notice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(620px, 60vw);
+    padding: 8px 10px;
+    border: 1px solid #f2c7c7;
+    border-radius: 12px;
+    background: #fff1f1;
+    color: #8a3a3a;
+    font-size: 12px;
+    line-height: 1.25;
+}
+
+.learning-alpha-notice span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.learning-alpha-notice a {
+    flex: 0 0 auto;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: var(--learning-orange);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+@media (max-width: 800px) {
+    .learning-navbar {
+        height: auto;
+        flex-wrap: wrap;
+        padding: 6px 12px;
+    }
+
+    .learning-navbar-brand {
+        width: 100%;
+        gap: 10px;
+    }
+
+    .learning-navbar-logo {
+        height: 22px;
+    }
+
+    .learning-alpha-notice {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: none;
+        padding: 4px 8px;
+        font-size: 11px;
+        gap: 8px;
+    }
+
+    .learning-alpha-notice a {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+}
+
 .learning-header {
     flex: 0 0 auto;
     padding: 16px 24px;
@@ -38,10 +132,25 @@ body {
     backdrop-filter: blur(4px);
 }
 
+.learning-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
 .learning-title {
     font-size: 15px;
     font-weight: 600;
-    margin-bottom: 10px;
+}
+
+.learning-timer {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--learning-text-muted);
 }
 
 .learning-progress {
@@ -68,6 +177,7 @@ body {
 }
 
 .learning-main {
+    position: relative;
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
@@ -75,7 +185,37 @@ body {
     justify-content: center;
     overflow: auto;
     padding: 16px;
+}
+
+.learning-fireworks {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.learning-fade {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     gap: 12px;
+    animation: learning-fade-in 280ms ease;
+}
+
+@keyframes learning-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .learning-question-title {
@@ -250,11 +390,14 @@ body {
 .learning-nav button {
     padding: 10px 20px;
     font-size: 14px;
+    font-weight: 600;
     border-radius: 6px;
-    border: 1px solid var(--learning-line);
-    background: #ffffff;
-    color: var(--learning-text);
+    border: 1px solid var(--learning-orange-border);
+    background: var(--learning-orange);
+    color: #ffffff;
     cursor: pointer;
+    box-shadow: 0 4px 12px rgba(234, 88, 12, 0.18);
+    transition: background-color 0.15s ease;
 }
 
 .learning-nav button:disabled {
@@ -263,6 +406,5 @@ body {
 }
 
 .learning-nav button:not(:disabled):hover {
-    border-color: var(--learning-accent);
-    color: var(--learning-accent);
+    background: var(--learning-orange-dark);
 }

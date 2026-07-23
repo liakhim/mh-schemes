@@ -57,6 +57,8 @@ const collectNtcModuleRefs = (controllerDevices, extModules) => {
         if (isNtcModule(device)) refs.push({ kind: 'controller', deviceIndex, ownerKey: CONTROLLER_MIXING_OWNER });
     });
     extModules.forEach((moduleItem, moduleIndex) => {
+        const moduleType = canonicalDeviceType(moduleItem?.type);
+        if (moduleType !== 'rl6' && moduleType !== 'rl6s') return;
         const oneWireDevices = Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : [];
         oneWireDevices.forEach((device, deviceIndex) => {
             if (isNtcModule(device)) refs.push({ kind: 'ext', moduleIndex, deviceIndex, ownerKey: getExtMixingOwner(moduleItem, moduleIndex) });
@@ -99,6 +101,9 @@ const findBestModuleRef = (controllerDevices, extModules, refs, startIndex, owne
 };
 
 export const balanceNtcSensors = (scheme) => {
+    const controllerType = canonicalDeviceType(
+        typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type,
+    );
     const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
     const ntcSensors = sensors
         .map((sensor, index) => ({ sensor, index }))
@@ -113,7 +118,10 @@ export const balanceNtcSensors = (scheme) => {
         ...moduleItem,
         one_wire_devices: Array.isArray(moduleItem?.one_wire_devices) ? [...moduleItem.one_wire_devices] : [],
     }));
-    const refs = collectNtcModuleRefs(controllerDevices, extModules);
+    const refs = collectNtcModuleRefs(
+        controllerDevices,
+        controllerType === 'pro' || controllerType === 'ecosmart' ? extModules : [],
+    );
     if (refs.length === 0) return scheme;
 
     const assignedSensorIndexes = new Set();

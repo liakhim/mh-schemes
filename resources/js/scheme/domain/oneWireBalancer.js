@@ -59,21 +59,17 @@ const tryPushGroupToLine = (lineBuckets, lineIndex, group) => {
 };
 
 const placeGroupPreferController = (lineBuckets, group, cursorRef) => {
-    if (tryPushGroupToLine(lineBuckets, 0, group)) return;
+    if (tryPushGroupToLine(lineBuckets, 0, group)) return true;
 
     for (let attempt = 1; attempt < lineBuckets.length; attempt += 1) {
         const idx = ((cursorRef.value - 1 + attempt) % (lineBuckets.length - 1)) + 1;
         if (tryPushGroupToLine(lineBuckets, idx, group)) {
             cursorRef.value = idx;
-            return;
+            return true;
         }
     }
 
-    const fallback = getMostFreeLineIndex(lineBuckets, 1);
-    if (fallback >= 0) {
-        const free = LINE_CAPACITY - lineBuckets[fallback].length;
-        group.slice(0, Math.max(0, free)).forEach((item) => lineBuckets[fallback].push(item));
-    }
+    return false;
 };
 
 const placeGroupRoundRobin = (lineBuckets, group, rrRef) => {
@@ -81,14 +77,10 @@ const placeGroupRoundRobin = (lineBuckets, group, rrRef) => {
         const idx = (rrRef.value + attempt) % lineBuckets.length;
         if (tryPushGroupToLine(lineBuckets, idx, group)) {
             rrRef.value = (idx + 1) % lineBuckets.length;
-            return;
+            return true;
         }
     }
-    const fallback = getMostFreeLineIndex(lineBuckets, rrRef.value);
-    if (fallback >= 0) {
-        const free = LINE_CAPACITY - lineBuckets[fallback].length;
-        group.slice(0, Math.max(0, free)).forEach((item) => lineBuckets[fallback].push(item));
-    }
+    return false;
 };
 
 const tryPlaceGroupPreferController = (lineBuckets, group, cursorRef) => {
@@ -166,28 +158,32 @@ export const balanceOneWireDevices = (scheme, extModules) => {
 
     const lineBuckets = lines.map(() => []);
     const extThermostatDevices = [];
+    const extThermostatPlacedDevices = [];
     const proExtThermostatSlotsFree = getControllerType(scheme) === 'pro'
         ? Math.max(0, EXT_LINE_CAPACITY - (Array.isArray(extModules) ? extModules.length : 0) - getControllerExtThermostatCount(scheme))
         : 0;
     const cursorRef = { value: 1 };
     const ntcRoundRobinRef = { value: 0 };
     const placePinnedDevice = (device) => {
-        const ownerKey = device?.[MIXING_OWNER_FIELD];
+        const ownerKey = device?.[MIXING_OWNER_FIELD]
+            || (device?.ownerExtModuleId != null ? `ext:${device.ownerExtModuleId}` : null);
         const lineIndex = lines.findIndex((line) => line.ownerKey === ownerKey);
         return lineIndex >= 0 && tryPushGroupToLine(lineBuckets, lineIndex, [device]);
     };
     rdtModules.forEach((device) => {
-        placeGroupPreferController(lineBuckets, [device], cursorRef);
+        if (device?.ownerExtModuleId != null) placePinnedDevice(device);
+        else placeGroupPreferController(lineBuckets, [device], cursorRef);
     });
 
-    ntcModules.filter((device) => device?.[MIXING_OWNER_FIELD]).forEach(placePinnedDevice);
-    ntcModules.filter((device) => !device?.[MIXING_OWNER_FIELD]).forEach((device) => {
+    ntcModules.filter((device) => device?.[MIXING_OWNER_FIELD] || device?.ownerExtModuleId != null).forEach(placePinnedDevice);
+    ntcModules.filter((device) => !device?.[MIXING_OWNER_FIELD] && device?.ownerExtModuleId == null).forEach((device) => {
         placeGroupRoundRobin(lineBuckets, [device], ntcRoundRobinRef);
     });
 
     thermostatGroups.forEach((group) => {
         if (extThermostatDevices.length < proExtThermostatSlotsFree && isThermostatGroupWithFloorSensor(group)) {
             extThermostatDevices.push(makeExtThermostatFromGroup(group));
+            extThermostatPlacedDevices.push(...group);
             return;
         }
         if (tryPlaceGroupPreferController(lineBuckets, group, cursorRef)) return;
@@ -203,8 +199,8 @@ export const balanceOneWireDevices = (scheme, extModules) => {
     });
 
     const oneWireRoundRobinRef = { value: 0 };
-    sortedRemaining.filter((device) => device?.[MIXING_OWNER_FIELD]).forEach(placePinnedDevice);
-    sortedRemaining.filter((device) => !device?.[MIXING_OWNER_FIELD] && !isMixingUnitSensor(device)).forEach((device) => {
+    sortedRemaining.filter((device) => device?.[MIXING_OWNER_FIELD] || device?.ownerExtModuleId != null).forEach(placePinnedDevice);
+    sortedRemaining.filter((device) => !device?.[MIXING_OWNER_FIELD] && device?.ownerExtModuleId == null && !isMixingUnitSensor(device)).forEach((device) => {
         placeGroupRoundRobin(lineBuckets, [device], oneWireRoundRobinRef);
     });
 
@@ -219,5 +215,14 @@ export const balanceOneWireDevices = (scheme, extModules) => {
         controllerDevices: lineBuckets[0] || [],
         extDevicesByModuleIndex,
         extThermostatDevices,
+        unplacedDevices: devices.filter((device) => ![
+            ...lineBuckets.flat(),
+            ...extThermostatDevices,
+            ...extThermostatPlacedDevices,
+        ].some((placed) => placed === device || (
+            placed?.id != null && device?.id != null
+            && canonicalDeviceType(placed?.type) === canonicalDeviceType(device?.type)
+            && placed.id === device.id
+        ))),
     };
 };

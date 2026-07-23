@@ -9,6 +9,7 @@ import { balanceDiscreteDevices } from './discreteDeviceBalancer.js';
 import { balanceEcosmartNtcLines } from './ecosmartNtcLineBalancer.js';
 import { balanceOneWireDevices } from './oneWireBalancer.js';
 import { balanceNtcSensors } from './ntcSensorBalancer.js';
+import { restoreConnectionAssignments } from './connectionAssignments.js';
 import {
     CONTROLLER_MIXING_OWNER,
     getExtMixingOwner,
@@ -22,19 +23,6 @@ const NTC_MODULE_CAPACITY = 6;
 const getControllerType = (scheme) => canonicalDeviceType(
     typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type,
 );
-
-const filterExtModulesForController = (scheme) => {
-    const controllerType = getControllerType(scheme);
-    if (controllerType !== 'ecosmart' || !Array.isArray(scheme?.ext_modules)) return scheme;
-
-    return {
-        ...scheme,
-        ext_modules: scheme.ext_modules.filter((item) => {
-            const type = canonicalDeviceType(typeof item === 'string' ? item : item?.type);
-            return type !== 'bl2';
-        }),
-    };
-};
 
 const normalizeExtModule = (item, index) => {
     const rawType = typeof item === 'string' ? item : item?.type;
@@ -121,12 +109,17 @@ const hasNtcAssignments = (device) => {
     ));
 };
 
+const isAutoNtcModule = (device) => canonicalDeviceType(device?.type) === 'ntc-1-wire'
+    && String(device?.id || '').startsWith('auto-ntc-1-wire-');
+
+const keepNtcModule = (device) => !isAutoNtcModule(device) || hasNtcAssignments(device);
+
 const removeEmptyNtcOneWireModules = (scheme) => {
     const controller = scheme?.controller && typeof scheme.controller === 'object'
         ? {
             ...scheme.controller,
             one_wire_devices: Array.isArray(scheme.controller.one_wire_devices)
-                ? scheme.controller.one_wire_devices.filter(hasNtcAssignments)
+                ? scheme.controller.one_wire_devices.filter(keepNtcModule)
                 : scheme.controller.one_wire_devices,
         }
         : scheme?.controller;
@@ -135,13 +128,13 @@ const removeEmptyNtcOneWireModules = (scheme) => {
         ...scheme,
         ...(controller ? { controller } : {}),
         one_wire_modules: Array.isArray(scheme?.one_wire_modules)
-            ? scheme.one_wire_modules.filter(hasNtcAssignments)
+            ? scheme.one_wire_modules.filter(keepNtcModule)
             : scheme?.one_wire_modules,
         ext_modules: Array.isArray(scheme?.ext_modules)
             ? scheme.ext_modules.map((moduleItem) => ({
                 ...moduleItem,
                 one_wire_devices: Array.isArray(moduleItem?.one_wire_devices)
-                    ? moduleItem.one_wire_devices.filter(hasNtcAssignments)
+                    ? moduleItem.one_wire_devices.filter(keepNtcModule)
                     : moduleItem?.one_wire_devices,
             }))
             : scheme?.ext_modules,
@@ -159,31 +152,7 @@ const assignNtcSensorsToModule = (moduleDevice, sensors) => ({
 });
 
 const compactEcosmartNtcOneWireModules = (scheme) => {
-    if (getControllerType(scheme) !== 'ecosmart') return scheme;
-    const controller = scheme?.controller && typeof scheme.controller === 'object' ? scheme.controller : null;
-    const oneWireDevices = Array.isArray(controller?.one_wire_devices) ? controller.one_wire_devices : [];
-    const ntcModules = oneWireDevices.filter((device) => canonicalDeviceType(device?.type) === 'ntc-1-wire');
-    if (ntcModules.length <= 1) return scheme;
-
-    const sensors = ntcModules.flatMap(getNtcAssignments);
-    const compactedModules = ntcModules
-        .slice(0, Math.ceil(sensors.length / NTC_MODULE_CAPACITY))
-        .map((moduleDevice, index) => assignNtcSensorsToModule(
-            moduleDevice,
-            sensors.slice(index * NTC_MODULE_CAPACITY, index * NTC_MODULE_CAPACITY + NTC_MODULE_CAPACITY),
-        ));
-    const otherOneWireDevices = oneWireDevices.filter((device) => canonicalDeviceType(device?.type) !== 'ntc-1-wire');
-
-    return {
-        ...scheme,
-        controller: {
-            ...controller,
-            one_wire_devices: [
-                ...compactedModules,
-                ...otherOneWireDevices,
-            ],
-        },
-    };
+    return scheme;
 };
 
 const ensureNtcOneWireModules = (scheme) => {
@@ -223,7 +192,8 @@ const ensureOwnedNtcOneWireModules = (scheme) => {
         .map((device) => (canonicalDeviceType(device?.type) === 'ntc-1-wire'
             ? { ...device, [MIXING_OWNER_FIELD]: device?.[MIXING_OWNER_FIELD] || CONTROLLER_MIXING_OWNER }
             : device));
-    const extModules = (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : []).map((moduleItem, moduleIndex) => {
+    const supportsExt = ['pro', 'ecosmart'].includes(getControllerType(scheme));
+    const extModules = supportsExt ? (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : []).map((moduleItem, moduleIndex) => {
         const ownerKey = getExtMixingOwner(moduleItem, moduleIndex);
         return {
             ...moduleItem,
@@ -232,7 +202,7 @@ const ensureOwnedNtcOneWireModules = (scheme) => {
                     ? { ...device, [MIXING_OWNER_FIELD]: device?.[MIXING_OWNER_FIELD] || ownerKey }
                     : device)),
         };
-    });
+    }) : scheme?.ext_modules;
     const oneWireModules = (Array.isArray(scheme?.one_wire_modules) ? scheme.one_wire_modules : []).map((device, index) => (
         typeof device === 'string' ? { id: `one-wire-${index}`, type: canonicalDeviceType(device) } : { ...device }
     ));
@@ -243,7 +213,7 @@ const ensureOwnedNtcOneWireModules = (scheme) => {
                 .filter((device) => canonicalDeviceType(device?.type) === 'ntc-1-wire')
                 .reduce((sum, device) => sum + getNtcModuleFreeSlots(device), 0)
             : 0;
-        const extCapacity = extModules.reduce((sum, moduleItem, moduleIndex) => (
+        const extCapacity = (supportsExt ? extModules : []).reduce((sum, moduleItem, moduleIndex) => (
             getExtMixingOwner(moduleItem, moduleIndex) === ownerKey
                 ? sum + moduleItem.one_wire_devices
                     .filter((device) => canonicalDeviceType(device?.type) === 'ntc-1-wire')
@@ -330,8 +300,60 @@ const filterMovedOneWireLineItems = (items, placedCounts) => {
 
 const copyPlacedCounts = (placedCounts) => new Map(placedCounts);
 
+const getRestoreDeviceKey = (device) => {
+    const identityKey = getDeviceKey(device);
+    if (device?.id != null) return identityKey;
+    return [
+        canonicalDeviceType(device?.type),
+        String(device?.connection_type || '').toLowerCase(),
+        device?.device_type || '',
+        device?.mixing_unit_id ?? device?._uid ?? '',
+        device?.ownerThermostatId ?? '',
+    ].join('|');
+};
+
+const appendUniqueDevices = (items, additions) => {
+    const result = Array.isArray(items) ? [...items] : [];
+    const existingCounts = new Map();
+    const identityKeys = new Set();
+    result.map(getRestoreDeviceKey).filter(Boolean).forEach((key) => {
+        existingCounts.set(key, (existingCounts.get(key) || 0) + 1);
+    });
+    result.forEach((device) => {
+        if (device?.id != null) identityKeys.add(getRestoreDeviceKey(device));
+    });
+    additions.forEach((device) => {
+        const key = getRestoreDeviceKey(device);
+        if (device?.id != null && identityKeys.has(key)) return;
+        const existingCount = key ? existingCounts.get(key) || 0 : 0;
+        if (existingCount > 0) {
+            existingCounts.set(key, existingCount - 1);
+            return;
+        }
+        result.push(device);
+        if (device?.id != null && key) identityKeys.add(key);
+    });
+    return result;
+};
+
+const restoreUnplacedOneWireDevices = (scheme, devices) => {
+    const unplaced = Array.isArray(devices) ? devices : [];
+    const modules = unplaced.filter((device) => {
+        const type = canonicalDeviceType(device?.type);
+        return type === 'ntc-1-wire' || type === 'rdt2';
+    });
+    const sensors = unplaced.filter((device) => device?.device_type === 'sensor');
+    const wiredDevices = unplaced.filter((device) => !modules.includes(device) && !sensors.includes(device));
+    return {
+        ...scheme,
+        one_wire_modules: appendUniqueDevices(scheme?.one_wire_modules, modules),
+        sensors: appendUniqueDevices(scheme?.sensors, sensors),
+        wired_devices: appendUniqueDevices(scheme?.wired_devices, wiredDevices),
+    };
+};
+
 export const materializeBalancedOneWireScheme = (scheme) => {
-    const compatibleScheme = filterExtModulesForController(scheme);
+    const compatibleScheme = restoreConnectionAssignments(scheme);
     const boilerBalancedScheme = balanceBoilers(compatibleScheme);
     const servoBalancedScheme = balanceServos(boilerBalancedScheme);
     const relayBalancedScheme = balanceRelayDevices(servoBalancedScheme);
@@ -341,9 +363,11 @@ export const materializeBalancedOneWireScheme = (scheme) => {
     const ecosmartNtcBalancedScheme = balanceEcosmartNtcLines(discreteBalancedScheme);
     const ownedNtcModuleScheme = ensureOwnedNtcOneWireModules(ecosmartNtcBalancedScheme);
     const ntcModuleBalancedScheme = ensureNtcOneWireModules(ownedNtcModuleScheme);
-    const extModules = (Array.isArray(ntcModuleBalancedScheme?.ext_modules) ? ntcModuleBalancedScheme.ext_modules : [])
-        .map((item, index) => normalizeExtModule(item, index))
-        .filter(Boolean);
+    const sourceExtModules = Array.isArray(ntcModuleBalancedScheme?.ext_modules) ? ntcModuleBalancedScheme.ext_modules : [];
+    const supportsExt = ['pro', 'ecosmart'].includes(getControllerType(ntcModuleBalancedScheme));
+    const extModules = supportsExt
+        ? sourceExtModules.map((item, index) => normalizeExtModule(item, index) || item)
+        : [];
     const balanced = balanceOneWireDevices(ntcModuleBalancedScheme, extModules);
     const controllerDevices = (balanced.controllerDevices || [])
         .map(normalizeOneWireDevice)
@@ -366,7 +390,7 @@ export const materializeBalancedOneWireScheme = (scheme) => {
     ];
     const { controller_one_wire_devices: legacyControllerOneWireDevices, ...balancedSchemeBase } = ntcModuleBalancedScheme;
 
-    const oneWireBalancedScheme = {
+    const oneWireBalancedScheme = restoreUnplacedOneWireDevices({
         ...balancedSchemeBase,
         controller: {
             ...controllerBase,
@@ -376,13 +400,19 @@ export const materializeBalancedOneWireScheme = (scheme) => {
         one_wire_modules: filterMovedOneWireItems(ntcModuleBalancedScheme?.one_wire_modules, copyPlacedCounts(placedMovedCounts)),
         wired_devices: filterMovedOneWireLineItems(ntcModuleBalancedScheme?.wired_devices, copyPlacedCounts(placedMovedCounts)),
         sensors: filterMovedOneWireLineItems(ntcModuleBalancedScheme?.sensors, copyPlacedCounts(placedMovedCounts)),
-        ext_modules: extModules.map((moduleItem, moduleIndex) => ({
-            ...moduleItem,
-            one_wire_devices: (balanced.extDevicesByModuleIndex[moduleIndex] || [])
-                .map(normalizeOneWireDevice)
-                .filter(Boolean),
-        })),
-    };
+        ext_modules: supportsExt
+            ? extModules.map((moduleItem, moduleIndex) => {
+                const type = canonicalDeviceType(moduleItem?.type);
+                if (type !== 'rl6' && type !== 'rl6s') return moduleItem;
+                return {
+                    ...moduleItem,
+                    one_wire_devices: (balanced.extDevicesByModuleIndex[moduleIndex] || [])
+                        .map(normalizeOneWireDevice)
+                        .filter(Boolean),
+                };
+            })
+            : sourceExtModules,
+    }, balanced.unplacedDevices);
 
     return assignMaterializedDeviceTitles(compactEcosmartNtcOneWireModules(removeEmptyNtcOneWireModules(balanceNtcSensors(oneWireBalancedScheme))));
 };

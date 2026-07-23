@@ -9,7 +9,7 @@ const getControllerType = (scheme) => canonicalDeviceType(
 );
 
 const getController420Key = (controller) => (
-    controller && Object.prototype.hasOwnProperty.call(controller, 'devices420') ? 'devices420' : 'devices_420'
+    controller && Array.isArray(controller.devices420) ? 'devices420' : 'devices_420'
 );
 
 const normalizeExtModule = (moduleItem, index) => {
@@ -19,6 +19,7 @@ const normalizeExtModule = (moduleItem, index) => {
     return {
         ...base,
         id: base.id ?? `${type}-${index}`,
+        ...(base.id == null ? { connectionAssignmentGeneratedId: true } : {}),
         type,
         connection_type: base.connection_type ?? 'EXT',
         one_wire_devices: Array.isArray(base.one_wire_devices) ? base.one_wire_devices : [],
@@ -40,6 +41,7 @@ const isPressureSensor = (sensor) => (
 const normalizePressureSensor = (sensor, index) => ({
     ...sensor,
     id: sensor?.id ?? `pressure-sensor-${index}`,
+    ...(sensor?.id == null ? { connectionAssignmentGeneratedId: true } : {}),
     type: 'pressure-sensor',
     connection_type: '4-20',
 });
@@ -56,15 +58,15 @@ export const balancePressureSensors = (scheme) => {
         ? { ...scheme.controller }
         : { type: controllerType };
     const controller420Key = getController420Key(controller);
-    const extModules = (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [])
-        .map(normalizeExtModule)
-        .filter(Boolean);
+    const extModules = controllerType === 'pro' || controllerType === 'ecosmart'
+        ? (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : []).map(normalizeExtModule).filter(Boolean)
+        : scheme?.ext_modules;
 
     controller[controller420Key] = Array.isArray(controller[controller420Key]) ? [...controller[controller420Key]] : [];
 
     const lines = [
         { devices: controller[controller420Key], capacity: getController420Capacity(controllerType) },
-        ...extModules
+        ...(controllerType === 'pro' || controllerType === 'ecosmart' ? extModules : [])
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'io4')
             .map((moduleItem) => ({ devices: moduleItem.channel_devices, capacity: IO4_CHANNEL_CAPACITY })),
     ].filter((line) => line.capacity > 0);

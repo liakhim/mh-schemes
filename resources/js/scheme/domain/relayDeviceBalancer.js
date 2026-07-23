@@ -1,4 +1,5 @@
 import { canonicalDeviceType } from './deviceTypes.js';
+import { appendRelayDeviceToFreeSpan } from './relaySlots.js';
 
 const RELAY_LINE_CAPACITY = 6;
 const PRO_CONTROLLER_RELAY_CAPACITY = 4;
@@ -22,6 +23,7 @@ const normalizeExtModule = (moduleItem, index) => {
     return {
         ...base,
         id: base.id ?? `${type}-${index}`,
+        ...(base.id == null ? { connectionAssignmentGeneratedId: true } : {}),
         type,
         connection_type: base.connection_type ?? 'EXT',
         one_wire_devices: Array.isArray(base.one_wire_devices) ? base.one_wire_devices : [],
@@ -40,6 +42,7 @@ const normalizeDiModule = (moduleItem, index) => {
     return {
         ...base,
         id: base.id ?? `${type}-${index}`,
+        ...(base.id == null ? { connectionAssignmentGeneratedId: true } : {}),
         type,
         connection_type: base.connection_type ?? 'DI',
         relay_devices: Array.isArray(base.relay_devices) ? base.relay_devices : [],
@@ -88,7 +91,7 @@ const supportsRelayS = (device) => {
     const type = canonicalDeviceType(device?.type);
     const connectionTypes = getConnectionTypes(device);
     if (type === 'valve') {
-        return false;
+        return connectionTypes.includes('relay-s') || connectionTypes.includes('double_relay');
     }
     if (type === 'zoneServo') {
         return connectionTypes.includes('relay-s');
@@ -102,20 +105,14 @@ const supportsRelayS = (device) => {
 const normalizeRelayDevice = (device, index) => ({
     ...device,
     id: device?.id ?? `relay-device-${index}`,
+    ...(device?.id == null ? { connectionAssignmentGeneratedId: true } : {}),
     type: canonicalDeviceType(device?.type),
 });
-
-const occupiedSlots = (devices) => (Array.isArray(devices)
-    ? devices.reduce((sum, device) => (String(device?.connection_type || '').toLowerCase() === 'double_relay' ? sum + 2 : sum + 1), 0)
-    : 0);
 
 const pushToLine = (line, device) => {
     if (line.onlyTypes && !line.onlyTypes.has(canonicalDeviceType(device?.type))) return false;
     if (line.accepts && !line.accepts(device)) return false;
-    const span = String(device?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1;
-    if (!Array.isArray(line.devices) || occupiedSlots(line.devices) + span > line.capacity) return false;
-    line.devices.push(device);
-    return true;
+    return appendRelayDeviceToFreeSpan(line.devices, line.capacity, device);
 };
 
 export const balanceRelayDevices = (scheme) => {
@@ -125,22 +122,18 @@ export const balanceRelayDevices = (scheme) => {
     const controller = scheme?.controller && typeof scheme.controller === 'object'
         ? { ...scheme.controller }
         : { type: controllerType };
-    const extModules = (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [])
-        .map(normalizeExtModule)
-        .filter(Boolean);
-    const diModules = (Array.isArray(scheme?.di_modules) ? scheme.di_modules : [])
-        .map(normalizeDiModule)
-        .filter(Boolean);
+    const extModules = controllerType === 'pro' || controllerType === 'ecosmart'
+        ? (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : []).map(normalizeExtModule).filter(Boolean)
+        : scheme?.ext_modules;
+    const diModules = controllerType === 'smart2'
+        ? (Array.isArray(scheme?.di_modules) ? scheme.di_modules : []).map((item, index) => normalizeDiModule(item, index) || item)
+        : scheme?.di_modules;
 
     const controllerRelaySDevices = Array.isArray(controller.relay_s_devices)
         ? controller.relay_s_devices
-            .map((device, index) => {
+            .map((device) => {
                 if (!device || typeof device !== 'object') return null;
-                const storedSlotIndex = Number(device.relay_slot_index);
-                return {
-                    ...device,
-                    relay_slot_index: Number.isInteger(storedSlotIndex) ? storedSlotIndex : index,
-                };
+                return { ...device };
             })
             .filter(Boolean)
         : [];
@@ -167,23 +160,21 @@ export const balanceRelayDevices = (scheme) => {
         strayStupidBoilers.push(...strays);
         moduleItem.relay_s_devices = moduleItem.relay_s_devices.filter((device) => !isStupidBoilerDevice(device));
     };
-    extModules.forEach(stripStupidBoilersFromRelayS);
-    diModules.forEach(stripStupidBoilersFromRelayS);
+    if (controllerType === 'pro' || controllerType === 'ecosmart') extModules.forEach(stripStupidBoilersFromRelayS);
+    if (controllerType === 'smart2') diModules.forEach(stripStupidBoilersFromRelayS);
 
     const unplacedStupidBoilers = [];
     if (strayStupidBoilers.length > 0) {
         const boilerRelayLines = [
             { devices: controller.relay_devices, capacity: getControllerRelayCapacity(controllerType) },
-            ...extModules
+            ...(controllerType === 'pro' || controllerType === 'ecosmart' ? extModules : [])
                 .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6')
                 .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: RELAY_LINE_CAPACITY })),
         ].filter((line) => line.capacity > 0);
         strayStupidBoilers.forEach((boiler) => {
             const device = { ...boiler, connection_type: 'relay' };
             const placed = boilerRelayLines.some((line) => {
-                if (!Array.isArray(line.devices) || occupiedSlots(line.devices) + 1 > line.capacity) return false;
-                line.devices.push(device);
-                return true;
+                return appendRelayDeviceToFreeSpan(line.devices, line.capacity, device);
             });
             if (!placed) unplacedStupidBoilers.push(device);
         });
@@ -196,16 +187,16 @@ export const balanceRelayDevices = (scheme) => {
         { devices: controller.relay_220pump3_devices, capacity: controllerType === 'ecosmart' ? 1 : 0, onlyTypes: new Set(['pump-220v']) },
         { devices: controller.relay_devices, capacity: getControllerRelayCapacity(controllerType), accepts: supportsRelay },
         { devices: controller.relay_s_devices, capacity: getControllerRelaySCapacity(controllerType), accepts: supportsRelayS },
-        ...extModules
+        ...(controllerType === 'pro' || controllerType === 'ecosmart' ? extModules : [])
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6')
             .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: RELAY_LINE_CAPACITY, accepts: supportsRelay })),
-        ...extModules
+        ...(controllerType === 'pro' || controllerType === 'ecosmart' ? extModules : [])
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6s')
             .map((moduleItem) => ({ devices: moduleItem.relay_s_devices, capacity: RELAY_LINE_CAPACITY, accepts: supportsRelayS })),
-        ...diModules
+        ...(controllerType === 'smart2' ? diModules : [])
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl2')
             .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: 2, accepts: supportsRelay })),
-        ...diModules
+        ...(controllerType === 'smart2' ? diModules : [])
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl2s')
             .map((moduleItem) => ({ devices: moduleItem.relay_s_devices, capacity: 2, accepts: supportsRelayS })),
     ].filter((line) => line.capacity > 0);

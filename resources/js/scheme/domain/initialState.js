@@ -16,6 +16,9 @@ const isThermostatFloorSensor = (device) => {
 const expandOneWireDeviceWithFloorAdditions = (device, deviceIndex, ownerPrefix = 'thermostat') => {
     if (!device || typeof device !== 'object') return [];
     const normalizedType = canonicalDeviceType(device?.type);
+    if (normalizedType !== 'thermostat') {
+        return [{ ...device, type: normalizedType, connection_type: '1-wire' }];
+    }
     const ownerThermostatKey = device?.id != null ? `${ownerPrefix}:${device.id}` : `${ownerPrefix}-index:${deviceIndex}`;
     const rawAdditions = Array.isArray(device?.additions) ? device.additions : [];
     const extractedAdditions = [];
@@ -140,11 +143,17 @@ export const getOneWireDevicesFromScheme = (scheme) => {
 };
 
 export const getExtOneWireDevicesByModuleIndex = (scheme) => {
+    const controllerType = canonicalDeviceType(
+        typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type,
+    );
+    if (controllerType !== 'pro' && controllerType !== 'ecosmart') return {};
     const extModules = Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [];
     const out = {};
 
     extModules.forEach((moduleItem, moduleIndex) => {
         if (!moduleItem || typeof moduleItem !== 'object') return;
+        const moduleType = canonicalDeviceType(moduleItem.type);
+        if (moduleType !== 'rl6' && moduleType !== 'rl6s') return;
         const devices = Array.isArray(moduleItem.one_wire_devices) ? moduleItem.one_wire_devices : [];
         if (!devices.length) return;
         out[moduleIndex] = devices
@@ -152,7 +161,11 @@ export const getExtOneWireDevicesByModuleIndex = (scheme) => {
                 if (!device || typeof device !== 'object') return null;
                 if (isExtConnection(device)) return null;
                 return expandOneWireDeviceWithFloorAdditions(device, deviceIndex, `ext-${moduleIndex}-thermostat`)
-                    .map((item) => ({ ...item, ownerExtModuleIndex: moduleIndex }));
+                    .map((item) => ({
+                        ...item,
+                        ownerExtModuleId: moduleItem.id ?? null,
+                        ownerExtModuleIndex: moduleIndex,
+                    }));
             })
             .filter(Boolean);
     });
