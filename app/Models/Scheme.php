@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
     'version',
     'system_device_id',
     'incoming_scheme',
+    'floor_plan',
 ])]
 class Scheme extends Model
 {
@@ -27,6 +28,7 @@ class Scheme extends Model
             'version' => 'integer',
             'system_device_id' => 'integer',
             'incoming_scheme' => 'array',
+            'floor_plan' => 'array',
         ];
     }
 }
