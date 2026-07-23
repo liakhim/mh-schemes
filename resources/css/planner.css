@@ -1,0 +1,339 @@
+:root {
+    --planner-bg: #f5f5f6;
+    --planner-panel: #ffffff;
+    --planner-panel-border: #e4e4e7;
+    --planner-panel-shadow: 0 4px 18px rgba(20, 20, 20, 0.1);
+    --planner-text: #141414;
+    --planner-muted: #6b6b70;
+    --planner-accent: #ff6a00;
+    --planner-accent-weak: #fff2e8;
+    --planner-danger: #d63b2f;
+    --planner-input-bg: #ffffff;
+    --planner-input-border: #dcdce0;
+    --planner-btn-bg: #ffffff;
+    --planner-btn-hover: #f2f2f4;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--planner-bg);
+    color: var(--planner-text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+}
+
+#planner-app,
+.planner-root {
+    position: fixed;
+    inset: 0;
+}
+
+.planner-canvas {
+    position: absolute;
+    inset: 0;
+}
+
+.planner-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    color: var(--planner-muted);
+    font-size: 15px;
+}
+
+/* ---- Toolbar ---- */
+.planner-toolbar {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    padding: 8px 12px;
+    background: var(--planner-panel);
+    border: 1px solid var(--planner-panel-border);
+    border-radius: 12px;
+    box-shadow: var(--planner-panel-shadow);
+    z-index: 10;
+}
+
+.planner-brand {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+    padding-right: 6px;
+    border-right: 1px solid var(--planner-panel-border);
+}
+
+.planner-brand-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--planner-accent);
+}
+
+.planner-brand-sub {
+    font-size: 11px;
+    color: var(--planner-muted);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.planner-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.planner-group-right {
+    margin-left: auto;
+}
+
+.planner-btn {
+    appearance: none;
+    border: 1px solid var(--planner-input-border);
+    background: var(--planner-btn-bg);
+    color: var(--planner-text);
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.planner-btn:hover {
+    background: var(--planner-btn-hover);
+}
+
+.planner-btn-active {
+    background: var(--planner-accent);
+    border-color: var(--planner-accent);
+    color: #ffffff;
+}
+
+.planner-btn-active:hover {
+    background: #f26100;
+}
+
+.planner-btn-primary {
+    background: var(--planner-accent);
+    border-color: var(--planner-accent);
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.planner-btn-primary:hover {
+    background: #f26100;
+}
+
+.planner-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.planner-btn-danger {
+    background: transparent;
+    border-color: var(--planner-danger);
+    color: var(--planner-danger);
+}
+
+.planner-btn-danger:hover {
+    background: rgba(214, 59, 47, 0.1);
+}
+
+.planner-btn-wide {
+    width: 100%;
+    margin-top: 6px;
+}
+
+.planner-save-error {
+    color: var(--planner-danger);
+    font-size: 12px;
+}
+
+/* ---- Panels ---- */
+.planner-panel {
+    position: absolute;
+    background: var(--planner-panel);
+    border: 1px solid var(--planner-panel-border);
+    border-radius: 12px;
+    box-shadow: var(--planner-panel-shadow);
+    padding: 12px;
+    z-index: 9;
+    width: 240px;
+}
+
+.planner-panel-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--planner-muted);
+    margin-bottom: 10px;
+}
+
+.planner-levels {
+    top: 74px;
+    left: 12px;
+}
+
+.planner-properties {
+    top: 74px;
+    right: 12px;
+}
+
+/* ---- Levels ---- */
+.planner-level-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
+.planner-level {
+    border: 1px solid var(--planner-panel-border);
+    border-radius: 8px;
+    padding: 7px 8px;
+    cursor: pointer;
+    background: #fafafa;
+}
+
+.planner-level-active {
+    border-color: var(--planner-accent);
+    background: var(--planner-accent-weak);
+}
+
+.planner-level-name {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--planner-text);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 2px 0;
+    outline: none;
+}
+
+.planner-level-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--planner-muted);
+}
+
+.planner-level-height {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.planner-level-height input {
+    width: 52px;
+}
+
+.planner-level-elev {
+    margin-left: auto;
+}
+
+.planner-icon-btn {
+    border: none;
+    background: transparent;
+    color: var(--planner-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.planner-icon-btn:hover {
+    color: var(--planner-danger);
+    background: rgba(214, 59, 47, 0.1);
+}
+
+/* ---- Properties ---- */
+.planner-prop-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    padding: 3px 0;
+    color: var(--planner-muted);
+}
+
+.planner-prop-row b {
+    color: var(--planner-text);
+}
+
+.planner-prop-sub {
+    margin-top: 10px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--planner-accent);
+}
+
+.planner-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--planner-muted);
+    margin-top: 8px;
+}
+
+.planner-empty-hint {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--planner-muted);
+    line-height: 1.4;
+}
+
+/* number/text inputs */
+.planner-panel input[type='number'],
+.planner-field input {
+    background: var(--planner-input-bg);
+    border: 1px solid var(--planner-input-border);
+    color: var(--planner-text);
+    border-radius: 6px;
+    padding: 5px 7px;
+    font-size: 12px;
+    outline: none;
+}
+
+.planner-panel input:focus {
+    border-color: var(--planner-accent);
+}
+
+/* ---- Help hint ---- */
+.planner-help {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--planner-panel);
+    border: 1px solid var(--planner-panel-border);
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 12.5px;
+    color: var(--planner-text);
+    z-index: 9;
+    box-shadow: var(--planner-panel-shadow);
+}
+
+.planner-help b {
+    color: var(--planner-accent);
+}

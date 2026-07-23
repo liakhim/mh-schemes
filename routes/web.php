@@ -42,6 +42,7 @@ Route::get('/api/schemes/{scheme}', function (Scheme $scheme) {
         'version' => $scheme->version,
         'system_device_id' => $scheme->system_device_id,
         'incoming_scheme' => $scheme->incoming_scheme,
+        'floor_plan' => $scheme->floor_plan,
     ]);
 })->whereNumber('scheme')->name('schemes.show');
 
@@ -73,6 +74,7 @@ Route::patch('/api/schemes/{scheme}', function (Request $request, Scheme $scheme
         'description' => ['sometimes', 'nullable', 'string', 'max:65535'],
         'system_device_id' => ['sometimes', 'nullable', 'integer'],
         'incoming_scheme' => ['sometimes', 'required', 'array'],
+        'floor_plan' => ['sometimes', 'nullable', 'array'],
     ]);
 
     if (array_key_exists('name', $validated)) {
@@ -87,6 +89,9 @@ Route::patch('/api/schemes/{scheme}', function (Request $request, Scheme $scheme
     if (array_key_exists('incoming_scheme', $validated)) {
         $scheme->incoming_scheme = $validated['incoming_scheme'];
     }
+    if (array_key_exists('floor_plan', $validated)) {
+        $scheme->floor_plan = $validated['floor_plan'];
+    }
     $scheme->save();
 
     return response()->json([
@@ -96,6 +101,7 @@ Route::patch('/api/schemes/{scheme}', function (Request $request, Scheme $scheme
         'system_device_id' => $scheme->system_device_id,
         'updated_at' => $scheme->updated_at?->format('Y-m-d H:i'),
         'incoming_scheme' => $scheme->incoming_scheme,
+        'floor_plan' => $scheme->floor_plan,
     ]);
 })->whereNumber('scheme')->name('schemes.update');
 
@@ -164,3 +170,11 @@ Route::get('/scheme/{scheme}', function (Scheme $scheme) {
 })
     ->whereNumber('scheme')
     ->name('scheme.with-id');
+
+// 3D planner: build the apartment/house, place equipment, route cables to the panel.
+Route::view('/planner', 'planner', ['scheme' => null])->name('planner');
+Route::get('/planner/{scheme}', function (Scheme $scheme) {
+    return view('planner', ['scheme' => $scheme]);
+})
+    ->whereNumber('scheme')
+    ->name('planner.with-id');

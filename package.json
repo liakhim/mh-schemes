@@ -8,11 +8,15 @@
         "test:js": "node --test resources/js/scheme/domain/*.test.js"
     },
     "dependencies": {
+        "@react-three/drei": "^10.7.7",
+        "@react-three/fiber": "^9.6.1",
         "jspdf": "^3.0.3",
         "konva": "^9.3.22",
         "react": "^19.1.0",
         "react-dom": "^19.1.0",
-        "react-konva": "^19.0.7"
+        "react-konva": "^19.0.7",
+        "three": "^0.185.1",
+        "zustand": "^5.0.14"
     },
     "devDependencies": {
         "@vitejs/plugin-react": "^5.0.4",
