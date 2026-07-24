@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'mhtest' => [
+        'base_url' => env('MHTEST_INTEGRATION_URL', 'https://mhtest.ru/api/integration'),
+        'origin' => env('MHTEST_ORIGIN', 'https://mhtest.ru'),
+        'referer' => env('MHTEST_REFERER', 'https://mhtest.ru/podbor-oborudovaniya'),
+        'timeout' => env('MHTEST_TIMEOUT', 10),
+    ],
+
 ];

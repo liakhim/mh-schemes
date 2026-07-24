@@ -4,6 +4,8 @@ import EquipmentOfferModal from './components/EquipmentOfferModal';
 import { getAllOneWireDevicesForBalancing } from './scheme/domain/initialState';
 import { materializePowerModules } from './scheme/domain/powerModules';
 import { countRinnaiAdapters, RINNAI_ADAPTER_LABEL, RINNAI_ADAPTER_PRICE, withRinnaiAdapter } from './scheme/domain/rinnaiAdapter';
+import { normalizeSchemeIds } from './scheme/domain/schemeIds';
+import { buildSelectionConfig } from './scheme/domain/selectionConfig';
 import {
     calculateSelectionMixedIoModules,
     getProExtPortUsage,
@@ -2787,6 +2789,8 @@ const SelectionApp = () => {
     const [controllerConnectorGeometry, setControllerConnectorGeometry] = useState(null);
     const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
     const [upsRequested, setUpsRequested] = useState(false);
+    const [requestedControllerType, setRequestedControllerType] = useState('go');
+    const [controllerSelectionSource, setControllerSelectionSource] = useState('default');
     const upsRequestedRef = useRef(false);
     const upsRequestSourceRef = useRef(null);
     const controllerWrapRef = useRef(null);
@@ -2798,6 +2802,8 @@ const SelectionApp = () => {
         upsRequestSourceRef.current = null;
         upsRequestedRef.current = false;
         setUpsRequested(false);
+        setRequestedControllerType('go');
+        setControllerSelectionSource('default');
         setIncomingScheme(createInitialSelectionScheme());
         setWiredThermostatColor('black');
         setWiredThermostatHasFloorSensor(false);
@@ -2818,6 +2824,8 @@ const SelectionApp = () => {
         upsRequestSourceRef.current = requestSource;
         upsRequestedRef.current = requested;
         setUpsRequested(requested);
+        setRequestedControllerType(pendingDraft.requestedControllerType || getControllerType(pendingDraft.incomingScheme));
+        setControllerSelectionSource(pendingDraft.controllerSelectionSource === 'manual' ? 'manual' : 'default');
         setIncomingScheme(pendingDraft.incomingScheme);
         setWiredThermostatColor(editor.wiredThermostatColor || 'black');
         setWiredThermostatHasFloorSensor(editor.wiredThermostatHasFloorSensor === true);
@@ -2865,6 +2873,8 @@ const SelectionApp = () => {
             incomingScheme,
             upsRequested,
             upsRequestSource: upsRequestSourceRef.current,
+            requestedControllerType,
+            controllerSelectionSource,
             editor: {
                 wiredThermostatColor,
                 wiredThermostatHasFloorSensor,
@@ -2878,6 +2888,8 @@ const SelectionApp = () => {
         pendingDraft,
         incomingScheme,
         upsRequested,
+        requestedControllerType,
+        controllerSelectionSource,
         wiredThermostatColor,
         wiredThermostatHasFloorSensor,
         wirelessThermostatColor,
@@ -3061,6 +3073,11 @@ const SelectionApp = () => {
                 name: result.name,
                 reserve: false,
                 connection_type: isStupid ? 'RELAY' : 'BUS',
+                catalog_ref: {
+                    source: 'mhtest',
+                    catalog_id: result.id != null ? String(result.id) : null,
+                    bus_type: result.bus_type ?? null,
+                },
             });
             boilers.push(boiler);
             const nextScheme = withStupidBoilerSensor({ ...prev, boilers }, boiler);
@@ -3283,6 +3300,8 @@ const SelectionApp = () => {
     /** Переключает controllerValue и синхронизирует UPS и обязательные модули. */
     const setController = useCallback((controllerValue) => {
         const targetControllerType = canonicalType(controllerValue?.type);
+        setRequestedControllerType(targetControllerType);
+        setControllerSelectionSource('manual');
         let requested = upsRequestedRef.current;
         if (targetControllerType === 'go+') {
             requested = true;
@@ -3321,6 +3340,22 @@ const SelectionApp = () => {
         }
 
         try {
+            const normalizedScheme = normalizeSchemeIds(incomingScheme);
+            const selectionConfig = buildSelectionConfig({
+                selectionState: normalizedScheme,
+                requestedControllerType,
+                controllerSelectionSource,
+                upsRequested,
+                upsRequestSource: upsRequestSourceRef.current,
+                editor: {
+                    wiredThermostatColor,
+                    wiredThermostatHasFloorSensor,
+                    wirelessThermostatColor,
+                    wirelessThermostatHasFloorSensor,
+                    wiredTemperatureSensorKey,
+                    wirelessTemperatureSensorKey,
+                },
+            });
             const response = await fetch('/api/schemes', {
                 method: 'POST',
                 headers: {
@@ -3331,7 +3366,8 @@ const SelectionApp = () => {
                 body: JSON.stringify({
                     name: makeSchemeName(),
                     description: 'Создано со страницы подбора',
-                    incoming_scheme: incomingScheme,
+                    incoming_scheme: normalizedScheme,
+                    selection_config: selectionConfig,
                 }),
             });
 
@@ -3353,7 +3389,19 @@ const SelectionApp = () => {
             setBuildSchemeError(error instanceof Error ? error.message : 'Не удалось сохранить схему');
             setIsBuildingScheme(false);
         }
-    }, [controllerCompatibilityIssues, incomingScheme]);
+    }, [
+        controllerCompatibilityIssues,
+        incomingScheme,
+        requestedControllerType,
+        controllerSelectionSource,
+        upsRequested,
+        wiredThermostatColor,
+        wiredThermostatHasFloorSensor,
+        wirelessThermostatColor,
+        wirelessThermostatHasFloorSensor,
+        wiredTemperatureSensorKey,
+        wirelessTemperatureSensorKey,
+    ]);
 
     return (
         <div

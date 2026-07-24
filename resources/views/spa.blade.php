@@ -15,6 +15,7 @@
             'version' => $scheme->version,
             'system_device_id' => $scheme->system_device_id,
             'incoming_scheme' => $scheme->incoming_scheme,
+            'selection_config' => $scheme->selection_config,
         ];
     @endphp
     <script>

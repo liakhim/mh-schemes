@@ -8,6 +8,7 @@ import { getWirelessDeviceTitle, getOneWireDeviceTitle } from './scheme/domain/d
 import { getInitialWirelessDevices, getOneWireDevicesFromScheme } from './scheme/domain/initialState';
 import { balanceOneWireDevices } from './scheme/domain/oneWireBalancer';
 import { materializeBalancedOneWireScheme } from './scheme/domain/oneWireMaterializer';
+import { normalizeSchemeIds } from './scheme/domain/schemeIds';
 import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './scheme/domain/oneWireMutations';
 import { buildSmart2InstallationDiConnections } from './scheme/domain/installationDi';
 import { shouldIncludeCollisionSlot, translateRect, unionRects } from './scheme/domain/collisionGeometry';
@@ -22,6 +23,7 @@ import { parsePorts, withFallbackPorts, getPortsByClassToken } from './scheme/la
 import { getOneWirePortByRole, getPortPosition } from './scheme/layout/ports';
 import { Line, RealisticConnectionLines, snapPixel } from './scheme/rendering/SharpLine';
 import EquipmentOfferModal from './components/EquipmentOfferModal';
+import SelectionConfigModal from './components/SelectionConfigModal';
 import commentIconPath from '../assets/icons/comment-icon.svg';
 import commentAddIconPath from '../assets/icons/comment-add-icon.svg';
 import logoPath from '../assets/logo/logo.svg';
@@ -250,6 +252,7 @@ const createGridPatternImage = (step) => {
  * @returns {object} Схема, готовая для отрисовки и ручного редактирования.
  */
 const buildSchemeFromIncoming = (sourceScheme) => {
+    const canonicalSourceScheme = normalizeSchemeIds(sourceScheme);
     const normalizeRinnaiAdapters = (schemeValue) => {
         const controller = schemeValue?.controller && typeof schemeValue.controller === 'object'
             ? {
@@ -274,12 +277,12 @@ const buildSchemeFromIncoming = (sourceScheme) => {
                 : schemeValue?.ext_modules,
         };
     };
-    const legacyEcosmartBl2 = Array.isArray(sourceScheme?.ecosmart_bl2) ? sourceScheme.ecosmart_bl2 : null;
+    const legacyEcosmartBl2 = Array.isArray(canonicalSourceScheme?.ecosmart_bl2) ? canonicalSourceScheme.ecosmart_bl2 : null;
     const {
         ecosmart_bl2: removedEcosmartBl2,
         installation_layout: removedInstallationLayout,
         ...schemeWithoutLegacyEcosmartBl2
-    } = sourceScheme || {};
+    } = canonicalSourceScheme || {};
     const controller = schemeWithoutLegacyEcosmartBl2.controller;
     const normalizedController = controller && typeof controller === 'object'
         ? controller
@@ -1470,8 +1473,8 @@ const App = () => {
     const routeSchemeId = getRouteSchemeId();
     const initialSchemeRecord = getInitialSchemeRecord();
     const requestedControllerOnlyScheme = getRequestedControllerOnlyScheme();
-    const initialIncomingScheme = initialSchemeRecord?.incoming_scheme
-        || (routeSchemeId ? {} : (requestedControllerOnlyScheme || incomingScheme));
+    const initialIncomingScheme = normalizeSchemeIds(initialSchemeRecord?.incoming_scheme
+        || (routeSchemeId ? {} : (requestedControllerOnlyScheme || incomingScheme)));
     const stageRef = useRef(null);
     const gridLayerRef = useRef(null);
     const [canvasSize, setCanvasSize] = useState(getCanvasSize);
@@ -1491,6 +1494,7 @@ const App = () => {
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(() => window.localStorage?.getItem(HELP_MODAL_STORAGE_KEY) !== '1');
     const [showOfferModal, setShowOfferModal] = useState(false);
+    const [showSelectionConfig, setShowSelectionConfig] = useState(false);
     const [installationMode, setInstallationMode] = useState(!requestedControllerOnlyScheme);
     const [morphImages, setMorphImages] = useState([]);
     const [installationPanelSize, setInstallationPanelSize] = useState(() => (
@@ -1553,6 +1557,7 @@ const App = () => {
     const gridPatternImage = useMemo(() => createGridPatternImage(indentSize), [indentSize]);
     const [schemeName, setSchemeName] = useState(initialSchemeRecord?.name || (requestedControllerOnlyScheme ? 'Новая схема' : 'Hardcoded scheme'));
     const [schemeDescription, setSchemeDescription] = useState(initialSchemeRecord?.description || '');
+    const [selectionConfig, setSelectionConfig] = useState(initialSchemeRecord?.selection_config || null);
     const [schemeLoadState, setSchemeLoadState] = useState(routeSchemeId ? (initialSchemeRecord?.incoming_scheme ? 'loaded' : 'loading') : 'hardcoded');
     const [schemeLoadError, setSchemeLoadError] = useState(null);
     const [schemeSaveState, setSchemeSaveState] = useState('idle');
@@ -1579,9 +1584,9 @@ const App = () => {
     const getPersistedIncomingScheme = () => {
         const publicScheme = serializePublicScheme(scheme);
         const layout = writeInstallationLayout(controllerType, installationPanelSize, installationItemOffsets);
-        if (layout) return { ...publicScheme, installation_layout: layout };
+        if (layout) return normalizeSchemeIds({ ...publicScheme, installation_layout: layout });
         const { installation_layout: removedInstallationLayout, ...schemeWithoutInstallationLayout } = publicScheme;
-        return schemeWithoutInstallationLayout;
+        return normalizeSchemeIds(schemeWithoutInstallationLayout);
     };
 
     useEffect(() => {
@@ -1696,13 +1701,15 @@ const App = () => {
                 if (!payload?.incoming_scheme || typeof payload.incoming_scheme !== 'object') {
                     throw new Error(`Scheme ${routeSchemeId} has invalid incoming_scheme`);
                 }
-                setScheme(buildSchemeFromIncoming(payload.incoming_scheme));
-                applyInstallationLayout(payload.incoming_scheme);
-                setSchemeJsonText(JSON.stringify(payload.incoming_scheme, null, 2));
+                const normalizedIncomingScheme = normalizeSchemeIds(payload.incoming_scheme);
+                setScheme(buildSchemeFromIncoming(normalizedIncomingScheme));
+                applyInstallationLayout(normalizedIncomingScheme);
+                setSchemeJsonText(JSON.stringify(normalizedIncomingScheme, null, 2));
                 setSchemeJsonDirty(false);
                 setSchemeJsonError(null);
                 setSchemeName(payload.name || `Scheme #${routeSchemeId}`);
                 setSchemeDescription(payload.description || '');
+                setSelectionConfig(payload.selection_config || null);
                 setOneWireSlotOffsets({});
                 setExtSlotOffsets({});
                 setDiSlotOffsets({});
@@ -1956,10 +1963,11 @@ const App = () => {
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
                 throw new Error('JSON должен быть объектом incomingScheme');
             }
-            const nextScheme = buildSchemeFromIncoming(parsed);
+            const normalizedIncomingScheme = normalizeSchemeIds(parsed);
+            const nextScheme = buildSchemeFromIncoming(normalizedIncomingScheme);
             setScheme(nextScheme);
-            applyInstallationLayout(parsed);
-            setSchemeJsonText(JSON.stringify(parsed, null, 2));
+            applyInstallationLayout(normalizedIncomingScheme);
+            setSchemeJsonText(JSON.stringify(normalizedIncomingScheme, null, 2));
             setSchemeJsonDirty(false);
             setSchemeJsonError(null);
             setUseInitialOneWireBalance(false);
@@ -2105,6 +2113,7 @@ const App = () => {
                 name: name.trim(),
                 description: `Копия схемы: ${schemeName}`,
                 incoming_scheme: getPersistedIncomingScheme(),
+                ...(selectionConfig ? { selection_config: selectionConfig } : {}),
             }),
         })
             .then((response) => {
@@ -4516,6 +4525,9 @@ const App = () => {
             {showOfferModal && (
                 <EquipmentOfferModal sections={schemeOfferSections} onClose={() => setShowOfferModal(false)} />
             )}
+            {showSelectionConfig && selectionConfig && (
+                <SelectionConfigModal config={selectionConfig} onClose={() => setShowSelectionConfig(false)} />
+            )}
             {showSettingsModal && (
                 <div className="scheme-settings-backdrop" onMouseDown={() => setShowSettingsModal(false)}>
                     <aside className="scheme-settings-sidebar" onMouseDown={(event) => event.stopPropagation()}>
@@ -4660,6 +4672,11 @@ const App = () => {
                 <button type="button" className="spa-offer-button" onClick={() => setShowOfferModal(true)}>
                     Коммерческое предложение
                 </button>
+                {selectionConfig && (
+                    <button type="button" className="spa-offer-button spa-selection-config-button" onClick={() => setShowSelectionConfig(true)}>
+                        Исходный подбор
+                    </button>
+                )}
             </div>
             {schemeLoadError && (
                 <div style={{ position: 'fixed', top: 72, right: 16, zIndex: 60, color: '#d32f2f', background: '#fff', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>

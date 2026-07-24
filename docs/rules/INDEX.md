@@ -46,6 +46,13 @@
 - Сбор и восстановление: `resources/js/scheme/domain/connectionAssignments.js`
 - Интеграция: `resources/js/scheme/publicSchemeSerializer.js`, `resources/js/scheme/domain/oneWireMaterializer.js`
 
+## Selection Config
+
+- Файл правил: `docs/rules/selection-config.md`
+- Формирование: `resources/js/scheme/domain/selectionConfig.js`, `resources/js/selection.jsx`
+- Просмотр: `resources/js/components/SelectionConfigModal.jsx`
+- Хранение: `schemes.selection_config`
+
 ## Full Source
 
 - Полный журнал: `JOURNAL.md`

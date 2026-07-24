@@ -1,164 +1,60 @@
 <?php
 
+use App\Http\Controllers\IntegrationController;
+use App\Http\Controllers\SchemeController;
 use App\Models\Scheme;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 
+// Редирект с главной страницы на страницу подбора оборудования.
 Route::redirect('/', '/selection');
+
+// Административная страница (тестовые данные).
 Route::view('/admin', 'admin', ['data' => 'test'])->name('admin');
 
-Route::get('/schemes', function (Request $request) {
-    $search = trim((string) $request->query('search', ''));
+// Страница со списком схем с возможностью поиска по названию.
+Route::get('/schemes', [SchemeController::class, 'index'])->name('schemes.index');
 
-    return view('schemes', [
-        'schemes' => Scheme::query()
-            ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"))
-            ->orderByDesc('updated_at')
-            ->orderByDesc('id')
-            ->paginate(20)
-            ->withQueryString(),
-        'search' => $search,
-    ]);
-})->name('schemes.index');
+// Массовое удаление схем по списку идентификаторов.
+Route::delete('/api/schemes', [SchemeController::class, 'destroyMany'])->name('schemes.destroy-many');
 
-Route::delete('/api/schemes', function (Request $request) {
-    $validated = $request->validate([
-        'ids' => ['required', 'array', 'min:1'],
-        'ids.*' => ['required', 'integer', 'distinct'],
-    ]);
+// Получить данные одной схемы в формате JSON.
+Route::get('/api/schemes/{scheme}', [SchemeController::class, 'show'])
+    ->whereNumber('scheme')
+    ->name('schemes.show');
 
-    $deleted = Scheme::query()->whereIn('id', $validated['ids'])->delete();
+// Создать новую схему.
+Route::post('/api/schemes', [SchemeController::class, 'store'])->name('schemes.store');
 
-    return response()->json(['deleted' => $deleted]);
-})->name('schemes.destroy-many');
+// Обновить существующую схему.
+Route::patch('/api/schemes/{scheme}', [SchemeController::class, 'update'])
+    ->whereNumber('scheme')
+    ->name('schemes.update');
 
-Route::get('/api/schemes/{scheme}', function (Scheme $scheme) {
-    return response()->json([
-        'id' => $scheme->id,
-        'name' => $scheme->name,
-        'description' => $scheme->description,
-        'user_id' => $scheme->user_id,
-        'version' => $scheme->version,
-        'system_device_id' => $scheme->system_device_id,
-        'incoming_scheme' => $scheme->incoming_scheme,
-    ]);
-})->whereNumber('scheme')->name('schemes.show');
+// Удалить одну схему.
+Route::delete('/api/schemes/{scheme}', [SchemeController::class, 'destroy'])
+    ->whereNumber('scheme')
+    ->name('schemes.destroy');
 
-Route::post('/api/schemes', function (Request $request) {
-    $validated = $request->validate([
-        'name' => ['required', 'string', 'max:255'],
-        'description' => ['nullable', 'string', 'max:65535'],
-        'incoming_scheme' => ['required', 'array'],
-    ]);
+// Проксирование запроса интеграции во внешний сервис mhtest.ru.
+Route::post('/api/integration', [IntegrationController::class, 'proxy'])->name('integration.proxy');
 
-    $scheme = Scheme::create([
-        'name' => $validated['name'],
-        'description' => $validated['description'] ?? null,
-        'user_id' => 1,
-        'incoming_scheme' => $validated['incoming_scheme'],
-    ]);
+// Поиск котлов по названию через внешний сервис интеграции.
+Route::post('/api/boilers/search', [IntegrationController::class, 'searchBoilers'])->name('boilers.search');
 
-    return response()->json([
-        'id' => $scheme->id,
-        'name' => $scheme->name,
-        'description' => $scheme->description,
-        'incoming_scheme' => $scheme->incoming_scheme,
-    ], 201);
-})->name('schemes.store');
-
-Route::patch('/api/schemes/{scheme}', function (Request $request, Scheme $scheme) {
-    $validated = $request->validate([
-        'name' => ['sometimes', 'required', 'string', 'max:255'],
-        'description' => ['sometimes', 'nullable', 'string', 'max:65535'],
-        'system_device_id' => ['sometimes', 'nullable', 'integer'],
-        'incoming_scheme' => ['sometimes', 'required', 'array'],
-    ]);
-
-    if (array_key_exists('name', $validated)) {
-        $scheme->name = $validated['name'];
-    }
-    if (array_key_exists('description', $validated)) {
-        $scheme->description = $validated['description'];
-    }
-    if (array_key_exists('system_device_id', $validated)) {
-        $scheme->system_device_id = $validated['system_device_id'];
-    }
-    if (array_key_exists('incoming_scheme', $validated)) {
-        $scheme->incoming_scheme = $validated['incoming_scheme'];
-    }
-    $scheme->save();
-
-    return response()->json([
-        'id' => $scheme->id,
-        'name' => $scheme->name,
-        'description' => $scheme->description,
-        'system_device_id' => $scheme->system_device_id,
-        'updated_at' => $scheme->updated_at?->format('Y-m-d H:i'),
-        'incoming_scheme' => $scheme->incoming_scheme,
-    ]);
-})->whereNumber('scheme')->name('schemes.update');
-
-Route::delete('/api/schemes/{scheme}', function (Scheme $scheme) {
-    $scheme->delete();
-
-    return response()->noContent();
-})->whereNumber('scheme')->name('schemes.destroy');
-
-$integrationHeaders = function (Request $request): array {
-    $headers = [
-        'Accept' => '*/*',
-        'Origin' => 'https://mhtest.ru',
-        'Referer' => 'https://mhtest.ru/podbor-oborudovaniya',
-    ];
-
-    if ($request->header('Cookie')) {
-        $headers['Cookie'] = $request->header('Cookie');
-    }
-
-    return $headers;
-};
-
-$proxyIntegration = function (Request $request) use ($integrationHeaders) {
-    $response = Http::withHeaders($integrationHeaders($request))
-        ->asJson()
-        ->timeout(10)
-        ->post('https://mhtest.ru/api/integration', $request->all());
-
-    return response($response->body(), $response->status())
-        ->header('Content-Type', 'application/json');
-};
-
-Route::post('/api/proxy/integration', $proxyIntegration)->name('proxy.integration');
-Route::post('/api/integration', $proxyIntegration)->name('integration.proxy');
-
-Route::post('/api/boilers/search', function (Request $request) use ($integrationHeaders) {
-    $validated = $request->validate([
-        'query' => ['required', 'string', 'max:255'],
-    ]);
-
-    $response = Http::withHeaders($integrationHeaders($request))
-        ->asJson()
-        ->timeout(10)
-        ->post('https://mhtest.ru/api/integration', [
-            'action' => 'getNames',
-            'data' => [
-                'name' => $validated['query'],
-            ],
-        ]);
-
-
-    return response($response->body(), $response->status())
-        ->header('Content-Type', 'application/json');
-})->name('boilers.search');
-
+// Страница SVG-редактора.
 Route::view('/svg-editor', 'svg-editor')->name('svg-editor');
 
+// Страница обучения.
 Route::view('/learning', 'learning')->name('learning');
 
+// Страницы подбора оборудования (текущая и старая версии).
 Route::view('/selection', 'selection')->name('selection');
 Route::view('/selection-old', 'selection-old')->name('selection-old');
+
+// SPA-страница для создания новой схемы.
 Route::view('/scheme', 'spa', ['scheme' => null])->name('scheme');
+
+// SPA-страница для редактирования существующей схемы по идентификатору.
 Route::get('/scheme/{scheme}', function (Scheme $scheme) {
     return view('spa', ['scheme' => $scheme]);
 })
