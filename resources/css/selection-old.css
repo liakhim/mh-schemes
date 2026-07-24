@@ -27,6 +27,7 @@
     display: inline-flex;
     align-items: center;
     line-height: 0;
+    text-decoration: none;
 }
 
 .old-shell-logo-badge img {

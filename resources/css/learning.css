@@ -61,6 +61,12 @@ body {
     flex: 0 0 auto;
 }
 
+.learning-navbar-logo-link {
+    display: block;
+    flex: 0 0 auto;
+    line-height: 0;
+}
+
 .learning-alpha-notice {
     display: flex;
     align-items: center;

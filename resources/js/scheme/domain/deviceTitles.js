@@ -44,6 +44,17 @@ const materializedDeviceNames = {
     stupid: 'Котёл',
 };
 
+export const getDeviceStoredTitle = (device) => {
+    const explicitTitle = device?.title || device?.titile;
+    if (typeof explicitTitle === 'string' && explicitTitle.trim()) return explicitTitle.trim();
+
+    const type = canonicalDeviceType(device?.type);
+    if ((type === 'smart' || type === 'stupid') && typeof device?.name === 'string' && device.name.trim()) {
+        return device.name.trim();
+    }
+    return null;
+};
+
 export const getWirelessDeviceTitle = (devices, device, index) => {
     const baseName = wirelessDeviceNames[device.type] || 'Беспроводное устройство';
     const systemNumber = devices

@@ -4,7 +4,7 @@ import Konva from 'konva';
 import { Circle as KonvaCircle, Group, Image, Layer, Rect, Stage, Text } from 'react-konva';
 import { din, incomingScheme, indent, module_height } from './constants';
 import { canonicalDeviceType } from './scheme/domain/deviceTypes';
-import { getWirelessDeviceTitle, getOneWireDeviceTitle } from './scheme/domain/deviceTitles';
+import { getDeviceStoredTitle, getWirelessDeviceTitle, getOneWireDeviceTitle } from './scheme/domain/deviceTitles';
 import { getInitialWirelessDevices, getOneWireDevicesFromScheme } from './scheme/domain/initialState';
 import { balanceOneWireDevices } from './scheme/domain/oneWireBalancer';
 import { materializeBalancedOneWireScheme } from './scheme/domain/oneWireMaterializer';
@@ -698,13 +698,6 @@ const shouldShowDiDeviceInfoBlock = (device) => (
     DI_WIRED_DEVICE_TYPES.includes(canonicalDeviceType(device?.type))
 );
 const isDiscreteDiDeviceType = (type) => DISCRETE_DI_DEVICE_TYPES.includes(canonicalDeviceType(type));
-const getDeviceStoredTitle = (device) => {
-    const type = canonicalDeviceType(device?.type);
-    if ((type === 'smart' || type === 'stupid') && typeof device?.name === 'string' && device.name.trim()) {
-        return device.name.trim();
-    }
-    return device?.title || device?.titile || null;
-};
 const INSTALLATION_DEVICE_TYPE_TITLES = {
     'boiler-pump': 'Насос бойлера',
     'pump-220v': 'Насос 220V',
@@ -4472,7 +4465,9 @@ const App = () => {
         <main className="spa-page">
             <nav className="spa-navbar">
                 <div className="spa-navbar-brand">
-                    <img src={logoPath} alt="MyHeat" className="spa-navbar-logo" />
+                    <a href="/" className="spa-navbar-logo-link" aria-label="MyHeat — главная">
+                        <img src={logoPath} alt="MyHeat" className="spa-navbar-logo" />
+                    </a>
                     <div className="spa-alpha-notice">
                         <span>Приложение находится <u>в стадии альфа-тестирования</u>, все вопросы к разработчику:</span>
                         <a href="https://t.me/mmingareev" target="_blank" rel="noreferrer">Telegram</a>

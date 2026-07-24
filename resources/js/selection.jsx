@@ -1851,23 +1851,19 @@ const getTemperatureSensorGroup = (template) => (template.target === 'wireless_d
 
 const getKitTemperatureSensorTemplateKey = (device, controllerType) => {
     const type = canonicalType(device?.type);
+    if (['ntc-sensor', 'mixing-ntc-sensor'].includes(type)) return 'wired-flask-ntc';
     if (controllerType === 'ecosmart' && [
-        'ntc-sensor',
-        'mixing-ntc-sensor',
         'flask-sensor-gvs-boiler',
         'flask-sensor-strategy',
     ].includes(type)) return 'wired-flask-ntc';
-    if (controllerType === 'pro') {
-        if (type === 'wall-digital-sensor') return 'wired-wall-digital';
-        if ([
-            'flask-sensor-temperature',
-            'flask-sensor-gvs-boiler',
-            'flask-sensor-strategy',
-            'flask-sensor-mixing-unit',
-            'flask-sensor-stupid-boiler',
-        ].includes(type)) return 'wired-flask-digital';
-    }
-    if ((controllerType === 'smart2' || controllerType === 'go') && type === 'wall-digital-sensor') return 'wired-wall-digital';
+    if ([
+        'flask-sensor-temperature',
+        'flask-sensor-gvs-boiler',
+        'flask-sensor-strategy',
+        'flask-sensor-mixing-unit',
+        'flask-sensor-stupid-boiler',
+    ].includes(type)) return 'wired-flask-digital';
+    if (type === 'wall-digital-sensor' && (controllerType === 'pro' || controllerType === 'smart2' || controllerType === 'go')) return 'wired-wall-digital';
     if (controllerType === 'go+' && type === 'wall-temperature-sensor') return 'wireless-wall';
     return null;
 };
@@ -1877,6 +1873,7 @@ const getKitTemperatureSensorLabel = (device) => {
     if (type === 'mixing-ntc-sensor') return 'NTC-датчик температуры';
     if (type === 'flask-sensor-gvs-boiler') return 'Датчик бойлера';
     if (type === 'flask-sensor-strategy') return 'Датчик стратегии котлов';
+    if (type === 'flask-sensor-mixing-unit') return 'Датчик смесительного узла';
     return getTemperatureSensorLabel(device);
 };
 
@@ -2549,7 +2546,7 @@ const getTemperatureSensorRows = (scheme, controllerType) => {
     });
     const extraRows = aggregateAddedItems(extraSensors.map(({ device, target }) => ({
         label: getKitTemperatureSensorLabel(device),
-        templateKey: getTemperatureSensorTemplateKey(device, controllerType) || getTemperatureSensorTemplateKey(device),
+        templateKey: getKitTemperatureSensorTemplateKey(device, controllerType) || getTemperatureSensorTemplateKey(device),
         removeKey: target ? { target, id: device.id } : null,
     })));
     const kitRows = kitTemperatureDevices.map((device) => ({
@@ -2773,6 +2770,7 @@ const RADIO_MODULE_ACTIVATION_LABEL = 'Активация радиомодуля
 
 const SelectionApp = () => {
     const [pendingDraft, setPendingDraft] = useState(readSelectionDraft);
+    const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
     const [incomingScheme, setIncomingScheme] = useState(createInitialSelectionScheme);
     const [showJsonDetails, setShowJsonDetails] = useState(false);
     const [wiredThermostatColor, setWiredThermostatColor] = useState('black');
@@ -3433,6 +3431,39 @@ const SelectionApp = () => {
                     </div>
                 </div>
             )}
+            {isResetConfirmOpen && (
+                <div className="selection-draft-backdrop">
+                    <div
+                        className="selection-draft-modal"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="selection-reset-title"
+                    >
+                        <h2 id="selection-reset-title">Сбросить схему</h2>
+                        <p>Сбросить всю схему? Все добавленные устройства будут удалены.</p>
+                        <div className="selection-draft-actions">
+                            <button
+                                type="button"
+                                className="selection-secondary-button"
+                                onClick={() => setIsResetConfirmOpen(false)}
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                type="button"
+                                className="selection-danger-button"
+                                autoFocus
+                                onClick={() => {
+                                    setIsResetConfirmOpen(false);
+                                    clearScheme();
+                                }}
+                            >
+                                Сбросить схему
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {controllerCompatibilityIssues.length > 0 && (
                 <div
                     style={{
@@ -3527,11 +3558,7 @@ const SelectionApp = () => {
                     <button
                         type="button"
                         className="selection-danger-button"
-                        onClick={() => {
-                            if (window.confirm('Сбросить всю схему? Все добавленные устройства будут удалены.')) {
-                                clearScheme();
-                            }
-                        }}
+                        onClick={() => setIsResetConfirmOpen(true)}
                         style={{
                             padding: '10px 16px',
                             border: '1px solid #dc2626',

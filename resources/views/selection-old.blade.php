@@ -18,9 +18,9 @@
 </head>
 <body class="old-shell">
     <header class="old-shell-nav">
-        <span class="old-shell-logo-badge">
+        <a class="old-shell-logo-badge" href="{{ route('home') }}" aria-label="MyHeat — главная">
             <img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat">
-        </span>
+        </a>
         <span class="old-shell-nav-title">Подбор оборудования</span>
     </header>
 

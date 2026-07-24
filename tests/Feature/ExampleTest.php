@@ -14,6 +14,12 @@ class ExampleTest extends TestCase
     {
         $response = $this->get('/');
 
-        $response->assertRedirect('/selection');
+        $response
+            ->assertOk()
+            ->assertViewIs('home')
+            ->assertSee('Подбор')
+            ->assertSee(route('schemes.index'), false)
+            ->assertSee(route('learning'), false)
+            ->assertSee(route('admin'), false);
     }
 }

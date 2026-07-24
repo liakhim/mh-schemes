@@ -142,7 +142,7 @@
 
         .table-wrap {
             flex: 1 1 auto;
-            overflow-x: auto;
+            overflow-x: hidden;
             border: 1px solid #d7dbe4;
             border-radius: 10px;
             background: #fff;
@@ -151,9 +151,20 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 900px;
+            min-width: 0;
+            table-layout: auto;
             font-size: 14px;
         }
+
+        .scheme-col-select { width: 4%; }
+        .scheme-col-id { width: 5%; }
+        .scheme-col-controller { width: 9%; }
+        .scheme-col-name { width: 26%; }
+        .scheme-col-user { width: 7%; }
+        .scheme-col-version { width: 7%; }
+        .scheme-col-system { width: 11%; }
+        .scheme-col-updated { width: 11%; }
+        .scheme-col-actions { width: 1%; }
 
         th,
         td {
@@ -168,7 +179,13 @@
             background: #f8fafc;
             color: #475569;
             font-weight: 700;
+            line-height: 1.25;
+            text-align: left;
             white-space: nowrap;
+        }
+
+        td {
+            overflow-wrap: anywhere;
         }
 
         tr:last-child td {
@@ -189,6 +206,10 @@
 
         .name {
             font-weight: 700;
+        }
+
+        .scheme-name-value {
+            overflow-wrap: anywhere;
         }
 
         .description {
@@ -240,7 +261,12 @@
             display: flex;
             flex-wrap: nowrap;
             align-items: center;
+            justify-content: flex-end;
             gap: 4px;
+        }
+
+        td:last-child {
+            text-align: right;
             white-space: nowrap;
         }
 
@@ -468,7 +494,7 @@
             background: #f1f5f9;
         }
 
-        @media (max-width: 700px) {
+        @media (max-width: 900px) {
             .page {
                 padding: 18px 12px;
             }
@@ -547,7 +573,6 @@
                 max-width: none;
             }
             .row-actions {
-                overflow-x: auto;
                 padding-bottom: 2px;
             }
             .controller-grid {
@@ -559,7 +584,9 @@
 <body>
     <nav class="spa-navbar">
         <div class="spa-navbar-brand">
-            <img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat" class="spa-navbar-logo">
+            <a href="{{ route('home') }}" class="spa-navbar-logo-link" aria-label="MyHeat — главная">
+                <img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat" class="spa-navbar-logo">
+            </a>
             <div class="spa-alpha-notice">
                 <span>Приложение находится <u>в стадии альфа-тестирования</u>, все вопросы к разработчику:</span>
                 <a href="https://t.me/mmingareev" target="_blank" rel="noreferrer">Telegram</a>
@@ -591,6 +618,17 @@
                 <div class="empty">Сохраненных схем пока нет.</div>
             @else
                 <table>
+                    <colgroup>
+                        <col class="scheme-col-select">
+                        <col class="scheme-col-id">
+                        <col class="scheme-col-controller">
+                        <col class="scheme-col-name">
+                        <col class="scheme-col-user">
+                        <col class="scheme-col-version">
+                        <col class="scheme-col-system">
+                        <col class="scheme-col-updated">
+                        <col class="scheme-col-actions">
+                    </colgroup>
                     <thead>
                          <tr>
                              <th><input class="scheme-select" id="selectAllSchemes" type="checkbox" aria-label="Выбрать все схемы"></th>
@@ -599,7 +637,7 @@
                              <th>Название</th>
                             <th>User ID</th>
                             <th>Версия</th>
-                            <th>System Device ID</th>
+                             <th>Device ID</th>
                             <th>Обновлена</th>
                             <th>Действия</th>
                         </tr>
@@ -637,25 +675,29 @@
                                 </td>
                                 <td data-label="User ID">{{ $scheme->user_id ?? '—' }}</td>
                                 <td data-label="Версия">{{ $scheme->version }}</td>
-                                <td data-label="System Device ID">
+                                <td data-label="Device ID">
                                     <span class="system-device-value">{{ $scheme->system_device_id ?? '—' }}</span>
                                 </td>
                                 <td class="updated" data-label="Обновлена">{{ optional($scheme->updated_at)->format('Y-m-d H:i') }}</td>
                                   <td data-label="Действия"><div class="row-actions">
                                       <a class="button compact info" href="{{ route('scheme.with-id', ['scheme' => $scheme]) }}" target="_blank">Открыть</a>
-                                      <button
-                                          class="button compact edit-scheme-button"
+                                       <button
+                                           class="button compact edit-scheme-button"
+                                           type="button"
+                                           aria-label="Изменить схему"
+                                           title="Изменить"
+                                           data-name="{{ $scheme->name }}"
+                                           data-description="{{ $scheme->description }}"
+                                           data-system-device-id="{{ $scheme->system_device_id }}"
+                                       ><span class="scheme-settings-icon" aria-hidden="true"></span></button>
+                                       <button
+                                           class="button compact danger delete-scheme-button"
                                           type="button"
+                                          aria-label="Удалить схему"
+                                          title="Удалить"
+                                          data-url="{{ route('schemes.destroy', ['scheme' => $scheme]) }}"
                                           data-name="{{ $scheme->name }}"
-                                          data-description="{{ $scheme->description }}"
-                                          data-system-device-id="{{ $scheme->system_device_id }}"
-                                      >Изменить</button>
-                                      <button
-                                          class="button compact danger delete-scheme-button"
-                                         type="button"
-                                         data-url="{{ route('schemes.destroy', ['scheme' => $scheme]) }}"
-                                         data-name="{{ $scheme->name }}"
-                                      >Удалить</button>
+                                       ><span class="scheme-trash-icon" aria-hidden="true"></span></button>
                                   </div></td>
                             </tr>
                         @endforeach

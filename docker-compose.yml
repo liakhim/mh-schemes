@@ -8,15 +8,6 @@ services:
     volumes:
       - ./:/var/www
     environment:
-      APP_ENV: local
-      APP_DEBUG: "true"
-      APP_URL: http://localhost:8099
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: schemes_db
-      DB_USERNAME: schemes_user
-      DB_PASSWORD: schemes_pass
       SUPERUSER_PASSWORD: superuser123
       VIEW_COMPILED_PATH: /tmp/laravel/framework/views
     depends_on:

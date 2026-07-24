@@ -5,8 +5,8 @@ use App\Http\Controllers\SchemeController;
 use App\Models\Scheme;
 use Illuminate\Support\Facades\Route;
 
-// Редирект с главной страницы на страницу подбора оборудования.
-Route::redirect('/', '/selection');
+// Главная страница с навигацией по сервисам.
+Route::view('/', 'home')->name('home');
 
 // Административная страница (тестовые данные).
 Route::view('/admin', 'admin', ['data' => 'test'])->name('admin');

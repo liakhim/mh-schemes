@@ -53,6 +53,36 @@ test('ECOsmart assigns mixing sensors only for servos that were placed', () => {
     assert.deepEqual(materializeBalancedOneWireScheme(result), result);
 });
 
+test('PRO places a linked GVS boiler sensor on one-wire instead of treating it as mixing', () => {
+    const result = materializeBalancedOneWireScheme({
+        controller: { type: 'pro', relay_devices: [], relay_s_devices: [], one_wire_devices: [] },
+        ext_modules: [],
+        wired_devices: [{
+            id: 'gvs-pump',
+            type: 'boiler-pump',
+            device_type: 'equipment',
+            connection_type: 'relay|relay-s',
+            mixing_unit_id: 'gvs-1',
+            _group: 'gvs',
+        }],
+        sensors: [{
+            id: 'gvs-sensor',
+            type: 'flask-sensor-gvs-boiler',
+            device_type: 'sensor',
+            connection_type: '1-wire|ntc',
+            mixing_unit_id: 'gvs-1',
+            _group: 'gvs',
+        }],
+        one_wire_modules: [{ id: 'ntc-module', type: 'ntc-1-wire', connection_type: '1-wire' }],
+    });
+
+    assert.equal(
+        result.controller.one_wire_devices.some((device) => device.id === 'gvs-sensor'),
+        true,
+    );
+    assert.equal(result.sensors.some((device) => device.id === 'gvs-sensor'), false);
+});
+
 test('returns controller 1-wire overflow to its public source without losses', () => {
     const sensors = Array.from({ length: 7 }, (_, index) => ({
         id: `digital-${index + 1}`,

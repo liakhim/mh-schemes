@@ -77,10 +77,6 @@ const SelectionConfigModal = ({ config, onClose }) => {
 
                 <div className="selection-config-intent">
                     <div>
-                        <span>Запрошенный контроллер</span>
-                        <strong>{CONTROLLER_LABELS[intent.requested_controller_type] || intent.requested_controller_type || 'Не указан'}</strong>
-                    </div>
-                    <div>
                         <span>Итоговый контроллер</span>
                         <strong>{CONTROLLER_LABELS[intent.resolved_controller_type] || intent.resolved_controller_type || 'Не указан'}</strong>
                         <small>{SOURCE_LABELS[intent.controller_selection_source] || intent.controller_selection_source}</small>

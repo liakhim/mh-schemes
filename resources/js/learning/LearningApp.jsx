@@ -26,7 +26,9 @@ const formatElapsed = (totalSeconds) => {
 const LearningNavbar = () => (
     <nav className="learning-navbar">
         <div className="learning-navbar-brand">
-            <img src={logoPath} alt="MyHeat" className="learning-navbar-logo" />
+            <a href="/" className="learning-navbar-logo-link" aria-label="MyHeat — главная">
+                <img src={logoPath} alt="MyHeat" className="learning-navbar-logo" />
+            </a>
             <div className="learning-alpha-notice">
                 <span>Приложение находится <u>в стадии альфа-тестирования</u>, все вопросы к разработчику:</span>
                 <a href="https://t.me/mmingareev" target="_blank" rel="noreferrer">Telegram</a>
