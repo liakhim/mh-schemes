@@ -5,7 +5,9 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "test:js": "node --test resources/js/scheme/domain/*.test.js resources/js/scheme/publicSchemeSerializer.test.js resources/js/selectionMixedIoCapacity.unique.test.js"
+        "test:js": "node --test resources/js/scheme/domain/*.test.js resources/js/scheme/publicSchemeSerializer.test.js resources/js/selectionMixedIoCapacity.unique.test.js",
+        "test:e2e": "playwright test",
+        "test:e2e:headed": "playwright test --headed --workers=1"
     },
     "dependencies": {
         "jspdf": "^3.0.3",
@@ -15,6 +17,7 @@
         "react-konva": "^19.0.7"
     },
     "devDependencies": {
+        "@playwright/test": "^1.62.0",
         "@vitejs/plugin-react": "^5.0.4",
         "concurrently": "^9.0.1",
         "laravel-vite-plugin": "^3.0.0",

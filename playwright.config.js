@@ -1,0 +1,19 @@
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+    testDir: './playwright-tests',
+    fullyParallel: true,
+    retries: 2,
+    timeout: 60_000,
+    reporter: 'list',
+    use: {
+        trace: 'on-first-retry',
+        navigationTimeout: 45_000,
+    },
+    projects: [
+        {
+            name: 'chromium',
+            use: { ...devices['Desktop Chrome'] },
+        },
+    ],
+});
