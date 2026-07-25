@@ -13,6 +13,9 @@
 }
 
 .old-shell-nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
     background: #1b1b1b;
     padding: 14px 24px;
     display: flex;

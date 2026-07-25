@@ -36,6 +36,9 @@ body {
 /* Mirrors the .spa-navbar header used on the Schemes page (logo + alpha-test notice), kept as
    its own copy here since the learning page doesn't load app.css. */
 .learning-navbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
     flex: 0 0 auto;
     display: flex;
     align-items: center;
