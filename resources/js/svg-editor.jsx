@@ -171,7 +171,7 @@ function cleanExportMarkup(svgEl) {
     return new XMLSerializer().serializeToString(clone);
 }
 
-function TreeNode({ node, selectedSeid, onSelect, depth }) {
+const TreeNode = React.memo(function TreeNode({ node, selectedSeid, onSelect, depth }) {
     const el = node.el;
     const classes = getClassList(el);
     const idAttr = el.getAttribute('id');
@@ -194,7 +194,7 @@ function TreeNode({ node, selectedSeid, onSelect, depth }) {
             ))}
         </div>
     );
-}
+});
 
 function ClassEditor({ el, onChange }) {
     const [newClass, setNewClass] = useState('');
@@ -709,7 +709,21 @@ function SvgEditorApp() {
         if (target) target.removeAttribute('data-svg-editor-hover');
     }, []);
 
-    const bumpEdit = useCallback(() => setEditVersion((v) => v + 1), []);
+    const bumpEditTimerRef = useRef(null);
+    const bumpEdit = useCallback(() => {
+        if (bumpEditTimerRef.current !== null) return;
+        bumpEditTimerRef.current = setTimeout(() => {
+            bumpEditTimerRef.current = null;
+            setEditVersion((v) => v + 1);
+        }, 150);
+    }, []);
+
+    useEffect(
+        () => () => {
+            if (bumpEditTimerRef.current !== null) clearTimeout(bumpEditTimerRef.current);
+        },
+        []
+    );
 
     const selectedNode = selectedSeid !== null ? seidMapRef.current.get(selectedSeid) : null;
     const selectedEl = selectedNode ? selectedNode.el : null;

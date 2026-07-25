@@ -31,15 +31,37 @@
                 <span class="home-service-index">01</span>
                 <span class="home-service-copy">
                     <small>Начать проект</small>
-                    <strong>Подбор</strong>
+                    <strong>Подбор оборудования 2.0</strong>
                     <span>Соберите конфигурацию системы и автоматически подберите контроллер и модули.</span>
                 </span>
                 <span class="home-service-arrow" aria-hidden="true"></span>
                 <img src="{{ Vite::asset('resources/assets/controllers/go+/go+.svg') }}" alt="" aria-hidden="true">
             </a>
 
-            <a class="home-service home-service-schemes" href="{{ route('schemes.index') }}">
+            <a class="home-service home-service-selection-old" href="https://mhtest.ru/podbor-oborudovaniya" target="_blank" rel="noreferrer">
                 <span class="home-service-index">02</span>
+                <span class="home-service-copy">
+                    <small>Предыдущая версия</small>
+                    <strong>Подбор оборудования v1.0</strong>
+                    <span>Классический интерфейс подбора конфигурации для уже привычных сценариев.</span>
+                </span>
+                <span class="home-service-arrow" aria-hidden="true"></span>
+                <img src="{{ Vite::asset('resources/assets/controllers/go/go.svg') }}" alt="" aria-hidden="true">
+            </a>
+
+            <a class="home-service home-service-svg-editor" href="{{ route('svg-editor') }}">
+                <span class="home-service-index">03</span>
+                <span class="home-service-copy">
+                    <small>Графический инструмент</small>
+                    <strong>SVG-редактор</strong>
+                    <span>Редактируйте SVG-изображения оборудования, используемые в схемах.</span>
+                </span>
+                <span class="home-service-arrow" aria-hidden="true"></span>
+                <img src="{{ Vite::asset('resources/assets/icons/settings.svg') }}" alt="" aria-hidden="true">
+            </a>
+
+            <a class="home-service home-service-schemes" href="{{ route('schemes.index') }}">
+                <span class="home-service-index">04</span>
                 <span class="home-service-copy">
                     <small>Рабочее пространство</small>
                     <strong>Список схем</strong>
@@ -50,7 +72,7 @@
             </a>
 
             <a class="home-service home-service-learning" href="{{ route('learning') }}">
-                <span class="home-service-index">03</span>
+                <span class="home-service-index">05</span>
                 <span class="home-service-copy">
                     <small>Практика подключения</small>
                     <strong>Обучение</strong>
@@ -61,7 +83,7 @@
             </a>
 
             <a class="home-service home-service-equipment" href="{{ route('admin') }}">
-                <span class="home-service-index">04</span>
+                <span class="home-service-index">06</span>
                 <span class="home-service-copy">
                     <small>Технический справочник</small>
                     <strong>Список оборудования</strong>

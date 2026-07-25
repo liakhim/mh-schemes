@@ -1857,6 +1857,8 @@ const getKitTemperatureSensorTemplateKey = (device, controllerType) => {
         'flask-sensor-strategy',
     ].includes(type)) return 'wired-flask-ntc';
     if ([
+        'flask-sensor-floor',
+        'floor-sensor',
         'flask-sensor-temperature',
         'flask-sensor-gvs-boiler',
         'flask-sensor-strategy',
@@ -1870,6 +1872,7 @@ const getKitTemperatureSensorTemplateKey = (device, controllerType) => {
 
 const getKitTemperatureSensorLabel = (device) => {
     const type = canonicalType(device?.type);
+    if (type === 'flask-sensor-floor' || type === 'floor-sensor') return 'Цифровой датчик температуры в колбе';
     if (type === 'mixing-ntc-sensor') return 'NTC-датчик температуры';
     if (type === 'flask-sensor-gvs-boiler') return 'Датчик бойлера';
     if (type === 'flask-sensor-strategy') return 'Датчик стратегии котлов';
@@ -2530,6 +2533,7 @@ const getTemperatureSensorRows = (scheme, controllerType) => {
         .filter((device) => isTemperatureSensor(device) || isKitTemperatureSensor(device))
         .map((device) => ({ device, target: 'sensors' }));
     const embeddedTemperatureSensors = (Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [])
+        .concat(Array.isArray(scheme?.wireless_devices) ? scheme.wireless_devices : [])
         .flatMap((device) => (Array.isArray(device?.additions) ? device.additions : []))
         .filter(isKitTemperatureSensor)
         .map((device) => ({ device, target: null }));

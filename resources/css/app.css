@@ -247,6 +247,14 @@ body {
     transform: translateY(-50%) rotate(-1deg) scale(1.03);
 }
 
+.home-service-selection-old {
+    --service-accent: #b45309;
+}
+
+.home-service-svg-editor {
+    --service-accent: #0d9488;
+}
+
 .home-service-schemes {
     --service-accent: #2563eb;
 }
