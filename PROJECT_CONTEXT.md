@@ -54,6 +54,8 @@
 - Power: `docs/rules/power.md`
 - EXT/DI/channel: `docs/rules/ext-di.md`
 - Controllers: `docs/rules/controllers.md`
+- Connection Layout: `docs/rules/connection-layout.md`
+- Selection Config: `docs/rules/selection-config.md`
 - Полный changelog: `JOURNAL.md`, раздел `Change log правил`
 
 ## Проверки

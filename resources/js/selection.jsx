@@ -1603,11 +1603,12 @@ const reconcileRequiredModules = (scheme) => {
  * @param {boolean} upsRequested Пользовательское требование UPS.
  * @returns {object} Готовая согласованная схема.
  */
-const resolveControllerAndRequiredModules = (scheme, upsRequested = false) => {
+const resolveControllerAndRequiredModules = (scheme, upsRequested = false, isManualControllerSelection = false) => {
     const initialControllerType = getControllerType(scheme);
     const preferredGoControllerType = getPreferredGoControllerType(scheme, upsRequested);
     if (
-        (initialControllerType === 'go' || initialControllerType === 'go+')
+        !isManualControllerSelection
+        && (initialControllerType === 'go' || initialControllerType === 'go+')
         && initialControllerType !== preferredGoControllerType
     ) {
         scheme = withControllerValue(scheme, getControllerTemplateValue(preferredGoControllerType));
@@ -2795,6 +2796,7 @@ const SelectionApp = () => {
     const [controllerSelectionSource, setControllerSelectionSource] = useState('default');
     const upsRequestedRef = useRef(false);
     const upsRequestSourceRef = useRef(null);
+    const controllerSelectionSourceRef = useRef('default');
     const controllerWrapRef = useRef(null);
     const controllerCardRefs = useRef([]);
     const stickyTopRef = useRef(null);
@@ -2805,6 +2807,7 @@ const SelectionApp = () => {
         upsRequestedRef.current = false;
         setUpsRequested(false);
         setRequestedControllerType('go');
+        controllerSelectionSourceRef.current = 'default';
         setControllerSelectionSource('default');
         setIncomingScheme(createInitialSelectionScheme());
         setWiredThermostatColor('black');
@@ -2827,7 +2830,8 @@ const SelectionApp = () => {
         upsRequestedRef.current = requested;
         setUpsRequested(requested);
         setRequestedControllerType(pendingDraft.requestedControllerType || getControllerType(pendingDraft.incomingScheme));
-        setControllerSelectionSource(pendingDraft.controllerSelectionSource === 'manual' ? 'manual' : 'default');
+        controllerSelectionSourceRef.current = pendingDraft.controllerSelectionSource === 'manual' ? 'manual' : 'default';
+        setControllerSelectionSource(controllerSelectionSourceRef.current);
         setIncomingScheme(pendingDraft.incomingScheme);
         setWiredThermostatColor(editor.wiredThermostatColor || 'black');
         setWiredThermostatHasFloorSensor(editor.wiredThermostatHasFloorSensor === true);
@@ -2838,7 +2842,11 @@ const SelectionApp = () => {
         setPendingDraft(null);
     }, [pendingDraft]);
     const resolveSelectionScheme = useCallback(
-        (scheme, requested = upsRequestedRef.current) => resolveControllerAndRequiredModules(scheme, requested),
+        (scheme, requested = upsRequestedRef.current) => resolveControllerAndRequiredModules(
+            scheme,
+            requested,
+            controllerSelectionSourceRef.current === 'manual',
+        ),
         [],
     );
     const controllerCompatibilityIssues = useMemo(
@@ -3303,6 +3311,7 @@ const SelectionApp = () => {
     const setController = useCallback((controllerValue) => {
         const targetControllerType = canonicalType(controllerValue?.type);
         setRequestedControllerType(targetControllerType);
+        controllerSelectionSourceRef.current = 'manual';
         setControllerSelectionSource('manual');
         let requested = upsRequestedRef.current;
         if (targetControllerType === 'go+') {

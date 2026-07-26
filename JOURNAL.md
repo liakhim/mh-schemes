@@ -192,18 +192,7 @@
 
 ## Базовая структура схемы
 
-```js
-const incomingScheme = {
-    controller: '',        // go, go+, smart2, ecosmart, pro
-    ext_modules: [
-        // { id?, type: 'bl2 | rl6 | rl6s | io4 | di6', device_type: 'module', connection_type: 'EXT', one_wire_devices? }
-    ],
-    di_modules: [],
-    one_wire_modules: [],
-    power_modules: ['circuit-breaker', 'power-unit'],
-    wifi_modules: []
-};
-```
+> Актуальная форма `incomingScheme` и все поля контракта: `INCOMING_SCHEME.md`, раздел "Общая структура". Здесь она не дублируется, чтобы не расходиться с контрактом при его изменениях.
 
 ## Запорный клапан
 
@@ -826,22 +815,7 @@ const incomingScheme = {
 
 ## Контракт входных данных (актуальный)
 
-```js
-const incomingScheme = {
-    controller: 'go | go+ | smart2 | ecosmart | pro',
-    wireless_devices: [
-        // { id?, type, color?, additions? }
-    ],
-    wired_devices: [
-        // используется минимум для type=thermostat в 1-wire линии
-    ],
-    ext_modules: [],
-    di_modules: [],
-    one_wire_modules: [], // поддерживается alias rdt -> rdt2
-    power_modules: ['circuit-breaker', 'power-unit'],
-    wifi_modules: []
-};
-```
+> Актуальная форма `incomingScheme` и все поля контракта: `INCOMING_SCHEME.md`, раздел "Общая структура". Здесь она не дублируется, чтобы не расходиться с контрактом при его изменениях.
 
 ### Нормализация и alias
 

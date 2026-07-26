@@ -26,6 +26,8 @@ After startup:
 - Short project context: `PROJECT_CONTEXT.md`
 - Full rules journal: `JOURNAL.md`
 - Rule index: `docs/rules/INDEX.md`
+- Connection layout rules: `docs/rules/connection-layout.md`
+- Selection config rules: `docs/rules/selection-config.md`
 - Domain materialization pipeline: `resources/js/scheme/domain/oneWireMaterializer.js`
 - Beget deploy notes: `docs/deploy/beget.md`
 
