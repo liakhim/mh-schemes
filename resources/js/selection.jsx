@@ -1857,9 +1857,13 @@ const getKitTemperatureSensorTemplateKey = (device, controllerType) => {
         'flask-sensor-gvs-boiler',
         'flask-sensor-strategy',
     ].includes(type)) return 'wired-flask-ntc';
+    // Датчик пола термостата — отдельная позиция каталога (короткая гильза,
+    // провод 3 м, код 6304), а не обычный flask-sensor (код 6286): комплектный
+    // датчик, идущий в комплекте с контроллером, физически непригоден для
+    // установки в стяжку пола, поэтому у него свой templateKey и он никогда
+    // не должен закрываться квотой комплектных датчиков.
+    if (['flask-sensor-floor', 'floor-sensor'].includes(type)) return 'wired-flask-floor';
     if ([
-        'flask-sensor-floor',
-        'floor-sensor',
         'flask-sensor-temperature',
         'flask-sensor-gvs-boiler',
         'flask-sensor-strategy',
@@ -1873,7 +1877,7 @@ const getKitTemperatureSensorTemplateKey = (device, controllerType) => {
 
 const getKitTemperatureSensorLabel = (device) => {
     const type = canonicalType(device?.type);
-    if (type === 'flask-sensor-floor' || type === 'floor-sensor') return 'Цифровой датчик температуры в колбе';
+    if (type === 'flask-sensor-floor' || type === 'floor-sensor') return 'Датчик пола (в колбе, 3 м)';
     if (type === 'mixing-ntc-sensor') return 'NTC-датчик температуры';
     if (type === 'flask-sensor-gvs-boiler') return 'Датчик бойлера';
     if (type === 'flask-sensor-strategy') return 'Датчик стратегии котлов';
@@ -2763,6 +2767,7 @@ const MYHEAT_PRICES = {
         'wired-wall-digital': 1650, // Датчик температуры настенный проводной
         'wired-flask-digital': 1450, // Датчик температуры в колбе проводной
         'wired-flask-ntc': 3190, // Датчик температуры в колбе NTC 10K
+        'wired-flask-floor': 3690, // Датчик температуры в колбе MyHeat (3 метра), код 6304 — датчик пола для термостата
     },
     thermostat: 9490, // Комнатный термостат MyHeat
     pressureSensor: 5990, // Датчик давления 4-20мА
@@ -3465,6 +3470,7 @@ const SelectionApp = () => {
                             <button
                                 type="button"
                                 className="selection-danger-button"
+                                data-test-id="reset-equipment-confirm"
                                 autoFocus
                                 onClick={() => {
                                     setIsResetConfirmOpen(false);
@@ -3537,6 +3543,7 @@ const SelectionApp = () => {
                     <button
                         type="button"
                         className="selection-secondary-button"
+                        data-test-id="open-commercial-offer"
                         onClick={() => setIsOfferModalOpen(true)}
                         style={{
                             padding: '10px 16px',
@@ -3571,6 +3578,7 @@ const SelectionApp = () => {
                     <button
                         type="button"
                         className="selection-danger-button"
+                        data-test-id="reset-equipment"
                         onClick={() => setIsResetConfirmOpen(true)}
                         style={{
                             padding: '10px 16px',
@@ -3711,6 +3719,8 @@ const SelectionApp = () => {
                                 <div
                                     key={index}
                                     ref={(el) => { controllerCardRefs.current[index] = el; }}
+                                    data-test-id={`controller-card-${controllerTypeValue}`}
+                                    data-active={isActive}
                                     onClick={isCompatible ? () => setController(item.value) : undefined}
                                     aria-disabled={!isCompatible}
                                     title={isCompatible ? undefined : 'Этот контроллер не поддерживает текущую конфигурацию'}
@@ -4016,6 +4026,7 @@ const SelectionApp = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                 <button
                                     onClick={() => addMixingUnit(item, 'gvs')}
+                                    data-test-id="add-gvs-boiler"
                                     style={{
                                         padding: '6px 14px',
                                         border: '1px solid #3498db',
@@ -4185,6 +4196,7 @@ const SelectionApp = () => {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                     <button
                                         onClick={() => addMixingUnit(item, 'zone')}
+                                        data-test-id="add-zone"
                                         style={{
                                             padding: '6px 14px',
                                             border: '1px solid #3498db',
@@ -4244,6 +4256,7 @@ const SelectionApp = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                 <button
                                     onClick={() => addMixingUnit(item, 'other')}
+                                    data-test-id="add-other-equipment"
                                     style={{
                                         padding: '6px 14px',
                                         border: '1px solid #3498db',
@@ -4422,6 +4435,7 @@ const SelectionApp = () => {
                                 <button
                                     onClick={() => addLeakItem(item)}
                                     disabled={isUnifiedLeakLimitReached}
+                                    data-test-id={`add-${canonicalType(item.data.type)}`}
                                     style={{
                                         padding: '6px 14px',
                                         border: `1px solid ${isUnifiedLeakLimitReached ? '#cbd5e1' : '#3498db'}`,
@@ -4534,6 +4548,7 @@ const SelectionApp = () => {
                             </span>
                             <input
                                 type="checkbox"
+                                data-test-id="ups-toggle"
                                 checked={upsRequested}
                                 onChange={(event) => setUpsIntent(event.target.checked)}
                             />

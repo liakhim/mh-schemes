@@ -7,6 +7,8 @@ export default defineConfig({
     timeout: 60_000,
     reporter: 'list',
     use: {
+        baseURL: process.env.BASE_URL || 'http://localhost:8099',
+        testIdAttribute: 'data-test-id',
         trace: 'on-first-retry',
         navigationTimeout: 45_000,
     },
