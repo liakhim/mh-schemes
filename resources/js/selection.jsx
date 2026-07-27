@@ -3037,6 +3037,25 @@ const SelectionApp = () => {
         };
     }, []);
 
+    // Держит --sel-sticky-height в актуальном состоянии: высота липкой шапки
+    // меняется, когда появляется панель «Подобранный контроллер», а боковая
+    // навигация прилипает именно под шапку и должна следовать за этой высотой.
+    useEffect(() => {
+        const sticky = stickyTopRef.current;
+        if (!sticky) return undefined;
+        const applyHeight = () => {
+            const height = Math.round(sticky.getBoundingClientRect().height);
+            document.documentElement.style.setProperty('--sel-sticky-height', `${height}px`);
+        };
+        applyHeight();
+        const observer = new ResizeObserver(applyHeight);
+        observer.observe(sticky);
+        return () => {
+            observer.disconnect();
+            document.documentElement.style.removeProperty('--sel-sticky-height');
+        };
+    }, []);
+
     // После паузы во вводе ищет котлы по текущему запросу;
     // cleanup отменяет debounce и предыдущий HTTP-запрос при изменении строки.
     useEffect(() => {
@@ -3595,7 +3614,6 @@ const SelectionApp = () => {
                     </button>
                 </div>
             </div>
-            <SelectionQuickNav />
             {isControllerBarStuck && (
                 <div className="sel-stuck-controllers-panel">
                 <div className="sel-stuck-controllers-title" style={{ paddingTop: 10, fontSize: 13, fontWeight: 700, color: '#475569' }}>Подобранный контроллер</div>
@@ -3704,6 +3722,12 @@ const SelectionApp = () => {
             {isOfferModalOpen && (
                 <EquipmentOfferModal sections={equipmentOfferSections} onClose={() => setIsOfferModalOpen(false)} />
             )}
+
+            <div className="sel-layout">
+            <aside className="sel-side-nav">
+                <SelectionQuickNav />
+            </aside>
+            <div className="sel-layout-content">
 
             <div className="sel-group-label" id="chapter-controller">Контроллер</div>
             <section style={{ marginBottom: 32 }}>
@@ -4559,6 +4583,8 @@ const SelectionApp = () => {
 
             </section>
             </div>{/* /Питание */}
+            </div>{/* /sel-layout-content */}
+            </div>{/* /sel-layout */}
 
             {showJsonDetails && (
                 <div
