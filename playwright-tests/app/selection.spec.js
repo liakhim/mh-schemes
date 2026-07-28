@@ -17,9 +17,11 @@ test.describe('/selection — подбор оборудования', () => { //
     });
 
     test('добавление 5 зон отражается в коммерческом предложении', async ({ page }) => {
-        const addZoneButton = page.getByTestId('add-zone'); // кнопка "Добавить" в карточке "Зона"
-        for (let i = 0; i < 5; i += 1) { // кликаем 5 раз подряд
-            await addZoneButton.click(); // каждый клик добавляет одно устройство zoneServo в схему
+        // Первая зона добавляется большой кнопкой; после этого она исчезает,
+        // и количество набирается "+" в списке "Добавленные зоны".
+        await page.getByTestId('add-zone').click(); // добавляет устройство zoneServo в схему
+        for (let i = 1; i < 5; i += 1) { // добираем до 5
+            await page.getByTestId('zone-qty-inc').click();
         }
 
         // 5 зон (relay | relay-s) превышают релейную ёмкость go/go+ (1 слот) и требуют
@@ -111,9 +113,11 @@ test.describe('/selection — подбор оборудования', () => { //
     });
 
     test('добавление 5 бойлеров ГВС отражается в коммерческом предложении', async ({ page }) => {
-        const addGvsButton = page.getByTestId('add-gvs-boiler'); // кнопка "Добавить" в карточке "Бойлер ГВС"
-        for (let i = 0; i < 5; i += 1) { // кликаем 5 раз подряд
-            await addGvsButton.click(); // каждый клик добавляет boilerPump (relay|relay-s) + датчик flask-sensor-gvs-boiler
+        // Первый бойлер добавляется большой кнопкой; после этого она исчезает,
+        // и количество набирается "+" в списке "Добавленные бойлеры ГВС".
+        await page.getByTestId('add-gvs-boiler').click(); // boilerPump (relay|relay-s) + датчик flask-sensor-gvs-boiler
+        for (let i = 1; i < 5; i += 1) { // добираем до 5
+            await page.getByTestId('gvs-qty-inc').click();
         }
 
         // 5 насосов relay|relay-s так же превышают релейную ёмкость go/go+ (1 слот)

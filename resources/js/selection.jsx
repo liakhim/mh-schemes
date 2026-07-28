@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import EquipmentOfferModal from './components/EquipmentOfferModal';
 import { getAllOneWireDevicesForBalancing } from './scheme/domain/initialState';
@@ -23,10 +23,34 @@ const controllerImagePaths = {
 };
 
 const thermostatImagePaths = {
-    black: new URL('../assets/thermostats/black/thermostat_black.svg', import.meta.url).href,
-    white: new URL('../assets/thermostats/white/thermostat_white.svg', import.meta.url).href,
-    gray: new URL('../assets/thermostats/gray/thermostat_gray.svg', import.meta.url).href,
+    black: new URL('../images/thermostats/black_thermostat.png', import.meta.url).href,
+    white: new URL('../images/thermostats/white_thermostat.png', import.meta.url).href,
+    gray: new URL('../images/thermostats/gray_thermostat.png', import.meta.url).href,
 };
+
+/** Интерьерное фото — фон карточки термостата. */
+const THERMOSTAT_ROOM_IMAGE_PATH = new URL('../images/thermostats/thermostat_room.png', import.meta.url).href;
+
+// TODO: временные картинки для карточки уличного датчика — нужны фото самого
+// датчика и уличный кадр под фон; сейчас переиспользуется схематичный SVG
+// из отрисовки схемы и интерьерный снимок от термостата.
+const OUTDOOR_SENSOR_IMAGE_PATH = new URL('../assets/sensors/wirelessOutdoorSensor.svg', import.meta.url).href;
+const OUTDOOR_SENSOR_BACKGROUND_PATH = THERMOSTAT_ROOM_IMAGE_PATH;
+
+/** Котельная — фон карточки подбора котла. */
+const BOILER_ROOM_IMAGE_PATH = new URL('../images/thermostats/boiler_room.png', import.meta.url).href;
+
+/** Фон карточки смесительного узла. */
+const MIXING_UNIT_BACKGROUND_PATH = new URL('../images/thermostats/mixing_room.png', import.meta.url).href;
+
+/** Фон карточки бойлера ГВС. */
+const GVS_BOILER_BACKGROUND_PATH = new URL('../images/thermostats/boiler_gvs_room.png', import.meta.url).href;
+
+/** Фон карточки зонирования. */
+const ZONES_BACKGROUND_PATH = new URL('../images/thermostats/zones_room.jpg', import.meta.url).href;
+
+/** Быстрые подсказки над строкой поиска: подставляют бренд в запрос. */
+const BOILER_BRAND_TAGS = ['Baxi', 'Ariston', 'Arderia', 'Rinnai', 'Zota'];
 
 const MYHEAT_LOGO_PATH = new URL('../assets/logo/logo.svg', import.meta.url).href;
 
@@ -201,23 +225,9 @@ const CONTROLLER_LABELS = {
     ecosmart: 'ECOsmart',
 };
 
-const CONTROLLER_DESC_BOX_WIDTH = 260;
-const CONTROLLER_CONNECTOR_GAP = 20;
-const CONTROLLER_CONNECTOR_COLOR = '#c7ccd6';
-
-const controllerDescBoxStyle = {
-    position: 'absolute',
-    width: CONTROLLER_DESC_BOX_WIDTH,
-    border: '1px solid #d7dbe4',
-    borderRadius: 10,
-    background: '#f8fafc',
-    padding: '10px 14px',
-    fontSize: 12.5,
-    lineHeight: 1.45,
-    color: '#64748b',
-    textAlign: 'center',
-    boxSizing: 'border-box',
-};
+// Заглушка описания в карточках панели «Подобранный контроллер»:
+// ждём реальные тексты под каждый контроллер.
+const CONTROLLER_CARD_DESCRIPTION = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
 
 const CONTROLLER_KIT_TEMPERATURE_DEVICES = {
     pro: [
@@ -1668,6 +1678,18 @@ const THERMOSTAT_COLORS = [
     { value: 'gray', label: 'Серый' },
 ];
 
+const THERMOSTAT_CONNECTIONS = [
+    { value: 'wired', label: 'Проводной' },
+    { value: 'wireless', label: 'Беспроводной' },
+];
+
+/** Заливка кружка-образца в переключателе цвета термостата. */
+const THERMOSTAT_SWATCH_FILL = {
+    black: '#1c2230',
+    white: '#ffffff',
+    gray: '#a3aab8',
+};
+
 /**
  * Создает шаблон термостата по подключению, цвету и наличию датчика пола.
  * @param {object} options Параметры шаблона.
@@ -1846,6 +1868,13 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     },
 ];
 
+// Уличный радиодатчик вынесен из общей карточки беспроводных датчиков:
+// он допустим в единственном экземпляре и включается тумблером.
+const OUTDOOR_TEMPERATURE_SENSOR_KEY = 'wireless-outdoor';
+const OUTDOOR_TEMPERATURE_SENSOR_TEMPLATE = TEMPERATURE_SENSOR_TEMPLATES
+    .find((template) => template.key === OUTDOOR_TEMPERATURE_SENSOR_KEY);
+const OUTDOOR_TEMPERATURE_SENSOR_TYPE = canonicalType(OUTDOOR_TEMPERATURE_SENSOR_TEMPLATE.data.type);
+
 const TEMPERATURE_SENSOR_TYPES = new Set(TEMPERATURE_SENSOR_TEMPLATES.map((template) => canonicalType(template.data.type)));
 const isTemperatureSensor = (device) => TEMPERATURE_SENSOR_TYPES.has(canonicalType(device?.type));
 const getTemperatureSensorGroup = (template) => (template.target === 'wireless_devices' ? 'wireless' : 'wired');
@@ -1960,6 +1989,8 @@ const GVS_TEMPLATES = [
 const MIXING_TEMPLATES = [
     {
         label: 'Сервопривод 220V с цифровым датчиком',
+        servo: '220',
+        sensor: 'digital',
         description: 'Обеспечивает автоматическое управление отоплением с высокой точностью измерения температуры.',
         wiredDevice: {
             id: 0,
@@ -1974,6 +2005,8 @@ const MIXING_TEMPLATES = [
     },
     {
         label: 'Сервопривод 220V с NTC-датчиком',
+        servo: '220',
+        sensor: 'ntc',
         description: 'Предназначен для автоматического управления системой отопления по температуре.',
         wiredDevice: {
             id: 0,
@@ -1988,6 +2021,8 @@ const MIXING_TEMPLATES = [
     },
     {
         label: 'Сервопривод 0-10V с NTC-датчиком',
+        servo: '010',
+        sensor: 'ntc',
         description: 'Предназначен для плавного управления исполнительным механизмом по аналоговому сигналу 0–10 В.',
         wiredDevice: {
             id: 13,
@@ -2001,6 +2036,24 @@ const MIXING_TEMPLATES = [
         sensors: [],
     },
 ];
+
+// Смесительный узел собирается из двух независимых выборов; комбинация
+// «0-10V + цифровой датчик» в MIXING_TEMPLATES отсутствует и в интерфейсе
+// блокируется — по аналоговому входу цифровой датчик не подключить.
+const MIXING_SERVO_OPTIONS = [
+    { value: '220', label: '220V' },
+    { value: '010', label: '0-10V' },
+];
+
+const MIXING_SENSOR_OPTIONS = [
+    { value: 'digital', label: 'Цифровой' },
+    { value: 'ntc', label: 'NTC' },
+];
+
+const findMixingTemplate = (servo, sensor) => MIXING_TEMPLATES
+    .find((template) => template.servo === servo && template.sensor === sensor) || null;
+
+const isMixingCombinationAvailable = (servo, sensor) => findMixingTemplate(servo, sensor) !== null;
 
 const JsonView = ({ data, name }) => {
     const [collapsed, setCollapsed] = useState({});
@@ -2187,69 +2240,297 @@ const AddedDevicesTitle = ({ children }) => (
     <h3 style={{ margin: '0 0 14px', fontSize: 18, fontWeight: 500 }}>{children}</h3>
 );
 
-/** Карточка термостата: callbacks меняют цвет, датчик пола и добавляют устройство. */
-const ThermostatCard = ({ template, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, showJsonDetails = false }) => (
+/**
+ * Фоновый слой карточки: фото прижато к правому краю, альфа-маска проявляет
+ * его слева направо от 0 до 100%, сверху матовый blur. Контент карточки должен
+ * быть позиционированным, чтобы рисоваться поверх.
+ *
+ * Два режима размера:
+ * - с `aspectRatio` слой повторяет пропорции снимка и занимает правую часть
+ *   карточки; `cover` тут точен, потому что слой и так в пропорциях снимка.
+ *   Ширина считается от высоты, поэтому режим только для карточек постоянной
+ *   высоты.
+ * - без `aspectRatio` слой растянут на всю карточку, а снимок масштабируется
+ *   строго по ширине (`100% auto`). Это ключевой момент: `cover` пересчитал бы
+ *   масштаб, как только карточка станет выше снимка, и фон бы дергался при
+ *   добавлении строк. С привязкой по ширине рост карточки просто открывает
+ *   кадр ниже.
+ *
+ * `fallbackColor` подкладывается под снимок: если карточка выросла выше, чем
+ * хватает высоты кадра, снизу продолжается этот цвет, а не белый край.
+ * `position` перебивает привязку фона (по умолчанию — правый верхний угол).
+ */
+const CardPhotoBackdrop = ({ image, aspectRatio = null, blur = 5, position = null, fallbackColor = null }) => (
+    <>
+        <div
+            aria-hidden
+            className="sel-card-photo"
+            style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                right: 0,
+                ...(aspectRatio ? { aspectRatio, maxWidth: '100%' } : { left: 0 }),
+                // Слои скругляются сами, чтобы карточке не требовался
+                // `overflow: hidden` — иначе он обрезал бы выпадашки.
+                borderRadius: 'inherit',
+                backgroundColor: fallbackColor || undefined,
+                backgroundImage: `url(${image})`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: position || (aspectRatio ? 'center right' : 'right top'),
+                backgroundSize: aspectRatio ? 'cover' : '100% auto',
+                maskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 100%)',
+                WebkitMaskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 100%)',
+                pointerEvents: 'none',
+            }}
+        />
+        <div
+            aria-hidden
+            style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: 'inherit',
+                backdropFilter: `blur(${blur}px)`,
+                WebkitBackdropFilter: `blur(${blur}px)`,
+                pointerEvents: 'none',
+            }}
+        />
+    </>
+);
+
+/** Тумблер: скрытый checkbox плюс дорожка с бегунком. */
+const ToggleSwitch = ({ checked, onChange, label }) => (
+    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14 }}>
+        <input
+            type="checkbox"
+            role="switch"
+            checked={checked}
+            onChange={(event) => onChange(event.target.checked)}
+            style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+        />
+        <span
+            style={{
+                position: 'relative',
+                flex: '0 0 auto',
+                width: 40,
+                height: 22,
+                borderRadius: 999,
+                background: checked ? '#e07020' : '#cbd5e1',
+                transition: 'background 0.18s ease',
+            }}
+        >
+            <span
+                style={{
+                    position: 'absolute',
+                    top: 3,
+                    left: 3,
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    background: '#fff',
+                    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.22)',
+                    transform: checked ? 'translateX(18px)' : 'none',
+                    transition: 'transform 0.18s ease',
+                }}
+            />
+        </span>
+        {label}
+    </label>
+);
+
+/** Подпись группы настроек внутри карточки термостата. */
+const ThermostatFieldLabel = ({ children }) => (
     <div
-        className="sel-card"
         style={{
-            flex: '1 1 320px',
-            minWidth: 260,
-            border: '1px solid #d7dbe4',
-            borderRadius: 14,
-            padding: 18,
-            background: '#fff',
             display: 'flex',
-            flexDirection: 'column',
+            alignItems: 'baseline',
+            gap: 8,
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.07em',
+            textTransform: 'uppercase',
+            color: '#8a93a8',
+            marginBottom: 10,
         }}
     >
-        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-            <div style={{ fontWeight: 700, marginBottom: 14, fontSize: 16 }}>{template.label}</div>
+        {children}
+    </div>
+);
 
-            <div style={{ marginBottom: 14 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: '#475569' }}>Цвет</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {THERMOSTAT_COLORS.map((item) => (
-                        <button
-                            className="selection-option-button"
-                            key={item.value}
-                            type="button"
-                            onClick={() => onColorChange(item.value)}
-                            style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                padding: '8px 12px',
-                                border: `1px solid ${color === item.value ? '#c85e18' : '#d7dbe4'}`,
-                                borderRadius: 8,
-                                background: color === item.value ? '#fff7ed' : '#fff',
-                                color: '#202738',
-                                cursor: 'pointer',
-                                fontSize: 13,
-                            }}
-                        >
-                            <span
-                                style={{
-                                    width: 14,
-                                    height: 14,
-                                    borderRadius: '50%',
-                                    border: '1px solid #cbd5e1',
-                                    background: item.value === 'black' ? '#111827' : item.value === 'gray' ? '#9ca3af' : '#fff',
-                                }}
-                            />
-                            {item.label}
-                        </button>
+/** Карточка термостата: callbacks меняют тип подключения, цвет, датчик пола и добавляют устройство. */
+const ThermostatCard = ({ template, connection, onConnectionChange, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, addedRows = [], onRemoveRow, showJsonDetails = false }) => (
+    <div
+        className="sel-card sel-card-static"
+        style={{
+            flex: '1 1 100%',
+            width: '100%',
+            minWidth: 260,
+            border: '1px solid #d7dbe4',
+            borderRadius: 16,
+            padding: 24,
+            background: '#fff',
+            display: 'flex',
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 32,
+            alignItems: 'stretch',
+            position: 'relative',
+            overflow: 'hidden',
+        }}
+    >
+        <CardPhotoBackdrop image={THERMOSTAT_ROOM_IMAGE_PATH} aspectRatio="1030 / 787" />
+
+        <div
+            style={{
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                gap: 20,
+                // Колонке настроек нужно заметно больше места, чем колонке с
+                // рендером: в одном ряду стоят капсула типа подключения и
+                // чекбокс датчика пола, при базовых 340px они не помещались.
+                flex: '2 1 420px',
+                minWidth: 260,
+                maxWidth: 540,
+            }}
+        >
+            <div style={{ fontWeight: 700, fontSize: 18, lineHeight: 1.3 }}>{template.label}</div>
+
+            {addedRows.length > 0 && (
+                <AddedDevicesBlock marginTop={0}>
+                    <AddedDevicesTitle>Добавленные термостаты:</AddedDevicesTitle>
+                    {addedRows.map((row) => (
+                        <AddedDeviceLine
+                            key={row.label}
+                            label={row.label}
+                            count={row.count}
+                            myheat
+                            onRemove={() => onRemoveRow(row)}
+                        />
                     ))}
+                </AddedDevicesBlock>
+            )}
+
+            {/* Тип подключения и датчик пола — в одном ряду; выравнивание по
+                нижнему краю, чтобы капсула и чекбокс стояли на одной линии. */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
+            <div>
+                <ThermostatFieldLabel>Тип подключения</ThermostatFieldLabel>
+                {/* Сегментированный переключатель: два взаимоисключающих варианта в одной капсуле. */}
+                <div
+                    style={{
+                        display: 'inline-flex',
+                        gap: 3,
+                        padding: 3,
+                        border: '1px solid #e3e7ef',
+                        borderRadius: 12,
+                        background: '#f4f6fa',
+                    }}
+                >
+                    {THERMOSTAT_CONNECTIONS.map((item) => {
+                        const isActive = connection === item.value;
+                        return (
+                            <button
+                                className="selection-option-button"
+                                key={item.value}
+                                type="button"
+                                data-test-id={`thermostat-connection-${item.value}`}
+                                data-active={isActive}
+                                onClick={() => onConnectionChange(item.value)}
+                                style={{
+                                    padding: '9px 18px',
+                                    border: `1px solid ${isActive ? '#e3e7ef' : 'transparent'}`,
+                                    borderRadius: 9,
+                                    background: isActive ? '#fff' : 'transparent',
+                                    color: isActive ? '#202738' : '#667089',
+                                    boxShadow: isActive ? '0 1px 3px rgba(32, 39, 56, 0.12)' : 'none',
+                                    cursor: 'pointer',
+                                    fontSize: 13.5,
+                                    fontWeight: isActive ? 700 : 500,
+                                    transition: 'background 0.18s, color 0.18s, box-shadow 0.18s',
+                                }}
+                            >
+                                {item.label}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 14, fontSize: 14 }}>
-                <input
-                    type="checkbox"
-                    checked={hasFloorSensor}
-                    onChange={(event) => onFloorSensorChange(event.target.checked)}
-                />
-                Добавить датчик пола
-            </label>
+                <label
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '12px 16px',
+                        border: `1px solid ${hasFloorSensor ? '#f2cba6' : '#e3e7ef'}`,
+                        borderRadius: 12,
+                        background: hasFloorSensor ? '#fff8f2' : '#fff',
+                        cursor: 'pointer',
+                        fontSize: 14,
+                        transition: 'background 0.18s, border-color 0.18s',
+                    }}
+                >
+                    <input
+                        type="checkbox"
+                        checked={hasFloorSensor}
+                        onChange={(event) => onFloorSensorChange(event.target.checked)}
+                        style={{ width: 16, height: 16, margin: 0, accentColor: '#e07020', cursor: 'pointer' }}
+                    />
+                    Добавить датчик пола
+                </label>
+            </div>
+
+            <div>
+                <ThermostatFieldLabel>
+                    Цвет
+                    <span style={{ fontWeight: 500, letterSpacing: 0, textTransform: 'none', fontSize: 12.5, color: '#667089' }}>
+                        {THERMOSTAT_COLORS.find((item) => item.value === color)?.label}
+                    </span>
+                </ThermostatFieldLabel>
+                {/* Кружки-образцы: название выбранного цвета выведено в подписи группы. */}
+                <div style={{ display: 'flex', gap: 10 }}>
+                    {THERMOSTAT_COLORS.map((item) => {
+                        const isActive = color === item.value;
+                        return (
+                            <button
+                                className="selection-option-button"
+                                key={item.value}
+                                type="button"
+                                title={item.label}
+                                aria-label={item.label}
+                                aria-pressed={isActive}
+                                onClick={() => onColorChange(item.value)}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: 36,
+                                    height: 36,
+                                    padding: 0,
+                                    borderRadius: '50%',
+                                    border: `2px solid ${isActive ? '#e07020' : '#e3e7ef'}`,
+                                    background: '#fff',
+                                    cursor: 'pointer',
+                                    boxShadow: isActive ? '0 0 0 3px rgba(224, 112, 32, 0.16)' : 'none',
+                                    transition: 'border-color 0.18s, box-shadow 0.18s',
+                                }}
+                            >
+                                <span
+                                    style={{
+                                        width: 22,
+                                        height: 22,
+                                        borderRadius: '50%',
+                                        border: '1px solid rgba(32, 39, 56, 0.16)',
+                                        background: THERMOSTAT_SWATCH_FILL[item.value],
+                                    }}
+                                />
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
 
             <pre
                 style={{
@@ -2259,29 +2540,459 @@ const ThermostatCard = ({ template, color, onColorChange, hasFloorSensor, onFloo
                     fontSize: 12,
                     lineHeight: 1.5,
                     overflow: 'auto',
-                    margin: '0 0 12px',
+                    margin: 0,
                 }}
             >
 {showJsonDetails ? JSON.stringify(template.data, null, 4) : null}
             </pre>
+
             <button
                 onClick={onAdd}
                 style={{
-                    marginTop: 'auto',
-                    padding: '8px 16px',
-                    border: '1px solid #3498db',
-                    borderRadius: 8,
-                    background: '#3498db',
+                    alignSelf: 'flex-start',
+                    padding: '12px 26px',
+                    border: '1px solid #c85e18',
+                    borderRadius: 10,
+                    background: '#e07020',
                     color: '#fff',
                     cursor: 'pointer',
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: 700,
                 }}
             >
                 Добавить термостат
             </button>
         </div>
+
+        {/* Изображение термостата: вместо плашки-фона под устройством мягкое
+            свечение и тень, все цвета лежат стопкой и переключаются
+            прозрачностью — кроссфейд без подгрузки картинки в момент клика. */}
+        <div
+            style={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flex: '1 1 300px',
+                minWidth: 240,
+                minHeight: 290,
+            }}
+        >
+            <div
+                aria-hidden
+                style={{
+                    position: 'absolute',
+                    width: '86%',
+                    maxWidth: 330,
+                    aspectRatio: '1 / 1',
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(224, 112, 32, 0.10) 0%, rgba(224, 112, 32, 0) 68%)',
+                }}
+            />
+            <div
+                aria-hidden
+                style={{
+                    position: 'absolute',
+                    bottom: '11%',
+                    width: '44%',
+                    maxWidth: 175,
+                    height: 16,
+                    borderRadius: '50%',
+                    background: 'radial-gradient(ellipse, rgba(32, 39, 56, 0.20) 0%, rgba(32, 39, 56, 0) 72%)',
+                }}
+            />
+            <div style={{ position: 'relative', width: '100%', maxWidth: 255, aspectRatio: '1 / 1' }}>
+                {THERMOSTAT_COLORS.map((item) => (
+                    <img
+                        key={item.value}
+                        src={thermostatImagePaths[item.value]}
+                        alt={item.value === color ? template.label : ''}
+                        aria-hidden={item.value !== color}
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            opacity: item.value === color ? 1 : 0,
+                            transition: 'opacity 260ms ease',
+                        }}
+                    />
+                ))}
+            </div>
+        </div>
     </div>
+);
+
+/**
+ * Карточка уличного радиодатчика. Датчик в схеме может быть только один,
+ * поэтому вместо кнопки «Добавить» и счетчика здесь тумблер: включен —
+ * датчик есть, выключен — его нет.
+ */
+const OutdoorSensorCard = ({ template, enabled, onEnabledChange, showJsonDetails = false }) => (
+    <div
+        className="sel-card sel-card-static"
+        style={{
+            flex: '1 1 100%',
+            width: '100%',
+            minWidth: 260,
+            border: '1px solid #d7dbe4',
+            borderRadius: 16,
+            padding: 24,
+            background: '#fff',
+            display: 'flex',
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 32,
+            alignItems: 'stretch',
+            position: 'relative',
+            overflow: 'hidden',
+        }}
+    >
+        <CardPhotoBackdrop image={OUTDOOR_SENSOR_BACKGROUND_PATH} aspectRatio="1030 / 787" />
+
+        <div
+            style={{
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                gap: 20,
+                flex: '1 1 340px',
+                minWidth: 260,
+                maxWidth: 480,
+            }}
+        >
+            <div style={{ fontWeight: 700, fontSize: 18, lineHeight: 1.3 }}>{template.label}</div>
+
+            <p style={{ margin: 0, color: '#667089', fontSize: 13.5, lineHeight: 1.5 }}>
+                Измеряет уличную температуру и передает ее по радиоканалу.
+                В схеме используется только один такой датчик.
+            </p>
+
+            <div
+                style={{
+                    alignSelf: 'flex-start',
+                    padding: '12px 16px',
+                    border: `1px solid ${enabled ? '#f2cba6' : '#e3e7ef'}`,
+                    borderRadius: 12,
+                    background: enabled ? '#fff8f2' : '#fff',
+                    transition: 'background 0.18s, border-color 0.18s',
+                }}
+                data-test-id="outdoor-sensor-toggle"
+                data-active={enabled}
+            >
+                <ToggleSwitch
+                    checked={enabled}
+                    onChange={onEnabledChange}
+                    label="Уличный датчик в схеме"
+                />
+            </div>
+
+            <pre
+                style={{
+                    background: '#f5f7fb',
+                    padding: 10,
+                    borderRadius: 6,
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    overflow: 'auto',
+                    margin: 0,
+                }}
+            >
+{showJsonDetails ? JSON.stringify(template.data, null, 4) : null}
+            </pre>
+        </div>
+
+        {/* Изображение датчика — как в карточке термостата: мягкое свечение и
+            тень под устройством вместо плашки-фона. */}
+        <div
+            style={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flex: '1 1 280px',
+                minWidth: 220,
+            }}
+        >
+            <div
+                aria-hidden
+                style={{
+                    position: 'absolute',
+                    width: '78%',
+                    height: '86%',
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(224, 112, 32, 0.10) 0%, rgba(224, 112, 32, 0) 68%)',
+                }}
+            />
+            <div
+                aria-hidden
+                style={{
+                    position: 'absolute',
+                    bottom: '4%',
+                    width: '46%',
+                    maxWidth: 180,
+                    height: 14,
+                    borderRadius: '50%',
+                    background: 'radial-gradient(ellipse, rgba(32, 39, 56, 0.20) 0%, rgba(32, 39, 56, 0) 72%)',
+                }}
+            />
+            <img
+                src={OUTDOOR_SENSOR_IMAGE_PATH}
+                alt={template.label}
+                style={{ position: 'relative', width: '100%', maxWidth: 260, maxHeight: 170, objectFit: 'contain' }}
+            />
+        </div>
+    </div>
+);
+
+/**
+ * Общий каркас карточки-раздела: фото на фоне, заголовок с описанием, список
+ * уже добавленного оборудования со счетчиками и кнопка добавления. Настройки,
+ * специфичные для раздела (переключатели и т.п.), передаются через children и
+ * встают между списком и кнопкой.
+ */
+const SectionEquipmentCard = ({
+    image,
+    backgroundColor = null,
+    backgroundPosition = null,
+    aspectRatio = null,
+    blur = 3,
+    title,
+    description = null,
+    addedTitle,
+    addedRows = [],
+    onAddUnit,
+    onRemoveUnit,
+    addLabel,
+    onAdd,
+    showAdd = true,
+    addTestId = null,
+    qtyTestId = null,
+    jsonData = null,
+    showJsonDetails = false,
+    children = null,
+}) => (
+    <div
+        className="sel-card sel-card-static"
+        style={{
+            flex: '1 1 100%',
+            width: '100%',
+            minWidth: 260,
+            border: '1px solid #d7dbe4',
+            borderRadius: 16,
+            padding: 24,
+            background: '#fff',
+            display: 'flex',
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 32,
+            alignItems: 'stretch',
+            position: 'relative',
+        }}
+    >
+        <CardPhotoBackdrop
+            image={image}
+            blur={blur}
+            aspectRatio={aspectRatio}
+            position={backgroundPosition}
+            fallbackColor={backgroundColor}
+        />
+
+        <div
+            style={{
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 20,
+                flex: '1 1 420px',
+                minWidth: 260,
+                maxWidth: 560,
+            }}
+        >
+            <div style={{ fontWeight: 700, fontSize: 18, lineHeight: 1.3 }}>{title}</div>
+
+            {description && (
+                <p style={{ margin: 0, color: '#667089', fontSize: 13.5, lineHeight: 1.5 }}>
+                    {description}
+                </p>
+            )}
+
+            {addedRows.length > 0 && (
+                <AddedDevicesBlock marginTop={0}>
+                    <AddedDevicesTitle>{addedTitle}</AddedDevicesTitle>
+                    {addedRows.map((row) => (
+                        <AddedDeviceLine
+                            key={row.label}
+                            label={row.label}
+                            hideCount
+                            control={(
+                                <QtyStepper
+                                    count={row.count}
+                                    onDecrement={() => onRemoveUnit(row)}
+                                    onIncrement={() => onAddUnit(row)}
+                                    decTestId={qtyTestId ? `${qtyTestId}-dec` : null}
+                                    incTestId={qtyTestId ? `${qtyTestId}-inc` : null}
+                                />
+                            )}
+                        />
+                    ))}
+                </AddedDevicesBlock>
+            )}
+
+            {children}
+
+            <pre
+                style={{
+                    background: '#f5f7fb',
+                    padding: 10,
+                    borderRadius: 6,
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    overflow: 'auto',
+                    margin: 0,
+                }}
+            >
+{showJsonDetails ? JSON.stringify(jsonData, null, 4) : null}
+            </pre>
+
+            {showAdd && (
+                <button
+                    onClick={onAdd}
+                    data-test-id={addTestId || undefined}
+                    style={{
+                        alignSelf: 'flex-start',
+                        padding: '12px 26px',
+                        border: '1px solid #c85e18',
+                        borderRadius: 10,
+                        background: '#e07020',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontSize: 14,
+                        fontWeight: 700,
+                    }}
+                >
+                    {addLabel}
+                </button>
+            )}
+        </div>
+    </div>
+);
+
+/**
+ * Карточка смесительного узла: сервопривод и датчик выбираются независимо,
+ * из пары получается шаблон MIXING_TEMPLATES. Комбинации «0-10V + цифровой
+ * датчик» не существует, поэтому такой вариант датчика гасится.
+ */
+const MixingUnitCard = ({ template, servo, onServoChange, sensor, onSensorChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, showJsonDetails = false }) => (
+    <SectionEquipmentCard
+        image={MIXING_UNIT_BACKGROUND_PATH}
+        backgroundColor="#474847"
+        title={template.label}
+        description={template.description}
+        addedTitle="Добавленные смесительные узлы:"
+        addedRows={addedRows}
+        onAddUnit={onAddUnit}
+        onRemoveUnit={onRemoveUnit}
+        addLabel={`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
+        onAdd={onAdd}
+        // Как только этот вариант узла попал в список, количеством управляет
+        // счетчик в строке — большая кнопка становится лишней и прячется.
+        showAdd={!addedRows.some((row) => row.label === template.label)}
+        jsonData={{ wired_device: template.wiredDevice, sensors: template.sensors }}
+        showJsonDetails={showJsonDetails}
+    >
+        {/* Оба переключателя в одном ряду; на узкой карточке переносятся. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+            <div>
+                <ThermostatFieldLabel>Сервопривод</ThermostatFieldLabel>
+                <div
+                    style={{
+                        display: 'inline-flex',
+                        gap: 3,
+                        padding: 3,
+                        border: '1px solid #e3e7ef',
+                        borderRadius: 12,
+                        background: '#f4f6fa',
+                    }}
+                >
+                    {MIXING_SERVO_OPTIONS.map((item) => {
+                        const isActive = servo === item.value;
+                        return (
+                            <button
+                                className="selection-option-button"
+                                key={item.value}
+                                type="button"
+                                data-test-id={`mixing-servo-${item.value}`}
+                                data-active={isActive}
+                                onClick={() => onServoChange(item.value)}
+                                style={{
+                                    padding: '9px 18px',
+                                    border: `1px solid ${isActive ? '#e3e7ef' : 'transparent'}`,
+                                    borderRadius: 9,
+                                    background: isActive ? '#fff' : 'transparent',
+                                    color: isActive ? '#202738' : '#667089',
+                                    boxShadow: isActive ? '0 1px 3px rgba(32, 39, 56, 0.12)' : 'none',
+                                    cursor: 'pointer',
+                                    fontSize: 13.5,
+                                    fontWeight: isActive ? 700 : 500,
+                                    transition: 'background 0.18s, color 0.18s, box-shadow 0.18s',
+                                }}
+                            >
+                                {item.label}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div>
+                <ThermostatFieldLabel>Датчик</ThermostatFieldLabel>
+                <div
+                    style={{
+                        display: 'inline-flex',
+                        gap: 3,
+                        padding: 3,
+                        border: '1px solid #e3e7ef',
+                        borderRadius: 12,
+                        background: '#f4f6fa',
+                    }}
+                >
+                    {MIXING_SENSOR_OPTIONS.map((item) => {
+                        const isActive = sensor === item.value;
+                        const isAvailable = isMixingCombinationAvailable(servo, item.value);
+                        return (
+                            <button
+                                className="selection-option-button"
+                                key={item.value}
+                                type="button"
+                                data-test-id={`mixing-sensor-${item.value}`}
+                                data-active={isActive}
+                                disabled={!isAvailable}
+                                title={isAvailable ? undefined : 'Цифровой датчик не подключается к сервоприводу 0-10V'}
+                                onClick={() => isAvailable && onSensorChange(item.value)}
+                                style={{
+                                    padding: '9px 18px',
+                                    border: `1px solid ${isActive ? '#e3e7ef' : 'transparent'}`,
+                                    borderRadius: 9,
+                                    background: isActive ? '#fff' : 'transparent',
+                                    color: isAvailable ? (isActive ? '#202738' : '#667089') : '#b3bac8',
+                                    boxShadow: isActive ? '0 1px 3px rgba(32, 39, 56, 0.12)' : 'none',
+                                    cursor: isAvailable ? 'pointer' : 'not-allowed',
+                                    fontSize: 13.5,
+                                    fontWeight: isActive ? 700 : 500,
+                                    transition: 'background 0.18s, color 0.18s, box-shadow 0.18s',
+                                }}
+                            >
+                                {item.label}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    </SectionEquipmentCard>
 );
 
 /** Карточка датчика: options задает варианты, selectedKey выбор, stepper счетчик. */
@@ -2360,10 +3071,10 @@ const TemperatureSensorCard = ({ options, selectedKey, onSelectKey, template, on
     </div>
 );
 
-const AddedDevicesBlock = ({ children }) => (
+const AddedDevicesBlock = ({ children, marginTop = 24 }) => (
     <div
         style={{
-            marginTop: 24,
+            marginTop,
             padding: '14px 16px',
             border: '1px solid #b8c7d9',
             borderRadius: 12,
@@ -2390,13 +3101,14 @@ const QTY_STEPPER_BLOCK_STYLE = {
     boxSizing: 'border-box',
 };
 
-const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false }) => {
+const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false, decTestId = null, incTestId = null }) => {
     if (!count) return null;
     return (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             <button
                 type="button"
                 title="Убрать одно"
+                data-test-id={decTestId || undefined}
                 onClick={onDecrement}
                 disabled={disabled}
                 style={{ ...QTY_STEPPER_BLOCK_STYLE, cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#94a3b8' : '#e74c3c', opacity: disabled ? 0.6 : 1 }}
@@ -2407,6 +3119,7 @@ const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false }) => {
             <button
                 type="button"
                 title="Добавить ещё"
+                data-test-id={incTestId || undefined}
                 onClick={onIncrement}
                 disabled={disabled}
                 style={{ ...QTY_STEPPER_BLOCK_STYLE, cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#94a3b8' : '#2e7d32', opacity: disabled ? 0.6 : 1 }}
@@ -2418,7 +3131,6 @@ const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false }) => {
 };
 
 const SEL_CHAPTERS = [
-    { id: 'chapter-controller', label: 'Контроллер' },
     { id: 'chapter-boilers', label: 'Котлы' },
     { id: 'chapter-hydraulics', label: 'Гидравлика' },
     { id: 'chapter-climate', label: 'Климат' },
@@ -2783,18 +3495,23 @@ const SelectionApp = () => {
     const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
     const [incomingScheme, setIncomingScheme] = useState(createInitialSelectionScheme);
     const [showJsonDetails, setShowJsonDetails] = useState(false);
+    const [thermostatConnection, setThermostatConnection] = useState('wired');
     const [wiredThermostatColor, setWiredThermostatColor] = useState('black');
     const [wiredThermostatHasFloorSensor, setWiredThermostatHasFloorSensor] = useState(false);
     const [wirelessThermostatColor, setWirelessThermostatColor] = useState('black');
     const [wirelessThermostatHasFloorSensor, setWirelessThermostatHasFloorSensor] = useState(false);
+    const [mixingServo, setMixingServo] = useState('220');
+    const [mixingSensor, setMixingSensor] = useState('digital');
     const [wiredTemperatureSensorKey, setWiredTemperatureSensorKey] = useState('wired-wall-digital');
-    const [wirelessTemperatureSensorKey, setWirelessTemperatureSensorKey] = useState('wireless-outdoor');
+    const [wirelessTemperatureSensorKey, setWirelessTemperatureSensorKey] = useState('wireless-wall');
     const [isBuildingScheme, setIsBuildingScheme] = useState(false);
     const [buildSchemeError, setBuildSchemeError] = useState('');
     const [boilerQuery, setBoilerQuery] = useState('');
     const [boilerResults, setBoilerResults] = useState([]);
     const [boilerSearchLoading, setBoilerSearchLoading] = useState(false);
-    const [controllerConnectorGeometry, setControllerConnectorGeometry] = useState(null);
+    // Запрос, по которому поиск уже завершился. Нужен, чтобы «Котлы не найдены»
+    // показывалось только для отработанного запроса, а не в паузе перед ним.
+    const [boilerSearchedQuery, setBoilerSearchedQuery] = useState('');
     const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
     const [upsRequested, setUpsRequested] = useState(false);
     const [requestedControllerType, setRequestedControllerType] = useState('go');
@@ -2802,10 +3519,7 @@ const SelectionApp = () => {
     const upsRequestedRef = useRef(false);
     const upsRequestSourceRef = useRef(null);
     const controllerSelectionSourceRef = useRef('default');
-    const controllerWrapRef = useRef(null);
-    const controllerCardRefs = useRef([]);
     const stickyTopRef = useRef(null);
-    const [isControllerBarStuck, setIsControllerBarStuck] = useState(false);
     const startSelectionFromScratch = useCallback(() => {
         removeSelectionDraft();
         upsRequestSourceRef.current = null;
@@ -2815,12 +3529,15 @@ const SelectionApp = () => {
         controllerSelectionSourceRef.current = 'default';
         setControllerSelectionSource('default');
         setIncomingScheme(createInitialSelectionScheme());
+        setThermostatConnection('wired');
         setWiredThermostatColor('black');
         setWiredThermostatHasFloorSensor(false);
         setWirelessThermostatColor('black');
         setWirelessThermostatHasFloorSensor(false);
+        setMixingServo('220');
+        setMixingSensor('digital');
         setWiredTemperatureSensorKey('wired-wall-digital');
-        setWirelessTemperatureSensorKey('wireless-outdoor');
+        setWirelessTemperatureSensorKey('wireless-wall');
         setBuildSchemeError('');
         setPendingDraft(null);
     }, []);
@@ -2838,12 +3555,15 @@ const SelectionApp = () => {
         controllerSelectionSourceRef.current = pendingDraft.controllerSelectionSource === 'manual' ? 'manual' : 'default';
         setControllerSelectionSource(controllerSelectionSourceRef.current);
         setIncomingScheme(pendingDraft.incomingScheme);
+        setThermostatConnection(editor.thermostatConnection === 'wireless' ? 'wireless' : 'wired');
         setWiredThermostatColor(editor.wiredThermostatColor || 'black');
         setWiredThermostatHasFloorSensor(editor.wiredThermostatHasFloorSensor === true);
         setWirelessThermostatColor(editor.wirelessThermostatColor || 'black');
         setWirelessThermostatHasFloorSensor(editor.wirelessThermostatHasFloorSensor === true);
+        setMixingServo(editor.mixingServo === '010' ? '010' : '220');
+        setMixingSensor(editor.mixingSensor === 'ntc' ? 'ntc' : 'digital');
         setWiredTemperatureSensorKey(editor.wiredTemperatureSensorKey || 'wired-wall-digital');
-        setWirelessTemperatureSensorKey(editor.wirelessTemperatureSensorKey || 'wireless-outdoor');
+        setWirelessTemperatureSensorKey(editor.wirelessTemperatureSensorKey || 'wireless-wall');
         setPendingDraft(null);
     }, [pendingDraft]);
     const resolveSelectionScheme = useCallback(
@@ -2891,10 +3611,13 @@ const SelectionApp = () => {
             requestedControllerType,
             controllerSelectionSource,
             editor: {
+                thermostatConnection,
                 wiredThermostatColor,
                 wiredThermostatHasFloorSensor,
                 wirelessThermostatColor,
                 wirelessThermostatHasFloorSensor,
+                mixingServo,
+                mixingSensor,
                 wiredTemperatureSensorKey,
                 wirelessTemperatureSensorKey,
             },
@@ -2905,10 +3628,13 @@ const SelectionApp = () => {
         upsRequested,
         requestedControllerType,
         controllerSelectionSource,
+        thermostatConnection,
         wiredThermostatColor,
         wiredThermostatHasFloorSensor,
         wirelessThermostatColor,
         wirelessThermostatHasFloorSensor,
+        mixingServo,
+        mixingSensor,
         wiredTemperatureSensorKey,
         wirelessTemperatureSensorKey,
     ]);
@@ -2946,100 +3672,48 @@ const SelectionApp = () => {
         color: wirelessThermostatColor,
         hasFloorSensor: wirelessThermostatHasFloorSensor,
     }), [wirelessThermostatColor, wirelessThermostatHasFloorSensor]);
+    // Карточка термостата одна: тип подключения переключается внутри неё,
+    // но цвет и датчик пола запоминаются отдельно для каждого типа.
+    const isWirelessThermostat = thermostatConnection === 'wireless';
+    const thermostatTemplate = isWirelessThermostat ? wirelessThermostatTemplate : wiredThermostatTemplate;
     const wiredTemperatureSensorOptions = useMemo(() => TEMPERATURE_SENSOR_TEMPLATES.filter(
         (template) => getTemperatureSensorGroup(template) === 'wired',
     ), []);
+    // Уличный датчик живет в собственной карточке с тумблером, поэтому из
+    // списка вариантов общей беспроводной карточки он исключен.
     const wirelessTemperatureSensorOptions = useMemo(() => TEMPERATURE_SENSOR_TEMPLATES.filter(
-        (template) => getTemperatureSensorGroup(template) === 'wireless',
+        (template) => getTemperatureSensorGroup(template) === 'wireless'
+            && template.key !== OUTDOOR_TEMPERATURE_SENSOR_KEY,
     ), []);
+    // Датчик и сервопривод выбираются независимо, но комбинации
+    // «0-10V + цифровой» не существует: при переходе на 0-10V откатываем
+    // датчик на NTC, иначе шаблон не нашелся бы.
+    const mixingTemplate = useMemo(
+        () => findMixingTemplate(mixingServo, mixingSensor) || findMixingTemplate(mixingServo, 'ntc'),
+        [mixingServo, mixingSensor],
+    );
+    // Строки списка нужны дважды: в самом списке и в условии показа кнопки.
+    const gvsBoilerRows = getGroupedDeviceRows(incomingScheme, 'gvs', GVS_TEMPLATES);
+    const zoneRows = getGroupedDeviceRows(incomingScheme, 'zone', ZONE_TEMPLATES);
+    const selectMixingServo = useCallback((servo) => {
+        setMixingServo(servo);
+        setMixingSensor((current) => (isMixingCombinationAvailable(servo, current) ? current : 'ntc'));
+    }, []);
+
     const wiredTemperatureSensorTemplate = useMemo(() => (
         wiredTemperatureSensorOptions.find((template) => template.key === wiredTemperatureSensorKey) || wiredTemperatureSensorOptions[0]
     ), [wiredTemperatureSensorKey, wiredTemperatureSensorOptions]);
     const wirelessTemperatureSensorTemplate = useMemo(() => (
         wirelessTemperatureSensorOptions.find((template) => template.key === wirelessTemperatureSensorKey) || wirelessTemperatureSensorOptions[0]
     ), [wirelessTemperatureSensorKey, wirelessTemperatureSensorOptions]);
+    const hasOutdoorTemperatureSensor = useMemo(() => (
+        (Array.isArray(incomingScheme.wireless_devices) ? incomingScheme.wireless_devices : [])
+            .some((item) => canonicalType(item?.type) === OUTDOOR_TEMPERATURE_SENSOR_TYPE)
+    ), [incomingScheme.wireless_devices]);
 
-    /** Измеряет карточки PRO/ECOsmart и обновляет геометрию соединительной подсказки. */
-    const measureControllerConnectors = useCallback(() => {
-        const wrap = controllerWrapRef.current;
-        const proEl = controllerCardRefs.current[3];
-        const ecosmartEl = controllerCardRefs.current[4];
-        if (!wrap || !proEl || !ecosmartEl) return;
 
-        const wrapRect = wrap.getBoundingClientRect();
-        const relRect = (el) => {
-            const r = el.getBoundingClientRect();
-            return {
-                left: r.left - wrapRect.left,
-                right: r.right - wrapRect.left,
-                top: r.top - wrapRect.top,
-                bottom: r.bottom - wrapRect.top,
-            };
-        };
-
-        const pro = relRect(proEl);
-        const ecosmart = relRect(ecosmartEl);
-
-        const proSideY = (pro.top + pro.bottom) / 2;
-        const proCenterX = (pro.right + ecosmart.left) / 2;
-        const proBoxTop = pro.bottom + CONTROLLER_CONNECTOR_GAP;
-
-        setControllerConnectorGeometry({
-            proBar: { left: pro.right, width: Math.max(0, ecosmart.left - pro.right), y: proSideY },
-            proStem: { x: proCenterX, top: proSideY, height: Math.max(0, proBoxTop - proSideY) },
-            proBoxTop,
-        });
-    }, []);
-
-    // До отрисовки кадра измеряет карточки PRO/ECOsmart и пересчитывает соединитель;
-    // resize ограничен одним animation frame, cleanup снимает подписку.
-    useLayoutEffect(() => {
-        let frameId = null;
-        const scheduleMeasure = () => {
-            if (frameId !== null) return;
-            frameId = window.requestAnimationFrame(() => {
-                frameId = null;
-                measureControllerConnectors();
-            });
-        };
-        scheduleMeasure();
-        window.addEventListener('resize', scheduleMeasure);
-        return () => {
-            window.removeEventListener('resize', scheduleMeasure);
-            if (frameId !== null) window.cancelAnimationFrame(frameId);
-        };
-    }, [measureControllerConnectors]);
-
-    // Следит за прокруткой и resize, чтобы показывать компактную закрепленную панель;
-    // измерения DOM выполняются не чаще одного раза за кадр.
-    useEffect(() => {
-        let frameId = null;
-        const updateControllerBarStuck = () => {
-            if (frameId !== null) return;
-            frameId = window.requestAnimationFrame(() => {
-                frameId = null;
-                const wrap = controllerWrapRef.current;
-                const sticky = stickyTopRef.current;
-                if (!wrap || !sticky) return;
-                const stickyBottom = sticky.getBoundingClientRect().bottom;
-                const wrapBottom = wrap.getBoundingClientRect().bottom;
-                const nextValue = wrapBottom <= stickyBottom;
-                setIsControllerBarStuck((currentValue) => (currentValue === nextValue ? currentValue : nextValue));
-            });
-        };
-        updateControllerBarStuck();
-        window.addEventListener('scroll', updateControllerBarStuck, { passive: true });
-        window.addEventListener('resize', updateControllerBarStuck);
-        return () => {
-            window.removeEventListener('scroll', updateControllerBarStuck);
-            window.removeEventListener('resize', updateControllerBarStuck);
-            if (frameId !== null) window.cancelAnimationFrame(frameId);
-        };
-    }, []);
-
-    // Держит --sel-sticky-height в актуальном состоянии: высота липкой шапки
-    // меняется, когда появляется панель «Подобранный контроллер», а боковая
-    // навигация прилипает именно под шапку и должна следовать за этой высотой.
+    // Держит --sel-sticky-height в актуальном состоянии: боковые колонки
+    // прилипают под липкой шапкой и должны следовать за её высотой.
     useEffect(() => {
         const sticky = stickyTopRef.current;
         if (!sticky) return undefined;
@@ -3063,12 +3737,16 @@ const SelectionApp = () => {
         if (!query) {
             setBoilerResults([]);
             setBoilerSearchLoading(false);
+            setBoilerSearchedQuery('');
             return;
         }
+        // Флаг поднимается сразу, а не внутри debounce: иначе между вводом и
+        // запросом состояние выглядит как «поиск закончен, ничего не нашли»,
+        // и выпадашка «Котлы не найдены» успевает мигнуть.
+        setBoilerSearchLoading(true);
         const controller = new AbortController();
         const timer = setTimeout(async () => {
             try {
-                setBoilerSearchLoading(true);
                 const res = await fetch(BOILER_SEARCH_ENDPOINT, {
                     method: 'POST',
                     headers: {
@@ -3086,6 +3764,7 @@ const SelectionApp = () => {
                 setBoilerResults([]);
             } finally {
                 if (!controller.signal.aborted) {
+                    setBoilerSearchedQuery(query);
                     setBoilerSearchLoading(false);
                 }
             }
@@ -3219,6 +3898,29 @@ const SelectionApp = () => {
         });
     }, []);
 
+
+    /**
+     * Уличный радиодатчик допустим в единственном экземпляре: включение
+     * заменяет все имеющиеся ровно одним, выключение убирает их полностью.
+     */
+    const setOutdoorTemperatureSensor = useCallback((enabled) => {
+        setIncomingScheme((prev) => {
+            const devices = Array.isArray(prev.wireless_devices) ? prev.wireless_devices : [];
+            const rest = devices.filter((item) => canonicalType(item?.type) !== OUTDOOR_TEMPERATURE_SENSOR_TYPE);
+            if (!enabled) return resolveSelectionScheme({ ...prev, wireless_devices: rest });
+            return resolveSelectionScheme({
+                ...prev,
+                wireless_devices: [
+                    ...rest,
+                    {
+                        ...OUTDOOR_TEMPERATURE_SENSOR_TEMPLATE.data,
+                        id: generateId(),
+                        title: OUTDOOR_TEMPERATURE_SENSOR_TEMPLATE.label,
+                    },
+                ],
+            });
+        });
+    }, [resolveSelectionScheme]);
 
     const addThermostat = useCallback((template) => {
         setIncomingScheme((prev) => {
@@ -3387,6 +4089,8 @@ const SelectionApp = () => {
                     wiredThermostatHasFloorSensor,
                     wirelessThermostatColor,
                     wirelessThermostatHasFloorSensor,
+                    mixingServo,
+                    mixingSensor,
                     wiredTemperatureSensorKey,
                     wirelessTemperatureSensorKey,
                 },
@@ -3434,6 +4138,8 @@ const SelectionApp = () => {
         wiredThermostatHasFloorSensor,
         wirelessThermostatColor,
         wirelessThermostatHasFloorSensor,
+        mixingServo,
+        mixingSensor,
         wiredTemperatureSensorKey,
         wirelessTemperatureSensorKey,
     ]);
@@ -3441,7 +4147,7 @@ const SelectionApp = () => {
     return (
         <div
             className={showJsonDetails ? 'selection-page selection-show-json' : 'selection-page selection-hide-json'}
-            style={{ padding: 24, width: 'min(1120px, 100%)', margin: '0 auto' }}
+            style={{ padding: 24, width: 'min(1500px, 100%)', margin: '0 auto' }}
         >
             {pendingDraft && (
                 <div className="selection-draft-backdrop">
@@ -3614,105 +4320,6 @@ const SelectionApp = () => {
                     </button>
                 </div>
             </div>
-            {isControllerBarStuck && (
-                <div className="sel-stuck-controllers-panel">
-                <div className="sel-stuck-controllers-title" style={{ paddingTop: 10, fontSize: 13, fontWeight: 700, color: '#475569' }}>Подобранный контроллер</div>
-                <div className="sel-stuck-controllers" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 8, justifyContent: 'flex-start' }}>
-                    {CONTROLLER_TEMPLATES.map((item, index) => {
-                        const isActive = incomingScheme.controller?.type === item.value.type;
-                        const isGoFamilySwitch = (controllerType === 'go' && item.value.type === 'go+')
-                            || (controllerType === 'go+' && item.value.type === 'go');
-                        const isCompatible = compatibleControllerTypes.has(item.value.type) || isGoFamilySwitch;
-                        return (
-                            <div
-                                key={index}
-                                className="sel-stuck-controller-card"
-                                onClick={isCompatible ? () => setController(item.value) : undefined}
-                                aria-disabled={!isCompatible}
-                                title={isCompatible ? undefined : 'Этот контроллер не поддерживает текущую конфигурацию'}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    flex: '0 0 auto',
-                                    border: `2px solid ${isActive ? ORANGE : '#d7dbe4'}`,
-                                    borderRadius: 8,
-                                    padding: '4px 10px 4px 6px',
-                                    background: isActive ? '#fff7ed' : '#fff',
-                                    cursor: isCompatible ? 'pointer' : 'not-allowed',
-                                    fontWeight: isActive ? 700 : 400,
-                                    fontSize: 13,
-                                    whiteSpace: 'nowrap',
-                                    transition: 'border-color 0.15s, background 0.15s',
-                                    opacity: isCompatible ? 1 : 0.45,
-                                }}
-                            >
-                                <img
-                                    src={controllerImagePaths[item.value.type]}
-                                    alt={item.label}
-                                    style={{ display: 'block', width: 44, height: 34, objectFit: 'contain' }}
-                                />
-                                <span>{item.label}</span>
-                            </div>
-                        );
-                    })}
-                </div>
-                {proAndEcosmartOptions && (
-                    <div
-                        className="sel-stuck-controllers-note"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 10,
-                            flexWrap: 'wrap',
-                            marginTop: 8,
-                            padding: '6px 10px',
-                            border: '1px solid #fed7aa',
-                            borderRadius: 8,
-                            background: '#fff7ed',
-                            color: '#9a3412',
-                            fontSize: 13,
-                        }}
-                    >
-                        <span>Для этой конфигурации подходят два контроллера: <strong>PRO</strong> и <strong>ECOsmart</strong>.</span>
-                        <button
-                            className="selection-option-button"
-                            type="button"
-                            onClick={() => setController(getControllerTemplateValue('pro'))}
-                            style={{
-                                padding: '4px 10px',
-                                border: '1px solid #ea580c',
-                                borderRadius: 8,
-                                background: controllerType === 'pro' ? '#e07020' : '#fff',
-                                color: controllerType === 'pro' ? '#fff' : '#9a3412',
-                                cursor: 'pointer',
-                                fontSize: 12,
-                                fontWeight: 700,
-                            }}
-                        >
-                            Использовать PRO
-                        </button>
-                        <button
-                            className="selection-option-button"
-                            type="button"
-                            onClick={() => setController(getControllerTemplateValue('ecosmart'))}
-                            style={{
-                                padding: '4px 10px',
-                                border: '1px solid #ea580c',
-                                borderRadius: 8,
-                                background: controllerType === 'ecosmart' ? '#e07020' : '#fff',
-                                color: controllerType === 'ecosmart' ? '#fff' : '#9a3412',
-                                cursor: 'pointer',
-                                fontSize: 12,
-                                fontWeight: 700,
-                            }}
-                        >
-                            Использовать ECOsmart
-                        </button>
-                    </div>
-                )}
-                </div>
-            )}
             </div>
             {buildSchemeError && (
                 <div style={{ marginBottom: 20, padding: '12px 14px', border: '1px solid #fecaca', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 14 }}>
@@ -3729,347 +4336,303 @@ const SelectionApp = () => {
             </aside>
             <div className="sel-layout-content">
 
-            <div className="sel-group-label" id="chapter-controller">Контроллер</div>
-            <section style={{ marginBottom: 32 }}>
-                <div ref={controllerWrapRef} style={{ position: 'relative', paddingBottom: proAndEcosmartOptions ? 108 : 0 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, paddingBottom: 8 }}>
-                        {CONTROLLER_TEMPLATES.map((item, index) => {
-                            const isActive = incomingScheme.controller?.type === item.value.type;
-                            const controllerTypeValue = item.value.type;
-                            const isGoFamilySwitch = (controllerType === 'go' && controllerTypeValue === 'go+')
-                                || (controllerType === 'go+' && controllerTypeValue === 'go');
-                            const isCompatible = compatibleControllerTypes.has(controllerTypeValue) || isGoFamilySwitch;
-                            return (
-                                <div
-                                    key={index}
-                                    ref={(el) => { controllerCardRefs.current[index] = el; }}
-                                    data-test-id={`controller-card-${controllerTypeValue}`}
-                                    data-active={isActive}
-                                    onClick={isCompatible ? () => setController(item.value) : undefined}
-                                    aria-disabled={!isCompatible}
-                                    title={isCompatible ? undefined : 'Этот контроллер не поддерживает текущую конфигурацию'}
-                                    style={{
-                                        border: `2px solid ${isActive ? ORANGE : '#d7dbe4'}`,
-                                        borderRadius: 10,
-                                        padding: 12,
-                                        background: isActive ? '#fff7ed' : '#fff',
-                                        cursor: isCompatible ? 'pointer' : 'not-allowed',
-                                        fontWeight: isActive ? 700 : 400,
-                                        fontSize: 15,
-                                        textAlign: 'center',
-                                        width: '100%',
-                                        boxSizing: 'border-box',
-                                        transition: 'border-color 0.15s, background 0.15s',
-                                        opacity: isCompatible ? 1 : 0.45,
-                                    }}
-                                >
-                                    <img
-                                        src={controllerImagePaths[controllerTypeValue]}
-                                        alt={item.label}
-                                        style={{ display: 'block', width: '100%', height: 160, objectFit: 'contain', marginBottom: 10 }}
-                                    />
-                                    <div>{item.label}</div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {controllerConnectorGeometry && proAndEcosmartOptions && (
-                        <>
-                            <div style={{ position: 'absolute', left: controllerConnectorGeometry.proBar.left, top: controllerConnectorGeometry.proBar.y - 1, width: controllerConnectorGeometry.proBar.width, height: 2, background: CONTROLLER_CONNECTOR_COLOR }} />
-                            <div style={{ position: 'absolute', left: controllerConnectorGeometry.proStem.x - 1, top: controllerConnectorGeometry.proStem.top, width: 2, height: controllerConnectorGeometry.proStem.height, background: CONTROLLER_CONNECTOR_COLOR }} />
-                            <div
-                                style={{
-                                    ...controllerDescBoxStyle,
-                                    left: controllerConnectorGeometry.proStem.x - CONTROLLER_DESC_BOX_WIDTH / 2,
-                                    top: controllerConnectorGeometry.proBoxTop,
-                                    border: '1px solid #fed7aa',
-                                    background: '#fff7ed',
-                                    color: '#9a3412',
-                                }}
-                            >
-                                Для этой конфигурации подходят два контроллера: <strong>PRO</strong> и <strong>ECOsmart</strong>.
-                                        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-                                            <button
-                                                className="selection-option-button"
-                                                type="button"
-                                                onClick={() => setController(getControllerTemplateValue('pro'))}
-                                                style={{
-                                                    padding: '7px 12px',
-                                                    border: '1px solid #ea580c',
-                                                    borderRadius: 8,
-                                                    background: controllerType === 'pro' ? '#e07020' : '#fff',
-                                                    color: controllerType === 'pro' ? '#fff' : '#9a3412',
-                                                    cursor: 'pointer',
-                                                    fontSize: 13,
-                                                    fontWeight: 700,
-                                                }}
-                                            >
-                                                Использовать PRO
-                                            </button>
-                                            <button
-                                                className="selection-option-button"
-                                                type="button"
-                                                onClick={() => setController(getControllerTemplateValue('ecosmart'))}
-                                                style={{
-                                                    padding: '7px 12px',
-                                                    border: '1px solid #ea580c',
-                                                    borderRadius: 8,
-                                                    background: controllerType === 'ecosmart' ? '#e07020' : '#fff',
-                                                    color: controllerType === 'ecosmart' ? '#fff' : '#9a3412',
-                                                    cursor: 'pointer',
-                                                    fontSize: 13,
-                                                    fontWeight: 700,
-                                                }}
-                                            >
-                                                Использовать ECOsmart
-                                            </button>
-                                        </div>
-                            </div>
-                        </>
-                    )}
-                </div>
-            </section>
-
             <div className="sel-group-label" id="chapter-boilers">Котлы</div>
             <section style={{ marginBottom: 32 }}>
-                <SectionSubtitle>
-                    Найдите котел по названию. Тип подключения определяется автоматически: котлы с цифровой шиной подключаются через BUS, остальные — через реле с датчиком подающей линии.
-                </SectionSubtitle>
-                <div style={{ position: 'relative' }}>
-                    <div style={{ position: 'relative' }}>
-                        <input
-                            type="text"
-                            placeholder="Введите название котла..."
-                            value={boilerQuery}
-                            onChange={(e) => setBoilerQuery(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '10px 40px 10px 14px',
-                                border: '1px solid #d7dbe4',
-                                borderRadius: boilerResults.length > 0 || (!boilerSearchLoading && boilerQuery.trim() && boilerResults.length === 0) ? '10px 10px 0 0' : 10,
-                                fontSize: 14,
-                                fontFamily: 'inherit',
-                                outline: 'none',
-                                boxSizing: 'border-box',
-                                color: 'var(--text)',
-                            }}
-                        />
-                        {boilerSearchLoading && (
-                            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }}>
-                                Поиск...
-                            </span>
-                        )}
-                    </div>
-                    {boilerResults.length > 0 && (
-                        <div style={{
-                            border: '1px solid #d7dbe4',
-                            borderTop: 'none',
-                            borderRadius: '0 0 10px 10px',
-                            background: '#fff',
-                            boxShadow: '0 6px 16px rgba(32,39,56,0.08)',
-                            maxHeight: 280,
-                            overflowY: 'auto',
-                        }}>
-                            {boilerResults.map((result) => {
-                                const isStupid = result.bus_type === 127;
-                                return (
-                                    <div
-                                        key={result.name}
-                                        onClick={() => addBoilerFromSearch(result)}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            gap: 12,
-                                            padding: '10px 14px',
-                                            cursor: 'pointer',
-                                            borderBottom: '1px solid #f1f5f9',
-                                            fontSize: 14,
-                                            transition: 'background 0.1s',
-                                        }}
-                                        onMouseEnter={(e) => { e.currentTarget.style.background = '#fff7ed'; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
-                                    >
-                                        <span>{result.name}</span>
-                                        <span style={{
-                                            flexShrink: 0,
-                                            padding: '2px 8px',
-                                            borderRadius: 999,
-                                            fontSize: 11,
-                                            fontWeight: 700,
-                                            letterSpacing: '0.03em',
-                                            background: isStupid ? '#fef2f2' : '#eff6ff',
-                                            color: isStupid ? '#dc2626' : '#2563eb',
-                                        }}>
-                                            {isStupid ? 'RELAY' : 'BUS'}
-                                        </span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                    {!boilerSearchLoading && boilerQuery.trim() && boilerResults.length === 0 && (
-                        <div style={{
-                            padding: '10px 14px',
-                            border: '1px solid #d7dbe4',
-                            borderTop: 'none',
-                            borderRadius: '0 0 10px 10px',
-                            background: '#fff',
-                            color: '#94a3b8',
-                            fontSize: 14,
-                        }}>
-                            Котлы не найдены
-                        </div>
-                    )}
-                </div>
+                <div
+                    className="sel-card sel-card-static"
+                    style={{
+                        flex: '1 1 100%',
+                        width: '100%',
+                        minWidth: 260,
+                        border: '1px solid #d7dbe4',
+                        borderRadius: 16,
+                        padding: 24,
+                        background: '#fff',
+                        display: 'flex',
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        gap: 32,
+                        alignItems: 'stretch',
+                        // Карточка — прямой ребенок section, поэтому перебиваем
+                        // общее правило `.selection-page section > div`,
+                        // центрирующее содержимое: колонка должна быть слева.
+                        justifyContent: 'flex-start',
+                        position: 'relative',
+                        // Без `overflow: hidden` — выпадашка поиска выходит за
+                        // пределы карточки. Фоновые слои скругляют себя сами.
+                    }}
+                >
+                    {/* Фон растянут на всю карточку и масштабируется от ширины,
+                        поэтому при добавлении котлов он не пересчитывается — просто
+                        открывается нижняя часть кадра. Сдвиг вверх на 70px нужен,
+                        чтобы в компактном состоянии котел попадал в кадр. */}
+                    <CardPhotoBackdrop image={BOILER_ROOM_IMAGE_PATH} blur={3} position="right -70px" />
 
-                {Array.isArray(incomingScheme.boilers) && incomingScheme.boilers.length > 0 && (
-                    <AddedDevicesBlock>
-                        <AddedDevicesTitle>Добавленные котлы</AddedDevicesTitle>
-                        {incomingScheme.boilers.map((boiler, index) => {
-                            const isSmart = canonicalType(boiler?.type) === 'smart';
-                            return (
-                                <AddedDeviceLine
-                                    key={boiler.id ?? `${boiler.name}-${index}`}
-                                    label={boiler.name}
-                                    control={isSmart ? (
-                                        <BoilerConnectionSwitch
-                                            connectionType={boiler.connection_type}
-                                            onChange={(connectionType) => setSmartBoilerConnectionType(index, connectionType)}
+                    <div
+                        style={{
+                            position: 'relative',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 20,
+                            flex: '1 1 420px',
+                            minWidth: 260,
+                            maxWidth: 560,
+                        }}
+                    >
+                        <div style={{ fontWeight: 700, fontSize: 18, lineHeight: 1.3 }}>Котлы</div>
+
+                        <p style={{ margin: 0, color: '#667089', fontSize: 13.5, lineHeight: 1.5 }}>
+                            Найдите котел по названию. Тип подключения определяется автоматически:
+                            котлы с цифровой шиной подключаются через BUS, остальные — через реле
+                            с датчиком подающей линии.
+                        </p>
+
+                        {Array.isArray(incomingScheme.boilers) && incomingScheme.boilers.length > 0 && (
+                            <AddedDevicesBlock marginTop={0}>
+                                <AddedDevicesTitle>Добавленные котлы</AddedDevicesTitle>
+                                {incomingScheme.boilers.map((boiler, index) => {
+                                    const isSmart = canonicalType(boiler?.type) === 'smart';
+                                    return (
+                                        <AddedDeviceLine
+                                            key={boiler.id ?? `${boiler.name}-${index}`}
+                                            label={boiler.name}
+                                            control={isSmart ? (
+                                                <BoilerConnectionSwitch
+                                                    connectionType={boiler.connection_type}
+                                                    onChange={(connectionType) => setSmartBoilerConnectionType(index, connectionType)}
+                                                />
+                                            ) : null}
+                                            hideCount
+                                            onRemove={() => removeBoiler(index)}
                                         />
-                                    ) : null}
-                                    hideCount
-                                    onRemove={() => removeBoiler(index)}
-                                />
-                            );
-                        })}
-                    </AddedDevicesBlock>
-                )}
+                                    );
+                                })}
+                            </AddedDevicesBlock>
+                        )}
+
+                        <div>
+                            {/* Быстрые теги брендов: подставляют бренд в строку поиска,
+                                повторный клик по активному тегу очищает запрос. */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                                {BOILER_BRAND_TAGS.map((brand) => {
+                                    const isActive = boilerQuery.trim().toLowerCase() === brand.toLowerCase();
+                                    return (
+                                        <button
+                                            className="selection-option-button"
+                                            key={brand}
+                                            type="button"
+                                            data-test-id={`boiler-brand-${brand.toLowerCase()}`}
+                                            data-active={isActive}
+                                            onClick={() => setBoilerQuery(isActive ? '' : brand)}
+                                            style={{
+                                                padding: '6px 14px',
+                                                border: `1px solid ${isActive ? '#e07020' : '#e3e7ef'}`,
+                                                borderRadius: 999,
+                                                background: isActive ? '#fff8f2' : '#fff',
+                                                color: isActive ? '#c85e18' : '#667089',
+                                                cursor: 'pointer',
+                                                fontSize: 13,
+                                                fontWeight: isActive ? 700 : 500,
+                                                transition: 'background 0.18s, border-color 0.18s, color 0.18s',
+                                            }}
+                                        >
+                                            {brand}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div style={{ position: 'relative' }}>
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Введите название котла..."
+                                        value={boilerQuery}
+                                        onChange={(e) => setBoilerQuery(e.target.value)}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px 44px 10px 14px',
+                                            border: '1px solid #d7dbe4',
+                                            borderRadius: boilerResults.length > 0 || (!boilerSearchLoading && boilerResults.length === 0 && boilerSearchedQuery === boilerQuery.trim() && boilerQuery.trim()) ? '10px 10px 0 0' : 10,
+                                            fontSize: 14,
+                                            fontFamily: 'inherit',
+                                            outline: 'none',
+                                            boxSizing: 'border-box',
+                                            background: '#fff',
+                                            color: 'var(--text)',
+                                        }}
+                                    />
+                                    {boilerSearchLoading && (
+                                        <span style={{ position: 'absolute', right: boilerQuery ? 44 : 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }}>
+                                            Поиск...
+                                        </span>
+                                    )}
+                                    {boilerQuery && (
+                                        <button
+                                            className="selection-option-button"
+                                            type="button"
+                                            data-test-id="boiler-search-clear"
+                                            aria-label="Очистить поиск"
+                                            title="Очистить поиск"
+                                            onClick={() => setBoilerQuery('')}
+                                            style={{
+                                                position: 'absolute',
+                                                right: 8,
+                                                top: '50%',
+                                                transform: 'translateY(-50%)',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                width: 26,
+                                                height: 26,
+                                                padding: 0,
+                                                border: 'none',
+                                                borderRadius: '50%',
+                                                background: 'transparent',
+                                                color: '#dc2626',
+                                                cursor: 'pointer',
+                                                fontSize: 18,
+                                                lineHeight: 1,
+                                                transition: 'background 0.15s',
+                                            }}
+                                            onMouseEnter={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </div>
+                                {/* Выпадашка висит поверх контента и не входит
+                                    в поток, чтобы высота карточки от нее не зависела. */}
+                                {boilerResults.length > 0 && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        right: 0,
+                                        zIndex: 20,
+                                        border: '1px solid #d7dbe4',
+                                        borderTop: 'none',
+                                        borderRadius: '0 0 10px 10px',
+                                        background: '#fff',
+                                        boxShadow: '0 6px 16px rgba(32,39,56,0.08)',
+                                        maxHeight: 280,
+                                        overflowY: 'auto',
+                                    }}>
+                                        {boilerResults.map((result) => {
+                                            const isStupid = result.bus_type === 127;
+                                            return (
+                                                <div
+                                                    key={result.name}
+                                                    onClick={() => addBoilerFromSearch(result)}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        gap: 12,
+                                                        padding: '10px 14px',
+                                                        cursor: 'pointer',
+                                                        borderBottom: '1px solid #f1f5f9',
+                                                        fontSize: 14,
+                                                        transition: 'background 0.1s',
+                                                    }}
+                                                    onMouseEnter={(e) => { e.currentTarget.style.background = '#fff7ed'; }}
+                                                    onMouseLeave={(e) => { e.currentTarget.style.background = ''; }}
+                                                >
+                                                    <span>{result.name}</span>
+                                                    <span style={{
+                                                        flexShrink: 0,
+                                                        padding: '2px 8px',
+                                                        borderRadius: 999,
+                                                        fontSize: 11,
+                                                        fontWeight: 700,
+                                                        letterSpacing: '0.03em',
+                                                        background: isStupid ? '#fef2f2' : '#eff6ff',
+                                                        color: isStupid ? '#dc2626' : '#2563eb',
+                                                    }}>
+                                                        {isStupid ? 'RELAY' : 'BUS'}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {!boilerSearchLoading && boilerResults.length === 0 && boilerQuery.trim() && boilerSearchedQuery === boilerQuery.trim() && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        right: 0,
+                                        zIndex: 20,
+                                        padding: '10px 14px',
+                                        border: '1px solid #d7dbe4',
+                                        borderTop: 'none',
+                                        borderRadius: '0 0 10px 10px',
+                                        background: '#fff',
+                                        boxShadow: '0 6px 16px rgba(32,39,56,0.08)',
+                                        color: '#94a3b8',
+                                        fontSize: 14,
+                                    }}>
+                                        Котлы не найдены
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <div className="sel-group-label" id="chapter-hydraulics">Гидравлика</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
 
-            <section style={{ flex: '1 1 280px', minWidth: 0 }}>
+            <section style={{ flex: '1 1 100%', minWidth: 0, marginBottom: 8 }}>
                 <h2>Смесительные узлы</h2>
                 <SectionSubtitle>Какое количество смесительных узлов будет использоваться в системе?</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    {MIXING_TEMPLATES.map((item, index) => (
-                        <div
-                            key={index}
-                            className="sel-card"
-                            style={{
-                                border: '1px solid #d7dbe4',
-                                borderRadius: 10,
-                                padding: 16,
-                                background: '#fff',
-                                flex: '1 1 260px',
-                                minWidth: 260,
-                            }}
-                        >
-                            <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
-                            {item.description && (
-                                <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
-                                    {item.description}
-                                </p>
-                            )}
-                            <pre
-                                style={{
-                                    background: '#f5f7fb',
-                                    padding: 10,
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    overflow: 'auto',
-                                    margin: 0,
-                                }}
-                            >
-{showJsonDetails ? JSON.stringify({ wired_device: item.wiredDevice, sensors: item.sensors }, null, 4) : null}
-                            </pre>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
-                                <button
-                                    onClick={() => addMixingUnit(item, 'mixing')}
-                                    style={{
-                                        padding: '6px 14px',
-                                        border: '1px solid #3498db',
-                                        borderRadius: 6,
-                                        background: '#3498db',
-                                        color: '#fff',
-                                        cursor: 'pointer',
-                                        fontSize: 13,
-                                        fontWeight: 700,
-                                    }}
-                                >
-                                    Добавить
-                                </button>
-                                {renderUnitStepper(item, 'mixing', MIXING_TEMPLATES)}
-                            </div>
-                        </div>
-                    ))}
+                    <MixingUnitCard
+                        template={mixingTemplate}
+                        servo={mixingServo}
+                        onServoChange={selectMixingServo}
+                        sensor={mixingSensor}
+                        onSensorChange={setMixingSensor}
+                        onAdd={() => addMixingUnit(mixingTemplate, 'mixing')}
+                        addedRows={getGroupedDeviceRows(incomingScheme, 'mixing', MIXING_TEMPLATES)}
+                        onAddUnit={(row) => addMixingUnit(
+                            MIXING_TEMPLATES.find((item) => item.label === row.label),
+                            'mixing',
+                        )}
+                        onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                        showJsonDetails={showJsonDetails}
+                    />
                 </div>
-
             </section>
 
-            <section style={{ flex: '1 1 280px', minWidth: 0 }}>
+            <section style={{ flex: '1 1 100%', minWidth: 0, marginBottom: 8 }}>
                 <h2>Бойлеры ГВС</h2>
                 <SectionSubtitle>Какое количество бойлеров косвенного нагрева подключено после гидравлического разделителя?</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    {GVS_TEMPLATES.map((item, index) => (
-                        <div
-                            key={index}
-                            className="sel-card"
-                            style={{
-                                border: '1px solid #d7dbe4',
-                                borderRadius: 10,
-                                padding: 16,
-                                background: '#fff',
-                                flex: '1 1 260px',
-                                minWidth: 260,
-                            }}
-                        >
-                            <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
-                            {item.description && (
-                                <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
-                                    {item.description}
-                                </p>
-                            )}
-                            <pre
-                                style={{
-                                    background: '#f5f7fb',
-                                    padding: 10,
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    overflow: 'auto',
-                                    margin: 0,
-                                }}
-                            >
-{showJsonDetails ? JSON.stringify({ wired_device: item.wiredDevice, sensors: item.sensors }, null, 4) : null}
-                            </pre>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
-                                <button
-                                    onClick={() => addMixingUnit(item, 'gvs')}
-                                    data-test-id="add-gvs-boiler"
-                                    style={{
-                                        padding: '6px 14px',
-                                        border: '1px solid #3498db',
-                                        borderRadius: 6,
-                                        background: '#3498db',
-                                        color: '#fff',
-                                        cursor: 'pointer',
-                                        fontSize: 13,
-                                        fontWeight: 700,
-                                    }}
-                                >
-                                    Добавить
-                                </button>
-                                {renderUnitStepper(item, 'gvs', GVS_TEMPLATES)}
-                            </div>
-                        </div>
-                    ))}
+                    <SectionEquipmentCard
+                        image={GVS_BOILER_BACKGROUND_PATH}
+                        backgroundColor="#555351"
+                        backgroundPosition="right -100px"
+                        title={GVS_TEMPLATES[0].label}
+                        description={GVS_TEMPLATES[0].description}
+                        addedTitle="Добавленные бойлеры ГВС:"
+                        addedRows={gvsBoilerRows}
+                        onAddUnit={(row) => addMixingUnit(
+                            GVS_TEMPLATES.find((item) => item.label === row.label) || GVS_TEMPLATES[0],
+                            'gvs',
+                        )}
+                        onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                        addLabel="Добавить бойлер ГВС"
+                        onAdd={() => addMixingUnit(GVS_TEMPLATES[0], 'gvs')}
+                        showAdd={gvsBoilerRows.length === 0}
+                        addTestId="add-gvs-boiler"
+                        qtyTestId="gvs-qty"
+                        jsonData={{ wired_device: GVS_TEMPLATES[0].wiredDevice, sensors: GVS_TEMPLATES[0].sensors }}
+                        showJsonDetails={showJsonDetails}
+                    />
                 </div>
-
             </section>
 
             <section style={{ flex: '1 1 280px', minWidth: 0 }}>
@@ -4140,106 +4703,45 @@ const SelectionApp = () => {
             <section style={{ marginBottom: 32 }}>
                 <h2>Термостаты</h2>
                 <SectionSubtitle>Укажите тип и количество термостатов</SectionSubtitle>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
                     <ThermostatCard
-                        template={wiredThermostatTemplate}
-                        color={wiredThermostatColor}
-                        onColorChange={setWiredThermostatColor}
-                        hasFloorSensor={wiredThermostatHasFloorSensor}
-                        onFloorSensorChange={setWiredThermostatHasFloorSensor}
-                        onAdd={() => addThermostat(wiredThermostatTemplate)}
-                        showJsonDetails={showJsonDetails}
-                    />
-                    <ThermostatCard
-                        template={wirelessThermostatTemplate}
-                        color={wirelessThermostatColor}
-                        onColorChange={setWirelessThermostatColor}
-                        hasFloorSensor={wirelessThermostatHasFloorSensor}
-                        onFloorSensorChange={setWirelessThermostatHasFloorSensor}
-                        onAdd={() => addThermostat(wirelessThermostatTemplate)}
+                        template={thermostatTemplate}
+                        connection={thermostatConnection}
+                        onConnectionChange={setThermostatConnection}
+                        color={isWirelessThermostat ? wirelessThermostatColor : wiredThermostatColor}
+                        onColorChange={isWirelessThermostat ? setWirelessThermostatColor : setWiredThermostatColor}
+                        hasFloorSensor={isWirelessThermostat ? wirelessThermostatHasFloorSensor : wiredThermostatHasFloorSensor}
+                        onFloorSensorChange={isWirelessThermostat ? setWirelessThermostatHasFloorSensor : setWiredThermostatHasFloorSensor}
+                        onAdd={() => addThermostat(thermostatTemplate)}
+                        addedRows={getThermostatRows(incomingScheme)}
+                        onRemoveRow={(row) => removeSchemeItemById(row.removeKeys[0].target, row.removeKeys[0].id)}
                         showJsonDetails={showJsonDetails}
                     />
                 </div>
-
-                {(() => {
-                    const thermostatRows = getThermostatRows(incomingScheme);
-                    if (thermostatRows.length === 0) return null;
-
-                    return (
-                        <AddedDevicesBlock>
-                            <AddedDevicesTitle>Добавленные термостаты</AddedDevicesTitle>
-                            {thermostatRows.map((row) => (
-                                <AddedDeviceLine
-                                    key={row.label}
-                                    label={row.label}
-                                    count={row.count}
-                                    myheat
-                                    onRemove={() => removeSchemeItemById(row.removeKeys[0].target, row.removeKeys[0].id)}
-                                />
-                            ))}
-                        </AddedDevicesBlock>
-                    );
-                })()}
             </section>
 
                 <section>
-                    <h2>Зоны</h2>
+                    <h2>Зональное управление</h2>
                     <SectionSubtitle>Настройте управление системой с помощью зонирования</SectionSubtitle>
-                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-                        {ZONE_TEMPLATES.map((item, index) => (
-                            <div
-                                key={index}
-                                className="sel-card"
-                                style={{
-                                    border: '1px solid #d7dbe4',
-                                    borderRadius: 10,
-                                    padding: 16,
-                                    background: '#fff',
-                                    flex: '1 1 260px',
-                                    minWidth: 260,
-                                    maxWidth: 'calc(50% - 8px)',
-                                }}
-                            >
-                                <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
-                                <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
-                                    Определите, на сколько зон будет разделена система, чтобы эффективно управлять оборудованием черех двухходовые сервоприводы.
-                                </p>
-                                <pre
-                                    style={{
-                                        background: '#f5f7fb',
-                                        padding: 10,
-                                        borderRadius: 6,
-                                        fontSize: 12,
-                                        lineHeight: 1.5,
-                                        overflow: 'auto',
-                                        margin: 0,
-                                    }}
-                                >
-{showJsonDetails ? JSON.stringify(item.wiredDevice, null, 4) : null}
-                            </pre>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
-                                    <button
-                                        onClick={() => addMixingUnit(item, 'zone')}
-                                        data-test-id="add-zone"
-                                        style={{
-                                            padding: '6px 14px',
-                                            border: '1px solid #3498db',
-                                            borderRadius: 6,
-                                            background: '#3498db',
-                                            color: '#fff',
-                                            cursor: 'pointer',
-                                            fontSize: 13,
-                                            fontWeight: 700,
-                                        }}
-                                    >
-                                        Добавить
-                                    </button>
-                                    {renderUnitStepper(item, 'zone', ZONE_TEMPLATES)}
-                                </div>
-                            </div>
-                        ))}
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                        <SectionEquipmentCard
+                            image={ZONES_BACKGROUND_PATH}
+                            aspectRatio="630 / 436"
+                            title={ZONE_TEMPLATES[0].label}
+                            description="Определите, на сколько зон будет разделена система, чтобы эффективно управлять оборудованием черех двухходовые сервоприводы."
+                            addedTitle="Добавленные зоны:"
+                            addedRows={zoneRows}
+                            onAddUnit={() => addMixingUnit(ZONE_TEMPLATES[0], 'zone')}
+                            onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                            addLabel="Добавить зону"
+                            onAdd={() => addMixingUnit(ZONE_TEMPLATES[0], 'zone')}
+                            showAdd={zoneRows.length === 0}
+                            addTestId="add-zone"
+                            qtyTestId="zone-qty"
+                            jsonData={ZONE_TEMPLATES[0].wiredDevice}
+                            showJsonDetails={showJsonDetails}
+                        />
                     </div>
-
                 </section>
 
             </div>{/* /Управление климатом */}
@@ -4338,6 +4840,19 @@ const SelectionApp = () => {
                     />
                 </div>
 
+            </section>
+
+            <section style={{ marginBottom: 32 }}>
+                <h2>Уличный датчик температуры</h2>
+                <SectionSubtitle>Беспроводной датчик уличной температуры — не более одного на схему</SectionSubtitle>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <OutdoorSensorCard
+                        template={OUTDOOR_TEMPERATURE_SENSOR_TEMPLATE}
+                        enabled={hasOutdoorTemperatureSensor}
+                        onEnabledChange={setOutdoorTemperatureSensor}
+                        showJsonDetails={showJsonDetails}
+                    />
+                </div>
             </section>
 
             <section>
@@ -4584,6 +5099,112 @@ const SelectionApp = () => {
             </section>
             </div>{/* /Питание */}
             </div>{/* /sel-layout-content */}
+            {/* Единственное место выбора контроллера: липкая колонка справа,
+                видна на всём протяжении подбора. */}
+            <aside className="sel-stuck-controllers-panel">
+                <div className="sel-stuck-controllers-title" style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Подобранный контроллер</div>
+                <div className="sel-stuck-controllers" style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8 }}>
+                    {CONTROLLER_TEMPLATES.map((item, index) => {
+                        const isActive = incomingScheme.controller?.type === item.value.type;
+                        const isGoFamilySwitch = (controllerType === 'go' && item.value.type === 'go+')
+                            || (controllerType === 'go+' && item.value.type === 'go');
+                        const isCompatible = compatibleControllerTypes.has(item.value.type) || isGoFamilySwitch;
+                        return (
+                            <div
+                                key={index}
+                                className="sel-stuck-controller-card"
+                                data-test-id={`controller-card-${item.value.type}`}
+                                data-active={isActive}
+                                onClick={isCompatible ? () => setController(item.value) : undefined}
+                                aria-disabled={!isCompatible}
+                                title={isCompatible ? undefined : 'Этот контроллер не поддерживает текущую конфигурацию'}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    width: '100%',
+                                    boxSizing: 'border-box',
+                                    border: `2px solid ${isActive ? ORANGE : '#d7dbe4'}`,
+                                    borderRadius: 8,
+                                    padding: '6px 8px 6px 6px',
+                                    background: isActive ? '#fff7ed' : '#fff',
+                                    cursor: isCompatible ? 'pointer' : 'not-allowed',
+                                    fontSize: 13,
+                                    transition: 'border-color 0.15s, background 0.15s',
+                                    opacity: isCompatible ? 1 : 0.45,
+                                }}
+                            >
+                                <img
+                                    src={controllerImagePaths[item.value.type]}
+                                    alt={item.label}
+                                    style={{ display: 'block', width: 56, height: 42, flexShrink: 0, objectFit: 'contain' }}
+                                />
+                                <span style={{ minWidth: 0 }}>
+                                    <span style={{ display: 'block', fontWeight: 700, lineHeight: 1.25 }}>{item.label}</span>
+                                    <span style={{ display: 'block', marginTop: 2, fontSize: 11, lineHeight: 1.3, color: '#64748b' }}>
+                                        {CONTROLLER_CARD_DESCRIPTION}
+                                    </span>
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+                {proAndEcosmartOptions && (
+                    <div
+                        className="sel-stuck-controllers-note"
+                        style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'stretch',
+                            gap: 8,
+                            marginTop: 8,
+                            padding: '8px 10px',
+                            border: '1px solid #fed7aa',
+                            borderRadius: 8,
+                            background: '#fff7ed',
+                            color: '#9a3412',
+                            fontSize: 12,
+                            lineHeight: 1.35,
+                        }}
+                    >
+                        <span>Для этой конфигурации подходят два контроллера: <strong>PRO</strong> и <strong>ECOsmart</strong>.</span>
+                        <button
+                            className="selection-option-button"
+                            type="button"
+                            onClick={() => setController(getControllerTemplateValue('pro'))}
+                            style={{
+                                padding: '4px 10px',
+                                border: '1px solid #ea580c',
+                                borderRadius: 8,
+                                background: controllerType === 'pro' ? '#e07020' : '#fff',
+                                color: controllerType === 'pro' ? '#fff' : '#9a3412',
+                                cursor: 'pointer',
+                                fontSize: 12,
+                                fontWeight: 700,
+                            }}
+                        >
+                            Использовать PRO
+                        </button>
+                        <button
+                            className="selection-option-button"
+                            type="button"
+                            onClick={() => setController(getControllerTemplateValue('ecosmart'))}
+                            style={{
+                                padding: '4px 10px',
+                                border: '1px solid #ea580c',
+                                borderRadius: 8,
+                                background: controllerType === 'ecosmart' ? '#e07020' : '#fff',
+                                color: controllerType === 'ecosmart' ? '#fff' : '#9a3412',
+                                cursor: 'pointer',
+                                fontSize: 12,
+                                fontWeight: 700,
+                            }}
+                        >
+                            Использовать ECOsmart
+                        </button>
+                    </div>
+                )}
+            </aside>
             </div>{/* /sel-layout */}
 
             {showJsonDetails && (

@@ -90,6 +90,26 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
         return { total: Number((match?.[1] || '0').replace(/\D/g, '')), text };
     };
 
+    /**
+     * Добавляет count зон. Как и у бойлеров ГВС, большая кнопка исчезает после
+     * первого добавления — дальше количество набирается "+" в списке
+     * "Добавленные зоны".
+     */
+    const addZones = async (page, count) => {
+        await page.getByTestId('add-zone').click();
+        for (let i = 1; i < count; i += 1) await page.getByTestId('zone-qty-inc').click();
+    };
+
+    /**
+     * Добавляет count бойлеров ГВС. Большая кнопка "Добавить бойлер ГВС"
+     * исчезает после первого добавления — дальше количество набирается "+"
+     * в списке "Добавленные бойлеры ГВС".
+     */
+    const addGvsBoilers = async (page, count) => {
+        await page.getByTestId('add-gvs-boiler').click();
+        for (let i = 1; i < count; i += 1) await page.getByTestId('gvs-qty-inc').click();
+    };
+
     test('ИБП: обе стороны переключаются на GO+ вместо доплаты за отдельный модуль', async ({ page }) => {
         // Локально: тумблер data-test-id="ups-toggle" переключает GO -> GO+ (втроенный ИБП), без наценки.
         await page.getByTestId('ups-toggle').click({ force: true }); // кастомный toggle визуально перекрыт своим label
@@ -108,8 +128,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
 
     test('5 зон: relay-ёмкость go/go+ не хватает, обе стороны добирают smart2 + 2 модуля', async ({ page }) => {
         // Локально: data-test-id="add-zone", 5 кликов — воспроизводит сценарий из selection.spec.js.
-        const addZoneButton = page.getByTestId('add-zone');
-        for (let i = 0; i < 5; i += 1) await addZoneButton.click();
+        await addZones(page, 5);
         const local = await readLocalOffer(page);
         // smart2 (18 990) + 2 модуля RL2 (по 3 890) — см. selection.spec.js.
         expect(local.total).toBe(26770);
@@ -393,12 +412,9 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     });
 
     test('беспроводной термостат: обе стороны переходят на GO+ (встроенный радиодатчик в комплекте)', async ({ page }) => {
-        // Локально: вторая карточка термостата (первая — проводная) — "Беспроводной".
-        const card = page.locator('div')
-            .filter({ hasText: 'Беспроводной' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить термостат' }) })
-            .last();
-        await card.getByRole('button', { name: 'Добавить термостат' }).click();
+        // Локально: карточка термостата одна, тип подключения переключается внутри неё.
+        await page.getByTestId('thermostat-connection-wireless').click();
+        await page.getByRole('button', { name: 'Добавить термостат' }).click();
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Термостат беспроводной, черный');
         expect(local.text).toContain('GO+');
@@ -492,15 +508,9 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     });
 
     test('беспроводной уличный датчик температуры (без термостата): обе стороны переходят на GO+', async ({ page }) => {
-        // Локально: карточка "Уличный датчик температуры" — это селектор ТИПА внутри
-        // общей беспроводной секции (соседствует со "Настенный датчик температуры"),
-        // а не отдельная кнопка "Добавить" — сначала выбираем тип, потом жмём "Добавить датчик".
-        await page.getByRole('button', { name: 'Уличный датчик температуры', exact: true }).click();
-        const card = page.locator('div')
-            .filter({ hasText: 'Уличный датчик температуры' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить датчик' }) })
-            .last();
-        await card.getByRole('button', { name: 'Добавить датчик' }).click();
+        // Локально: уличный датчик вынесен в отдельную карточку и включается
+        // тумблером — он допустим ровно в одном экземпляре.
+        await page.getByTestId('outdoor-sensor-toggle').locator('input').check();
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Беспроводной Уличный датчик температуры');
         expect(local.text).toContain('GO+');
@@ -523,8 +533,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     // на одиночных устройствах.
 
     test('комбинация 5 зон + 5 насосов 220V + 5 проводных термостатов: PRO + один RL6', async ({ page }) => {
-        const addZone = page.getByTestId('add-zone');
-        for (let i = 0; i < 5; i += 1) await addZone.click();
+        await addZones(page, 5);
 
         const pumpCard = page.locator('div')
             .filter({ hasText: 'Насос 220V' })
@@ -568,10 +577,8 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     });
 
     test('комбинация 3 бойлера ГВС + 3 зоны + 2 датчика давления: комплектные датчики PRO гасят часть цены', async ({ page }) => {
-        const addGvs = page.getByTestId('add-gvs-boiler');
-        for (let i = 0; i < 3; i += 1) await addGvs.click();
-        const addZone = page.getByTestId('add-zone');
-        for (let i = 0; i < 3; i += 1) await addZone.click();
+        await addGvsBoilers(page, 3);
+        await addZones(page, 3);
         const pressureCard = page.locator('div')
             .filter({ hasText: 'Токовый датчик давления' })
             .filter({ has: page.getByRole('button', { name: 'Добавить' }) })
@@ -602,8 +609,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
         // Самая смешанная схема набора: relay (зоны), di (ОПС) и 1-wire/ntc (датчики)
         // нагружаются одновременно, поэтому подбор обязан добрать сразу два разных
         // модуля — дискретный DI6 и NTC 1-Wire — поверх PRO.
-        const addZone = page.getByTestId('add-zone');
-        for (let i = 0; i < 4; i += 1) await addZone.click();
+        await addZones(page, 4);
 
         const opsCard = page.locator('div')
             .filter({ hasText: 'Датчик ОПС' })
@@ -672,10 +678,8 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     });
 
     test('комбинация 6 зон + 2 бойлера ГВС + 2 запорных клапана: комплектные датчики PRO закрывают оба бойлера', async ({ page }) => {
-        const addZone = page.getByTestId('add-zone');
-        for (let i = 0; i < 6; i += 1) await addZone.click();
-        const addGvs = page.getByTestId('add-gvs-boiler');
-        for (let i = 0; i < 2; i += 1) await addGvs.click();
+        await addZones(page, 6);
+        await addGvsBoilers(page, 2);
         const addValve = page.getByTestId('add-valve');
         for (let i = 0; i < 2; i += 1) await addValve.click();
 
@@ -753,10 +757,11 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     test('комбинация 3 проводных + 2 беспроводных термостата + 4 датчика протечки: Smart2 добирает радиомодуль RDT2', async ({ page }) => {
         // Беспроводные термостаты на Smart2 требуют радиомодуль RDT2 (4 990) —
         // единственный сценарий в наборе, где подбирается именно радиомодуль.
-        const wiredAdd = page.getByRole('button', { name: 'Добавить термостат' }).first();
-        for (let i = 0; i < 3; i += 1) await wiredAdd.click();
-        const wirelessAdd = page.getByRole('button', { name: 'Добавить термостат' }).nth(1);
-        for (let i = 0; i < 2; i += 1) await wirelessAdd.click();
+        // Карточка термостата одна: сначала добавляем проводные, потом переключаем тип.
+        const thermostatAdd = page.getByRole('button', { name: 'Добавить термостат' });
+        for (let i = 0; i < 3; i += 1) await thermostatAdd.click();
+        await page.getByTestId('thermostat-connection-wireless').click();
+        for (let i = 0; i < 2; i += 1) await thermostatAdd.click();
         const addLeak = page.getByTestId('add-leak-sensor');
         for (let i = 0; i < 4; i += 1) await addLeak.click();
 
@@ -812,10 +817,8 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     });
 
     test('комбинация 8 зон + 4 бойлера ГВС: два датчика бойлера платные, два закрыты комплектом PRO', async ({ page }) => {
-        const addZone = page.getByTestId('add-zone');
-        for (let i = 0; i < 8; i += 1) await addZone.click();
-        const addGvs = page.getByTestId('add-gvs-boiler');
-        for (let i = 0; i < 4; i += 1) await addGvs.click();
+        await addZones(page, 8);
+        await addGvsBoilers(page, 4);
 
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Модуль реле RL6');
@@ -864,8 +867,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     test('комбинация 4 бойлера ГВС + 5 NTC-датчиков: Smart2 добирает 2×RL2 и NTC-модуль', async ({ page }) => {
         // Единственный комплектный датчик Smart2 — настенный цифровой, поэтому все
         // 4 датчика бойлера платные; 5 NTC-датчиков требуют модуль NTC 1-Wire.
-        const addGvs = page.getByTestId('add-gvs-boiler');
-        for (let i = 0; i < 4; i += 1) await addGvs.click();
+        await addGvsBoilers(page, 4);
         await page.getByRole('button', { name: 'NTC-датчик в колбе', exact: true }).click();
         const ntcCard = page.locator('div')
             .filter({ hasText: 'NTC-датчик в колбе' })
@@ -908,8 +910,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     });
 
     test('комбинация 3 зоны + 3 ОПС + 2 запроса от бассейна + 1 датчик давления: DI6 под пять DI-устройств', async ({ page }) => {
-        const addZone = page.getByTestId('add-zone');
-        for (let i = 0; i < 3; i += 1) await addZone.click();
+        await addZones(page, 3);
         const addByTitle = async (title, times) => {
             const card = page.locator('div')
                 .filter({ hasText: title })
@@ -978,12 +979,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
         for (let i = 0; i < 4; i += 1) await pumpCard.getByRole('button', { name: 'Добавить' }).click();
         const wiredThermostatAdd = page.getByRole('button', { name: 'Добавить термостат' }).first();
         for (let i = 0; i < 3; i += 1) await wiredThermostatAdd.click();
-        await page.getByRole('button', { name: 'Уличный датчик температуры', exact: true }).click();
-        const outdoorCard = page.locator('div')
-            .filter({ hasText: 'Уличный датчик температуры' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить датчик' }) })
-            .last();
-        await outdoorCard.getByRole('button', { name: 'Добавить датчик' }).click();
+        await page.getByTestId('outdoor-sensor-toggle').locator('input').check();
 
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Радиомодуль RDT2'); // беспроводной датчик на Smart2 требует радиомодуль
