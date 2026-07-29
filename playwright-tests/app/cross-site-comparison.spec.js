@@ -101,6 +101,28 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     };
 
     /**
+     * Добавляет count токовых датчиков давления. Карточка устроена как зоны:
+     * большая кнопка исчезает после первого добавления, дальше количество
+     * набирается "+" в списке "Добавленные датчики давления".
+     */
+    const addPressureSensors = async (page, count) => {
+        await page.getByTestId('add-pressure-sensor').click();
+        for (let i = 1; i < count; i += 1) await page.getByTestId('pressure-sensor-qty-inc').click();
+    };
+
+    /**
+     * Добавляет count датчиков температуры. Проводные и беспроводные датчики
+     * живут в одной карточке: вариант набирается тумблерами «Проводной/
+     * Беспроводной», «Настенный/В колбе» и «Цифровой/NTC».
+     */
+    const addTemperatureSensors = async (page, { connection = 'wired', placement = 'wall', kind = 'digital' }, count = 1) => {
+        await page.getByTestId(`temperature-sensor-connection-${connection}`).click();
+        await page.getByTestId(`temperature-sensor-placement-${placement}`).click();
+        if (connection === 'wired') await page.getByTestId(`temperature-sensor-kind-${kind}`).click();
+        for (let i = 0; i < count; i += 1) await page.getByTestId('add-temperature-sensor').click();
+    };
+
+    /**
      * Добавляет count бойлеров ГВС. Большая кнопка "Добавить бойлер ГВС"
      * исчезает после первого добавления — дальше количество набирается "+"
      * в списке "Добавленные бойлеры ГВС".
@@ -181,17 +203,9 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
 
     test('3 проводных датчика температуры: NTC-датчик требует отдельный модуль NTC 1-Wire', async ({ page }) => {
         // Локально: настенный цифровой (уходит в комплект GO бесплатно) + цифровой в колбе + NTC в колбе.
-        const addWiredSensor = async (typeLabel) => {
-            await page.getByRole('button', { name: typeLabel, exact: true }).click();
-            const card = page.locator('div')
-                .filter({ hasText: typeLabel })
-                .filter({ has: page.getByRole('button', { name: 'Добавить датчик' }) })
-                .last();
-            await card.getByRole('button', { name: 'Добавить датчик' }).click();
-        };
-        await addWiredSensor('Настенный цифровой датчик');
-        await addWiredSensor('Цифровой датчик в колбе');
-        await addWiredSensor('NTC-датчик в колбе');
+        await addTemperatureSensors(page, { placement: 'wall', kind: 'digital' });
+        await addTemperatureSensors(page, { placement: 'flask', kind: 'digital' });
+        await addTemperatureSensors(page, { placement: 'flask', kind: 'ntc' });
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Модуль NTC 1-Wire');
         expect(local.text).toContain('Комплектный'); // настенный цифровой поглощён комплектом GO
@@ -579,11 +593,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     test('комбинация 3 бойлера ГВС + 3 зоны + 2 датчика давления: комплектные датчики PRO гасят часть цены', async ({ page }) => {
         await addGvsBoilers(page, 3);
         await addZones(page, 3);
-        const pressureCard = page.locator('div')
-            .filter({ hasText: 'Токовый датчик давления' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить' }) })
-            .last();
-        for (let i = 0; i < 2; i += 1) await pressureCard.getByRole('button', { name: 'Добавить' }).click();
+        await addPressureSensors(page, 2);
 
         const local = await readLocalOffer(page);
         // Второй датчик 4-20 уже не влезает во встроенный порт PRO — нужен IO4.
@@ -617,12 +627,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
             .last();
         for (let i = 0; i < 4; i += 1) await opsCard.getByRole('button', { name: 'Добавить' }).click();
 
-        await page.getByRole('button', { name: 'NTC-датчик в колбе', exact: true }).click();
-        const ntcCard = page.locator('div')
-            .filter({ hasText: 'NTC-датчик в колбе' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить датчик' }) })
-            .last();
-        for (let i = 0; i < 3; i += 1) await ntcCard.getByRole('button', { name: 'Добавить датчик' }).click();
+        await addTemperatureSensors(page, { placement: 'flask', kind: 'ntc' }, 3);
 
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Модуль DI6');
@@ -716,11 +721,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
             .last();
         for (let i = 0; i < 3; i += 1) await pumpCard.getByRole('button', { name: 'Добавить' }).click();
 
-        const pressureCard = page.locator('div')
-            .filter({ hasText: 'Токовый датчик давления' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить' }) })
-            .last();
-        for (let i = 0; i < 2; i += 1) await pressureCard.getByRole('button', { name: 'Добавить' }).click();
+        await addPressureSensors(page, 2);
 
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Модуль IO4');
@@ -868,12 +869,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
         // Единственный комплектный датчик Smart2 — настенный цифровой, поэтому все
         // 4 датчика бойлера платные; 5 NTC-датчиков требуют модуль NTC 1-Wire.
         await addGvsBoilers(page, 4);
-        await page.getByRole('button', { name: 'NTC-датчик в колбе', exact: true }).click();
-        const ntcCard = page.locator('div')
-            .filter({ hasText: 'NTC-датчик в колбе' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить датчик' }) })
-            .last();
-        for (let i = 0; i < 5; i += 1) await ntcCard.getByRole('button', { name: 'Добавить датчик' }).click();
+        await addTemperatureSensors(page, { placement: 'flask', kind: 'ntc' }, 5);
 
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Модуль реле RL2');
@@ -920,7 +916,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
         };
         await addByTitle('Датчик ОПС', 3);
         await addByTitle('Запрос тепла от бассейна', 2);
-        await addByTitle('Токовый датчик давления', 1);
+        await addPressureSensors(page, 1);
 
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Модуль DI6'); // 5 DI-устройств не влезают во встроенные входы PRO

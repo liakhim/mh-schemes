@@ -28,6 +28,7 @@ const materializedDeviceNames = {
     discrete_signal: 'Дискретный сигнал',
     discrete_ventilation: 'Дискретная вентиляция',
     'leak-sensor': 'Датчик протечки',
+    'leak-loop': 'Зона контроля протечки',
     'pressure-sensor': 'Датчик давления',
     'mixing-ntc-sensor': 'NTC смесителя',
     'boiler-ntc-sensor': 'Датчик бойлера',

@@ -49,6 +49,9 @@ const isDiscreteDevice = (device) => new Set([
     'discrete_fire_alarm',
     'discrete_signal',
     'discrete_ventilation',
+    // Зона протечки занимает один DI как единое устройство; `leak-sensor` —
+    // legacy-форма до миграции в зоны.
+    'leak-loop',
     'leak-sensor',
 ]).has(getDeviceType(device)) && hasConnectionType(device, 'di');
 

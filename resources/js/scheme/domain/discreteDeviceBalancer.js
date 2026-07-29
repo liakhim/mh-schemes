@@ -5,7 +5,11 @@ const SMART2_CONTROLLER_DI_CAPACITY = 4;
 const IO4_CHANNEL_CAPACITY = 4;
 const DI6_DI_CAPACITY = 6;
 const DISCRETE_ONLY_TYPES = new Set(['discrete_pool', 'discrete_fire_alarm', 'discrete_signal', 'discrete_ventilation']);
-const DISCRETE_TYPES = new Set([...DISCRETE_ONLY_TYPES, 'leak-sensor']);
+// Зона протечки занимает ровно один дискретный вход: все её датчики сидят на
+// одном шлейфе, поэтому в линию попадает один объект `leak-loop`. Одиночный
+// `leak-sensor` остаётся в списке как legacy-вход до миграции в зоны.
+const LEAK_DI_TYPES = new Set(['leak-loop', 'leak-sensor']);
+const DISCRETE_TYPES = new Set([...DISCRETE_ONLY_TYPES, ...LEAK_DI_TYPES]);
 
 const normalizePowerModuleType = (type) => {
     const normalized = canonicalDeviceType(type);
@@ -89,7 +93,7 @@ export const balanceDiscreteDevices = (scheme) => {
     controller.leak_sensor_devices = Array.isArray(controller.leak_sensor_devices) ? [...controller.leak_sensor_devices] : [];
 
     const lines = [
-        { devices: controller.leak_sensor_devices, capacity: controllerType === 'ecosmart' ? 1 : 0, onlyTypes: new Set(['leak-sensor']) },
+        { devices: controller.leak_sensor_devices, capacity: controllerType === 'ecosmart' ? 1 : 0, onlyTypes: LEAK_DI_TYPES },
         { devices: controller.di_devices, capacity: controllerType === 'ecosmart' ? 1 : 0, onlyTypes: DISCRETE_ONLY_TYPES },
         { devices: controller.di_devices, capacity: controllerType === 'pro' && useControllerDi ? CONTROLLER_DI_CAPACITY : 0 },
         { devices: controller.di_devices, capacity: controllerType === 'smart2' ? smart2ControllerDiCapacity : 0 },

@@ -37,7 +37,10 @@ export const buildSelectionConfig = ({
                 : (controllerSelectionSource || 'default'),
             ups_requested: upsRequested === true,
             ups_request_source: upsRequestSource || null,
-            unified_leak_loop: normalizedSelectionState?.unified_leak_loop === true,
+            // Число зон контроля протечки: каждая зона занимает один DI.
+            // Заменило булев unified_leak_loop прежней модели.
+            leak_zone_count: (Array.isArray(normalizedSelectionState?.sensors) ? normalizedSelectionState.sensors : [])
+                .filter((sensor) => String(sensor?.type || '').toLowerCase() === 'leak-loop').length,
         },
         editor: {
             wired_thermostat_color: editor?.wiredThermostatColor || 'black',

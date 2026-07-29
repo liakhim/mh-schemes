@@ -5,6 +5,7 @@
 - Короткий контекст проекта: `PROJECT_CONTEXT.md`
 - Входной контракт `incomingScheme`: `INCOMING_SCHEME.md`
 - Индекс правил по темам (wireless, 1-wire, relay, power, ext-di, controllers, connection-layout, selection-config): `docs/rules/INDEX.md`
+- Причины инженерных и доменных правил: `ENGINEERING_RATIONALE.md`
 - Полный архив правил и changelog (открывать точечно, не целиком): `JOURNAL.md`
 - Beget deploy notes: `docs/deploy/beget.md`
 

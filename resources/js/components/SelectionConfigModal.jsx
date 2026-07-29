@@ -86,8 +86,8 @@ const SelectionConfigModal = ({ config, onClose }) => {
                         <strong>{intent.ups_requested ? 'Требуется' : 'Не требуется'}</strong>
                     </div>
                     <div>
-                        <span>Единый шлейф протечки</span>
-                        <strong>{intent.unified_leak_loop ? 'Да' : 'Нет'}</strong>
+                        <span>Зоны контроля протечки</span>
+                        <strong>{intent.leak_zone_count ?? (intent.unified_leak_loop ? 1 : 0)}</strong>
                     </div>
                 </div>
 

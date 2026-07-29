@@ -15,6 +15,7 @@
 - Главная отрисовка и интерактив: `resources/js/spa.jsx`
 - Входной контракт: `INCOMING_SCHEME.md`
 - Полный журнал правил: `JOURNAL.md`
+- Инженерные обоснования правил: `ENGINEERING_RATIONALE.md`
 - Индекс быстрых правил: `docs/rules/INDEX.md`
 - Константы и demo input: `resources/js/constants.js`
 - SVG registry: `resources/js/scheme/assets/imageRegistry.js`

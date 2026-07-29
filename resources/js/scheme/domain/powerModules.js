@@ -14,16 +14,15 @@ const isPowerUnit = (moduleItem) => {
 
 export const materializePowerModules = (currentModules, controllerType, upsRequested) => {
     const modules = (Array.isArray(currentModules) ? currentModules : [])
-        .filter((moduleItem) => getModuleType(moduleItem) !== 'ups');
+        .filter((moduleItem) => (
+            getModuleType(moduleItem) !== 'ups'
+            && !isCircuitBreaker(moduleItem)
+            && !isPowerUnit(moduleItem)
+        ));
     const requiresPowerLine = controllerType === 'smart2' || controllerType === 'pro';
-    const result = requiresPowerLine
-        ? [
-            'circuit-breaker',
-            'power-unit',
-            ...modules.filter((moduleItem) => !isCircuitBreaker(moduleItem) && !isPowerUnit(moduleItem)),
-        ]
-        : modules;
+    if (!requiresPowerLine) return modules;
 
-    if (upsRequested && requiresPowerLine) result.push('ups');
+    const result = ['circuit-breaker', 'power-unit', ...modules];
+    if (upsRequested) result.push('ups');
     return result;
 };

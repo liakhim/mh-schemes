@@ -166,7 +166,7 @@ export const SELECTION_BUTTON_MAP = [
         section: '5. Прочее — Беспроводной уличный/настенный датчик температуры',
         local: [
             { testId: 'outdoor-sensor-toggle', description: 'Уличный датчик — отдельная карточка с тумблером (вкл/выкл, ровно 1 шт), кнопки "Добавить" и счётчика нет' },
-            { testId: null, description: 'Настенный беспроводной датчик остался в общей карточке wireless_devices: кнопка "Настенный датчик температуры" + "Добавить датчик"' },
+            { testId: 'temperature-sensor-connection-wireless', description: 'Настенный беспроводной датчик добавляется из общей карточки "Датчики температуры": тумблер "Беспроводной" + "Добавить датчик"' },
         ],
         live: { description: 'Простой toggle "Беспроводной уличный датчик температуры" (вкл/выкл, без выбора типа)' },
         soldByMyHeat: true,
@@ -175,18 +175,25 @@ export const SELECTION_BUTTON_MAP = [
 
     // --- 6. Датчики и защита ---
     {
-        section: '6. Датчики и защита — Датчики температуры (проводные)',
+        section: '6. Датчики и защита — Датчики температуры (общая карточка)',
         local: [
-            { testId: null, title: 'Настенный цифровой датчик', templateKey: 'wired-wall-digital', soldByMyHeat: true, price: 1650 },
-            { testId: null, title: 'Цифровой датчик в колбе', templateKey: 'wired-flask-digital', soldByMyHeat: true, price: 1450 },
-            { testId: null, title: 'NTC-датчик в колбе', templateKey: 'wired-flask-ntc', soldByMyHeat: true, price: 3190 },
-            { testId: null, title: 'Настенный NTC-датчик', templateKey: 'wired-wall-ntc', soldByMyHeat: false, disabledLocally: true },
+            { testId: 'temperature-sensor-connection-wired|-wireless', description: 'Тумблер "Проводной / Беспроводной"' },
+            { testId: 'temperature-sensor-placement-wall|-flask', description: 'Тумблер "Настенный / В колбе"; "В колбе" гаснет для беспроводного' },
+            { testId: 'temperature-sensor-kind-digital|-ntc', description: 'Тумблер "Цифровой / NTC", только для проводного; NTC гаснет для настенного' },
+            { testId: 'add-temperature-sensor', description: 'Кнопка "Добавить датчик" добавляет выбранную комбинацию' },
+        ],
+        combinations: [
+            { title: 'Настенный цифровой датчик', templateKey: 'wired-wall-digital', soldByMyHeat: true, price: 1650 },
+            { title: 'Цифровой датчик в колбе', templateKey: 'wired-flask-digital', soldByMyHeat: true, price: 1450 },
+            { title: 'NTC-датчик в колбе', templateKey: 'wired-flask-ntc', soldByMyHeat: true, price: 3190 },
+            { title: 'Настенный NTC-датчик', templateKey: 'wired-wall-ntc', soldByMyHeat: false, disabledLocally: true },
+            { title: 'Беспроводной настенный датчик', templateKey: 'wireless-wall', soldByMyHeat: true, price: 4190 },
         ],
         live: {
             description: '"+" у "Датчики температуры" открывает модалку с select "Тип подключения", select "Тип монтажа", select "Тип датчика", кнопка "Добавить"',
         },
         soldByMyHeat: 'mixed',
-        note: 'ВАЖНО: из 4 логических комбинаций (подключение x монтаж) продаются MyHeat только 3 — "Настенный NTC-датчик" (wired-wall-ntc) не имеет цены в MYHEAT_PRICES.temperatureSensors И явно помечен disabled: true в TEMPERATURE_SENSOR_TEMPLATES (resources/js/selection.jsx:1836-1846) — то есть локально кнопка либо не рендерится, либо неактивна (не как остальные 3). При сравнении с live-модалкой (3 select) нужно проверить, предлагает ли она вообще эту комбинацию, и если да — считать это расхождением каталога, а не бага теста.',
+        note: 'Проводные и беспроводные датчики объединены в одну карточку с тремя тумблерами — структура совпала с live-модалкой (3 select). Недоступные комбинации гасятся: беспроводного "в колбе" не существует, а "Настенный NTC-датчик" (wired-wall-ntc) помечен disabled: true в TEMPERATURE_SENSOR_TEMPLATES и не имеет цены в MYHEAT_PRICES.temperatureSensors. Уличный датчик в этой карточке не участвует — у него отдельный тумблер outdoor-sensor-toggle.',
     },
     {
         section: '6. Датчики и защита — Контроль протечки воды',
@@ -204,10 +211,10 @@ export const SELECTION_BUTTON_MAP = [
     },
     {
         section: '6. Датчики и защита — Токовый датчик давления',
-        local: { testId: null, title: 'Токовый датчик давления' },
+        local: { testId: 'add-pressure-sensor', title: 'Токовый датчик давления' },
         live: { description: 'Счётчик "Датчик 4-20мА" под заголовком "Токовый датчик давления"' },
         soldByMyHeat: true,
-        note: 'Прямое соответствие 1:1, заголовки идентичны. Продаётся MyHeat: MYHEAT_PRICES.pressureSensor = 5990 ₽. Локальной кнопке стоит добавить data-test-id (например add-pressure-sensor).',
+        note: 'Прямое соответствие 1:1, заголовки идентичны. Продаётся MyHeat: MYHEAT_PRICES.pressureSensor = 5990 ₽. Карточка широкая, как у зон: после первого добавления кнопка скрывается, количество набирается через pressure-sensor-qty-inc / -dec.',
     },
 
     // --- 7. Прочее (дискретные входы) ---

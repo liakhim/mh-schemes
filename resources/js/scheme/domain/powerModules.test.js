@@ -36,3 +36,16 @@ test('normalizes mandatory aliases and removes duplicates', () => {
 test('does not add a power line to unsupported controllers', () => {
     assert.deepEqual(materializePowerModules(undefined, 'ecosmart', true), []);
 });
+
+test('drops mandatory power modules carried over to unsupported controllers', () => {
+    assert.deepEqual(materializePowerModules([
+        'circuit-breaker',
+        'power-unit',
+        'ups',
+    ], 'ecosmart', true), []);
+
+    assert.deepEqual(materializePowerModules([
+        'circuitbreaker',
+        { type: 'power-unit' },
+    ], 'go', false), []);
+});

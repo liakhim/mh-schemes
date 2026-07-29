@@ -111,6 +111,10 @@ export const getWirelessDeviceImageKey = (device) => {
     if (normalizedType === 'ntc-sensor' || normalizedType === 'mixing-ntc-sensor') {
         return device?.port_side === 'left' ? 'ntc-sensor-left' : 'ntc-sensor';
     }
+    // Зона протечки рисуется тем же датчиком: отдельного изображения шлейфа нет.
+    if (normalizedType === 'leak-loop') {
+        return device?.port_side === 'right' ? 'leak-sensor-right-port' : 'leak-sensor';
+    }
     if (
         normalizedType === 'discrete_pool'
         || normalizedType === 'discrete_fire_alarm'

@@ -3,6 +3,16 @@ import { createRoot } from 'react-dom/client';
 import EquipmentOfferModal from './components/EquipmentOfferModal';
 import { getAllOneWireDevicesForBalancing } from './scheme/domain/initialState';
 import { materializePowerModules } from './scheme/domain/powerModules';
+import {
+    createLeakSensor,
+    createLeakValve,
+    createLeakZone,
+    getLeakZoneSensors,
+    getLeakZoneValves,
+    getLeakZones,
+    isLeakLoop,
+    materializeLeakZones,
+} from './scheme/domain/leakZones';
 import { countRinnaiAdapters, RINNAI_ADAPTER_LABEL, RINNAI_ADAPTER_PRICE, withRinnaiAdapter } from './scheme/domain/rinnaiAdapter';
 import { normalizeSchemeIds } from './scheme/domain/schemeIds';
 import { buildSelectionConfig } from './scheme/domain/selectionConfig';
@@ -48,6 +58,35 @@ const GVS_BOILER_BACKGROUND_PATH = new URL('../images/thermostats/boiler_gvs_roo
 
 /** Фон карточки зонирования. */
 const ZONES_BACKGROUND_PATH = new URL('../images/thermostats/zones_room.jpg', import.meta.url).href;
+
+/** Фон карточки прочего оборудования. */
+const OTHER_EQUIP_BACKGROUND_PATH = new URL('../images/thermostats/other_room.png', import.meta.url).href;
+
+/** Фон карточки зон контроля протечки: отдельного снимка нет, берём общий интерьер. */
+const LEAK_ZONE_BACKGROUND_PATH = new URL('../images/thermostats/standard_room.png', import.meta.url).href;
+
+/** Пример структуры зоны для режима «показать JSON». */
+const LEAK_ZONE_JSON_EXAMPLE = {
+    sensors: [{
+        type: 'leak-loop',
+        device_type: 'sensor',
+        connection_type: 'di',
+        additions: [{ type: 'leak-sensor', device_type: 'sensor' }],
+    }],
+    wired_devices: [{
+        type: 'valve',
+        device_type: 'equipment',
+        connection_type: 'double_relay',
+        leak_zone_id: '<id зоны>',
+    }],
+};
+
+/** Фон карточки источника бесперебойного питания. */
+const UPS_BACKGROUND_PATH = new URL('../images/thermostats/ups_room.png', import.meta.url).href;
+
+/** Фон карточки токового датчика давления и снимок самого датчика поверх него. */
+const PRESSURE_SENSOR_BACKGROUND_PATH = new URL('../images/thermostats/standard_room.png', import.meta.url).href;
+const PRESSURE_SENSOR_IMAGE_PATH = new URL('../images/thermostats/420sensor.png', import.meta.url).href;
 
 /** Быстрые подсказки над строкой поиска: подставляют бренд в запрос. */
 const BOILER_BRAND_TAGS = ['Baxi', 'Ariston', 'Arderia', 'Rinnai', 'Zota'];
@@ -755,7 +794,8 @@ const isEcosmartIdentified = (scheme) => {
     const mixing220 = wiredDevices.filter((device) => canonicalType(device?.type) === '220servo' && hasConnectionType(device, 'double_relay')).length;
     const pumps220 = wiredDevices.filter((device) => canonicalType(device?.type) === 'pump-220v').length;
     const pressure420 = sensors.filter((sensor) => canonicalType(sensor?.type) === 'pressure-sensor' && hasConnectionType(sensor, '4-20')).length;
-    const leakSensors = sensors.filter((sensor) => canonicalType(sensor?.type) === 'leak-sensor' && hasConnectionType(sensor, 'di')).length;
+    // Зона занимает один дискретный вход независимо от числа датчиков в шлейфе.
+    const leakZones = sensors.filter((sensor) => isLeakLoop(sensor) && hasConnectionType(sensor, 'di')).length;
     const valves = wiredDevices.filter((device) => canonicalType(device?.type) === 'valve').length;
     const discreteInputs = wiredDevices.filter((device) => DISCRETE_TEMPLATES.some((template) => canonicalType(template.data.type) === canonicalType(device?.type))).length;
     const io4Only = wiredDevices.reduce((sum, device) => sum + countIo4OnlyDeviceSlots(device), 0);
@@ -771,7 +811,7 @@ const isEcosmartIdentified = (scheme) => {
         && mixing220 <= 2
         && pumps220 <= 3
         && pressure420 <= 1
-        && leakSensors <= 1
+        && leakZones <= 1
         && valves <= 1
         && discreteInputs <= 1
         && io4Only === 0
@@ -1644,31 +1684,36 @@ const resolveControllerAndRequiredModules = (scheme, upsRequested = false, isMan
 };
 
 const DISCRETE_TEMPLATES = [
-    { label: 'Запрос тепла от бассейна', data: { id: 8, device_type: 'equipment', type: 'discrete_pool', connection_type: 'di' } },
-    { label: 'Запрос тепла от вентиляции', data: { id: 8, device_type: 'equipment', type: 'discrete_ventilation', connection_type: 'di' } },
-    { label: 'Датчик ОПС', data: { id: 9, device_type: 'equipment', type: 'discrete_fire_alarm', connection_type: 'di' } },
-    { label: 'Произвольный сигнал', data: { id: 10, device_type: 'equipment', type: 'discrete_signal', connection_type: 'di' } },
+    {
+        label: 'Запрос тепла от бассейна',
+        description: 'Сухой контакт от автоматики бассейна: контроллер получает запрос на нагрев. Занимает один дискретный вход.',
+        background: new URL('../images/thermostats/2_room.png', import.meta.url).href,
+        data: { id: 8, device_type: 'equipment', type: 'discrete_pool', connection_type: 'di' },
+    },
+    {
+        label: 'Запрос тепла от вентиляции',
+        description: 'Сухой контакт от приточной установки: запрос тепла на калорифер. Занимает один дискретный вход.',
+        background: new URL('../images/thermostats/1_room.png', import.meta.url).href,
+        data: { id: 8, device_type: 'equipment', type: 'discrete_ventilation', connection_type: 'di' },
+    },
+    {
+        label: 'Датчик ОПС',
+        description: 'Сигнал охранно-пожарной сигнализации приходит на дискретный вход контроллера. Занимает один вход.',
+        background: new URL('../images/thermostats/3_room.png', import.meta.url).href,
+        data: { id: 9, device_type: 'equipment', type: 'discrete_fire_alarm', connection_type: 'di' },
+    },
+    {
+        label: 'Произвольный сигнал',
+        description: 'Любой сухой контакт, состояние которого нужно видеть в системе. Занимает один дискретный вход.',
+        background: new URL('../images/thermostats/4_room.png', import.meta.url).href,
+        data: { id: 10, device_type: 'equipment', type: 'discrete_signal', connection_type: 'di' },
+    },
 ];
 
 const PRESSURE_TEMPLATES = [
     {
         label: 'Токовый датчик давления',
         data: { id: 4, device_type: 'sensor', type: 'pressure-sensor', connection_type: '4-20' },
-    },
-];
-
-const LEAK_TEMPLATES = [
-    {
-        label: 'Датчик защиты от протечки',
-        description: 'Предназначен для фиксации протечки воды и передачи аварийного сигнала на контроллер.',
-        target: 'sensors',
-        data: { id: 1, device_type: 'sensor', type: 'leak-sensor', connection_type: 'di' },
-    },
-    {
-        label: 'Запорный клапан',
-        description: 'Предназначен для фиксации протечки воды и передачи аварийного сигнала на контроллер.',
-        target: 'wired',
-        data: { id: 0, device_type: 'equipment', type: 'valve', connection_type: 'double_relay', additions: [] },
     },
 ];
 
@@ -1733,7 +1778,6 @@ const hasSelectedArrayItems = (value) => {
 const isSelectionDraftMeaningful = (scheme, upsRequested) => (
     canonicalType(typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type) !== 'go'
     || upsRequested === true
-    || scheme?.unified_leak_loop === true
     || hasSelectedArrayItems(scheme)
 );
 
@@ -1743,7 +1787,9 @@ const readSelectionDraft = () => {
         if (!raw) return null;
         const draft = JSON.parse(raw);
         if (draft?.version !== SELECTION_DRAFT_VERSION || !draft.incomingScheme || typeof draft.incomingScheme !== 'object') return null;
-        return isSelectionDraftMeaningful(draft.incomingScheme, draft.upsRequested) ? draft : null;
+        // Черновики со старой моделью протечки поднимаются уже в виде зон.
+        const migratedDraft = { ...draft, incomingScheme: materializeLeakZones(draft.incomingScheme) };
+        return isSelectionDraftMeaningful(migratedDraft.incomingScheme, migratedDraft.upsRequested) ? migratedDraft : null;
     } catch {
         return null;
     }
@@ -1878,6 +1924,22 @@ const OUTDOOR_TEMPERATURE_SENSOR_TYPE = canonicalType(OUTDOOR_TEMPERATURE_SENSOR
 const TEMPERATURE_SENSOR_TYPES = new Set(TEMPERATURE_SENSOR_TEMPLATES.map((template) => canonicalType(template.data.type)));
 const isTemperatureSensor = (device) => TEMPERATURE_SENSOR_TYPES.has(canonicalType(device?.type));
 const getTemperatureSensorGroup = (template) => (template.target === 'wireless_devices' ? 'wireless' : 'wired');
+
+// Варианты объединённой карточки датчиков температуры. Ключи проводных шаблонов
+// собираются как `wired-<расположение>-<тип>`, беспроводной вариант один —
+// настенный, поэтому «в колбе» для него гасится.
+const TEMPERATURE_SENSOR_CONNECTIONS = [
+    { value: 'wired', label: 'Проводной' },
+    { value: 'wireless', label: 'Беспроводной' },
+];
+const TEMPERATURE_SENSOR_PLACEMENTS = [
+    { value: 'wall', label: 'Настенный' },
+    { value: 'flask', label: 'В колбе' },
+];
+const TEMPERATURE_SENSOR_KINDS = [
+    { value: 'digital', label: 'Цифровой' },
+    { value: 'ntc', label: 'NTC' },
+];
 
 const getKitTemperatureSensorTemplateKey = (device, controllerType) => {
     const type = canonicalType(device?.type);
@@ -2130,9 +2192,7 @@ const JsonView = ({ data, name }) => {
 };
 
 const SectionSubtitle = ({ children }) => (
-    <p style={{ margin: '-8px 0 16px', color: '#64748b', fontSize: 14, lineHeight: 1.5 }}>
-        {children}
-    </p>
+    <p className="sel-subtitle">{children}</p>
 );
 
 const BoilerConnectionSwitch = ({ connectionType, onChange }) => {
@@ -2162,16 +2222,11 @@ const BoilerConnectionSwitch = ({ connectionType, onChange }) => {
 
 const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, myheat = false, price = null, disabled = false, control = null, hideCount = false }) => (
     <div
+        className="sel-added-line"
         style={{
-            display: 'flex',
             alignItems: badgeAbove ? 'flex-end' : 'baseline',
-            gap: 8,
-            width: '100%',
-            margin: '8px 0',
             color: disabled ? '#94a3b8' : '#203040',
             opacity: disabled ? 0.7 : 1,
-            fontSize: 15,
-            boxSizing: 'border-box',
         }}
     >
         {myheat && !badgeAbove && <MyHeatBadge />}
@@ -2237,7 +2292,7 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove 
 );
 
 const AddedDevicesTitle = ({ children }) => (
-    <h3 style={{ margin: '0 0 14px', fontSize: 18, fontWeight: 500 }}>{children}</h3>
+    <h3 className="sel-added-title">{children}</h3>
 );
 
 /**
@@ -2260,7 +2315,7 @@ const AddedDevicesTitle = ({ children }) => (
  * хватает высоты кадра, снизу продолжается этот цвет, а не белый край.
  * `position` перебивает привязку фона (по умолчанию — правый верхний угол).
  */
-const CardPhotoBackdrop = ({ image, aspectRatio = null, blur = 5, position = null, fallbackColor = null }) => (
+const CardPhotoBackdrop = ({ image, aspectRatio = null, width = null, blur = 5, position = null, fallbackColor = null }) => (
     <>
         <div
             aria-hidden
@@ -2270,7 +2325,12 @@ const CardPhotoBackdrop = ({ image, aspectRatio = null, blur = 5, position = nul
                 top: 0,
                 bottom: 0,
                 right: 0,
-                ...(aspectRatio ? { aspectRatio, maxWidth: '100%' } : { left: 0 }),
+                // `width` задаёт ширину слоя явно, поэтому снимок не зависит от
+                // высоты карточки: когда она растёт, кадр не масштабируется, а
+                // просто открывается ниже. `aspectRatio` наоборот считает ширину
+                // от высоты и при изменении контента заставляет фон прыгать.
+                ...(width ? { width, maxWidth: '100%' } : {}),
+                ...(aspectRatio ? { aspectRatio, maxWidth: '100%' } : (width ? {} : { left: 0 })),
                 // Слои скругляются сами, чтобы карточке не требовался
                 // `overflow: hidden` — иначе он обрезал бы выпадашки.
                 borderRadius: 'inherit',
@@ -2278,7 +2338,7 @@ const CardPhotoBackdrop = ({ image, aspectRatio = null, blur = 5, position = nul
                 backgroundImage: `url(${image})`,
                 backgroundRepeat: 'no-repeat',
                 backgroundPosition: position || (aspectRatio ? 'center right' : 'right top'),
-                backgroundSize: aspectRatio ? 'cover' : '100% auto',
+                backgroundSize: (aspectRatio || width) ? 'cover' : '100% auto',
                 maskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 100%)',
                 WebkitMaskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 100%)',
                 pointerEvents: 'none',
@@ -2299,11 +2359,58 @@ const CardPhotoBackdrop = ({ image, aspectRatio = null, blur = 5, position = nul
 );
 
 /** Тумблер: скрытый checkbox плюс дорожка с бегунком. */
-const ToggleSwitch = ({ checked, onChange, label }) => (
+/**
+ * Сегментированный переключатель: взаимоисключающие варианты в одной капсуле.
+ * Недоступные комбинации гасятся через `disabled` у варианта.
+ */
+const SegmentedToggle = ({ options, value, onChange, testIdPrefix = null }) => (
+    <div
+        style={{
+            display: 'inline-flex',
+            gap: 3,
+            padding: 3,
+            border: '1px solid #e3e7ef',
+            borderRadius: 12,
+            background: '#f4f6fa',
+        }}
+    >
+        {options.map((item) => {
+            const isActive = value === item.value;
+            return (
+                <button
+                    className="selection-option-button"
+                    key={item.value}
+                    type="button"
+                    disabled={item.disabled === true}
+                    data-test-id={testIdPrefix ? `${testIdPrefix}-${item.value}` : undefined}
+                    data-active={isActive}
+                    onClick={() => !item.disabled && onChange(item.value)}
+                    style={{
+                        padding: '9px 18px',
+                        border: `1px solid ${isActive ? '#e3e7ef' : 'transparent'}`,
+                        borderRadius: 9,
+                        background: isActive ? '#fff' : 'transparent',
+                        color: item.disabled ? '#a3aab9' : (isActive ? '#202738' : '#667089'),
+                        boxShadow: isActive ? '0 1px 3px rgba(32, 39, 56, 0.12)' : 'none',
+                        cursor: item.disabled ? 'not-allowed' : 'pointer',
+                        fontSize: 13.5,
+                        fontWeight: isActive ? 700 : 500,
+                        transition: 'background 0.18s, color 0.18s, box-shadow 0.18s',
+                    }}
+                >
+                    {item.label}
+                </button>
+            );
+        })}
+    </div>
+);
+
+const ToggleSwitch = ({ checked, onChange, label, testId = null }) => (
     <label style={{ display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14 }}>
         <input
             type="checkbox"
             role="switch"
+            data-test-id={testId || undefined}
             checked={checked}
             onChange={(event) => onChange(event.target.checked)}
             style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
@@ -2340,35 +2447,17 @@ const ToggleSwitch = ({ checked, onChange, label }) => (
 
 /** Подпись группы настроек внутри карточки термостата. */
 const ThermostatFieldLabel = ({ children }) => (
-    <div
-        style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: 8,
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.07em',
-            textTransform: 'uppercase',
-            color: '#8a93a8',
-            marginBottom: 10,
-        }}
-    >
-        {children}
-    </div>
+    <div className="sel-field-label">{children}</div>
 );
 
 /** Карточка термостата: callbacks меняют тип подключения, цвет, датчик пола и добавляют устройство. */
 const ThermostatCard = ({ template, connection, onConnectionChange, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, addedRows = [], onRemoveRow, showJsonDetails = false }) => (
     <div
-        className="sel-card sel-card-static"
+        className="sel-card sel-card-static sel-card-section"
         style={{
             flex: '1 1 100%',
             width: '100%',
             minWidth: 260,
-            border: '1px solid #d7dbe4',
-            borderRadius: 16,
-            padding: 24,
-            background: '#fff',
             display: 'flex',
             flexDirection: 'row',
             flexWrap: 'wrap',
@@ -2395,7 +2484,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                 maxWidth: 540,
             }}
         >
-            <div style={{ fontWeight: 700, fontSize: 18, lineHeight: 1.3 }}>{template.label}</div>
+            <div className="sel-card-heading">{template.label}</div>
 
             {addedRows.length > 0 && (
                 <AddedDevicesBlock marginTop={0}>
@@ -2532,19 +2621,9 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                 </div>
             </div>
 
-            <pre
-                style={{
-                    background: '#f5f7fb',
-                    padding: 10,
-                    borderRadius: 6,
-                    fontSize: 12,
-                    lineHeight: 1.5,
-                    overflow: 'auto',
-                    margin: 0,
-                }}
-            >
-{showJsonDetails ? JSON.stringify(template.data, null, 4) : null}
-            </pre>
+            {showJsonDetails && (
+                <pre className="sel-card-json">{JSON.stringify(template.data, null, 4)}</pre>
+            )}
 
             <button
                 onClick={onAdd}
@@ -2631,15 +2710,11 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
  */
 const OutdoorSensorCard = ({ template, enabled, onEnabledChange, showJsonDetails = false }) => (
     <div
-        className="sel-card sel-card-static"
+        className="sel-card sel-card-static sel-card-section"
         style={{
             flex: '1 1 100%',
             width: '100%',
             minWidth: 260,
-            border: '1px solid #d7dbe4',
-            borderRadius: 16,
-            padding: 24,
-            background: '#fff',
             display: 'flex',
             flexDirection: 'row',
             flexWrap: 'wrap',
@@ -2663,9 +2738,9 @@ const OutdoorSensorCard = ({ template, enabled, onEnabledChange, showJsonDetails
                 maxWidth: 480,
             }}
         >
-            <div style={{ fontWeight: 700, fontSize: 18, lineHeight: 1.3 }}>{template.label}</div>
+            <div className="sel-card-heading">{template.label}</div>
 
-            <p style={{ margin: 0, color: '#667089', fontSize: 13.5, lineHeight: 1.5 }}>
+            <p className="sel-card-desc">
                 Измеряет уличную температуру и передает ее по радиоканалу.
                 В схеме используется только один такой датчик.
             </p>
@@ -2689,19 +2764,9 @@ const OutdoorSensorCard = ({ template, enabled, onEnabledChange, showJsonDetails
                 />
             </div>
 
-            <pre
-                style={{
-                    background: '#f5f7fb',
-                    padding: 10,
-                    borderRadius: 6,
-                    fontSize: 12,
-                    lineHeight: 1.5,
-                    overflow: 'auto',
-                    margin: 0,
-                }}
-            >
-{showJsonDetails ? JSON.stringify(template.data, null, 4) : null}
-            </pre>
+            {showJsonDetails && (
+                <pre className="sel-card-json">{JSON.stringify(template.data, null, 4)}</pre>
+            )}
         </div>
 
         {/* Изображение датчика — как в карточке термостата: мягкое свечение и
@@ -2754,11 +2819,18 @@ const OutdoorSensorCard = ({ template, enabled, onEnabledChange, showJsonDetails
  * встают между списком и кнопкой.
  */
 const SectionEquipmentCard = ({
-    image,
+    image = null,
     backgroundColor = null,
     backgroundPosition = null,
     aspectRatio = null,
     blur = 3,
+    // Снимок устройства в правой части: рисуется поверх размытого фона и сам не размывается.
+    deviceImage = null,
+    deviceImageAlt = '',
+    // Ширина фонового слоя: фиксирует кадр независимо от высоты карточки.
+    backgroundWidth = null,
+    // Половинная ширина: две карточки в ряду (дискретные входы).
+    half = false,
     title,
     description = null,
     addedTitle,
@@ -2773,112 +2845,146 @@ const SectionEquipmentCard = ({
     jsonData = null,
     showJsonDetails = false,
     children = null,
-}) => (
+}) => {
+    const addedBlock = addedRows.length > 0 ? (
+        <AddedDevicesBlock marginTop={0}>
+            <AddedDevicesTitle>{addedTitle}</AddedDevicesTitle>
+            {addedRows.map((row) => (
+                <AddedDeviceLine
+                    key={row.label}
+                    label={row.label}
+                    hideCount
+                    control={(
+                        <QtyStepper
+                            count={row.count}
+                            onDecrement={() => onRemoveUnit(row)}
+                            onIncrement={() => onAddUnit(row)}
+                            decTestId={qtyTestId ? `${qtyTestId}-dec` : null}
+                            incTestId={qtyTestId ? `${qtyTestId}-inc` : null}
+                        />
+                    )}
+                />
+            ))}
+        </AddedDevicesBlock>
+    ) : null;
+
+    const addButton = showAdd ? (
+        <button
+            className="selection-add-button"
+            onClick={onAdd}
+            data-test-id={addTestId || undefined}
+        >
+            {addLabel}
+        </button>
+    ) : null;
+
+    return (
     <div
-        className="sel-card sel-card-static"
+        className={`sel-card sel-card-static sel-card-section${deviceImage ? ' sel-card-with-device' : ''}`}
         style={{
-            flex: '1 1 100%',
-            width: '100%',
-            minWidth: 260,
-            border: '1px solid #d7dbe4',
-            borderRadius: 16,
-            padding: 24,
-            background: '#fff',
+            flex: half ? '1 1 calc(50% - 8px)' : '1 1 100%',
+            width: half ? 'auto' : '100%',
+            minWidth: half ? 320 : 260,
             display: 'flex',
             flexDirection: 'row',
-            flexWrap: 'wrap',
+            // Со снимком устройства колонки не переносим: перенос менял бы высоту
+            // карточки при добавлении, и фон со снимком прыгали бы.
+            flexWrap: deviceImage ? 'nowrap' : 'wrap',
             gap: 32,
             alignItems: 'stretch',
             position: 'relative',
         }}
     >
-        <CardPhotoBackdrop
-            image={image}
-            blur={blur}
-            aspectRatio={aspectRatio}
-            position={backgroundPosition}
-            fallbackColor={backgroundColor}
-        />
+        {image && (
+            <CardPhotoBackdrop
+                image={image}
+                blur={blur}
+                aspectRatio={aspectRatio}
+                width={backgroundWidth}
+                position={backgroundPosition}
+                fallbackColor={backgroundColor}
+            />
+        )}
 
         <div
             style={{
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 20,
-                flex: '1 1 420px',
-                minWidth: 260,
-                maxWidth: 560,
+                gap: half ? 14 : 20,
+                flex: half ? '1 1 240px' : '1 1 420px',
+                minWidth: half ? 200 : 260,
+                // В половинной карточке текст короче: иначе строки уезжают на
+                // непрозрачную часть снимка.
+                maxWidth: half ? 300 : 560,
             }}
         >
-            <div style={{ fontWeight: 700, fontSize: 18, lineHeight: 1.3 }}>{title}</div>
+            <div className="sel-card-heading">{title}</div>
 
             {description && (
-                <p style={{ margin: 0, color: '#667089', fontSize: 13.5, lineHeight: 1.5 }}>
-                    {description}
-                </p>
+                <p className="sel-card-desc">{description}</p>
             )}
 
-            {addedRows.length > 0 && (
-                <AddedDevicesBlock marginTop={0}>
-                    <AddedDevicesTitle>{addedTitle}</AddedDevicesTitle>
-                    {addedRows.map((row) => (
-                        <AddedDeviceLine
-                            key={row.label}
-                            label={row.label}
-                            hideCount
-                            control={(
-                                <QtyStepper
-                                    count={row.count}
-                                    onDecrement={() => onRemoveUnit(row)}
-                                    onIncrement={() => onAddUnit(row)}
-                                    decTestId={qtyTestId ? `${qtyTestId}-dec` : null}
-                                    incTestId={qtyTestId ? `${qtyTestId}-inc` : null}
-                                />
-                            )}
-                        />
-                    ))}
-                </AddedDevicesBlock>
-            )}
+            {addedBlock}
 
             {children}
 
-            <pre
+            {showJsonDetails && (
+                <pre className="sel-card-json">{JSON.stringify(jsonData, null, 4)}</pre>
+            )}
+
+            {addButton}
+        </div>
+
+        {deviceImage && (
+            /* Тот же приём, что в карточке уличного датчика: мягкое свечение и
+               тень под устройством, снимок лежит поверх размытой подложки. */
+            <div
                 style={{
-                    background: '#f5f7fb',
-                    padding: 10,
-                    borderRadius: 6,
-                    fontSize: 12,
-                    lineHeight: 1.5,
-                    overflow: 'auto',
-                    margin: 0,
+                    position: 'relative',
+                    display: 'flex',
+                    // Колонка прижата к верху и не тянется по высоте карточки:
+                    // иначе при появлении списка добавленного снимок съезжал бы вниз.
+                    alignSelf: 'flex-start',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    // Колонка со снимком уступает ширину тексту первой.
+                    flex: '0 1 300px',
+                    minWidth: 160,
                 }}
             >
-{showJsonDetails ? JSON.stringify(jsonData, null, 4) : null}
-            </pre>
-
-            {showAdd && (
-                <button
-                    onClick={onAdd}
-                    data-test-id={addTestId || undefined}
+                <div
+                    aria-hidden
                     style={{
-                        alignSelf: 'flex-start',
-                        padding: '12px 26px',
-                        border: '1px solid #c85e18',
-                        borderRadius: 10,
-                        background: '#e07020',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        fontSize: 14,
-                        fontWeight: 700,
+                        position: 'absolute',
+                        width: '78%',
+                        height: '86%',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle, rgba(224, 112, 32, 0.10) 0%, rgba(224, 112, 32, 0) 68%)',
                     }}
-                >
-                    {addLabel}
-                </button>
-            )}
-        </div>
+                />
+                <div
+                    aria-hidden
+                    style={{
+                        position: 'absolute',
+                        bottom: '4%',
+                        width: '46%',
+                        maxWidth: 180,
+                        height: 14,
+                        borderRadius: '50%',
+                        background: 'radial-gradient(ellipse, rgba(32, 39, 56, 0.20) 0%, rgba(32, 39, 56, 0) 72%)',
+                    }}
+                />
+                <img
+                    src={deviceImage}
+                    alt={deviceImageAlt}
+                    style={{ position: 'relative', width: '100%', maxWidth: 300, maxHeight: 165, objectFit: 'contain' }}
+                />
+            </div>
+        )}
     </div>
-);
+    );
+};
 
 /**
  * Карточка смесительного узла: сервопривод и датчик выбираются независимо,
@@ -2996,91 +3102,8 @@ const MixingUnitCard = ({ template, servo, onServoChange, sensor, onSensorChange
 );
 
 /** Карточка датчика: options задает варианты, selectedKey выбор, stepper счетчик. */
-const TemperatureSensorCard = ({ options, selectedKey, onSelectKey, template, onAdd, stepper = null, showJsonDetails = false }) => (
-    <div
-        className="sel-card"
-        style={{
-            flex: '1 1 320px',
-            minWidth: 260,
-            border: '1px solid #d7dbe4',
-            borderRadius: 14,
-            padding: 18,
-            background: '#fff',
-        }}
-    >
-        <div style={{ fontWeight: 700, marginBottom: 14, fontSize: 16 }}>{template?.label}</div>
-
-        <div style={{ marginBottom: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: '#475569' }}>Тип датчика</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {options.map((item) => (
-                    <button
-                        className="selection-option-button"
-                        key={item.key}
-                        type="button"
-                        disabled={item.disabled}
-                        onClick={() => !item.disabled && onSelectKey(item.key)}
-                        style={{
-                            padding: '8px 12px',
-                            border: `1px solid ${selectedKey === item.key ? '#c85e18' : '#d7dbe4'}`,
-                            borderRadius: 8,
-                            background: item.disabled ? '#f1f5f9' : (selectedKey === item.key ? '#fff7ed' : '#fff'),
-                            color: item.disabled ? '#94a3b8' : '#202738',
-                            cursor: item.disabled ? 'not-allowed' : 'pointer',
-                            opacity: item.disabled ? 0.6 : 1,
-                            fontSize: 13,
-                        }}
-                    >
-                        {item.label.replace(/^Беспроводной |^Проводной /, '')}
-                    </button>
-                ))}
-            </div>
-        </div>
-
-        <pre
-            style={{
-                background: '#f5f7fb',
-                padding: 10,
-                borderRadius: 6,
-                fontSize: 12,
-                lineHeight: 1.5,
-                overflow: 'auto',
-                margin: '0 0 12px',
-            }}
-        >
-{showJsonDetails ? JSON.stringify(template?.data, null, 4) : null}
-        </pre>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-                onClick={onAdd}
-                style={{
-                    padding: '8px 16px',
-                    border: '1px solid #3498db',
-                    borderRadius: 8,
-                    background: '#3498db',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    fontWeight: 700,
-                }}
-            >
-                Добавить датчик
-            </button>
-            {stepper}
-        </div>
-    </div>
-);
-
 const AddedDevicesBlock = ({ children, marginTop = 24 }) => (
-    <div
-        style={{
-            marginTop,
-            padding: '14px 16px',
-            border: '1px solid #b8c7d9',
-            borderRadius: 12,
-            background: '#edf3f8',
-        }}
-    >
+    <div className="sel-added-block" style={{ marginTop }}>
         {children}
     </div>
 );
@@ -3314,12 +3337,12 @@ const getThermostatRows = (scheme) => {
 };
 
 const getLeakProtectionRows = (scheme) => {
+    // Датчики живут внутри шлейфов зон, поэтому в КП они собираются из additions.
     const leakItems = [
-        ...(Array.isArray(scheme?.sensors) ? scheme.sensors : [])
-            .filter((sensor) => sensor.type === 'leak-sensor')
-            .map((sensor) => ({ label: 'Датчик протечки', removeKey: { target: 'sensors', id: sensor.id } })),
+        ...getLeakZones(scheme).flatMap((zone) => getLeakZoneSensors(zone)
+            .map((sensor) => ({ label: 'Датчик протечки', removeKey: { target: 'sensors', id: sensor.id } }))),
         ...(Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [])
-            .filter((device) => device.type === 'valve')
+            .filter((device) => canonicalType(device?.type) === 'valve')
             .map((device) => ({ label: 'Запорный клапан', removeKey: { target: 'wired_devices', id: device.id } })),
     ];
     return aggregateAddedItems(leakItems);
@@ -3430,7 +3453,7 @@ const getEquipmentOfferSections = (incomingSchemeValue, controllerType) => {
 
     const leakRows = getLeakProtectionRows(incomingSchemeValue)
         .map((row) => ({ ...row, unitPrice: row.label === 'Датчик протечки' ? MYHEAT_PRICES.leakSensor : null }));
-    if (leakRows.length > 0) sections.push({ title: 'Контроль протечки воды', rows: leakRows });
+    if (leakRows.length > 0) sections.push({ title: 'Зоны контроля протечки воды', rows: leakRows });
 
     const discreteDevices = wiredDevices.filter((device) => DISCRETE_TEMPLATES.some((template) => template.data.type === device.type));
     if (discreteDevices.length > 0) {
@@ -3504,6 +3527,7 @@ const SelectionApp = () => {
     const [mixingSensor, setMixingSensor] = useState('digital');
     const [wiredTemperatureSensorKey, setWiredTemperatureSensorKey] = useState('wired-wall-digital');
     const [wirelessTemperatureSensorKey, setWirelessTemperatureSensorKey] = useState('wireless-wall');
+    const [temperatureSensorConnection, setTemperatureSensorConnection] = useState('wired');
     const [isBuildingScheme, setIsBuildingScheme] = useState(false);
     const [buildSchemeError, setBuildSchemeError] = useState('');
     const [boilerQuery, setBoilerQuery] = useState('');
@@ -3564,6 +3588,7 @@ const SelectionApp = () => {
         setMixingSensor(editor.mixingSensor === 'ntc' ? 'ntc' : 'digital');
         setWiredTemperatureSensorKey(editor.wiredTemperatureSensorKey || 'wired-wall-digital');
         setWirelessTemperatureSensorKey(editor.wirelessTemperatureSensorKey || 'wireless-wall');
+        setTemperatureSensorConnection(editor.temperatureSensorConnection === 'wireless' ? 'wireless' : 'wired');
         setPendingDraft(null);
     }, [pendingDraft]);
     const resolveSelectionScheme = useCallback(
@@ -3620,6 +3645,7 @@ const SelectionApp = () => {
                 mixingSensor,
                 wiredTemperatureSensorKey,
                 wirelessTemperatureSensorKey,
+                temperatureSensorConnection,
             },
         });
     }, [
@@ -3637,12 +3663,14 @@ const SelectionApp = () => {
         mixingSensor,
         wiredTemperatureSensorKey,
         wirelessTemperatureSensorKey,
+        temperatureSensorConnection,
     ]);
-    const unifiedLeakLoop = incomingScheme.unified_leak_loop === true;
-    const leakSensorCount = [
-        ...(Array.isArray(incomingScheme.sensors) ? incomingScheme.sensors : []),
-        ...(Array.isArray(incomingScheme.wired_devices) ? incomingScheme.wired_devices : []),
-    ].filter((item) => canonicalType(item?.type) === 'leak-sensor').length;
+    // Строки списка зон: у каждой свой шлейф датчиков и свои клапаны.
+    const leakZoneRows = useMemo(() => getLeakZones(incomingScheme).map((zone) => ({
+        id: zone.id,
+        sensorCount: getLeakZoneSensors(zone).length,
+        valveCount: getLeakZoneValves(incomingScheme, zone.id).length,
+    })), [incomingScheme]);
     const equipmentOfferSections = useMemo(
         () => (isOfferModalOpen ? getEquipmentOfferSections(incomingScheme, controllerType) : []),
         [incomingScheme, controllerType, isOfferModalOpen],
@@ -3695,6 +3723,27 @@ const SelectionApp = () => {
     // Строки списка нужны дважды: в самом списке и в условии показа кнопки.
     const gvsBoilerRows = getGroupedDeviceRows(incomingScheme, 'gvs', GVS_TEMPLATES);
     const zoneRows = getGroupedDeviceRows(incomingScheme, 'zone', ZONE_TEMPLATES);
+    const otherEquipmentRows = getGroupedDeviceRows(incomingScheme, 'other', OTHER_EQUIP_TEMPLATES);
+    // Список добавленного отдельно по каждому типу дискретного входа.
+    const discreteInputRows = useMemo(() => {
+        const wiredDevices = Array.isArray(incomingScheme?.wired_devices) ? incomingScheme.wired_devices : [];
+        return DISCRETE_TEMPLATES.reduce((rows, template) => {
+            const type = canonicalType(template.data.type);
+            const items = wiredDevices.filter((device) => canonicalType(device?.type) === type);
+            rows[type] = items.length > 0
+                ? [{ label: template.label, count: items.length, removeKeys: items.map((item) => item.id) }]
+                : [];
+            return rows;
+        }, {});
+    }, [incomingScheme]);
+    const pressureSensorRows = useMemo(() => {
+        const template = PRESSURE_TEMPLATES[0];
+        const items = (Array.isArray(incomingScheme?.sensors) ? incomingScheme.sensors : [])
+            .filter((item) => canonicalType(item?.type) === canonicalType(template.data.type));
+        return items.length > 0
+            ? [{ label: template.label, count: items.length, removeKeys: items.map((item) => item.id) }]
+            : [];
+    }, [incomingScheme]);
     const selectMixingServo = useCallback((servo) => {
         setMixingServo(servo);
         setMixingSensor((current) => (isMixingCombinationAvailable(servo, current) ? current : 'ntc'));
@@ -3710,6 +3759,50 @@ const SelectionApp = () => {
         (Array.isArray(incomingScheme.wireless_devices) ? incomingScheme.wireless_devices : [])
             .some((item) => canonicalType(item?.type) === OUTDOOR_TEMPERATURE_SENSOR_TYPE)
     ), [incomingScheme.wireless_devices]);
+
+    // Объединённая карточка датчиков температуры: три переключателя вместо двух
+    // отдельных карточек. Беспроводной вариант существует только настенный, а
+    // настенного NTC-датчика нет — недоступные комбинации гасятся.
+    const isWirelessTemperatureSensor = temperatureSensorConnection === 'wireless';
+    const temperatureSensorTemplate = isWirelessTemperatureSensor
+        ? wirelessTemperatureSensorTemplate
+        : wiredTemperatureSensorTemplate;
+    const temperatureSensorPlacement = isWirelessTemperatureSensor || !wiredTemperatureSensorKey.includes('flask')
+        ? 'wall'
+        : 'flask';
+    const temperatureSensorKind = wiredTemperatureSensorKey.endsWith('-ntc') ? 'ntc' : 'digital';
+    const temperatureSensorPlacementOptions = useMemo(() => TEMPERATURE_SENSOR_PLACEMENTS.map((item) => (
+        item.value === 'flask' && isWirelessTemperatureSensor ? { ...item, disabled: true } : item
+    )), [isWirelessTemperatureSensor]);
+    const temperatureSensorKindOptions = useMemo(() => TEMPERATURE_SENSOR_KINDS.map((item) => (
+        item.value === 'ntc' && temperatureSensorPlacement === 'wall' ? { ...item, disabled: true } : item
+    )), [temperatureSensorPlacement]);
+    const selectTemperatureSensorPlacement = useCallback((placement) => {
+        setWiredTemperatureSensorKey((current) => {
+            // Настенного NTC-датчика в каталоге нет, поэтому на стену уходит цифровой.
+            const kind = placement === 'wall' || !current.endsWith('-ntc') ? 'digital' : 'ntc';
+            return `wired-${placement}-${kind}`;
+        });
+    }, []);
+    const selectTemperatureSensorKind = useCallback((kind) => {
+        setWiredTemperatureSensorKey((current) => `wired-${current.includes('flask') ? 'flask' : 'wall'}-${kind}`);
+    }, []);
+    const temperatureSensorRows = useMemo(() => {
+        const items = [
+            ...(Array.isArray(incomingScheme?.sensors) ? incomingScheme.sensors : [])
+                .map((device) => ({ device, target: 'sensors' })),
+            ...(Array.isArray(incomingScheme?.wireless_devices) ? incomingScheme.wireless_devices : [])
+                .map((device) => ({ device, target: 'wireless_devices' })),
+        ].filter(({ device }) => (
+            isTemperatureSensor(device)
+            && canonicalType(device?.type) !== OUTDOOR_TEMPERATURE_SENSOR_TYPE
+        ));
+        return aggregateAddedItems(items.map(({ device, target }) => ({
+            label: getTemperatureSensorLabel(device),
+            templateKey: getTemperatureSensorTemplateKey(device),
+            removeKey: { target, id: device.id },
+        })));
+    }, [incomingScheme]);
 
 
     // Держит --sel-sticky-height в актуальном состоянии: боковые колонки
@@ -3935,13 +4028,9 @@ const SelectionApp = () => {
         });
     }, []);
 
+    /** Общий аддер устройства из шаблона в sensors либо wired_devices. */
     const addLeakItem = useCallback((template) => {
         setIncomingScheme((prev) => {
-            const hasUnifiedLeakSensor = prev.unified_leak_loop && [
-                ...(Array.isArray(prev.sensors) ? prev.sensors : []),
-                ...(Array.isArray(prev.wired_devices) ? prev.wired_devices : []),
-            ].some((item) => canonicalType(item?.type) === 'leak-sensor');
-            if (hasUnifiedLeakSensor) return prev;
             if (template.target === 'sensors') {
                 const items = Array.isArray(prev.sensors) ? [...prev.sensors] : [];
                 items.push({ ...template.data, id: generateId() });
@@ -3953,26 +4042,78 @@ const SelectionApp = () => {
         });
     }, []);
 
-    /** Переключает единый шлейф и при включении оставляет только один датчик протечки. */
-    const setUnifiedLeakLoop = useCallback((enabled) => {
+    /** Добавляет зону контроля протечки: шлейф с одним датчиком плюс один клапан. */
+    const addLeakZone = useCallback(() => {
         setIncomingScheme((prev) => {
-            const sensors = Array.isArray(prev.sensors) ? prev.sensors : [];
-            const wiredDevices = Array.isArray(prev.wired_devices) ? prev.wired_devices : [];
-            if (!enabled) return resolveSelectionScheme({ ...prev, unified_leak_loop: false });
-
-            let retained = false;
-            const keepFirstLeakSensor = (item) => {
-                if (canonicalType(item?.type) !== 'leak-sensor') return true;
-                if (retained) return false;
-                retained = true;
-                return true;
-            };
+            const { loop, valves } = createLeakZone({ id: generateId(), sensors: 1, valves: 1 });
             return resolveSelectionScheme({
                 ...prev,
-                unified_leak_loop: true,
-                sensors: sensors.filter(keepFirstLeakSensor),
-                wired_devices: wiredDevices.filter(keepFirstLeakSensor),
+                sensors: [...(Array.isArray(prev.sensors) ? prev.sensors : []), loop],
+                wired_devices: [...(Array.isArray(prev.wired_devices) ? prev.wired_devices : []), ...valves],
             });
+        });
+    }, []);
+
+    /** Удаляет зону вместе с её датчиками и привязанными клапанами. */
+    const removeLeakZone = useCallback((zoneId) => {
+        setIncomingScheme((prev) => resolveSelectionScheme({
+            ...prev,
+            sensors: (Array.isArray(prev.sensors) ? prev.sensors : [])
+                .filter((sensor) => !(isLeakLoop(sensor) && String(sensor.id) === String(zoneId))),
+            wired_devices: (Array.isArray(prev.wired_devices) ? prev.wired_devices : [])
+                .filter((device) => String(device?.leak_zone_id ?? '') !== String(zoneId)),
+        }));
+    }, []);
+
+    /** Меняет количество датчиков в шлейфе зоны: минимум один датчик. */
+    const changeLeakZoneSensors = useCallback((zoneId, delta) => {
+        setIncomingScheme((prev) => resolveSelectionScheme({
+            ...prev,
+            sensors: (Array.isArray(prev.sensors) ? prev.sensors : []).map((sensor) => {
+                if (!isLeakLoop(sensor) || String(sensor.id) !== String(zoneId)) return sensor;
+                const additions = Array.isArray(sensor.additions) ? sensor.additions : [];
+                const zoneSensors = additions.filter((item) => canonicalType(item?.type) === 'leak-sensor');
+                const others = additions.filter((item) => canonicalType(item?.type) !== 'leak-sensor');
+                if (delta > 0) {
+                    return { ...sensor, additions: [...others, ...zoneSensors, createLeakSensor(generateId())] };
+                }
+                if (zoneSensors.length <= 1) return sensor;
+                return { ...sensor, additions: [...others, ...zoneSensors.slice(0, -1)] };
+            }),
+        }));
+    }, []);
+
+    /** Меняет количество запорных клапанов зоны: минимум один клапан. */
+    const changeLeakZoneValves = useCallback((zoneId, delta) => {
+        setIncomingScheme((prev) => {
+            const wiredDevices = Array.isArray(prev.wired_devices) ? prev.wired_devices : [];
+            const zoneValves = wiredDevices.filter((device) => (
+                canonicalType(device?.type) === 'valve' && String(device?.leak_zone_id ?? '') === String(zoneId)
+            ));
+            if (delta > 0) {
+                return resolveSelectionScheme({
+                    ...prev,
+                    wired_devices: [...wiredDevices, createLeakValve(zoneId, generateId())],
+                });
+            }
+            if (zoneValves.length <= 1) return prev;
+            const removedValve = zoneValves[zoneValves.length - 1];
+            return resolveSelectionScheme({
+                ...prev,
+                wired_devices: wiredDevices.filter((device) => device !== removedValve),
+            });
+        });
+    }, []);
+
+    /**
+     * Добавляет токовый датчик давления в sensors. Отдельно от addLeakItem:
+     * у датчика давления нет ограничений единого шлейфа протечки.
+     */
+    const addPressureSensor = useCallback(() => {
+        setIncomingScheme((prev) => {
+            const sensors = Array.isArray(prev.sensors) ? [...prev.sensors] : [];
+            sensors.push({ ...PRESSURE_TEMPLATES[0].data, id: generateId() });
+            return resolveSelectionScheme({ ...prev, sensors });
         });
     }, []);
 
@@ -4093,6 +4234,7 @@ const SelectionApp = () => {
                     mixingSensor,
                     wiredTemperatureSensorKey,
                     wirelessTemperatureSensorKey,
+                    temperatureSensorConnection,
                 },
             });
             const response = await fetch('/api/schemes', {
@@ -4142,6 +4284,7 @@ const SelectionApp = () => {
         mixingSensor,
         wiredTemperatureSensorKey,
         wirelessTemperatureSensorKey,
+        temperatureSensorConnection,
     ]);
 
     return (
@@ -4288,10 +4431,8 @@ const SelectionApp = () => {
                         disabled={isBuildingScheme || controllerCompatibilityIssues.length > 0}
                         style={{
                             padding: '10px 16px',
-                            border: '1px solid #3498db',
+                            border: '1px solid #c85e18',
                             borderRadius: 8,
-                            background: '#3498db',
-                            color: '#fff',
                             cursor: isBuildingScheme || controllerCompatibilityIssues.length > 0 ? 'not-allowed' : 'pointer',
                             fontSize: 14,
                             fontWeight: 700,
@@ -4337,9 +4478,9 @@ const SelectionApp = () => {
             <div className="sel-layout-content">
 
             <div className="sel-group-label" id="chapter-boilers">Котлы</div>
-            <section style={{ marginBottom: 32 }}>
+            <section>
                 <div
-                    className="sel-card sel-card-static"
+                    className="sel-card sel-card-static sel-card-section"
                     style={{
                         flex: '1 1 100%',
                         width: '100%',
@@ -4585,7 +4726,7 @@ const SelectionApp = () => {
             <div className="sel-group-label" id="chapter-hydraulics">Гидравлика</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
 
-            <section style={{ flex: '1 1 100%', minWidth: 0, marginBottom: 8 }}>
+            <section style={{ flex: '1 1 100%', minWidth: 0 }}>
                 <h2>Смесительные узлы</h2>
                 <SectionSubtitle>Какое количество смесительных узлов будет использоваться в системе?</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -4607,7 +4748,7 @@ const SelectionApp = () => {
                 </div>
             </section>
 
-            <section style={{ flex: '1 1 100%', minWidth: 0, marginBottom: 8 }}>
+            <section style={{ flex: '1 1 100%', minWidth: 0 }}>
                 <h2>Бойлеры ГВС</h2>
                 <SectionSubtitle>Какое количество бойлеров косвенного нагрева подключено после гидравлического разделителя?</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -4642,48 +4783,25 @@ const SelectionApp = () => {
                     {PUMP_TEMPLATES.map((item, index) => (
                         <div
                             key={index}
-                            className="sel-card"
+                            className="sel-card sel-card-compact"
                             style={{
-                                border: '1px solid #d7dbe4',
-                                borderRadius: 10,
-                                padding: 16,
-                                background: '#fff',
                                 flex: '1 1 260px',
                                 minWidth: 260,
                             }}
                         >
-                            <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
+                            <div className="sel-card-title">{item.label}</div>
                             {item.description && (
-                                <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
+                                <p className="sel-card-desc">
                                     {item.description}
                                 </p>
                             )}
-                            <pre
-                                style={{
-                                    background: '#f5f7fb',
-                                    padding: 10,
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    overflow: 'auto',
-                                    margin: 0,
-                                }}
-                            >
-{showJsonDetails ? JSON.stringify(item.wiredDevice, null, 4) : null}
-                            </pre>
+                            {showJsonDetails && (
+                                <pre className="sel-card-json">{JSON.stringify(item.wiredDevice, null, 4)}</pre>
+                            )}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
                                 <button
+                                    className="selection-add-button selection-add-button-sm"
                                     onClick={() => addMixingUnit(item, 'pump')}
-                                    style={{
-                                        padding: '6px 14px',
-                                        border: '1px solid #3498db',
-                                        borderRadius: 6,
-                                        background: '#3498db',
-                                        color: '#fff',
-                                        cursor: 'pointer',
-                                        fontSize: 13,
-                                        fontWeight: 700,
-                                    }}
                                 >
                                     Добавить
                                 </button>
@@ -4700,7 +4818,7 @@ const SelectionApp = () => {
             <div className="sel-group-label" id="chapter-climate">Климат</div>
             <div style={{ marginBottom: 32 }}>
 
-            <section style={{ marginBottom: 32 }}>
+            <section>
                 <h2>Термостаты</h2>
                 <SectionSubtitle>Укажите тип и количество термостатов</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
@@ -4726,7 +4844,7 @@ const SelectionApp = () => {
                     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                         <SectionEquipmentCard
                             image={ZONES_BACKGROUND_PATH}
-                            aspectRatio="630 / 436"
+                            backgroundWidth={560}
                             title={ZONE_TEMPLATES[0].label}
                             description="Определите, на сколько зон будет разделена система, чтобы эффективно управлять оборудованием черех двухходовые сервоприводы."
                             addedTitle="Добавленные зоны:"
@@ -4750,56 +4868,26 @@ const SelectionApp = () => {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
             <section style={{ flex: '1 1 360px', minWidth: 0 }}>
                 <SectionSubtitle>Какое количество прочего оборудования (сирены и т.д.) будет управляться с помощью контроллера?</SectionSubtitle>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-                    {OTHER_EQUIP_TEMPLATES.map((item, index) => (
-                        <div
-                            key={index}
-                            className="sel-card"
-                            style={{
-                                border: '1px solid #d7dbe4',
-                                borderRadius: 10,
-                                padding: 16,
-                                background: '#fff',
-                                flex: '1 1 260px',
-                                minWidth: 260,
-                                maxWidth: 'calc(50% - 8px)',
-                            }}
-                        >
-                            <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
-                            <pre
-                                style={{
-                                    background: '#f5f7fb',
-                                    padding: 10,
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    overflow: 'auto',
-                                    margin: 0,
-                                }}
-                            >
-{showJsonDetails ? JSON.stringify(item.wiredDevice, null, 4) : null}
-                            </pre>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
-                                <button
-                                    onClick={() => addMixingUnit(item, 'other')}
-                                    data-test-id="add-other-equipment"
-                                    style={{
-                                        padding: '6px 14px',
-                                        border: '1px solid #3498db',
-                                        borderRadius: 6,
-                                        background: '#3498db',
-                                        color: '#fff',
-                                        cursor: 'pointer',
-                                        fontSize: 13,
-                                        fontWeight: 700,
-                                    }}
-                                >
-                                    Добавить
-                                </button>
-                                {renderUnitStepper(item, 'other', OTHER_EQUIP_TEMPLATES)}
-                            </div>
-                        </div>
-                    ))}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <SectionEquipmentCard
+                        image={OTHER_EQUIP_BACKGROUND_PATH}
+                        backgroundWidth={520}
+                        title={OTHER_EQUIP_TEMPLATES[0].label}
+                        description="Сирены, реле и другие устройства, которыми контроллер управляет через релейный выход. Каждое занимает один релейный порт."
+                        addedTitle="Добавленное оборудование:"
+                        addedRows={otherEquipmentRows}
+                        onAddUnit={(row) => addMixingUnit(
+                            OTHER_EQUIP_TEMPLATES.find((item) => item.label === row.label) || OTHER_EQUIP_TEMPLATES[0],
+                            'other',
+                        )}
+                        onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                        addLabel="Добавить оборудование"
+                        onAdd={() => addMixingUnit(OTHER_EQUIP_TEMPLATES[0], 'other')}
+                        addTestId="add-other-equipment"
+                        qtyTestId="other-equipment-qty"
+                        jsonData={OTHER_EQUIP_TEMPLATES[0].wiredDevice}
+                        showJsonDetails={showJsonDetails}
+                    />
                 </div>
 
             </section>
@@ -4808,41 +4896,68 @@ const SelectionApp = () => {
             <div className="sel-group-label" id="chapter-sensors">Датчики и защита</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
             <div style={{ flex: '1 1 500px', minWidth: 0 }}>
-            <section style={{ marginBottom: 32 }}>
+            <section>
                 <h2>Датчики температуры</h2>
                 <SectionSubtitle>Укажите тип и количество датчиков температуры</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    <TemperatureSensorCard
-                        options={wiredTemperatureSensorOptions}
-                        selectedKey={wiredTemperatureSensorKey}
-                        onSelectKey={setWiredTemperatureSensorKey}
-                        template={wiredTemperatureSensorTemplate}
-                        onAdd={() => addTemperatureSensor(wiredTemperatureSensorTemplate)}
+                    <SectionEquipmentCard
+                        image={THERMOSTAT_ROOM_IMAGE_PATH}
+                        backgroundWidth={520}
+                        title={temperatureSensorTemplate?.label}
+                        description="Измеряет температуру воздуха в помещении или теплоносителя в колбе и передаёт её контроллеру."
+                        addedTitle="Добавленные датчики температуры:"
+                        addedRows={temperatureSensorRows}
+                        onAddUnit={(row) => addTemperatureSensor(
+                            TEMPERATURE_SENSOR_TEMPLATES.find((template) => template.key === row.templateKey)
+                            || temperatureSensorTemplate,
+                        )}
+                        onRemoveUnit={(row) => {
+                            const removeKey = row.removeKeys[row.removeKeys.length - 1];
+                            removeSchemeItemById(removeKey.target, removeKey.id);
+                        }}
+                        addLabel="Добавить датчик"
+                        onAdd={() => addTemperatureSensor(temperatureSensorTemplate)}
+                        addTestId="add-temperature-sensor"
+                        jsonData={temperatureSensorTemplate?.data}
                         showJsonDetails={showJsonDetails}
-                        stepper={wiredTemperatureSensorTemplate ? renderItemStepper(
-                            wiredTemperatureSensorTemplate.target,
-                            wiredTemperatureSensorTemplate.data.type,
-                            () => addTemperatureSensor(wiredTemperatureSensorTemplate),
-                        ) : null}
-                    />
-                    <TemperatureSensorCard
-                        options={wirelessTemperatureSensorOptions}
-                        selectedKey={wirelessTemperatureSensorKey}
-                        onSelectKey={setWirelessTemperatureSensorKey}
-                        template={wirelessTemperatureSensorTemplate}
-                        onAdd={() => addTemperatureSensor(wirelessTemperatureSensorTemplate)}
-                        showJsonDetails={showJsonDetails}
-                        stepper={wirelessTemperatureSensorTemplate ? renderItemStepper(
-                            wirelessTemperatureSensorTemplate.target,
-                            wirelessTemperatureSensorTemplate.data.type,
-                            () => addTemperatureSensor(wirelessTemperatureSensorTemplate),
-                        ) : null}
-                    />
+                    >
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
+                            <div>
+                                <ThermostatFieldLabel>Тип подключения</ThermostatFieldLabel>
+                                <SegmentedToggle
+                                    options={TEMPERATURE_SENSOR_CONNECTIONS}
+                                    value={temperatureSensorConnection}
+                                    onChange={setTemperatureSensorConnection}
+                                    testIdPrefix="temperature-sensor-connection"
+                                />
+                            </div>
+                            <div>
+                                <ThermostatFieldLabel>Расположение</ThermostatFieldLabel>
+                                <SegmentedToggle
+                                    options={temperatureSensorPlacementOptions}
+                                    value={temperatureSensorPlacement}
+                                    onChange={selectTemperatureSensorPlacement}
+                                    testIdPrefix="temperature-sensor-placement"
+                                />
+                            </div>
+                            {!isWirelessTemperatureSensor && (
+                                <div>
+                                    <ThermostatFieldLabel>Тип датчика</ThermostatFieldLabel>
+                                    <SegmentedToggle
+                                        options={temperatureSensorKindOptions}
+                                        value={temperatureSensorKind}
+                                        onChange={selectTemperatureSensorKind}
+                                        testIdPrefix="temperature-sensor-kind"
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </SectionEquipmentCard>
                 </div>
 
             </section>
 
-            <section style={{ marginBottom: 32 }}>
+            <section>
                 <h2>Уличный датчик температуры</h2>
                 <SectionSubtitle>Беспроводной датчик уличной температуры — не более одного на схему</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -4858,58 +4973,26 @@ const SelectionApp = () => {
             <section>
                 <h2>Токовый датчик давления</h2>
                 <SectionSubtitle>Укажите количество токовых датчиков давления в системе</SectionSubtitle>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-                    {PRESSURE_TEMPLATES.map((item, index) => (
-                        <div
-                            key={index}
-                            className="sel-card"
-                            style={{
-                                border: '1px solid #d7dbe4',
-                                borderRadius: 10,
-                                padding: 16,
-                                background: '#fff',
-                                flex: '1 1 260px',
-                                minWidth: 260,
-                                maxWidth: 'calc(50% - 8px)',
-                            }}
-                        >
-                            <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
-                            <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
-                                Предназначен для измерения давления теплоносителя/воды в автоматизированных системах отопления и водоснабжения.
-                            </p>
-                            <pre
-                                style={{
-                                    background: '#f5f7fb',
-                                    padding: 10,
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    overflow: 'auto',
-                                    margin: 0,
-                                }}
-                            >
-{showJsonDetails ? JSON.stringify(item.data, null, 4) : null}
-                            </pre>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
-                                <button
-                                    onClick={() => addLeakItem({ ...item, target: 'sensors' })}
-                                    style={{
-                                        padding: '6px 14px',
-                                        border: '1px solid #3498db',
-                                        borderRadius: 6,
-                                        background: '#3498db',
-                                        color: '#fff',
-                                        cursor: 'pointer',
-                                        fontSize: 13,
-                                        fontWeight: 700,
-                                    }}
-                                >
-                                    Добавить
-                                </button>
-                                {renderItemStepper('sensors', item.data.type, () => addLeakItem({ ...item, target: 'sensors' }))}
-                            </div>
-                        </div>
-                    ))}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <SectionEquipmentCard
+                        image={PRESSURE_SENSOR_BACKGROUND_PATH}
+                        backgroundWidth={520}
+                        deviceImage={PRESSURE_SENSOR_IMAGE_PATH}
+                        deviceImageAlt={PRESSURE_TEMPLATES[0].label}
+                        title={PRESSURE_TEMPLATES[0].label}
+                        description="Предназначен для измерения давления теплоносителя/воды в автоматизированных системах отопления и водоснабжения."
+                        addedTitle="Добавленные датчики давления:"
+                        addedRows={pressureSensorRows}
+                        onAddUnit={addPressureSensor}
+                        onRemoveUnit={(row) => removeSchemeItemById('sensors', row.removeKeys[row.removeKeys.length - 1])}
+                        addLabel="Добавить датчик давления"
+                        onAdd={addPressureSensor}
+                        showAdd={pressureSensorRows.length === 0}
+                        addTestId="add-pressure-sensor"
+                        qtyTestId="pressure-sensor-qty"
+                        jsonData={PRESSURE_TEMPLATES[0].data}
+                        showJsonDetails={showJsonDetails}
+                    />
                 </div>
 
             </section>
@@ -4917,87 +5000,82 @@ const SelectionApp = () => {
 
             </div>{/* /Датчики и защита flex */}
 
-            <section style={{ marginBottom: 32 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
-                    <h2 style={{ margin: 0 }}>Контроль протечки воды</h2>
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#334155', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                        <span>Единый шлейф</span>
-                        <input
-                            type="checkbox"
-                            checked={unifiedLeakLoop}
-                            onChange={(event) => setUnifiedLeakLoop(event.target.checked)}
-                            style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
-                        />
-                        <span style={{ position: 'relative', width: 36, height: 20, borderRadius: 999, background: unifiedLeakLoop ? '#2e7d32' : '#cbd5e1', transition: 'background 0.18s ease' }}>
-                            <span style={{ position: 'absolute', top: 3, left: 3, width: 14, height: 14, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.22)', transform: unifiedLeakLoop ? 'translateX(16px)' : 'none', transition: 'transform 0.18s ease' }} />
-                        </span>
-                    </label>
-                </div>
-                {unifiedLeakLoop && <SectionSubtitle>В едином шлейфе используется один датчик протечки.</SectionSubtitle>}
+            <section>
+                <h2>Зоны контроля протечки воды</h2>
+                <SectionSubtitle>
+                    Зона — это шлейф датчиков протечки и запорные клапаны, которые он перекрывает.
+                    Все датчики одной зоны занимают один дискретный вход контроллера или модуля.
+                </SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    {LEAK_TEMPLATES.map((item, index) => {
-                        const isLeakSensor = canonicalType(item.data.type) === 'leak-sensor';
-                        const isUnifiedLeakLimitReached = unifiedLeakLoop && isLeakSensor && leakSensorCount > 0;
-                        return (
-                        <div
-                            key={index}
-                            className="sel-card"
-                            style={{
-                                border: '1px solid #d7dbe4',
-                                borderRadius: 10,
-                                padding: 16,
-                                background: '#fff',
-                                flex: '1 1 260px',
-                                minWidth: 260,
-                            }}
-                        >
-                            <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
-                            {item.description && (
-                                <p style={{ margin: '0 0 8px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
-                                    {item.description}
-                                </p>
-                            )}
-                            <pre
-                                style={{
-                                    background: '#f5f7fb',
-                                    padding: 10,
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    overflow: 'auto',
-                                    margin: 0,
-                                }}
-                            >
-{showJsonDetails ? JSON.stringify(item.data, null, 4) : null}
-                            </pre>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
-                                <button
-                                    onClick={() => addLeakItem(item)}
-                                    disabled={isUnifiedLeakLimitReached}
-                                    data-test-id={`add-${canonicalType(item.data.type)}`}
-                                    style={{
-                                        padding: '6px 14px',
-                                        border: `1px solid ${isUnifiedLeakLimitReached ? '#cbd5e1' : '#3498db'}`,
-                                        borderRadius: 6,
-                                        background: isUnifiedLeakLimitReached ? '#e2e8f0' : '#3498db',
-                                        color: isUnifiedLeakLimitReached ? '#94a3b8' : '#fff',
-                                        cursor: isUnifiedLeakLimitReached ? 'not-allowed' : 'pointer',
-                                        fontSize: 13,
-                                        fontWeight: 700,
-                                    }}
-                                >
-                                    Добавить
-                                </button>
-                                {renderItemStepper(
-                                    item.target === 'sensors' ? 'sensors' : 'wired_devices',
-                                    item.data.type,
-                                    () => addLeakItem(item),
-                                    unifiedLeakLoop && isLeakSensor,
-                                )}
-                            </div>
-                        </div>
-                        );
-                    })}
+                    <SectionEquipmentCard
+                        image={LEAK_ZONE_BACKGROUND_PATH}
+                        backgroundWidth={520}
+                        title="Зона контроля протечки"
+                        description="Датчики зоны собираются в один шлейф и занимают один дискретный вход. Клапаны перекрывают воду по сигналу этого шлейфа, каждый занимает два соседних релейных порта."
+                        addLabel="Добавить зону"
+                        onAdd={addLeakZone}
+                        addTestId="add-leak-zone"
+                        jsonData={LEAK_ZONE_JSON_EXAMPLE}
+                        showJsonDetails={showJsonDetails}
+                    >
+                        {leakZoneRows.length > 0 && (
+                            <AddedDevicesBlock marginTop={0}>
+                                <AddedDevicesTitle>Добавленные зоны:</AddedDevicesTitle>
+                                {leakZoneRows.map((zone, index) => (
+                                    <div
+                                        key={zone.id}
+                                        style={{
+                                            display: 'flex',
+                                            flexWrap: 'wrap',
+                                            alignItems: 'center',
+                                            gap: 12,
+                                            padding: '8px 0',
+                                            borderTop: index === 0 ? 'none' : '1px solid #d3dfeb',
+                                        }}
+                                    >
+                                        <span style={{ flex: '1 1 130px', fontWeight: 700, fontSize: 14 }}>
+                                            {`Зона ${index + 1}`}
+                                        </span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                                            <span style={{ color: '#475569', fontSize: 13 }}>Датчики</span>
+                                            <QtyStepper
+                                                count={zone.sensorCount}
+                                                onDecrement={() => changeLeakZoneSensors(zone.id, -1)}
+                                                onIncrement={() => changeLeakZoneSensors(zone.id, 1)}
+                                                decTestId={`leak-zone-sensor-qty-dec-${index}`}
+                                                incTestId={`leak-zone-sensor-qty-inc-${index}`}
+                                            />
+                                        </span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                                            <span style={{ color: '#475569', fontSize: 13 }}>Клапаны</span>
+                                            <QtyStepper
+                                                count={zone.valveCount}
+                                                onDecrement={() => changeLeakZoneValves(zone.id, -1)}
+                                                onIncrement={() => changeLeakZoneValves(zone.id, 1)}
+                                                decTestId={`leak-zone-valve-qty-dec-${index}`}
+                                                incTestId={`leak-zone-valve-qty-inc-${index}`}
+                                            />
+                                        </span>
+                                        <button
+                                            className="selection-secondary-button"
+                                            onClick={() => removeLeakZone(zone.id)}
+                                            data-test-id={`remove-leak-zone-${index}`}
+                                            style={{
+                                                padding: '6px 12px',
+                                                border: '1px solid #d7dbe4',
+                                                borderRadius: 8,
+                                                cursor: 'pointer',
+                                                fontSize: 12.5,
+                                                fontWeight: 700,
+                                            }}
+                                        >
+                                            Удалить зону
+                                        </button>
+                                    </div>
+                                ))}
+                            </AddedDevicesBlock>
+                        )}
+                    </SectionEquipmentCard>
                 </div>
 
             </section>
@@ -5007,54 +5085,29 @@ const SelectionApp = () => {
             <section style={{ flex: '1 1 400px', minWidth: 0 }}>
                 <h2>Дискретные входы</h2>
                 <SectionSubtitle>Укажите какое количество и как будут использоваться дискретные входы</SectionSubtitle>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'nowrap' }}>
-                    {DISCRETE_TEMPLATES.map((item, index) => (
-                        <div
-                            key={index}
-                            className="sel-card"
-                            style={{
-                                border: '1px solid #d7dbe4',
-                                borderRadius: 10,
-                                padding: 16,
-                                background: '#fff',
-                                flex: '1 1 0',
-                                minWidth: 180,
-                            }}
-                        >
-                            <div className="sel-card-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>{item.label}</div>
-                            <pre
-                                style={{
-                                    background: '#f5f7fb',
-                                    padding: 10,
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    lineHeight: 1.5,
-                                    overflow: 'auto',
-                                    margin: 0,
-                                }}
-                            >
-{showJsonDetails ? JSON.stringify(item.data, null, 4) : null}
-                            </pre>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
-                                <button
-                                    onClick={() => addLeakItem({ ...item, target: 'wired' })}
-                                    style={{
-                                        padding: '6px 14px',
-                                        border: '1px solid #3498db',
-                                        borderRadius: 6,
-                                        background: '#3498db',
-                                        color: '#fff',
-                                        cursor: 'pointer',
-                                        fontSize: 13,
-                                        fontWeight: 700,
-                                    }}
-                                >
-                                    Добавить
-                                </button>
-                                {renderItemStepper('wired_devices', item.data.type, () => addLeakItem({ ...item, target: 'wired' }))}
-                            </div>
-                        </div>
-                    ))}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    {DISCRETE_TEMPLATES.map((item) => {
+                        const rows = discreteInputRows[canonicalType(item.data.type)] || [];
+                        return (
+                            <SectionEquipmentCard
+                                key={item.data.type}
+                                half
+                                image={item.background}
+                                backgroundWidth={260}
+                                title={item.label}
+                                description={item.description}
+                                addedTitle="Добавлено:"
+                                addedRows={rows}
+                                onAddUnit={() => addLeakItem({ ...item, target: 'wired' })}
+                                onRemoveUnit={(row) => removeSchemeItemById('wired_devices', row.removeKeys[row.removeKeys.length - 1])}
+                                addLabel="Добавить"
+                                onAdd={() => addLeakItem({ ...item, target: 'wired' })}
+                                addTestId={`add-${canonicalType(item.data.type).replace(/_/g, '-')}`}
+                                jsonData={item.data}
+                                showJsonDetails={showJsonDetails}
+                            />
+                        );
+                    })}
                 </div>
 
             </section>
@@ -5066,34 +5119,36 @@ const SelectionApp = () => {
             <section style={{ flex: '1 1 400px', minWidth: 0 }}>
                 <h2>Источник бесперебойного питания</h2>
                 <SectionSubtitle>Требуется ли установка источника бесперебойного питания</SectionSubtitle>
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-                    <div
-                        className="sel-card"
-                        style={{
-                            border: '1px solid #d7dbe4',
-                            borderRadius: 10,
-                            padding: 16,
-                            background: '#fff',
-                            flex: '1 1 260px',
-                            minWidth: 260,
-                            maxWidth: 'calc(50% - 8px)',
-                        }}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <SectionEquipmentCard
+                        image={UPS_BACKGROUND_PATH}
+                        backgroundWidth={520}
+                        title="Источник бесперебойного питания"
+                        description="Поддерживает работу контроллера и модулей при отключении электричества."
+                        showAdd={false}
+                        jsonData={{ power_modules: ['ups'] }}
+                        showJsonDetails={showJsonDetails}
                     >
-                        <label className="scheme-settings-switch-row">
-                            <span className="sel-card-title" style={{ fontWeight: 700, fontSize: 14 }}>
-                                {controllerType === 'go'
-                                    ? 'Сменить контроллер с Go на Go+ (имеет встроенный ИБП)'
-                                    : 'Источник бесперебойного питания'}
-                            </span>
-                            <input
-                                type="checkbox"
-                                data-test-id="ups-toggle"
+                        <div
+                            style={{
+                                alignSelf: 'flex-start',
+                                padding: '12px 16px',
+                                border: `1px solid ${upsRequested ? '#f2cba6' : '#e3e7ef'}`,
+                                borderRadius: 12,
+                                background: upsRequested ? '#fff8f2' : '#fff',
+                                transition: 'background 0.18s, border-color 0.18s',
+                            }}
+                        >
+                            <ToggleSwitch
                                 checked={upsRequested}
-                                onChange={(event) => setUpsIntent(event.target.checked)}
+                                onChange={setUpsIntent}
+                                testId="ups-toggle"
+                                label={controllerType === 'go'
+                                    ? 'Сменить контроллер с Go на Go+ (имеет встроенный ИБП)'
+                                    : 'ИБП в схеме'}
                             />
-                            <span className="scheme-settings-switch" aria-hidden="true" />
-                        </label>
-                    </div>
+                        </div>
+                    </SectionEquipmentCard>
                 </div>
 
             </section>

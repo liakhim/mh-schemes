@@ -15,6 +15,7 @@ import { shouldIncludeCollisionSlot, translateRect, unionRects } from './scheme/
 import { getInstallationDinTotal } from './scheme/domain/installationDin';
 import { buildControllerOnlyScheme, isControllerOnlyScheme } from './scheme/domain/controllerOnlyScheme';
 import { materializePowerModules } from './scheme/domain/powerModules';
+import { getLeakZoneSensors, isLeakLoop, materializeLeakZones } from './scheme/domain/leakZones';
 import { getRinnaiBusSlotYOffset, RINNAI_ADAPTER_LABEL, RINNAI_ADAPTER_PRICE, usesRinnaiAdapter, withRinnaiAdapter } from './scheme/domain/rinnaiAdapter';
 import { restorePublicDevicesFromModules, serializePublicScheme } from './scheme/publicSchemeSerializer';
 import { controllerImagePaths, wirelessDeviceImagePaths, getWirelessDeviceImageKey, aerialImagePath, goAerialImagePath } from './scheme/assets/imageRegistry';
@@ -26,11 +27,10 @@ import EquipmentOfferModal from './components/EquipmentOfferModal';
 import SelectionConfigModal from './components/SelectionConfigModal';
 import commentIconPath from '../assets/icons/comment-icon.svg';
 import commentAddIconPath from '../assets/icons/comment-add-icon.svg';
-import logoPath from '../assets/logo/logo.svg';
 
 Konva.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
 
-const NAV_HEIGHT = 64;
+const NAV_HEIGHT = 0;
 const ACTIVE_INDICATOR_COLOR = '#00DA00';
 const ACTIVE_INDICATOR_SHADOW_BLUR = 6;
 const INFO_BLOCK_STROKE_WIDTH = 0.2;
@@ -44,6 +44,7 @@ const GRID_STROKE = 'rgba(154, 160, 166, 0.22)';
 const HELP_MODAL_STORAGE_KEY = 'mh-schemes-help-seen';
 const INSTALLATION_LAYOUT_VERSION = 1;
 const INSTALLATION_PANEL_PADDING_X = 16;
+const SHOW_DEVELOPER_TOOLS = true;
 
 const getRuntimeOffsetKey = (item, index, prefix) => (
     item && typeof item === 'object' && item.id != null
@@ -303,10 +304,13 @@ const buildSchemeFromIncoming = (sourceScheme) => {
     const schemeWithPowerModules = powerModules.length > 0 || Object.prototype.hasOwnProperty.call(normalizedScheme, 'power_modules')
         ? { ...normalizedScheme, power_modules: powerModules }
         : normalizedScheme;
+    // Плоские датчики протечки старых схем сворачиваются в зоны до балансировки:
+    // дальше по конвейеру зона — обычное DI-устройство.
+    const schemeWithLeakZones = materializeLeakZones(schemeWithPowerModules);
 
     return {
-        ...materializeBalancedOneWireScheme(schemeWithPowerModules),
-        wireless_devices: getInitialWirelessDevices(schemeWithPowerModules),
+        ...materializeBalancedOneWireScheme(schemeWithLeakZones),
+        wireless_devices: getInitialWirelessDevices(schemeWithLeakZones),
     };
 };
 
@@ -686,14 +690,18 @@ const getSmart2DiModuleExtraSpacing = (device, indentValue) => {
     return { left: 0, right: 0 };
 };
 const DISCRETE_DI_DEVICE_TYPES = ['discrete_pool', 'discrete_fire_alarm', 'discrete_signal', 'discrete_ventilation'];
-const DI_WIRED_DEVICE_TYPES = [...DISCRETE_DI_DEVICE_TYPES, 'leak-sensor'];
+// Зона протечки занимает DI как одно устройство; одиночный датчик — legacy-форма.
+const DI_WIRED_DEVICE_TYPES = [...DISCRETE_DI_DEVICE_TYPES, 'leak-loop', 'leak-sensor'];
 const DI_DEVICE_TITLES = {
     discrete_pool: 'Дискретный бассейн',
     discrete_fire_alarm: 'Дискретная пожарка',
     discrete_signal: 'Дискретный сигнал',
     discrete_ventilation: 'Дискретная вентиляция',
+    'leak-loop': 'Зона контроля протечки',
     'leak-sensor': 'Датчик протечки',
 };
+const LEAK_DI_DEVICE_TYPES = ['leak-loop', 'leak-sensor'];
+const isLeakDiDeviceType = (type) => LEAK_DI_DEVICE_TYPES.includes(canonicalDeviceType(type));
 const shouldShowDiDeviceInfoBlock = (device) => (
     DI_WIRED_DEVICE_TYPES.includes(canonicalDeviceType(device?.type))
 );
@@ -712,6 +720,7 @@ const INSTALLATION_DEVICE_TYPE_TITLES = {
     'flask-sensor': 'Датчик температуры',
     'ntc-sensor': 'NTC датчик',
     'leak-sensor': 'Датчик протечки',
+    'leak-loop': 'Зона контроля протечки',
     pressure: 'Датчик давления',
     'pressure-sensor': 'Датчик давления',
     rdt2: 'RDT2',
@@ -1484,11 +1493,15 @@ const App = () => {
     const [showGrid, setShowGrid] = useState(true);
     const [showLineFrames, setShowLineFrames] = useState(false);
     const [showIncomingScheme, setShowIncomingScheme] = useState(false);
-    const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(() => window.localStorage?.getItem(HELP_MODAL_STORAGE_KEY) !== '1');
     const [showOfferModal, setShowOfferModal] = useState(false);
     const [showSelectionConfig, setShowSelectionConfig] = useState(false);
+    const [showUnusedBundledSensors, setShowUnusedBundledSensors] = useState(false);
+    const [showSaveActions, setShowSaveActions] = useState(false);
+    const [showDeveloperToolsPanel, setShowDeveloperToolsPanel] = useState(false);
     const [installationMode, setInstallationMode] = useState(!requestedControllerOnlyScheme);
+    const [displayedToolsInstallationMode, setDisplayedToolsInstallationMode] = useState(installationMode);
+    const [rightToolsTransitionPhase, setRightToolsTransitionPhase] = useState('idle');
     const [morphImages, setMorphImages] = useState([]);
     const [installationPanelSize, setInstallationPanelSize] = useState(() => (
         readInstallationLayout(initialIncomingScheme).panelSize
@@ -1564,6 +1577,9 @@ const App = () => {
     const [titleEditor, setTitleEditor] = useState(null);
     const [commentEditor, setCommentEditor] = useState(null);
     const [commentViewer, setCommentViewer] = useState(null);
+    const unusedBundledSensorsRef = useRef(null);
+    const saveActionsRef = useRef(null);
+    const developerToolsRef = useRef(null);
     const schemeRevisionRef = useRef(0);
     const saveRequestIdRef = useRef(0);
     const saveSuccessTimerRef = useRef(null);
@@ -1868,9 +1884,11 @@ const App = () => {
             : new Map();
         const shouldMorph = sourceImages.size > 0;
         pendingMorphRef.current = shouldMorph ? { sourceImages } : null;
+        setShowSaveActions(false);
+        setShowDeveloperToolsPanel(false);
         setInstallationMode(enabled);
         if (!enabled) return;
-        setShowSettingsModal(false);
+        setShowIncomingScheme(false);
         if (stage) {
             stage.position({ x: 0, y: 0 });
             stage.scale({ x: 1, y: 1 });
@@ -2032,7 +2050,15 @@ const App = () => {
 
     const saveSchemeName = () => {
         const name = String(schemeNameEditor?.value || '').trim();
-        if (!routeSchemeId || !name || schemeNameEditor?.state === 'saving') return;
+        if (!routeSchemeId || schemeNameEditor?.state === 'saving') return;
+        if (!name) {
+            setSchemeNameEditor((current) => (current ? { ...current, state: 'error' } : current));
+            return;
+        }
+        if (name === schemeName) {
+            setSchemeNameEditor(null);
+            return;
+        }
 
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         setSchemeNameEditor((current) => (current ? { ...current, state: 'saving' } : current));
@@ -2448,7 +2474,7 @@ const App = () => {
         const wired = Array.isArray(currentScheme?.wired_devices) ? currentScheme.wired_devices : [];
         const sensors = Array.isArray(currentScheme?.sensors) ? currentScheme.sensors : [];
         return [...controllerLeakDevices, ...extDiDevices, ...wired, ...sensors]
-            .filter((sensor) => canonicalDeviceType(sensor?.type) === 'leak-sensor' && String(sensor?.connection_type || '').toLowerCase() === 'di');
+            .filter((sensor) => isLeakDiDeviceType(sensor?.type) && String(sensor?.connection_type || '').toLowerCase() === 'di');
     };
 
     const getLeakSensorDisplayIndex = (currentScheme, sensor) => {
@@ -2488,7 +2514,10 @@ const App = () => {
             if (device?.id != null && item?.id != null) return device.id === item.id;
             return device === item;
         }) + 1;
-        return displayIndex > 0 ? `${baseTitle} ${displayIndex}` : baseTitle;
+        const numberedTitle = displayIndex > 0 ? `${baseTitle} ${displayIndex}` : baseTitle;
+        // У зоны в подписи полезен размер шлейфа: сколько датчиков сидит на входе.
+        const zoneSensorCount = isLeakLoop(device) ? getLeakZoneSensors(device).length : 0;
+        return zoneSensorCount > 0 ? `${numberedTitle} (${zoneSensorCount} датч.)` : numberedTitle;
     };
 
     const isSameTitleTargetDevice = (candidate, target) => {
@@ -4216,6 +4245,69 @@ const App = () => {
             count,
             label: CONTROLLER_KIT_SENSOR_PRODUCTS[bucket] || bucket,
         }));
+    const unusedBundledSensorCount = memoUnusedBundledSensorCards.reduce((sum, card) => sum + card.count, 0);
+
+    useEffect(() => {
+        if (!showUnusedBundledSensors) return undefined;
+        const closeOnOutsideInteraction = (event) => {
+            if (!unusedBundledSensorsRef.current?.contains(event.target)) setShowUnusedBundledSensors(false);
+        };
+        const closeOnEscape = (event) => {
+            if (event.key === 'Escape') setShowUnusedBundledSensors(false);
+        };
+        document.addEventListener('pointerdown', closeOnOutsideInteraction);
+        document.addEventListener('keydown', closeOnEscape);
+        return () => {
+            document.removeEventListener('pointerdown', closeOnOutsideInteraction);
+            document.removeEventListener('keydown', closeOnEscape);
+        };
+    }, [showUnusedBundledSensors]);
+
+    useEffect(() => {
+        if (!showSaveActions) return undefined;
+        const closeOnOutsideInteraction = (event) => {
+            if (!saveActionsRef.current?.contains(event.target)) setShowSaveActions(false);
+        };
+        const closeOnEscape = (event) => {
+            if (event.key === 'Escape') setShowSaveActions(false);
+        };
+        document.addEventListener('pointerdown', closeOnOutsideInteraction);
+        document.addEventListener('keydown', closeOnEscape);
+        return () => {
+            document.removeEventListener('pointerdown', closeOnOutsideInteraction);
+            document.removeEventListener('keydown', closeOnEscape);
+        };
+    }, [showSaveActions]);
+
+    useEffect(() => {
+        if (!showDeveloperToolsPanel) return undefined;
+        const closeOnOutsideInteraction = (event) => {
+            if (!developerToolsRef.current?.contains(event.target)) setShowDeveloperToolsPanel(false);
+        };
+        const closeOnEscape = (event) => {
+            if (event.key === 'Escape') setShowDeveloperToolsPanel(false);
+        };
+        document.addEventListener('pointerdown', closeOnOutsideInteraction);
+        document.addEventListener('keydown', closeOnEscape);
+        return () => {
+            document.removeEventListener('pointerdown', closeOnOutsideInteraction);
+            document.removeEventListener('keydown', closeOnEscape);
+        };
+    }, [showDeveloperToolsPanel]);
+
+    useEffect(() => {
+        if (installationMode === displayedToolsInstallationMode) return undefined;
+        setRightToolsTransitionPhase('exiting');
+        const swapTimer = window.setTimeout(() => {
+            setDisplayedToolsInstallationMode(installationMode);
+            setRightToolsTransitionPhase('entering');
+        }, 430);
+        const finishTimer = window.setTimeout(() => setRightToolsTransitionPhase('idle'), 950);
+        return () => {
+            window.clearTimeout(swapTimer);
+            window.clearTimeout(finishTimer);
+        };
+    }, [installationMode]);
     const memoWirelessSlotX = useMemo(
         () => memoWirelessDevices.map((device, idx) => getWirelessSlotX(
             memoWirelessDevices,
@@ -4463,28 +4555,6 @@ const App = () => {
 
     return (
         <main className="spa-page">
-            <nav className="spa-navbar">
-                <div className="spa-navbar-brand">
-                    <a href="/" className="spa-navbar-logo-link" aria-label="MyHeat — главная">
-                        <img src={logoPath} alt="MyHeat" className="spa-navbar-logo" />
-                    </a>
-                    <div className="spa-alpha-notice">
-                        <span>Приложение находится <u>в стадии альфа-тестирования</u>, все вопросы к разработчику:</span>
-                        <a href="https://t.me/mmingareev" target="_blank" rel="noreferrer">Telegram</a>
-                    </div>
-                </div>
-                <div className="spa-navbar-actions">
-                    <button type="button" className="spa-reset-button" onClick={handleResetPositions}>
-                        Сброс позиций
-                    </button>
-                    <button type="button" onClick={() => setShowSettingsModal(true)}>
-                        Настройки
-                    </button>
-                    <button type="button" className="spa-help-button" onClick={() => setShowHelpModal(true)} aria-label="Помощь" title="Помощь">
-                        ?
-                    </button>
-                </div>
-            </nav>
             {showHelpModal && (
                 <div className="scheme-help-backdrop" onMouseDown={closeHelpModal}>
                     <div className="scheme-help-modal" onMouseDown={(event) => event.stopPropagation()}>
@@ -4499,11 +4569,11 @@ const App = () => {
                             </section>
                             <section className="scheme-help-block">
                                 <p>Для расширения существующей схемы:</p>
-                                <strong>Настройки → Отобразить доступные слоты</strong>
+                                <strong>Используйте кнопку «Доступные слоты» справа</strong>
                             </section>
                             <section className="scheme-help-block">
                                 <p>Для скачивания схемы:</p>
-                                <strong>Настройки → Скачать PDF</strong>
+                                <strong>Используйте кнопку PDF справа</strong>
                             </section>
                             <p className="scheme-help-note">Если вы находитесь на этой странице, значит Ваша схема уже сохранена, ссылкой можно делиться или зайти позже.</p>
                             <p>
@@ -4523,98 +4593,331 @@ const App = () => {
             {showSelectionConfig && selectionConfig && (
                 <SelectionConfigModal config={selectionConfig} onClose={() => setShowSelectionConfig(false)} />
             )}
-            {showSettingsModal && (
-                <div className="scheme-settings-backdrop" onMouseDown={() => setShowSettingsModal(false)}>
-                    <aside className="scheme-settings-sidebar" onMouseDown={(event) => event.stopPropagation()}>
-                        <div className="scheme-settings-header">
-                            <strong>Настройки схемы</strong>
-                            <button type="button" className="scheme-settings-close" onClick={() => setShowSettingsModal(false)}>×</button>
+            <div className="spa-floating-tools" ref={unusedBundledSensorsRef}>
+                <div className="spa-unused-sensors-tool">
+                    <button
+                        type="button"
+                        className={`spa-floating-tool-button spa-unused-sensors-button${showUnusedBundledSensors ? ' is-active' : ''}`}
+                        aria-label="Незадействованные комплектные датчики"
+                        aria-expanded={showUnusedBundledSensors}
+                        aria-controls="spa-unused-sensors-panel"
+                        title="Незадействованные комплектные датчики"
+                        onClick={() => setShowUnusedBundledSensors((current) => !current)}
+                    >
+                        <svg viewBox="0 0 32 32" aria-hidden="true">
+                            <path d="M13 5.5a3 3 0 0 1 6 0v11.1a7 7 0 1 1-6 0z" />
+                            <path d="M16 9v11.5" />
+                            <circle cx="16" cy="23" r="2.5" />
+                            <path d="M22.5 8.5h4m-4 4h3m-3 4h4" />
+                        </svg>
+                        <span className="spa-floating-tool-badge" aria-label={`${unusedBundledSensorCount} датчиков`}>
+                            {unusedBundledSensorCount}
+                        </span>
+                    </button>
+                    <section
+                        id="spa-unused-sensors-panel"
+                        className={`spa-unused-sensors-panel${showUnusedBundledSensors ? ' is-open' : ''}`}
+                        aria-hidden={!showUnusedBundledSensors}
+                        inert={!showUnusedBundledSensors}
+                    >
+                        <div className="spa-unused-sensors-panel-header">
+                            <strong>Незадействованные комплектные датчики</strong>
+                            <button type="button" onClick={() => setShowUnusedBundledSensors(false)} aria-label="Закрыть">×</button>
+                        </div>
+                        {memoUnusedBundledSensorCards.length > 0 ? (
+                            <div className="spa-unused-kit-sensors-list">
+                                {memoUnusedBundledSensorCards.map((card) => (
+                                    <div className="spa-unused-kit-sensor-card" key={card.bucket}>
+                                        <span>{card.label}</span>
+                                        <strong>×{card.count}</strong>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <span className="spa-unused-kit-sensors-empty">Все комплектные датчики задействованы</span>
+                        )}
+                    </section>
+                </div>
+                <button
+                    type="button"
+                    className="spa-floating-tool-button"
+                    aria-label="Коммерческое предложение"
+                    title="Коммерческое предложение"
+                    onClick={() => {
+                        setShowUnusedBundledSensors(false);
+                        setShowOfferModal(true);
+                    }}
+                >
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <path d="M8 3.5h11l5 5v20H8z" />
+                        <path d="M19 3.5v5h5M12 13h8m-8 4h5" />
+                        <path d="M12.5 24.5h5.25a2.25 2.25 0 0 0 0-4.5H14v7m0-3h6" />
+                    </svg>
+                </button>
+                {selectionConfig && (
+                    <button
+                        type="button"
+                        className="spa-floating-tool-button"
+                        aria-label="Исходный подбор"
+                        title="Исходный подбор"
+                        onClick={() => {
+                            setShowUnusedBundledSensors(false);
+                            setShowSelectionConfig(true);
+                        }}
+                    >
+                        <svg viewBox="0 0 32 32" aria-hidden="true">
+                            <path d="M9 5.5h14v23H9zM13 3.5h6v4h-6z" />
+                            <path d="m12 13 1.5 1.5L16 12m2 1h2m-8 6 1.5 1.5L16 18m2 1h2m-8 6 1.5 1.5L16 24m2 1h2" />
+                        </svg>
+                    </button>
+                )}
+            </div>
+            <div className="spa-mode-toggle" role="group" aria-label="Режим отображения схемы">
+                <button
+                    type="button"
+                    className={!installationMode ? 'is-active' : ''}
+                    aria-pressed={!installationMode}
+                    disabled={rightToolsTransitionPhase !== 'idle'}
+                    onClick={() => {
+                        if (installationMode) setInstallationModeEnabled(false);
+                    }}
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="5" cy="6" r="2" />
+                        <circle cx="19" cy="6" r="2" />
+                        <circle cx="12" cy="18" r="2" />
+                        <path d="M7 6h10M6.5 7.5l4.2 8.7m6.8-8.7-4.2 8.7" />
+                    </svg>
+                    <span>Схема</span>
+                </button>
+                <button
+                    type="button"
+                    className={installationMode ? 'is-active' : ''}
+                    aria-pressed={installationMode}
+                    title={canUseInstallationMode ? 'Режим инсталляции' : 'Режим инсталляции недоступен'}
+                    disabled={!canUseInstallationMode || rightToolsTransitionPhase !== 'idle'}
+                    onClick={() => {
+                        if (!installationMode) setInstallationModeEnabled(true);
+                    }}
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 5h18v14H3zM6 8h4v8H6zm8 0h4v8h-4z" />
+                    </svg>
+                    <span>Инсталляция</span>
+                </button>
+            </div>
+            <div className={`spa-right-tools is-${rightToolsTransitionPhase}`}>
+                {displayedToolsInstallationMode && (
+                    <div
+                        className="spa-floating-tool-button spa-installation-din-indicator"
+                        role="status"
+                        title="Занято на DIN-рейке"
+                        aria-label={installationDinTotal == null ? 'Количество DIN неизвестно' : `Занято ${installationDinTotal} DIN`}
+                    >
+                        <strong>{installationDinTotal == null ? '—' : installationDinTotal}</strong>
+                        <span>DIN</span>
+                    </div>
+                )}
+                <button
+                    type="button"
+                    className="spa-floating-tool-button spa-pdf-download-button"
+                    aria-label="Скачать схему в PDF"
+                    title="Скачать схему в PDF"
+                    onClick={handleDownloadPdf}
+                >
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <path d="M8 3.5h11l5 5v20H8z" />
+                        <path d="M19 3.5v5h5M16 11.5v10m-4-4 4 4 4-4M11.5 25h9" />
+                    </svg>
+                </button>
+                {!displayedToolsInstallationMode && (
+                    <button
+                        type="button"
+                        className={`spa-floating-tool-button spa-grid-toggle-button${showGrid ? ' is-active' : ''}`}
+                        aria-label={showGrid ? 'Скрыть сетку' : 'Отобразить сетку'}
+                        aria-pressed={showGrid}
+                        title={showGrid ? 'Скрыть сетку' : 'Отобразить сетку'}
+                        onClick={() => setShowGrid((current) => !current)}
+                    >
+                        <svg viewBox="0 0 32 32" aria-hidden="true">
+                            <path d="M4.5 4.5h23v23h-23zM12.2 4.5v23m7.6-23v23M4.5 12.2h23m-23 7.6h23" />
+                        </svg>
+                    </button>
+                )}
+                {!displayedToolsInstallationMode && (
+                    <button
+                        type="button"
+                        className={`spa-floating-tool-button spa-empty-slots-toggle-button${showEmptySlots ? ' is-active' : ''}`}
+                        aria-label={showEmptySlots ? 'Скрыть доступные слоты' : 'Отобразить доступные слоты'}
+                        aria-pressed={showEmptySlots}
+                        title={showEmptySlots ? 'Скрыть доступные слоты' : 'Отобразить доступные слоты'}
+                        onClick={() => setShowEmptySlots((current) => !current)}
+                    >
+                        <svg viewBox="0 0 32 32" aria-hidden="true">
+                            <rect x="4.5" y="6.5" width="9" height="9" rx="1.5" />
+                            <rect x="18.5" y="6.5" width="9" height="9" rx="1.5" />
+                            <rect x="4.5" y="19.5" width="9" height="7" rx="1.5" />
+                            <path d="M23 19.5v7m-3.5-3.5h7" />
+                        </svg>
+                    </button>
+                )}
+                <div className="spa-save-tool" ref={saveActionsRef}>
+                <button
+                    type="button"
+                    className={`spa-floating-tool-button${showSaveActions ? ' is-active' : ''}`}
+                    aria-label="Сохранить схему"
+                    aria-expanded={showSaveActions}
+                    aria-controls="spa-save-actions-panel"
+                    title="Сохранить схему"
+                    onClick={() => setShowSaveActions((current) => !current)}
+                >
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <path d="M5 4.5h19l3 3v20H5zM10 4.5v8h12v-8M10 27.5v-10h12v10" />
+                        <path d="M18.5 7.5h2" />
+                    </svg>
+                </button>
+                <section
+                    id="spa-save-actions-panel"
+                    className={`spa-save-actions-panel${showSaveActions ? ' is-open' : ''}`}
+                    aria-hidden={!showSaveActions}
+                    inert={!showSaveActions}
+                >
+                    <div className="spa-save-actions-header">
+                        <strong>Сохранение схемы</strong>
+                        <button type="button" onClick={() => setShowSaveActions(false)} aria-label="Закрыть">×</button>
+                    </div>
+                    <button
+                        type="button"
+                        className="scheme-settings-save-button"
+                        onClick={handleSaveScheme}
+                        disabled={!routeSchemeId || schemeLoadState !== 'loaded' || schemeSaveState === 'saving'}
+                        data-state={schemeSaveState}
+                        title={routeSchemeId ? undefined : 'Сохранение доступно только для схемы из базы'}
+                    >
+                        {schemeSaveState === 'saving'
+                            ? 'Сохраняем...'
+                            : (schemeSaveState === 'saved'
+                                ? 'Сохранено'
+                                : (schemeSaveState === 'error' ? 'Ошибка сохранения' : 'Сохранить изменения'))}
+                    </button>
+                    <button
+                        type="button"
+                        className="scheme-settings-save-button spa-save-as-new-button"
+                        onClick={handleSaveAsNewScheme}
+                        disabled={(routeSchemeId && schemeLoadState !== 'loaded') || schemeCreateState === 'saving'}
+                        data-state={schemeCreateState}
+                    >
+                        {schemeCreateState === 'saving'
+                            ? 'Сохраняем...'
+                            : (schemeCreateState === 'saved'
+                                ? 'Сохранено'
+                                : (schemeCreateState === 'error' ? 'Ошибка сохранения' : 'Сохранить как новую схему'))}
+                    </button>
+                </section>
+                </div>
+                {!displayedToolsInstallationMode && SHOW_DEVELOPER_TOOLS && (
+                    <div className="spa-developer-tools" ref={developerToolsRef}>
+                    <button
+                        type="button"
+                        className={`spa-floating-tool-button${showDeveloperToolsPanel ? ' is-active' : ''}`}
+                        aria-label="Инструменты разработчика"
+                        aria-expanded={showDeveloperToolsPanel}
+                        aria-controls="spa-developer-tools-panel"
+                        title="Инструменты разработчика"
+                        onClick={() => setShowDeveloperToolsPanel((current) => !current)}
+                    >
+                        <svg viewBox="0 0 32 32" aria-hidden="true">
+                            <path d="m12 8-7 8 7 8m8-16 7 8-7 8M18 5l-4 22" />
+                        </svg>
+                    </button>
+                    <section
+                        id="spa-developer-tools-panel"
+                        className={`spa-save-actions-panel spa-developer-tools-panel${showDeveloperToolsPanel ? ' is-open' : ''}`}
+                        aria-hidden={!showDeveloperToolsPanel}
+                        inert={!showDeveloperToolsPanel}
+                    >
+                        <div className="spa-save-actions-header">
+                            <strong>Инструменты разработчика</strong>
+                            <button type="button" onClick={() => setShowDeveloperToolsPanel(false)} aria-label="Закрыть">×</button>
                         </div>
                         <div className="scheme-settings-options">
                             <label className="scheme-settings-switch-row">
                                 <span>Отобразить порты входа линий</span>
-                                <input type="checkbox" checked={showPorts} onChange={(e) => setShowPorts(e.target.checked)} />
-                                <span className="scheme-settings-switch" aria-hidden="true" />
-                            </label>
-                            <label className="scheme-settings-switch-row">
-                                <span>Отобразить доступные слоты</span>
-                                <input type="checkbox" checked={showEmptySlots} onChange={(e) => setShowEmptySlots(e.target.checked)} />
-                                <span className="scheme-settings-switch" aria-hidden="true" />
-                            </label>
-                            <label className="scheme-settings-switch-row">
-                                <span>Отображать сетку</span>
-                                <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />
+                                <input type="checkbox" checked={showPorts} onChange={(event) => setShowPorts(event.target.checked)} />
                                 <span className="scheme-settings-switch" aria-hidden="true" />
                             </label>
                             <label className="scheme-settings-switch-row">
                                 <span>Отображать области линий подключения</span>
-                                <input type="checkbox" checked={showLineFrames} onChange={(e) => setShowLineFrames(e.target.checked)} />
+                                <input type="checkbox" checked={showLineFrames} onChange={(event) => setShowLineFrames(event.target.checked)} />
                                 <span className="scheme-settings-switch" aria-hidden="true" />
                             </label>
                             <label className="scheme-settings-switch-row">
                                 <span>Отображать отладочную панель</span>
-                                <input type="checkbox" checked={showIncomingScheme} onChange={(e) => setShowIncomingScheme(e.target.checked)} />
+                                <input type="checkbox" checked={showIncomingScheme} onChange={(event) => setShowIncomingScheme(event.target.checked)} />
                                 <span className="scheme-settings-switch" aria-hidden="true" />
                             </label>
                         </div>
-                        <div className="scheme-settings-actions">
-                            <button type="button" className="scheme-settings-pdf-button" onClick={handleDownloadPdf}>
-                                Скачать PDF
-                            </button>
-                            <div className="scheme-settings-note">
-                                Схему также можно сохранить как простое изображение, нажав правую кнопку в произвольном месте и выбрав соответствующий пункт
-                            </div>
-                            <button
-                                type="button"
-                                className="scheme-settings-save-button"
-                                onClick={handleSaveAsNewScheme}
-                                disabled={(routeSchemeId && schemeLoadState !== 'loaded') || schemeCreateState === 'saving'}
-                                style={{
-                                    background: schemeCreateState === 'error' ? '#c62828' : undefined,
-                                    borderColor: schemeCreateState === 'error' ? '#c62828' : undefined,
-                                }}
-                            >
-                                {schemeCreateState === 'saving'
-                                    ? 'Сохраняем...'
-                                    : (schemeCreateState === 'saved'
-                                        ? 'Сохранено'
-                                        : (schemeCreateState === 'error' ? 'Ошибка сохранения' : 'Сохранить как новую схему'))}
-                            </button>
-                            <button
-                                type="button"
-                                className="scheme-settings-save-button"
-                                onClick={handleSaveScheme}
-                                disabled={!routeSchemeId || schemeLoadState !== 'loaded' || schemeSaveState === 'saving'}
-                                style={{
-                                    background: schemeSaveState === 'error' ? '#c62828' : undefined,
-                                    borderColor: schemeSaveState === 'error' ? '#c62828' : undefined,
-                                }}
-                                title={routeSchemeId ? undefined : 'Сохранение доступно только для схемы из базы'}
-                            >
-                                {schemeSaveState === 'saving'
-                                    ? 'Сохраняем...'
-                                    : (schemeSaveState === 'saved'
-                                        ? 'Сохранено'
-                                        : (schemeSaveState === 'error' ? 'Ошибка сохранения' : 'Сохранить изменения'))}
-                            </button>
-                        </div>
-                    </aside>
-                </div>
+                    </section>
+                    </div>
+                )}
+            </div>
+            {!displayedToolsInstallationMode && (
+                <button
+                    type="button"
+                    className={`spa-floating-tool-button spa-reset-positions-button is-${rightToolsTransitionPhase}`}
+                    aria-label="Сбросить позиции"
+                    title="Сбросить позиции"
+                    onClick={handleResetPositions}
+                >
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <path d="M7.5 11.5A10 10 0 1 1 6 20" />
+                        <path d="M7.5 5.5v6h6M16 10.5v6l4 2.5" />
+                    </svg>
+                </button>
             )}
+            <button
+                type="button"
+                className="spa-floating-tool-button spa-floating-help-button"
+                aria-label="Помощь"
+                title="Помощь"
+                onClick={() => setShowHelpModal(true)}
+            >
+                ?
+            </button>
             <div className="spa-scheme-title spa-fixed-scheme-title">
                 <span className="spa-scheme-title-label">Схема</span>
                 <div className="spa-scheme-title-value" title={schemeName}>
-                    <strong>{schemeName}</strong>
-                    <button
-                        type="button"
-                        className="spa-scheme-title-edit"
-                        aria-label="Переименовать схему"
-                        title="Переименовать схему"
-                        disabled={!routeSchemeId}
-                        onClick={() => setSchemeNameEditor({ value: schemeName, state: 'idle' })}
-                    >
-                        &#9998;
-                    </button>
+                    {schemeNameEditor ? (
+                        <input
+                            className={`spa-scheme-name-input${schemeNameEditor.state === 'error' ? ' is-error' : ''}`}
+                            value={schemeNameEditor.value}
+                            autoFocus
+                            disabled={schemeNameEditor.state === 'saving'}
+                            aria-label="Название схемы"
+                            title={schemeNameEditor.state === 'error' ? 'Название не сохранено' : undefined}
+                            onChange={(event) => setSchemeNameEditor({ value: event.target.value, state: 'idle' })}
+                            onBlur={saveSchemeName}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    event.currentTarget.blur();
+                                }
+                                if (event.key === 'Escape') {
+                                    event.preventDefault();
+                                    setSchemeNameEditor(null);
+                                }
+                            }}
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            className="spa-scheme-name-button"
+                            disabled={!routeSchemeId}
+                            onClick={() => setSchemeNameEditor({ value: schemeName, state: 'idle' })}
+                        >
+                            {schemeName}
+                        </button>
+                    )}
                 </div>
                 <span className="spa-scheme-description-label">Описание</span>
                 <div className="spa-scheme-description-value" title={schemeDescription || 'Без описания'}>
@@ -4632,46 +4935,6 @@ const App = () => {
                         &#9998;
                     </button>
                 </div>
-                <div className="spa-unused-kit-sensors">
-                    <span className="spa-unused-kit-sensors-label">Незадействованные комплектные датчики</span>
-                    {memoUnusedBundledSensorCards.length > 0 ? (
-                        <div className="spa-unused-kit-sensors-list">
-                            {memoUnusedBundledSensorCards.map((card) => (
-                                <div className="spa-unused-kit-sensor-card" key={card.bucket}>
-                                    <span>{card.label}</span>
-                                    {card.count > 1 && <strong>×{card.count}</strong>}
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <span className="spa-unused-kit-sensors-empty">Все комплектные датчики задействованы</span>
-                    )}
-                </div>
-                <div className="spa-installation-summary">
-                    <span className="spa-unused-kit-sensors-label">Монтажная схема</span>
-                    <label className="spa-installation-switch" title={canUseInstallationMode ? 'Режим инсталляции' : 'Режим инсталляции доступен для GO, GO+, Smart2, PRO и ECOsmart'}>
-                        <span>Режим инсталляции</span>
-                        <input
-                            type="checkbox"
-                            checked={installationMode}
-                            disabled={!canUseInstallationMode}
-                            onChange={(event) => setInstallationModeEnabled(event.target.checked)}
-                        />
-                        <span className="scheme-settings-switch" aria-hidden="true" />
-                    </label>
-                    <div className="spa-installation-din-card">
-                        <span>Занято на DIN-рейке</span>
-                        <strong>{installationDinTotal == null ? '—' : `${installationDinTotal} DIN`}</strong>
-                    </div>
-                </div>
-                <button type="button" className="spa-offer-button" onClick={() => setShowOfferModal(true)}>
-                    Коммерческое предложение
-                </button>
-                {selectionConfig && (
-                    <button type="button" className="spa-offer-button spa-selection-config-button" onClick={() => setShowSelectionConfig(true)}>
-                        Исходный подбор
-                    </button>
-                )}
             </div>
             {schemeLoadError && (
                 <div style={{ position: 'fixed', top: 72, right: 16, zIndex: 60, color: '#d32f2f', background: '#fff', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>
@@ -4709,44 +4972,6 @@ const App = () => {
                         <div className="title-editor-actions">
                             <button type="button" className="title-editor-secondary" onClick={closeTitleEditor}>Отмена</button>
                             <button type="submit" className="title-editor-primary" disabled={!String(titleEditor.value || '').trim()}>Сохранить</button>
-                        </div>
-                    </form>
-                </div>
-            )}
-            {schemeNameEditor && (
-                <div className="title-editor-backdrop" onMouseDown={() => setSchemeNameEditor(null)}>
-                    <form
-                        className="title-editor-modal"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            saveSchemeName();
-                        }}
-                        onMouseDown={(event) => event.stopPropagation()}
-                    >
-                        <div className="title-editor-header">
-                            <strong>Переименовать схему</strong>
-                            <button type="button" className="title-editor-close" onClick={() => setSchemeNameEditor(null)}>×</button>
-                        </div>
-                        <label className="title-editor-label" htmlFor="scheme-name-editor-input">Название схемы</label>
-                        <input
-                            id="scheme-name-editor-input"
-                            className="title-editor-input"
-                            value={schemeNameEditor.value}
-                            autoFocus
-                            onChange={(event) => setSchemeNameEditor((current) => (current ? { ...current, value: event.target.value, state: 'idle' } : current))}
-                            onKeyDown={(event) => {
-                                if (event.key === 'Escape') {
-                                    event.preventDefault();
-                                    setSchemeNameEditor(null);
-                                }
-                            }}
-                        />
-                        {schemeNameEditor.state === 'error' && <div className="title-editor-error">Не удалось переименовать схему</div>}
-                        <div className="title-editor-actions">
-                            <button type="button" className="title-editor-secondary" onClick={() => setSchemeNameEditor(null)}>Отмена</button>
-                            <button type="submit" className="title-editor-primary" disabled={!String(schemeNameEditor.value || '').trim() || schemeNameEditor.state === 'saving'}>
-                                {schemeNameEditor.state === 'saving' ? 'Сохраняем...' : 'Сохранить'}
-                            </button>
                         </div>
                     </form>
                 </div>
@@ -5642,7 +5867,8 @@ const App = () => {
                                                 const visualDevice = isDiscreteDiDeviceType(device?.type)
                                                     ? { ...device, port_side: 'left' }
                                                     : device;
-                                                const imageKey = canonicalDeviceType(device?.type) === 'leak-sensor'
+                                                const deviceType = canonicalDeviceType(device?.type);
+                                                const imageKey = deviceType === 'leak-sensor' || deviceType === 'leak-loop'
                                                     ? 'leak-sensor'
                                                     : getWirelessDeviceImageKey(visualDevice);
                                                 const image = imageKey ? wirelessImages[imageKey] : null;
@@ -5714,7 +5940,8 @@ const App = () => {
                                                 const visualDevice = isDiscreteDiDeviceType(device?.type)
                                                     ? { ...device, port_side: 'left' }
                                                     : device;
-                                                const imageKey = canonicalDeviceType(device?.type) === 'leak-sensor'
+                                                const deviceType = canonicalDeviceType(device?.type);
+                                                const imageKey = deviceType === 'leak-sensor' || deviceType === 'leak-loop'
                                                     ? 'leak-sensor'
                                                     : getWirelessDeviceImageKey(visualDevice);
                                                 const image = imageKey ? wirelessImages[imageKey] : null;
@@ -5858,9 +6085,12 @@ const App = () => {
                                     const hoverKey = 'ecosmart-leak-sensor';
                                     const isHovered = hoveredNtcSlotKey === hoverKey;
                                     const leakSensorDisplayIndex = getLeakSensorDisplayIndex(scheme, leakSensor);
-                                    const leakSensorTitle = getDeviceStoredTitle(leakSensor) || (leakSensorDisplayIndex > 0
-                                        ? `Датчик протечки ${leakSensorDisplayIndex}`
-                                        : 'Датчик протечки');
+                                    const leakSensorBaseTitle = isLeakLoop(leakSensor) ? 'Зона контроля протечки' : 'Датчик протечки';
+                                    const leakZoneSensorCount = isLeakLoop(leakSensor) ? getLeakZoneSensors(leakSensor).length : 0;
+                                    const leakSensorTitle = getDeviceStoredTitle(leakSensor) || [
+                                        leakSensorDisplayIndex > 0 ? `${leakSensorBaseTitle} ${leakSensorDisplayIndex}` : leakSensorBaseTitle,
+                                        leakZoneSensorCount > 0 ? `(${leakZoneSensorCount} датч.)` : null,
+                                    ].filter(Boolean).join(' ');
 
                                     return (
                                         <Group
@@ -12163,10 +12393,10 @@ const App = () => {
                                                             const visualSlotHeight = slotDeviceType === 'pressure-sensor'
                                                                 ? 2 * indentSize
                                                                 : (slotDeviceType === '010pump' || slotDeviceType === '010servo' ? 8 * indentSize : channelSlotHeight);
-                                                            const imageBoxWidth = slotDeviceType === 'leak-sensor'
+                                                            const imageBoxWidth = isLeakDiDeviceType(slotDeviceType)
                                                                 ? visualSlotWidth * CHANNEL_LEAK_SENSOR_IMAGE_SCALE
                                                                 : (slotDeviceType === '010servo' ? visualSlotWidth - indentSize : visualSlotWidth);
-                                                            const imageBoxHeight = slotDeviceType === 'leak-sensor' ? visualSlotHeight * CHANNEL_LEAK_SENSOR_IMAGE_SCALE : visualSlotHeight;
+                                                            const imageBoxHeight = isLeakDiDeviceType(slotDeviceType) ? visualSlotHeight * CHANNEL_LEAK_SENSOR_IMAGE_SCALE : visualSlotHeight;
                                                             const renderSize = (hasDevice && slotDeviceImage)
                                                                 ? getContainSize(slotDeviceImage, imageBoxWidth, imageBoxHeight)
                                                                 : { width: visualSlotWidth, height: visualSlotHeight };
@@ -12499,8 +12729,8 @@ const App = () => {
                                                                 const channelIndex = channelPortStart + localIndex - 1;
                                                                 const fromPort = extPorts.find((port) => port.name === modulePortName);
                                                                 const slotYLine = getDi6SlotY(visualIndex);
-                                                                const imageBoxWidth = slotDeviceType === 'leak-sensor' ? di6SlotWidth * CHANNEL_LEAK_SENSOR_IMAGE_SCALE : di6SlotWidth;
-                                                                const imageBoxHeight = slotDeviceType === 'leak-sensor' ? di6SlotHeight * CHANNEL_LEAK_SENSOR_IMAGE_SCALE : di6SlotHeight;
+                                                                const imageBoxWidth = isLeakDiDeviceType(slotDeviceType) ? di6SlotWidth * CHANNEL_LEAK_SENSOR_IMAGE_SCALE : di6SlotWidth;
+                                                                const imageBoxHeight = isLeakDiDeviceType(slotDeviceType) ? di6SlotHeight * CHANNEL_LEAK_SENSOR_IMAGE_SCALE : di6SlotHeight;
                                                                 const renderSize = (hasDevice && slotDeviceImage)
                                                                     ? getContainSize(slotDeviceImage, imageBoxWidth, imageBoxHeight)
                                                                     : { width: di6SlotWidth, height: di6SlotHeight };
