@@ -2419,6 +2419,18 @@ body {
     font-weight: 500;
 }
 
+/* Компактный список добавленного: используется там, где строк много и у
+   каждой свой счётчик (термостаты). */
+.sel-added-block-compact .sel-added-title {
+    margin-bottom: 10px;
+    font-size: 15px;
+}
+
+.sel-added-block-compact .sel-added-line {
+    margin: 6px 0;
+    font-size: 13px;
+}
+
 .sel-added-line {
     display: flex;
     gap: 8px;

@@ -2220,7 +2220,18 @@ const BoilerConnectionSwitch = ({ connectionType, onChange }) => {
     );
 };
 
-const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, myheat = false, price = null, disabled = false, control = null, hideCount = false }) => (
+const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, myheat = false, price = null, disabled = false, control = null, hideCount = false, removeFirst = false }) => {
+    const removeButton = onRemove ? (
+        <button
+            onClick={onRemove}
+            style={{ border: 'none', background: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
+            title="Удалить"
+        >
+            ×
+        </button>
+    ) : null;
+
+    return (
     <div
         className="sel-added-line"
         style={{
@@ -2272,6 +2283,7 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove 
             </span>
         ) : <span>{label}</span>}
         <span style={{ flex: 1, borderBottom: '1px dotted #6b7f95', transform: badgeAbove ? 'none' : 'translateY(-3px)' }} />
+        {removeFirst && removeButton}
         {control}
         {!hideCount && <span style={{ whiteSpace: 'nowrap' }}>{count} шт</span>}
         {price != null && (
@@ -2279,17 +2291,10 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove 
                 {price.toLocaleString('ru-RU')} ₽
             </span>
         )}
-        {onRemove && (
-            <button
-                onClick={onRemove}
-                style={{ border: 'none', background: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
-                title="Удалить"
-            >
-                ×
-            </button>
-        )}
+        {!removeFirst && removeButton}
     </div>
-);
+    );
+};
 
 const AddedDevicesTitle = ({ children }) => (
     <h3 className="sel-added-title">{children}</h3>
@@ -2451,7 +2456,7 @@ const ThermostatFieldLabel = ({ children }) => (
 );
 
 /** Карточка термостата: callbacks меняют тип подключения, цвет, датчик пола и добавляют устройство. */
-const ThermostatCard = ({ template, connection, onConnectionChange, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, addedRows = [], onRemoveRow, showJsonDetails = false }) => (
+const ThermostatCard = ({ template, connection, onConnectionChange, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, addedRows = [], onRemoveRow, onAddRow, showJsonDetails = false }) => (
     <div
         className="sel-card sel-card-static sel-card-section"
         style={{
@@ -2487,7 +2492,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             <div className="sel-card-heading">{template.label}</div>
 
             {addedRows.length > 0 && (
-                <AddedDevicesBlock marginTop={0}>
+                <AddedDevicesBlock marginTop={0} compact>
                     <AddedDevicesTitle>Добавленные термостаты:</AddedDevicesTitle>
                     {addedRows.map((row) => (
                         <AddedDeviceLine
@@ -2495,7 +2500,16 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                             label={row.label}
                             count={row.count}
                             myheat
+                            hideCount
+                            removeFirst
                             onRemove={() => onRemoveRow(row)}
+                            control={(
+                                <QtyStepper
+                                    count={row.count}
+                                    onDecrement={() => onRemoveRow(row)}
+                                    onIncrement={() => onAddRow(row)}
+                                />
+                            )}
                         />
                     ))}
                 </AddedDevicesBlock>
@@ -2639,7 +2653,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                     fontWeight: 700,
                 }}
             >
-                Добавить термостат
+                {`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
             </button>
         </div>
 
@@ -3102,8 +3116,8 @@ const MixingUnitCard = ({ template, servo, onServoChange, sensor, onSensorChange
 );
 
 /** Карточка датчика: options задает варианты, selectedKey выбор, stepper счетчик. */
-const AddedDevicesBlock = ({ children, marginTop = 24 }) => (
-    <div className="sel-added-block" style={{ marginTop }}>
+const AddedDevicesBlock = ({ children, marginTop = 24, compact = false }) => (
+    <div className={`sel-added-block${compact ? ' sel-added-block-compact' : ''}`} style={{ marginTop }}>
         {children}
     </div>
 );
@@ -3331,6 +3345,12 @@ const getThermostatRows = (scheme) => {
             && device.additions.some((addition) => canonicalType(addition?.type) === 'flask-sensor-floor');
         return {
             label: `Термостат ${connectionLabel.toLowerCase()}, ${colorLabel.toLowerCase()}${hasFloorSensor ? ', с датчиком пола' : ''}`,
+            // Ключ конфигурации нужен счётчику: «+» добавляет точно такой же термостат.
+            templateKey: [
+                target === 'wireless_devices' ? 'wireless' : 'wired',
+                device.color || 'black',
+                hasFloorSensor ? 'floor' : 'no-floor',
+            ].join('|'),
             removeKey: { target, id: device.id },
         };
     }));
@@ -4832,7 +4852,20 @@ const SelectionApp = () => {
                         onFloorSensorChange={isWirelessThermostat ? setWirelessThermostatHasFloorSensor : setWiredThermostatHasFloorSensor}
                         onAdd={() => addThermostat(thermostatTemplate)}
                         addedRows={getThermostatRows(incomingScheme)}
-                        onRemoveRow={(row) => removeSchemeItemById(row.removeKeys[0].target, row.removeKeys[0].id)}
+                        onRemoveRow={(row) => {
+                            const removeKey = row.removeKeys[row.removeKeys.length - 1];
+                            removeSchemeItemById(removeKey.target, removeKey.id);
+                        }}
+                        onAddRow={(row) => {
+                            // Конфигурация берётся из самой строки, а не из текущих
+                            // переключателей карточки: «+» повторяет именно эту позицию.
+                            const [rowTarget, rowColor, rowFloor] = String(row.templateKey || '').split('|');
+                            addThermostat(makeThermostatTemplate({
+                                target: rowTarget === 'wireless' ? 'wireless' : 'wired',
+                                color: rowColor || 'black',
+                                hasFloorSensor: rowFloor === 'floor',
+                            }));
+                        }}
                         showJsonDetails={showJsonDetails}
                     />
                 </div>
