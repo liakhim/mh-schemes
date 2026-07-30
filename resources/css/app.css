@@ -1001,6 +1001,191 @@ body {
     gap: 10px;
 }
 
+.spa-device-preview {
+    position: fixed;
+    top: calc(var(--nav-height) + 80px);
+    right: 82px;
+    z-index: 89;
+    display: grid;
+    width: 240px;
+    height: 240px;
+    grid-template-rows: auto auto 1fr auto;
+    overflow: hidden;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+    backdrop-filter: blur(8px);
+}
+
+.spa-device-preview-header {
+    display: flex;
+    min-height: 31px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 9px 0 11px;
+    border-bottom: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.spa-device-preview-header button {
+    display: grid;
+    width: 23px;
+    height: 23px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    color: #64748b;
+    background: transparent;
+    cursor: pointer;
+    font-size: 19px;
+    line-height: 1;
+    place-items: center;
+}
+
+.spa-device-preview-header button:hover {
+    color: #1e293b;
+    background: #f1f5f9;
+}
+
+.spa-device-preview-type {
+    justify-self: center;
+    max-width: calc(100% - 24px);
+    margin-top: 8px;
+    overflow: hidden;
+    color: #2e7d32;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.spa-device-preview-image {
+    display: grid;
+    min-height: 0;
+    padding: 8px 18px 6px;
+    place-items: center;
+}
+
+.spa-device-preview-image img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.spa-device-preview-image > span {
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.spa-device-preview-info-block {
+    margin: 0 10px 10px;
+    border: 1px solid #2f08af;
+    border-radius: 5px;
+    background: #fff;
+}
+
+.spa-device-preview-info-block > button,
+.spa-device-preview-info-block form {
+    display: flex;
+    width: 100%;
+    min-height: 34px;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px 4px 10px;
+    border: 0;
+    border-radius: 4px;
+    color: #4a6a8a;
+    background: transparent;
+    font: 600 12px/1.25 "Segoe UI", Tahoma, sans-serif;
+    text-align: center;
+}
+
+.spa-device-preview-info-block > button {
+    cursor: pointer;
+}
+
+.spa-device-preview-info-block > button:hover {
+    background: #f5f3ff;
+}
+
+.spa-device-preview-info-block > button span {
+    flex: 1 1 auto;
+}
+
+.spa-device-preview-info-block svg {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.spa-device-preview-info-block input {
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: 4px 5px;
+    border: 1px solid #a5b4fc;
+    border-radius: 3px;
+    color: #334155;
+    font: inherit;
+    outline: none;
+}
+
+.spa-device-preview-info-block input:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.14);
+}
+
+.spa-device-preview-info-block form button {
+    width: 25px;
+    height: 25px;
+    flex: 0 0 auto;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    color: #fff;
+    background: #4f46e5;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.spa-device-preview-empty {
+    display: grid;
+    grid-row: 2 / span 3;
+    align-content: center;
+    justify-items: center;
+    gap: 12px;
+    padding: 18px 28px;
+    color: #94a3b8;
+    text-align: center;
+}
+
+.spa-device-preview-empty svg {
+    width: 46px;
+    height: 46px;
+    fill: none;
+    stroke: #a8b6c8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.4;
+}
+
+.spa-device-preview-empty span {
+    font-size: 12px;
+    line-height: 1.4;
+}
+
 .spa-right-tools > .spa-floating-tool-button,
 .spa-right-tools > .spa-save-tool,
 .spa-right-tools > .spa-developer-tools {
@@ -2767,6 +2952,89 @@ body {
 /* Панель «Подобранный контроллер»: липкая колонка справа от основного
    контента (третья колонка .sel-layout) и единственное место выбора
    контроллера — видна всё время. */
+/* Подбор сменил контроллер: панель на мгновение приподнимается над контентом.
+   Класс вешает selection.jsx на 520ms — длительность анимации. */
+@keyframes sel-controller-panel-pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.045); }
+    100% { transform: scale(1); }
+}
+
+.sel-stuck-controllers-panel.is-controller-changed {
+    /* Ниже липкой шапки (200), но выше основного контента. */
+    z-index: 150;
+    box-shadow: 0 14px 34px rgba(32, 39, 56, 0.18);
+    animation: sel-controller-panel-pop 520ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sel-stuck-controllers-panel.is-controller-changed {
+        animation: none;
+    }
+}
+
+/* Модули расширения в панели контроллера: плитка со снимком модуля, количество
+   одинаковых модулей — кружком в правом верхнем углу плитки (внутри её границ,
+   иначе панель с `overflow-y: auto` обрезала бы кружок). */
+.sel-stuck-modules {
+    margin-top: 14px;
+}
+
+.sel-stuck-modules-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #475569;
+}
+
+/* Три плитки в ряд — по трети ширины панели. */
+.sel-stuck-modules-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding-top: 8px;
+}
+
+.sel-stuck-module-tile {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 100%;
+    /* Модули на снимках вертикальные (121x201 и 81x201), поэтому плитка выше,
+       чем шире: так изображение занимает её почти целиком. */
+    aspect-ratio: 3 / 4;
+    padding: 2px;
+    border: 1px solid #d7dbe4;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.sel-stuck-module-tile img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.sel-stuck-module-count {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 999px;
+    background: #e07020;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+
 /* Сброс подбора: отдельная кнопка внизу панели контроллера, во всю её ширину. */
 .selection-page button.sel-stuck-controllers-reset {
     width: 100%;
@@ -2863,6 +3131,10 @@ body {
     .spa-scheme-meta-editor {
         width: calc(100vw - 28px);
     }
+
+    .spa-device-preview {
+        display: none;
+    }
 }
 
 @media (max-width: 480px) {
@@ -2898,8 +3170,37 @@ body {
     .selection-page {
         padding: 12px !important;
         /* Место под закреплённую снизу ленту выбора контроллера вместе с
-           кнопкой сброса под ней. */
-        padding-bottom: 140px !important;
+           плитками модулей и кнопкой сброса под ней. */
+        padding-bottom: 184px !important;
+    }
+
+    /* В нижней ленте плитки модулей компактнее, заголовок не нужен. */
+    .sel-stuck-modules {
+        margin-top: 8px;
+    }
+
+    .sel-stuck-modules-title {
+        display: none;
+    }
+
+    /* В нижней ленте плитки идут одной строкой со свайпом, а не сеткой в три
+       колонки: вертикального места там нет. */
+    .sel-stuck-modules-grid {
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: 34px;
+        overflow-x: auto;
+        padding-top: 0;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .sel-stuck-modules-grid::-webkit-scrollbar {
+        display: none;
+    }
+
+    .sel-stuck-module-tile {
+        width: 34px;
     }
 
     /* В нижней ленте кнопка сброса компактнее, чтобы лента не съедала экран. */

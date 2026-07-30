@@ -32,6 +32,20 @@ const controllerImagePaths = {
     ecosmart: new URL('../assets/controllers/ecosmart/ecosmart.svg', import.meta.url).href,
 };
 
+/** Снимки модулей расширения для плиток панели «Подобранный контроллер». */
+const moduleImagePaths = {
+    bl2: new URL('../assets/modules/bl2/bl2.svg', import.meta.url).href,
+    ecosmartbl2: new URL('../assets/modules/bl2/ecosmartbl2.svg', import.meta.url).href,
+    rl6: new URL('../assets/modules/rl6/rl6.svg', import.meta.url).href,
+    rl6s: new URL('../assets/modules/rl6s/rl6s.svg', import.meta.url).href,
+    io4: new URL('../assets/modules/io4/io4.svg', import.meta.url).href,
+    di6: new URL('../assets/modules/di6/di6.svg', import.meta.url).href,
+    rl2: new URL('../assets/modules/rl2/rl2.svg', import.meta.url).href,
+    rl2s: new URL('../assets/modules/rl2s/rl2s.svg', import.meta.url).href,
+    'ntc-1-wire': new URL('../assets/modules/ntc-1-wire/ntc-1-wire.svg', import.meta.url).href,
+    rdt2: new URL('../assets/modules/rdt2/rdt2.svg', import.meta.url).href,
+};
+
 const thermostatImagePaths = {
     black: new URL('../images/thermostats/black_thermostat.png', import.meta.url).href,
     white: new URL('../images/thermostats/white_thermostat.png', import.meta.url).href,
@@ -286,6 +300,11 @@ const CONTROLLER_LABELS = {
 // Заглушка описания в карточках панели «Подобранный контроллер»:
 // ждём реальные тексты под каждый контроллер.
 const CONTROLLER_CARD_DESCRIPTION = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+
+// Подсветка смены подобранного контроллера. Длительность должна совпадать с
+// анимациями `sel-controller-*` в app.css, иначе класс снимут раньше времени.
+const CONTROLLER_CHANGE_CLASS = 'is-controller-changed';
+const CONTROLLER_CHANGE_ANIMATION_MS = 520;
 
 const CONTROLLER_KIT_TEMPERATURE_DEVICES = {
     pro: [
@@ -3671,6 +3690,8 @@ const SelectionApp = () => {
     const upsRequestSourceRef = useRef(null);
     const controllerSelectionSourceRef = useRef('default');
     const stickyTopRef = useRef(null);
+    const controllerPanelRef = useRef(null);
+    const previousControllerTypeRef = useRef(null);
     const startSelectionFromScratch = useCallback(() => {
         removeSelectionDraft();
         upsRequestSourceRef.current = null;
@@ -3687,6 +3708,7 @@ const SelectionApp = () => {
         setWirelessThermostatHasFloorSensor(false);
         setMixingServo('220');
         setMixingSensor('digital');
+        setPumpType('220');
         setWiredTemperatureSensorKey('wired-wall-digital');
         setWirelessTemperatureSensorKey('wireless-wall');
         setBuildSchemeError('');
@@ -3748,6 +3770,35 @@ const SelectionApp = () => {
         setUpsRequested(false);
         setIncomingScheme((prev) => resolveSelectionScheme(prev, false));
     }, [controllerType, resolveSelectionScheme]);
+    /**
+     * Подбор сменил контроллер — панель справа на мгновение приподнимается над
+     * контентом. Класс снимается и ставится через рефлоу: иначе повторная смена
+     * подряд не перезапустила бы ту же CSS-анимацию.
+     */
+    useEffect(() => {
+        const panel = controllerPanelRef.current;
+        // Первое значение — это загрузка страницы или черновика, а не смена.
+        if (!panel || !previousControllerTypeRef.current) {
+            previousControllerTypeRef.current = controllerType;
+            return undefined;
+        }
+        if (previousControllerTypeRef.current === controllerType) return undefined;
+        previousControllerTypeRef.current = controllerType;
+        panel.classList.remove(CONTROLLER_CHANGE_CLASS);
+        void panel.offsetWidth;
+        panel.classList.add(CONTROLLER_CHANGE_CLASS);
+        // Класс снимается по концу анимации, иначе приподнятая тень висела бы
+        // дольше самого движения. Таймер — страховка на случай, когда анимации
+        // нет вовсе (prefers-reduced-motion) и события не будет.
+        const stop = () => {
+            panel.removeEventListener('animationend', stop);
+            clearTimeout(timer);
+            panel.classList.remove(CONTROLLER_CHANGE_CLASS);
+        };
+        const timer = setTimeout(stop, CONTROLLER_CHANGE_ANIMATION_MS + 200);
+        panel.addEventListener('animationend', stop);
+        return stop;
+    }, [controllerType]);
     useEffect(() => {
         if (pendingDraft) return;
         if (!isSelectionDraftMeaningful(incomingScheme, upsRequested)) {
@@ -3810,6 +3861,24 @@ const SelectionApp = () => {
     const ecosmartAvailableForProScheme = useMemo(
         () => controllerType === 'pro' && isEcosmartIdentified(incomingScheme),
         [controllerType, incomingScheme],
+    );
+    /**
+     * В панели виден только подобранный контроллер. Исключение — конфигурация,
+     * которую закрывают и PRO, и ECOsmart: тогда показываем обе карточки, чтобы
+     * вариант можно было выбрать. Если тип неизвестен, показываем весь список,
+     * иначе панель осталась бы пустой.
+     */
+    const panelControllerTemplates = useMemo(() => {
+        if (proAndEcosmartOptions) {
+            return CONTROLLER_TEMPLATES.filter((item) => item.value.type === 'pro' || item.value.type === 'ecosmart');
+        }
+        const selected = CONTROLLER_TEMPLATES.filter((item) => item.value.type === controllerType);
+        return selected.length > 0 ? selected : CONTROLLER_TEMPLATES;
+    }, [proAndEcosmartOptions, controllerType]);
+    /** Плитки модулей расширения под карточкой контроллера. */
+    const panelModuleTiles = useMemo(
+        () => getExpansionModuleRows(incomingScheme).filter((row) => moduleImagePaths[row.templateKey]),
+        [incomingScheme],
     );
     const ecosmartIncomingScheme = useMemo(() => {
         if (!ecosmartAvailableForProScheme) return null;
@@ -5268,10 +5337,10 @@ const SelectionApp = () => {
             </div>{/* /sel-layout-content */}
             {/* Единственное место выбора контроллера: липкая колонка справа,
                 видна на всём протяжении подбора. */}
-            <aside className="sel-stuck-controllers-panel">
+            <aside className="sel-stuck-controllers-panel" ref={controllerPanelRef}>
                 <div className="sel-stuck-controllers-title" style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Подобранный контроллер</div>
                 <div className="sel-stuck-controllers" style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8 }}>
-                    {CONTROLLER_TEMPLATES.map((item, index) => {
+                    {panelControllerTemplates.map((item, index) => {
                         const isActive = incomingScheme.controller?.type === item.value.type;
                         const isGoFamilySwitch = (controllerType === 'go' && item.value.type === 'go+')
                             || (controllerType === 'go+' && item.value.type === 'go');
@@ -5369,6 +5438,29 @@ const SelectionApp = () => {
                         >
                             Использовать ECOsmart
                         </button>
+                    </div>
+                )}
+                {/* Модули расширения, которые подбор добавил к контроллеру:
+                    только снимок в плитке, название — в подсказке, количество
+                    одинаковых — кружком в углу. */}
+                {panelModuleTiles.length > 0 && (
+                    <div className="sel-stuck-modules">
+                        <div className="sel-stuck-modules-title">Модули расширения</div>
+                        <div className="sel-stuck-modules-grid">
+                            {panelModuleTiles.map((tile) => (
+                                <div
+                                    key={tile.label}
+                                    className="sel-stuck-module-tile"
+                                    data-test-id={`panel-module-${tile.templateKey}`}
+                                    title={tile.count > 1 ? `${tile.label}, ${tile.count} шт` : tile.label}
+                                >
+                                    <img src={moduleImagePaths[tile.templateKey]} alt={tile.label} />
+                                    {tile.count > 1 && (
+                                        <span className="sel-stuck-module-count">{tile.count}</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
                 {/* Сброс живёт под выбором контроллера, а не в шапке: действие

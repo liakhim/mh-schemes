@@ -1574,6 +1574,9 @@ const App = () => {
     const [schemeJsonDirty, setSchemeJsonDirty] = useState(false);
     const [schemeJsonError, setSchemeJsonError] = useState(null);
     const [schemeMetadataEditor, setSchemeMetadataEditor] = useState(null);
+    const [selectedDevicePreview, setSelectedDevicePreview] = useState(null);
+    const [previewTitleEditor, setPreviewTitleEditor] = useState(false);
+    const [previewTitleDraft, setPreviewTitleDraft] = useState('');
     const [titleEditor, setTitleEditor] = useState(null);
     const [commentEditor, setCommentEditor] = useState(null);
     const [commentViewer, setCommentViewer] = useState(null);
@@ -1584,6 +1587,11 @@ const App = () => {
     const saveRequestIdRef = useRef(0);
     const saveSuccessTimerRef = useRef(null);
     const controllerType = getControllerType(scheme);
+    const selectedPreviewDevice = selectedDevicePreview?.device || null;
+    const selectedPreviewImagePath = selectedPreviewDevice
+        ? wirelessDeviceImagePaths[getWirelessDeviceImageKey(selectedPreviewDevice)]
+        : null;
+    const selectedPreviewType = selectedPreviewDevice ? canonicalDeviceType(selectedPreviewDevice.type) : '';
     const canUseInstallationMode = INSTALLATION_CONTROLLERS.has(controllerType);
     const applyInstallationLayout = (sourceScheme) => {
         const layout = readInstallationLayout(sourceScheme);
@@ -2551,6 +2559,22 @@ const App = () => {
         setTitleEditor({ device, currentTitle, value: currentTitle });
     };
 
+    const selectDevicePreview = (device, title = '') => {
+        if (!device) return;
+        setSelectedDevicePreview({ device, title });
+        setPreviewTitleEditor(false);
+        setPreviewTitleDraft(title);
+    };
+
+    const savePreviewTitle = () => {
+        if (!selectedDevicePreview?.device) return;
+        const title = String(previewTitleDraft || '').trim();
+        if (!title) return;
+        setScheme((currentScheme) => updateDeviceTitleInValue(currentScheme, selectedDevicePreview.device, title));
+        setSelectedDevicePreview((current) => (current ? { ...current, title, device: { ...current.device, title } } : current));
+        setPreviewTitleEditor(false);
+    };
+
     const closeTitleEditor = () => {
         setTitleEditor(null);
     };
@@ -2610,6 +2634,11 @@ const App = () => {
         if (!normalizedTitle) return;
         if (normalizedTitle !== titleEditor.currentTitle) {
             setScheme((currentScheme) => updateDeviceTitleInValue(currentScheme, titleEditor.device, normalizedTitle));
+            setSelectedDevicePreview((current) => (
+                current && isSameTitleTargetDevice(current.device, titleEditor.device)
+                    ? { ...current, title: normalizedTitle, device: { ...current.device, title: normalizedTitle } }
+                    : current
+            ));
         }
         closeTitleEditor();
     };
@@ -2654,7 +2683,7 @@ const App = () => {
         };
 
         return (
-            <Group>
+            <Group onClick={() => selectDevicePreview(device, title)} onTap={() => selectDevicePreview(device, title)}>
                 <Rect
                     x={x}
                     y={y}
@@ -4680,6 +4709,81 @@ const App = () => {
                     <span>Инсталляция</span>
                 </button>
             </div>
+            {!displayedToolsInstallationMode && (
+            <aside className={`spa-device-preview${selectedPreviewDevice ? ' has-device' : ''}`} aria-label="Увеличенный просмотр устройства">
+                <div className="spa-device-preview-header">
+                    <span>Лупа устройства</span>
+                    {selectedPreviewDevice && (
+                        <button
+                            type="button"
+                            aria-label="Закрыть просмотр устройства"
+                            onClick={() => setSelectedDevicePreview(null)}
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
+                {selectedPreviewDevice ? (
+                    <>
+                        <span className="spa-device-preview-type">{selectedPreviewType || 'устройство'}</span>
+                        <div className="spa-device-preview-image">
+                            {selectedPreviewImagePath ? (
+                                <img src={selectedPreviewImagePath} alt="" />
+                            ) : (
+                                <span>Нет изображения</span>
+                            )}
+                        </div>
+                        <div className="spa-device-preview-info-block">
+                            {previewTitleEditor ? (
+                                <form
+                                    onSubmit={(event) => {
+                                        event.preventDefault();
+                                        savePreviewTitle();
+                                    }}
+                                >
+                                    <input
+                                        value={previewTitleDraft}
+                                        autoFocus
+                                        aria-label="Текст инфоблока"
+                                        onChange={(event) => setPreviewTitleDraft(event.target.value)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Escape') {
+                                                event.preventDefault();
+                                                setPreviewTitleEditor(false);
+                                                setPreviewTitleDraft(selectedDevicePreview.title);
+                                            }
+                                        }}
+                                    />
+                                    <button type="submit" aria-label="Сохранить текст инфоблока">✓</button>
+                                </form>
+                            ) : (
+                                <button
+                                    type="button"
+                                    title="Изменить текст инфоблока"
+                                    onClick={() => {
+                                        setPreviewTitleDraft(selectedDevicePreview.title);
+                                        setPreviewTitleEditor(true);
+                                    }}
+                                >
+                                    <span>{selectedDevicePreview.title}</span>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="m5 16.5-.7 3.2 3.2-.7L18 8.5 15.5 6zM14 7.5l2.5 2.5" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    </>
+                ) : (
+                    <div className="spa-device-preview-empty">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="10.5" cy="10.5" r="5.5" />
+                            <path d="m15 15 5 5M10.5 8v5m-2.5-2.5h5" />
+                        </svg>
+                        <span>Нажмите на инфоблок устройства на схеме</span>
+                    </div>
+                )}
+            </aside>
+            )}
             <div className={`spa-right-tools is-${rightToolsTransitionPhase}`}>
                 {displayedToolsInstallationMode && (
                     <div
