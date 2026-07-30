@@ -56,6 +56,25 @@ const MIXING_UNIT_BACKGROUND_PATH = new URL('../images/thermostats/mixing_room.p
 /** Фон карточки бойлера ГВС. */
 const GVS_BOILER_BACKGROUND_PATH = new URL('../images/thermostats/boiler_gvs_room.png', import.meta.url).href;
 
+/** Фон карточки насосов. */
+const PUMP_BACKGROUND_PATH = new URL('../images/thermostats/pump_room.png', import.meta.url).href;
+
+/**
+ * Цвет нижней кромки фоновых снимков. Снимок в карточке масштабируется по
+ * ширине слоя и не тянется по высоте, поэтому у высокой карточки кадр
+ * заканчивается раньше её нижней грани — ниже продолжается этот цвет.
+ * Значения — средний цвет нижних строк пикселей соответствующего файла.
+ */
+const CARD_PHOTO_TAIL_COLOR = {
+    boilerRoom: '#51534d',
+    pumpRoom: '#bdbab8',
+    standardRoom: '#9d8a7f',
+    otherRoom: '#615f61',
+    thermostatRoom: '#323538',
+    upsRoom: '#a09b97',
+    zonesRoom: '#fdfdfd',
+};
+
 /** Фон карточки зонирования. */
 const ZONES_BACKGROUND_PATH = new URL('../images/thermostats/zones_room.jpg', import.meta.url).href;
 
@@ -1686,29 +1705,31 @@ const resolveControllerAndRequiredModules = (scheme, upsRequested = false, isMan
 const DISCRETE_TEMPLATES = [
     {
         label: 'Запрос тепла от бассейна',
-        description: 'Сухой контакт от автоматики бассейна: контроллер получает запрос на нагрев. Занимает один дискретный вход.',
         background: new URL('../images/thermostats/2_room.png', import.meta.url).href,
         data: { id: 8, device_type: 'equipment', type: 'discrete_pool', connection_type: 'di' },
     },
     {
         label: 'Запрос тепла от вентиляции',
-        description: 'Сухой контакт от приточной установки: запрос тепла на калорифер. Занимает один дискретный вход.',
         background: new URL('../images/thermostats/1_room.png', import.meta.url).href,
         data: { id: 8, device_type: 'equipment', type: 'discrete_ventilation', connection_type: 'di' },
     },
     {
         label: 'Датчик ОПС',
-        description: 'Сигнал охранно-пожарной сигнализации приходит на дискретный вход контроллера. Занимает один вход.',
         background: new URL('../images/thermostats/3_room.png', import.meta.url).href,
         data: { id: 9, device_type: 'equipment', type: 'discrete_fire_alarm', connection_type: 'di' },
     },
     {
         label: 'Произвольный сигнал',
-        description: 'Любой сухой контакт, состояние которого нужно видеть в системе. Занимает один дискретный вход.',
         background: new URL('../images/thermostats/4_room.png', import.meta.url).href,
         data: { id: 10, device_type: 'equipment', type: 'discrete_signal', connection_type: 'di' },
     },
 ];
+
+// Высота карточки дискретного входа фиксирована, потому что фон карточки —
+// снимок в режиме `cover`: он масштабируется по высоте слоя, и любое изменение
+// высоты (появился блок «Добавлено», исчезла кнопка) дёргало бы кадр. Высоты
+// хватает на оба состояния карточки, поэтому картинка стоит на месте.
+const DISCRETE_CARD_HEIGHT = 158;
 
 const PRESSURE_TEMPLATES = [
     {
@@ -2007,6 +2028,7 @@ const ZONE_TEMPLATES = [
 const PUMP_TEMPLATES = [
     {
         label: 'Насос 220V',
+        pump: '220',
         description: 'Циркуляционный насос с питанием 220 В предназначен для обеспечения стабильной циркуляции теплоносителя в системах отопления и горячего водоснабжения. Простое подключение и надежная работа делают его оптимальным решением для большинства стандартных систем.',
         wiredDevice: {
             id: 12,
@@ -2019,6 +2041,7 @@ const PUMP_TEMPLATES = [
     },
     {
         label: 'Насос 0-10V',
+        pump: '010',
         description: 'Циркуляционный насос с управлением 0–10 В обеспечивает плавное регулирование производительности по внешнему сигналу. Подходит для автоматизированных систем, где требуется точное поддержание заданных параметров и повышение энергоэффективности.',
         wiredDevice: {
             id: 13,
@@ -2029,6 +2052,12 @@ const PUMP_TEMPLATES = [
         },
         sensors: [],
     },
+];
+
+/** Тип управления насосом: значения совпадают с ключом `pump` в PUMP_TEMPLATES. */
+const PUMP_TYPE_OPTIONS = [
+    { value: '220', label: '220V' },
+    { value: '010', label: '0-10V' },
 ];
 
 const GVS_TEMPLATES = [
@@ -2310,11 +2339,11 @@ const AddedDevicesTitle = ({ children }) => (
  *   карточки; `cover` тут точен, потому что слой и так в пропорциях снимка.
  *   Ширина считается от высоты, поэтому режим только для карточек постоянной
  *   высоты.
- * - без `aspectRatio` слой растянут на всю карточку, а снимок масштабируется
- *   строго по ширине (`100% auto`). Это ключевой момент: `cover` пересчитал бы
- *   масштаб, как только карточка станет выше снимка, и фон бы дергался при
- *   добавлении строк. С привязкой по ширине рост карточки просто открывает
- *   кадр ниже.
+ * - без `aspectRatio` снимок масштабируется строго по ширине слоя
+ *   (`100% auto`): по ширине карточки, если `width` не задан, иначе по самому
+ *   `width`. Это ключевой момент: `cover` пересчитывал бы масштаб, как только
+ *   слой станет выше кадра, и фон дергался бы при каждом добавлении строки.
+ *   С привязкой по ширине рост карточки просто открывает кадр ниже.
  *
  * `fallbackColor` подкладывается под снимок: если карточка выросла выше, чем
  * хватает высоты кадра, снизу продолжается этот цвет, а не белый край.
@@ -2343,7 +2372,7 @@ const CardPhotoBackdrop = ({ image, aspectRatio = null, width = null, blur = 5, 
                 backgroundImage: `url(${image})`,
                 backgroundRepeat: 'no-repeat',
                 backgroundPosition: position || (aspectRatio ? 'center right' : 'right top'),
-                backgroundSize: (aspectRatio || width) ? 'cover' : '100% auto',
+                backgroundSize: aspectRatio ? 'cover' : '100% auto',
                 maskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 100%)',
                 WebkitMaskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 100%)',
                 pointerEvents: 'none',
@@ -2472,7 +2501,14 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             overflow: 'hidden',
         }}
     >
-        <CardPhotoBackdrop image={THERMOSTAT_ROOM_IMAGE_PATH} aspectRatio="1030 / 787" />
+        {/* Кадр занимает правую половину карточки и масштабируется только по её
+            ширине: с `aspectRatio` ширина слоя считалась от высоты, и каждая
+            добавленная строка списка увеличивала снимок. */}
+        <CardPhotoBackdrop
+            image={THERMOSTAT_ROOM_IMAGE_PATH}
+            width="48%"
+            fallbackColor={CARD_PHOTO_TAIL_COLOR.thermostatRoom}
+        />
 
         <div
             style={{
@@ -2738,7 +2774,11 @@ const OutdoorSensorCard = ({ template, enabled, onEnabledChange, showJsonDetails
             overflow: 'hidden',
         }}
     >
-        <CardPhotoBackdrop image={OUTDOOR_SENSOR_BACKGROUND_PATH} aspectRatio="1030 / 787" />
+        <CardPhotoBackdrop
+            image={OUTDOOR_SENSOR_BACKGROUND_PATH}
+            width="48%"
+            fallbackColor={CARD_PHOTO_TAIL_COLOR.thermostatRoom}
+        />
 
         <div
             style={{
@@ -2845,40 +2885,55 @@ const SectionEquipmentCard = ({
     backgroundWidth = null,
     // Половинная ширина: две карточки в ряду (дискретные входы).
     half = false,
+    // Фиксированная высота карточки: держит фон-снимок неподвижным, когда
+    // содержимое карточки меняется.
+    minHeight = null,
     title,
     description = null,
     addedTitle,
     addedRows = [],
+    // Список добавленного во всю ширину карточки, а не внутри текстовой колонки:
+    // строке со счетчиком тесно в узкой колонке половинной карточки.
+    addedFullWidth = false,
+    // Плотная верстка списка: мельче заголовок, строка и счетчик, меньше
+    // отступов — блок ниже, а вместе с ним и карточка.
+    addedDense = false,
     onAddUnit,
     onRemoveUnit,
     addLabel,
     onAdd,
     showAdd = true,
     addTestId = null,
+    // Строка или функция от строки списка: у карточки с несколькими вариантами
+    // оборудования счетчики должны различаться (насос 220V и насос 0-10V).
     qtyTestId = null,
     jsonData = null,
     showJsonDetails = false,
     children = null,
 }) => {
     const addedBlock = addedRows.length > 0 ? (
-        <AddedDevicesBlock marginTop={0}>
+        <AddedDevicesBlock marginTop={0} dense={addedDense}>
             <AddedDevicesTitle>{addedTitle}</AddedDevicesTitle>
-            {addedRows.map((row) => (
-                <AddedDeviceLine
-                    key={row.label}
-                    label={row.label}
-                    hideCount
-                    control={(
-                        <QtyStepper
-                            count={row.count}
-                            onDecrement={() => onRemoveUnit(row)}
-                            onIncrement={() => onAddUnit(row)}
-                            decTestId={qtyTestId ? `${qtyTestId}-dec` : null}
-                            incTestId={qtyTestId ? `${qtyTestId}-inc` : null}
-                        />
-                    )}
-                />
-            ))}
+            {addedRows.map((row) => {
+                const rowQtyTestId = typeof qtyTestId === 'function' ? qtyTestId(row) : qtyTestId;
+                return (
+                    <AddedDeviceLine
+                        key={row.label}
+                        label={row.label}
+                        hideCount
+                        control={(
+                            <QtyStepper
+                                count={row.count}
+                                dense={addedDense}
+                                onDecrement={() => onRemoveUnit(row)}
+                                onIncrement={() => onAddUnit(row)}
+                                decTestId={rowQtyTestId ? `${rowQtyTestId}-dec` : null}
+                                incTestId={rowQtyTestId ? `${rowQtyTestId}-inc` : null}
+                            />
+                        )}
+                    />
+                );
+            })}
         </AddedDevicesBlock>
     ) : null;
 
@@ -2892,6 +2947,10 @@ const SectionEquipmentCard = ({
         </button>
     ) : null;
 
+    // Во всю ширину список выносится из текстовой колонки отдельной строкой
+    // карточки. Непрозрачный фон блока сам перекрывает снимок справа.
+    const wideAddedBlock = addedFullWidth && addedBlock;
+
     return (
     <div
         className={`sel-card sel-card-static sel-card-section${deviceImage ? ' sel-card-with-device' : ''}`}
@@ -2899,12 +2958,16 @@ const SectionEquipmentCard = ({
             flex: half ? '1 1 calc(50% - 8px)' : '1 1 100%',
             width: half ? 'auto' : '100%',
             minWidth: half ? 320 : 260,
+            ...(minHeight ? { minHeight } : {}),
             display: 'flex',
             flexDirection: 'row',
             // Со снимком устройства колонки не переносим: перенос менял бы высоту
             // карточки при добавлении, и фон со снимком прыгали бы.
             flexWrap: deviceImage ? 'nowrap' : 'wrap',
-            gap: 32,
+            columnGap: 32,
+            // Перенесённый на свою строку список отбивается от текста так же,
+            // как отбивались бы соседние элементы внутри колонки.
+            rowGap: wideAddedBlock ? (half ? 14 : 20) : 32,
             alignItems: 'stretch',
             position: 'relative',
         }}
@@ -2939,7 +3002,7 @@ const SectionEquipmentCard = ({
                 <p className="sel-card-desc">{description}</p>
             )}
 
-            {addedBlock}
+            {!addedFullWidth && addedBlock}
 
             {children}
 
@@ -2949,6 +3012,12 @@ const SectionEquipmentCard = ({
 
             {addButton}
         </div>
+
+        {wideAddedBlock && (
+            <div style={{ position: 'relative', flex: '1 1 100%', width: '100%', minWidth: 0 }}>
+                {addedBlock}
+            </div>
+        )}
 
         {deviceImage && (
             /* Тот же приём, что в карточке уличного датчика: мягкое свечение и
@@ -3001,6 +3070,66 @@ const SectionEquipmentCard = ({
 };
 
 /**
+ * Сегментированный переключатель варианта оборудования внутри карточки:
+ * подпись сверху, кнопки в одной обойме. Недоступный вариант не убирается из
+ * ряда, а гасится — так видно весь набор возможностей.
+ */
+const SegmentedField = ({
+    label,
+    options,
+    value,
+    onChange,
+    testIdPrefix,
+    isAvailable = () => true,
+    unavailableTitle = null,
+}) => (
+    <div>
+        <ThermostatFieldLabel>{label}</ThermostatFieldLabel>
+        <div
+            style={{
+                display: 'inline-flex',
+                gap: 3,
+                padding: 3,
+                border: '1px solid #e3e7ef',
+                borderRadius: 12,
+                background: '#f4f6fa',
+            }}
+        >
+            {options.map((item) => {
+                const isActive = value === item.value;
+                const available = isAvailable(item.value);
+                return (
+                    <button
+                        className="selection-option-button"
+                        key={item.value}
+                        type="button"
+                        data-test-id={`${testIdPrefix}-${item.value}`}
+                        data-active={isActive}
+                        disabled={!available}
+                        title={available ? undefined : unavailableTitle || undefined}
+                        onClick={() => available && onChange(item.value)}
+                        style={{
+                            padding: '9px 18px',
+                            border: `1px solid ${isActive ? '#e3e7ef' : 'transparent'}`,
+                            borderRadius: 9,
+                            background: isActive ? '#fff' : 'transparent',
+                            color: available ? (isActive ? '#202738' : '#667089') : '#b3bac8',
+                            boxShadow: isActive ? '0 1px 3px rgba(32, 39, 56, 0.12)' : 'none',
+                            cursor: available ? 'pointer' : 'not-allowed',
+                            fontSize: 13.5,
+                            fontWeight: isActive ? 700 : 500,
+                            transition: 'background 0.18s, color 0.18s, box-shadow 0.18s',
+                        }}
+                    >
+                        {item.label}
+                    </button>
+                );
+            })}
+        </div>
+    </div>
+);
+
+/**
  * Карточка смесительного узла: сервопривод и датчик выбираются независимо,
  * из пары получается шаблон MIXING_TEMPLATES. Комбинации «0-10V + цифровой
  * датчик» не существует, поэтому такой вариант датчика гасится.
@@ -3025,99 +3154,66 @@ const MixingUnitCard = ({ template, servo, onServoChange, sensor, onSensorChange
     >
         {/* Оба переключателя в одном ряду; на узкой карточке переносятся. */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
-            <div>
-                <ThermostatFieldLabel>Сервопривод</ThermostatFieldLabel>
-                <div
-                    style={{
-                        display: 'inline-flex',
-                        gap: 3,
-                        padding: 3,
-                        border: '1px solid #e3e7ef',
-                        borderRadius: 12,
-                        background: '#f4f6fa',
-                    }}
-                >
-                    {MIXING_SERVO_OPTIONS.map((item) => {
-                        const isActive = servo === item.value;
-                        return (
-                            <button
-                                className="selection-option-button"
-                                key={item.value}
-                                type="button"
-                                data-test-id={`mixing-servo-${item.value}`}
-                                data-active={isActive}
-                                onClick={() => onServoChange(item.value)}
-                                style={{
-                                    padding: '9px 18px',
-                                    border: `1px solid ${isActive ? '#e3e7ef' : 'transparent'}`,
-                                    borderRadius: 9,
-                                    background: isActive ? '#fff' : 'transparent',
-                                    color: isActive ? '#202738' : '#667089',
-                                    boxShadow: isActive ? '0 1px 3px rgba(32, 39, 56, 0.12)' : 'none',
-                                    cursor: 'pointer',
-                                    fontSize: 13.5,
-                                    fontWeight: isActive ? 700 : 500,
-                                    transition: 'background 0.18s, color 0.18s, box-shadow 0.18s',
-                                }}
-                            >
-                                {item.label}
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            <div>
-                <ThermostatFieldLabel>Датчик</ThermostatFieldLabel>
-                <div
-                    style={{
-                        display: 'inline-flex',
-                        gap: 3,
-                        padding: 3,
-                        border: '1px solid #e3e7ef',
-                        borderRadius: 12,
-                        background: '#f4f6fa',
-                    }}
-                >
-                    {MIXING_SENSOR_OPTIONS.map((item) => {
-                        const isActive = sensor === item.value;
-                        const isAvailable = isMixingCombinationAvailable(servo, item.value);
-                        return (
-                            <button
-                                className="selection-option-button"
-                                key={item.value}
-                                type="button"
-                                data-test-id={`mixing-sensor-${item.value}`}
-                                data-active={isActive}
-                                disabled={!isAvailable}
-                                title={isAvailable ? undefined : 'Цифровой датчик не подключается к сервоприводу 0-10V'}
-                                onClick={() => isAvailable && onSensorChange(item.value)}
-                                style={{
-                                    padding: '9px 18px',
-                                    border: `1px solid ${isActive ? '#e3e7ef' : 'transparent'}`,
-                                    borderRadius: 9,
-                                    background: isActive ? '#fff' : 'transparent',
-                                    color: isAvailable ? (isActive ? '#202738' : '#667089') : '#b3bac8',
-                                    boxShadow: isActive ? '0 1px 3px rgba(32, 39, 56, 0.12)' : 'none',
-                                    cursor: isAvailable ? 'pointer' : 'not-allowed',
-                                    fontSize: 13.5,
-                                    fontWeight: isActive ? 700 : 500,
-                                    transition: 'background 0.18s, color 0.18s, box-shadow 0.18s',
-                                }}
-                            >
-                                {item.label}
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
+            <SegmentedField
+                label="Сервопривод"
+                options={MIXING_SERVO_OPTIONS}
+                value={servo}
+                onChange={onServoChange}
+                testIdPrefix="mixing-servo"
+            />
+            <SegmentedField
+                label="Датчик"
+                options={MIXING_SENSOR_OPTIONS}
+                value={sensor}
+                onChange={onSensorChange}
+                testIdPrefix="mixing-sensor"
+                isAvailable={(option) => isMixingCombinationAvailable(servo, option)}
+                unavailableTitle="Цифровой датчик не подключается к сервоприводу 0-10V"
+            />
         </div>
     </SectionEquipmentCard>
 );
 
+/**
+ * Карточка насоса: тип управления выбирается переключателем, как сервопривод в
+ * смесительном узле. В списке добавленного 220V и 0-10V остаются отдельными
+ * строками со своими счетчиками.
+ */
+const PumpCard = ({ template, pumpType, onPumpTypeChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, showJsonDetails = false }) => (
+    <SectionEquipmentCard
+        image={PUMP_BACKGROUND_PATH}
+        backgroundColor={CARD_PHOTO_TAIL_COLOR.pumpRoom}
+        title={template.label}
+        description={template.description}
+        addedTitle="Добавленные насосы:"
+        addedRows={addedRows}
+        onAddUnit={onAddUnit}
+        onRemoveUnit={onRemoveUnit}
+        addLabel={`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
+        onAdd={onAdd}
+        // Выбранный тип уже в списке — количеством управляет счетчик строки.
+        showAdd={!addedRows.some((row) => row.label === template.label)}
+        addTestId="add-pump"
+        qtyTestId={(row) => `pump-${PUMP_TEMPLATES.find((item) => item.label === row.label)?.pump}-qty`}
+        jsonData={{ wired_device: template.wiredDevice }}
+        showJsonDetails={showJsonDetails}
+    >
+        <SegmentedField
+            label="Управление"
+            options={PUMP_TYPE_OPTIONS}
+            value={pumpType}
+            onChange={onPumpTypeChange}
+            testIdPrefix="pump-type"
+        />
+    </SectionEquipmentCard>
+);
+
 /** Карточка датчика: options задает варианты, selectedKey выбор, stepper счетчик. */
-const AddedDevicesBlock = ({ children, marginTop = 24, compact = false }) => (
-    <div className={`sel-added-block${compact ? ' sel-added-block-compact' : ''}`} style={{ marginTop }}>
+const AddedDevicesBlock = ({ children, marginTop = 24, compact = false, dense = false }) => (
+    <div
+        className={`sel-added-block${compact ? ' sel-added-block-compact' : ''}${dense ? ' sel-added-block-dense' : ''}`}
+        style={{ marginTop }}
+    >
         {children}
     </div>
 );
@@ -3138,28 +3234,38 @@ const QTY_STEPPER_BLOCK_STYLE = {
     boxSizing: 'border-box',
 };
 
-const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false, decTestId = null, incTestId = null }) => {
+// Уменьшенный счетчик для плотных списков: та же геометрия, но мельче.
+const QTY_STEPPER_DENSE_STYLE = {
+    ...QTY_STEPPER_BLOCK_STYLE,
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    fontSize: 12,
+};
+
+const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false, dense = false, decTestId = null, incTestId = null }) => {
     if (!count) return null;
+    const blockStyle = dense ? QTY_STEPPER_DENSE_STYLE : QTY_STEPPER_BLOCK_STYLE;
     return (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: dense ? 3 : 4, flexShrink: 0 }}>
             <button
                 type="button"
                 title="Убрать одно"
                 data-test-id={decTestId || undefined}
                 onClick={onDecrement}
                 disabled={disabled}
-                style={{ ...QTY_STEPPER_BLOCK_STYLE, cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#94a3b8' : '#e74c3c', opacity: disabled ? 0.6 : 1 }}
+                style={{ ...blockStyle, cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#94a3b8' : '#e74c3c', opacity: disabled ? 0.6 : 1 }}
             >
                 −
             </button>
-            <span style={{ ...QTY_STEPPER_BLOCK_STYLE, color: '#203040' }}>{count}</span>
+            <span style={{ ...blockStyle, color: '#203040' }}>{count}</span>
             <button
                 type="button"
                 title="Добавить ещё"
                 data-test-id={incTestId || undefined}
                 onClick={onIncrement}
                 disabled={disabled}
-                style={{ ...QTY_STEPPER_BLOCK_STYLE, cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#94a3b8' : '#2e7d32', opacity: disabled ? 0.6 : 1 }}
+                style={{ ...blockStyle, cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#94a3b8' : '#2e7d32', opacity: disabled ? 0.6 : 1 }}
             >
                 +
             </button>
@@ -3545,6 +3651,7 @@ const SelectionApp = () => {
     const [wirelessThermostatHasFloorSensor, setWirelessThermostatHasFloorSensor] = useState(false);
     const [mixingServo, setMixingServo] = useState('220');
     const [mixingSensor, setMixingSensor] = useState('digital');
+    const [pumpType, setPumpType] = useState('220');
     const [wiredTemperatureSensorKey, setWiredTemperatureSensorKey] = useState('wired-wall-digital');
     const [wirelessTemperatureSensorKey, setWirelessTemperatureSensorKey] = useState('wireless-wall');
     const [temperatureSensorConnection, setTemperatureSensorConnection] = useState('wired');
@@ -3740,8 +3847,13 @@ const SelectionApp = () => {
         () => findMixingTemplate(mixingServo, mixingSensor) || findMixingTemplate(mixingServo, 'ntc'),
         [mixingServo, mixingSensor],
     );
+    const pumpTemplate = useMemo(
+        () => PUMP_TEMPLATES.find((item) => item.pump === pumpType) || PUMP_TEMPLATES[0],
+        [pumpType],
+    );
     // Строки списка нужны дважды: в самом списке и в условии показа кнопки.
     const gvsBoilerRows = getGroupedDeviceRows(incomingScheme, 'gvs', GVS_TEMPLATES);
+    const pumpCardRows = getGroupedDeviceRows(incomingScheme, 'pump', PUMP_TEMPLATES);
     const zoneRows = getGroupedDeviceRows(incomingScheme, 'zone', ZONE_TEMPLATES);
     const otherEquipmentRows = getGroupedDeviceRows(incomingScheme, 'other', OTHER_EQUIP_TEMPLATES);
     // Список добавленного отдельно по каждому типу дискретного входа.
@@ -4166,19 +4278,6 @@ const SelectionApp = () => {
     }, []);
 
     /** Строит счетчик составных устройств указанного шаблона и группы. */
-    const renderUnitStepper = (template, group, templates) => {
-        const row = getGroupedDeviceRows(incomingScheme, group, templates)
-            .find((item) => item.label === template.label);
-        if (!row) return null;
-        return (
-            <QtyStepper
-                count={row.count}
-                onIncrement={() => addMixingUnit(template, group)}
-                onDecrement={() => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
-            />
-        );
-    };
-
     /** Строит счетчик однотипных элементов массива target. */
     const renderItemStepper = (target, type, onIncrement, disabled = false) => {
         const items = (Array.isArray(incomingScheme[target]) ? incomingScheme[target] : [])
@@ -4459,25 +4558,7 @@ const SelectionApp = () => {
                             opacity: isBuildingScheme || controllerCompatibilityIssues.length > 0 ? 0.72 : 1,
                         }}
                     >
-                        {isBuildingScheme ? 'Сохраняем...' : 'Построить схему'}
-                    </button>
-                    <button
-                        type="button"
-                        className="selection-danger-button"
-                        data-test-id="reset-equipment"
-                        onClick={() => setIsResetConfirmOpen(true)}
-                        style={{
-                            padding: '10px 16px',
-                            border: '1px solid #dc2626',
-                            borderRadius: 8,
-                            background: '#dc2626',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            fontSize: 14,
-                            fontWeight: 700,
-                        }}
-                    >
-                        Сбросить схему
+                        {isBuildingScheme ? 'Сохраняем...' : 'Конструктор'}
                     </button>
                 </div>
             </div>
@@ -4527,7 +4608,12 @@ const SelectionApp = () => {
                         поэтому при добавлении котлов он не пересчитывается — просто
                         открывается нижняя часть кадра. Сдвиг вверх на 70px нужен,
                         чтобы в компактном состоянии котел попадал в кадр. */}
-                    <CardPhotoBackdrop image={BOILER_ROOM_IMAGE_PATH} blur={3} position="right -70px" />
+                    <CardPhotoBackdrop
+                        image={BOILER_ROOM_IMAGE_PATH}
+                        blur={3}
+                        position="right -70px"
+                        fallbackColor={CARD_PHOTO_TAIL_COLOR.boilerRoom}
+                    />
 
                     <div
                         style={{
@@ -4796,39 +4882,23 @@ const SelectionApp = () => {
                 </div>
             </section>
 
-            <section style={{ flex: '1 1 280px', minWidth: 0 }}>
+            <section style={{ flex: '1 1 100%', minWidth: 0 }}>
                 <h2>Насосы</h2>
                 <SectionSubtitle>Какое количество циркуляционных насосов будет использоваться в системе?</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    {PUMP_TEMPLATES.map((item, index) => (
-                        <div
-                            key={index}
-                            className="sel-card sel-card-compact"
-                            style={{
-                                flex: '1 1 260px',
-                                minWidth: 260,
-                            }}
-                        >
-                            <div className="sel-card-title">{item.label}</div>
-                            {item.description && (
-                                <p className="sel-card-desc">
-                                    {item.description}
-                                </p>
-                            )}
-                            {showJsonDetails && (
-                                <pre className="sel-card-json">{JSON.stringify(item.wiredDevice, null, 4)}</pre>
-                            )}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
-                                <button
-                                    className="selection-add-button selection-add-button-sm"
-                                    onClick={() => addMixingUnit(item, 'pump')}
-                                >
-                                    Добавить
-                                </button>
-                                {renderUnitStepper(item, 'pump', PUMP_TEMPLATES)}
-                            </div>
-                        </div>
-                    ))}
+                    <PumpCard
+                        template={pumpTemplate}
+                        pumpType={pumpType}
+                        onPumpTypeChange={setPumpType}
+                        onAdd={() => addMixingUnit(pumpTemplate, 'pump')}
+                        addedRows={pumpCardRows}
+                        onAddUnit={(row) => addMixingUnit(
+                            PUMP_TEMPLATES.find((item) => item.label === row.label) || pumpTemplate,
+                            'pump',
+                        )}
+                        onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                        showJsonDetails={showJsonDetails}
+                    />
                 </div>
 
             </section>
@@ -4878,6 +4948,7 @@ const SelectionApp = () => {
                         <SectionEquipmentCard
                             image={ZONES_BACKGROUND_PATH}
                             backgroundWidth={560}
+                            backgroundColor={CARD_PHOTO_TAIL_COLOR.zonesRoom}
                             title={ZONE_TEMPLATES[0].label}
                             description="Определите, на сколько зон будет разделена система, чтобы эффективно управлять оборудованием черех двухходовые сервоприводы."
                             addedTitle="Добавленные зоны:"
@@ -4905,6 +4976,7 @@ const SelectionApp = () => {
                     <SectionEquipmentCard
                         image={OTHER_EQUIP_BACKGROUND_PATH}
                         backgroundWidth={520}
+                        backgroundColor={CARD_PHOTO_TAIL_COLOR.otherRoom}
                         title={OTHER_EQUIP_TEMPLATES[0].label}
                         description="Сирены, реле и другие устройства, которыми контроллер управляет через релейный выход. Каждое занимает один релейный порт."
                         addedTitle="Добавленное оборудование:"
@@ -4936,6 +5008,7 @@ const SelectionApp = () => {
                     <SectionEquipmentCard
                         image={THERMOSTAT_ROOM_IMAGE_PATH}
                         backgroundWidth={520}
+                        backgroundColor={CARD_PHOTO_TAIL_COLOR.thermostatRoom}
                         title={temperatureSensorTemplate?.label}
                         description="Измеряет температуру воздуха в помещении или теплоносителя в колбе и передаёт её контроллеру."
                         addedTitle="Добавленные датчики температуры:"
@@ -5010,6 +5083,7 @@ const SelectionApp = () => {
                     <SectionEquipmentCard
                         image={PRESSURE_SENSOR_BACKGROUND_PATH}
                         backgroundWidth={520}
+                        backgroundColor={CARD_PHOTO_TAIL_COLOR.standardRoom}
                         deviceImage={PRESSURE_SENSOR_IMAGE_PATH}
                         deviceImageAlt={PRESSURE_TEMPLATES[0].label}
                         title={PRESSURE_TEMPLATES[0].label}
@@ -5043,7 +5117,8 @@ const SelectionApp = () => {
                     <SectionEquipmentCard
                         image={LEAK_ZONE_BACKGROUND_PATH}
                         backgroundWidth={520}
-                        title="Зона контроля протечки"
+                        backgroundColor={CARD_PHOTO_TAIL_COLOR.standardRoom}
+                        title="Зоны контроля протечки воды"
                         description="Датчики зоны собираются в один шлейф и занимают один дискретный вход. Клапаны перекрывают воду по сигналу этого шлейфа, каждый занимает два соседних релейных порта."
                         addLabel="Добавить зону"
                         onAdd={addLeakZone}
@@ -5089,20 +5164,18 @@ const SelectionApp = () => {
                                                 incTestId={`leak-zone-valve-qty-inc-${index}`}
                                             />
                                         </span>
+                                        {/* Крестик прижат к правому краю строки, чтобы зона,
+                                            её счетчики и удаление читались одной строкой. */}
                                         <button
-                                            className="selection-secondary-button"
+                                            type="button"
+                                            className="selection-remove-icon"
                                             onClick={() => removeLeakZone(zone.id)}
                                             data-test-id={`remove-leak-zone-${index}`}
-                                            style={{
-                                                padding: '6px 12px',
-                                                border: '1px solid #d7dbe4',
-                                                borderRadius: 8,
-                                                cursor: 'pointer',
-                                                fontSize: 12.5,
-                                                fontWeight: 700,
-                                            }}
+                                            title="Удалить зону"
+                                            aria-label={`Удалить зону ${index + 1}`}
+                                            style={{ marginLeft: 'auto' }}
                                         >
-                                            Удалить зону
+                                            ×
                                         </button>
                                     </div>
                                 ))}
@@ -5127,14 +5200,19 @@ const SelectionApp = () => {
                                 half
                                 image={item.background}
                                 backgroundWidth={260}
+                                minHeight={DISCRETE_CARD_HEIGHT}
                                 title={item.label}
-                                description={item.description}
                                 addedTitle="Добавлено:"
                                 addedRows={rows}
+                                addedFullWidth
+                                addedDense
                                 onAddUnit={() => addLeakItem({ ...item, target: 'wired' })}
                                 onRemoveUnit={(row) => removeSchemeItemById('wired_devices', row.removeKeys[row.removeKeys.length - 1])}
                                 addLabel="Добавить"
                                 onAdd={() => addLeakItem({ ...item, target: 'wired' })}
+                                // Как только вход добавлен, количеством управляет счетчик в строке —
+                                // большая кнопка становится лишней и прячется.
+                                showAdd={rows.length === 0}
                                 addTestId={`add-${canonicalType(item.data.type).replace(/_/g, '-')}`}
                                 jsonData={item.data}
                                 showJsonDetails={showJsonDetails}
@@ -5156,6 +5234,7 @@ const SelectionApp = () => {
                     <SectionEquipmentCard
                         image={UPS_BACKGROUND_PATH}
                         backgroundWidth={520}
+                        backgroundColor={CARD_PHOTO_TAIL_COLOR.upsRoom}
                         title="Источник бесперебойного питания"
                         description="Поддерживает работу контроллера и модулей при отключении электричества."
                         showAdd={false}
@@ -5292,6 +5371,16 @@ const SelectionApp = () => {
                         </button>
                     </div>
                 )}
+                {/* Сброс живёт под выбором контроллера, а не в шапке: действие
+                    разрушительное, поэтому убрано от кнопок навигации. */}
+                <button
+                    type="button"
+                    className="selection-danger-button sel-stuck-controllers-reset"
+                    data-test-id="reset-equipment"
+                    onClick={() => setIsResetConfirmOpen(true)}
+                >
+                    Сбросить схему
+                </button>
             </aside>
             </div>{/* /sel-layout */}
 

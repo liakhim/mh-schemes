@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { createRoot } from 'react-dom/client';
 import Konva from 'konva';
 import { Circle as KonvaCircle, Group, Image, Layer, Rect, Stage, Text } from 'react-konva';
+import '../css/app.css';
 import { din, incomingScheme, indent, module_height } from './constants';
 import { canonicalDeviceType } from './scheme/domain/deviceTypes';
 import { getDeviceStoredTitle, getWirelessDeviceTitle, getOneWireDeviceTitle } from './scheme/domain/deviceTitles';
@@ -1572,8 +1573,7 @@ const App = () => {
     const [schemeJsonText, setSchemeJsonText] = useState(() => JSON.stringify(initialIncomingScheme, null, 2));
     const [schemeJsonDirty, setSchemeJsonDirty] = useState(false);
     const [schemeJsonError, setSchemeJsonError] = useState(null);
-    const [schemeNameEditor, setSchemeNameEditor] = useState(null);
-    const [schemeDescriptionEditor, setSchemeDescriptionEditor] = useState(null);
+    const [schemeMetadataEditor, setSchemeMetadataEditor] = useState(null);
     const [titleEditor, setTitleEditor] = useState(null);
     const [commentEditor, setCommentEditor] = useState(null);
     const [commentViewer, setCommentViewer] = useState(null);
@@ -2048,20 +2048,21 @@ const App = () => {
             });
     };
 
-    const saveSchemeName = () => {
-        const name = String(schemeNameEditor?.value || '').trim();
-        if (!routeSchemeId || schemeNameEditor?.state === 'saving') return;
+    const saveSchemeMetadata = () => {
+        const name = String(schemeMetadataEditor?.name || '').trim();
+        const description = String(schemeMetadataEditor?.description || '').trim();
+        if (!routeSchemeId || schemeMetadataEditor?.state === 'saving') return;
         if (!name) {
-            setSchemeNameEditor((current) => (current ? { ...current, state: 'error' } : current));
+            setSchemeMetadataEditor((current) => (current ? { ...current, state: 'invalid' } : current));
             return;
         }
-        if (name === schemeName) {
-            setSchemeNameEditor(null);
+        if (name === schemeName && description === schemeDescription) {
+            setSchemeMetadataEditor(null);
             return;
         }
 
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        setSchemeNameEditor((current) => (current ? { ...current, state: 'saving' } : current));
+        setSchemeMetadataEditor((current) => (current ? { ...current, state: 'saving' } : current));
 
         fetch(`/api/schemes/${routeSchemeId}`, {
             method: 'PATCH',
@@ -2069,46 +2070,19 @@ const App = () => {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken,
             },
-            body: JSON.stringify({ name }),
+            body: JSON.stringify({ name, description: description || null }),
         })
             .then((response) => {
-                if (!response.ok) throw new Error('Rename failed');
+                if (!response.ok) throw new Error('Metadata update failed');
                 return response.json();
             })
             .then((payload) => {
                 setSchemeName(payload.name || name);
-                setSchemeNameEditor(null);
-            })
-            .catch(() => {
-                setSchemeNameEditor((current) => (current ? { ...current, state: 'error' } : current));
-            });
-    };
-
-    const saveSchemeDescription = () => {
-        if (!routeSchemeId || schemeDescriptionEditor?.state === 'saving') return;
-
-        const description = String(schemeDescriptionEditor?.value || '').trim();
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-        setSchemeDescriptionEditor((current) => (current ? { ...current, state: 'saving' } : current));
-
-        fetch(`/api/schemes/${routeSchemeId}`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken,
-            },
-            body: JSON.stringify({ description: description || null }),
-        })
-            .then((response) => {
-                if (!response.ok) throw new Error('Description update failed');
-                return response.json();
-            })
-            .then((payload) => {
                 setSchemeDescription(payload.description || '');
-                setSchemeDescriptionEditor(null);
+                setSchemeMetadataEditor(null);
             })
             .catch(() => {
-                setSchemeDescriptionEditor((current) => (current ? { ...current, state: 'error' } : current));
+                setSchemeMetadataEditor((current) => (current ? { ...current, state: 'error' } : current));
             });
     };
 
@@ -4601,7 +4575,7 @@ const App = () => {
                         aria-label="Незадействованные комплектные датчики"
                         aria-expanded={showUnusedBundledSensors}
                         aria-controls="spa-unused-sensors-panel"
-                        title="Незадействованные комплектные датчики"
+                        data-tooltip="Незадействованные комплектные датчики"
                         onClick={() => setShowUnusedBundledSensors((current) => !current)}
                     >
                         <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -4642,7 +4616,7 @@ const App = () => {
                     type="button"
                     className="spa-floating-tool-button"
                     aria-label="Коммерческое предложение"
-                    title="Коммерческое предложение"
+                    data-tooltip="Коммерческое предложение"
                     onClick={() => {
                         setShowUnusedBundledSensors(false);
                         setShowOfferModal(true);
@@ -4659,7 +4633,7 @@ const App = () => {
                         type="button"
                         className="spa-floating-tool-button"
                         aria-label="Исходный подбор"
-                        title="Исходный подбор"
+                        data-tooltip="Исходный подбор"
                         onClick={() => {
                             setShowUnusedBundledSensors(false);
                             setShowSelectionConfig(true);
@@ -4711,7 +4685,7 @@ const App = () => {
                     <div
                         className="spa-floating-tool-button spa-installation-din-indicator"
                         role="status"
-                        title="Занято на DIN-рейке"
+                        data-tooltip="Занято на DIN-рейке"
                         aria-label={installationDinTotal == null ? 'Количество DIN неизвестно' : `Занято ${installationDinTotal} DIN`}
                     >
                         <strong>{installationDinTotal == null ? '—' : installationDinTotal}</strong>
@@ -4722,7 +4696,7 @@ const App = () => {
                     type="button"
                     className="spa-floating-tool-button spa-pdf-download-button"
                     aria-label="Скачать схему в PDF"
-                    title="Скачать схему в PDF"
+                    data-tooltip="Скачать схему в PDF"
                     onClick={handleDownloadPdf}
                 >
                     <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -4736,7 +4710,7 @@ const App = () => {
                         className={`spa-floating-tool-button spa-grid-toggle-button${showGrid ? ' is-active' : ''}`}
                         aria-label={showGrid ? 'Скрыть сетку' : 'Отобразить сетку'}
                         aria-pressed={showGrid}
-                        title={showGrid ? 'Скрыть сетку' : 'Отобразить сетку'}
+                        data-tooltip={showGrid ? 'Скрыть сетку' : 'Отобразить сетку'}
                         onClick={() => setShowGrid((current) => !current)}
                     >
                         <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -4750,7 +4724,7 @@ const App = () => {
                         className={`spa-floating-tool-button spa-empty-slots-toggle-button${showEmptySlots ? ' is-active' : ''}`}
                         aria-label={showEmptySlots ? 'Скрыть доступные слоты' : 'Отобразить доступные слоты'}
                         aria-pressed={showEmptySlots}
-                        title={showEmptySlots ? 'Скрыть доступные слоты' : 'Отобразить доступные слоты'}
+                        data-tooltip={showEmptySlots ? 'Скрыть доступные слоты' : 'Отобразить доступные слоты'}
                         onClick={() => setShowEmptySlots((current) => !current)}
                     >
                         <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -4768,7 +4742,7 @@ const App = () => {
                     aria-label="Сохранить схему"
                     aria-expanded={showSaveActions}
                     aria-controls="spa-save-actions-panel"
-                    title="Сохранить схему"
+                    data-tooltip="Сохранить схему"
                     onClick={() => setShowSaveActions((current) => !current)}
                 >
                     <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -4823,7 +4797,7 @@ const App = () => {
                         aria-label="Инструменты разработчика"
                         aria-expanded={showDeveloperToolsPanel}
                         aria-controls="spa-developer-tools-panel"
-                        title="Инструменты разработчика"
+                        data-tooltip="Инструменты разработчика"
                         onClick={() => setShowDeveloperToolsPanel((current) => !current)}
                     >
                         <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -4866,7 +4840,7 @@ const App = () => {
                     type="button"
                     className={`spa-floating-tool-button spa-reset-positions-button is-${rightToolsTransitionPhase}`}
                     aria-label="Сбросить позиции"
-                    title="Сбросить позиции"
+                    data-tooltip="Сбросить позиции"
                     onClick={handleResetPositions}
                 >
                     <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -4879,62 +4853,102 @@ const App = () => {
                 type="button"
                 className="spa-floating-tool-button spa-floating-help-button"
                 aria-label="Помощь"
-                title="Помощь"
+                data-tooltip="Помощь"
                 onClick={() => setShowHelpModal(true)}
             >
                 ?
             </button>
-            <div className="spa-scheme-title spa-fixed-scheme-title">
-                <span className="spa-scheme-title-label">Схема</span>
-                <div className="spa-scheme-title-value" title={schemeName}>
-                    {schemeNameEditor ? (
-                        <input
-                            className={`spa-scheme-name-input${schemeNameEditor.state === 'error' ? ' is-error' : ''}`}
-                            value={schemeNameEditor.value}
-                            autoFocus
-                            disabled={schemeNameEditor.state === 'saving'}
-                            aria-label="Название схемы"
-                            title={schemeNameEditor.state === 'error' ? 'Название не сохранено' : undefined}
-                            onChange={(event) => setSchemeNameEditor({ value: event.target.value, state: 'idle' })}
-                            onBlur={saveSchemeName}
-                            onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                    event.preventDefault();
-                                    event.currentTarget.blur();
-                                }
-                                if (event.key === 'Escape') {
-                                    event.preventDefault();
-                                    setSchemeNameEditor(null);
-                                }
-                            }}
-                        />
-                    ) : (
-                        <button
-                            type="button"
-                            className="spa-scheme-name-button"
-                            disabled={!routeSchemeId}
-                            onClick={() => setSchemeNameEditor({ value: schemeName, state: 'idle' })}
-                        >
-                            {schemeName}
-                        </button>
-                    )}
-                </div>
-                <span className="spa-scheme-description-label">Описание</span>
-                <div className="spa-scheme-description-value" title={schemeDescription || 'Без описания'}>
-                    <span className={schemeDescription ? undefined : 'spa-scheme-description-empty'}>
-                        {schemeDescription || 'Без описания'}
+            <div className={`spa-scheme-meta${schemeMetadataEditor ? ' is-open' : ''}`}>
+                <button
+                    type="button"
+                    className="spa-scheme-meta-card"
+                    disabled={!routeSchemeId}
+                    aria-expanded={Boolean(schemeMetadataEditor)}
+                    aria-controls="spa-scheme-meta-editor"
+                    title={routeSchemeId ? 'Редактировать название и описание' : schemeName}
+                    onClick={() => setSchemeMetadataEditor((current) => (current ? null : {
+                        name: schemeName,
+                        description: schemeDescription,
+                        state: 'idle',
+                    }))}
+                >
+                    <span className="spa-scheme-meta-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M6 3.5h9l3 3v14H6zM15 3.5v3h3M9 11h6m-6 3h6m-6 3h4" />
+                        </svg>
                     </span>
-                    <button
-                        type="button"
-                        className="spa-scheme-title-edit"
-                        aria-label="Редактировать описание схемы"
-                        title="Редактировать описание схемы"
-                        disabled={!routeSchemeId}
-                        onClick={() => setSchemeDescriptionEditor({ value: schemeDescription, state: 'idle' })}
+                    <span className="spa-scheme-meta-copy">
+                        <span className="spa-scheme-meta-kicker">Текущая схема</span>
+                        <strong>{schemeName}</strong>
+                        <small className={schemeDescription ? undefined : 'is-empty'}>
+                            {schemeDescription || 'Добавьте краткое описание'}
+                        </small>
+                    </span>
+                    {routeSchemeId && (
+                        <span className="spa-scheme-meta-edit" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <path d="m5 16.5-.7 3.2 3.2-.7L18 8.5 15.5 6zM14 7.5l2.5 2.5" />
+                            </svg>
+                        </span>
+                    )}
+                </button>
+                {schemeMetadataEditor && (
+                    <form
+                        id="spa-scheme-meta-editor"
+                        className="spa-scheme-meta-editor"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            saveSchemeMetadata();
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Escape') {
+                                event.preventDefault();
+                                setSchemeMetadataEditor(null);
+                            }
+                        }}
                     >
-                        &#9998;
-                    </button>
-                </div>
+                    <div className="spa-scheme-meta-editor-header">
+                        <div>
+                            <span>Паспорт схемы</span>
+                            <strong>Название и описание</strong>
+                        </div>
+                        <button type="button" onClick={() => setSchemeMetadataEditor(null)} aria-label="Закрыть">×</button>
+                    </div>
+                    <label className="spa-scheme-meta-field">
+                        <span>Название</span>
+                        <input
+                            value={schemeMetadataEditor?.name || ''}
+                            autoFocus
+                            maxLength={255}
+                            disabled={schemeMetadataEditor?.state === 'saving'}
+                            aria-invalid={schemeMetadataEditor?.state === 'invalid'}
+                            onChange={(event) => setSchemeMetadataEditor((current) => (
+                                current ? { ...current, name: event.target.value, state: 'idle' } : current
+                            ))}
+                        />
+                    </label>
+                    <label className="spa-scheme-meta-field">
+                        <span>Описание</span>
+                        <textarea
+                            value={schemeMetadataEditor?.description || ''}
+                            rows={3}
+                            disabled={schemeMetadataEditor?.state === 'saving'}
+                            placeholder="Назначение схемы, объект или важные примечания"
+                            onChange={(event) => setSchemeMetadataEditor((current) => (
+                                current ? { ...current, description: event.target.value, state: 'idle' } : current
+                            ))}
+                        />
+                    </label>
+                    {schemeMetadataEditor?.state === 'invalid' && <div className="spa-scheme-meta-error">Укажите название схемы</div>}
+                    {schemeMetadataEditor?.state === 'error' && <div className="spa-scheme-meta-error">Не удалось сохранить изменения</div>}
+                    <div className="spa-scheme-meta-actions">
+                        <button type="button" onClick={() => setSchemeMetadataEditor(null)}>Отмена</button>
+                        <button type="submit" className="is-primary" disabled={schemeMetadataEditor?.state === 'saving'}>
+                            {schemeMetadataEditor?.state === 'saving' ? 'Сохраняем...' : 'Сохранить'}
+                        </button>
+                    </div>
+                    </form>
+                )}
             </div>
             {schemeLoadError && (
                 <div style={{ position: 'fixed', top: 72, right: 16, zIndex: 60, color: '#d32f2f', background: '#fff', border: '1px solid #ef9a9a', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>
@@ -4972,44 +4986,6 @@ const App = () => {
                         <div className="title-editor-actions">
                             <button type="button" className="title-editor-secondary" onClick={closeTitleEditor}>Отмена</button>
                             <button type="submit" className="title-editor-primary" disabled={!String(titleEditor.value || '').trim()}>Сохранить</button>
-                        </div>
-                    </form>
-                </div>
-            )}
-            {schemeDescriptionEditor && (
-                <div className="title-editor-backdrop" onMouseDown={() => setSchemeDescriptionEditor(null)}>
-                    <form
-                        className="title-editor-modal"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            saveSchemeDescription();
-                        }}
-                        onMouseDown={(event) => event.stopPropagation()}
-                    >
-                        <div className="title-editor-header">
-                            <strong>Описание схемы</strong>
-                            <button type="button" className="title-editor-close" onClick={() => setSchemeDescriptionEditor(null)}>×</button>
-                        </div>
-                        <label className="title-editor-label" htmlFor="scheme-description-editor-input">Описание</label>
-                        <textarea
-                            id="scheme-description-editor-input"
-                            className="title-editor-input title-editor-textarea"
-                            value={schemeDescriptionEditor.value}
-                            autoFocus
-                            onChange={(event) => setSchemeDescriptionEditor((current) => (current ? { ...current, value: event.target.value, state: 'idle' } : current))}
-                            onKeyDown={(event) => {
-                                if (event.key === 'Escape') {
-                                    event.preventDefault();
-                                    setSchemeDescriptionEditor(null);
-                                }
-                            }}
-                        />
-                        {schemeDescriptionEditor.state === 'error' && <div className="title-editor-error">Не удалось сохранить описание схемы</div>}
-                        <div className="title-editor-actions">
-                            <button type="button" className="title-editor-secondary" onClick={() => setSchemeDescriptionEditor(null)}>Отмена</button>
-                            <button type="submit" className="title-editor-primary" disabled={schemeDescriptionEditor.state === 'saving'}>
-                                {schemeDescriptionEditor.state === 'saving' ? 'Сохраняем...' : 'Сохранить'}
-                            </button>
                         </div>
                     </form>
                 </div>

@@ -63,13 +63,13 @@ export const SELECTION_BUTTON_MAP = [
     // --- Шапка / общие действия ---
     {
         section: '0. Общие действия',
-        local: { testId: 'reset-equipment', description: 'Кнопка "Сбросить схему" — открывает confirm-диалог' },
+        local: { testId: 'reset-equipment', description: 'Кнопка "Сбросить схему" под панелью подобранного контроллера — открывает confirm-диалог' },
         live: { description: 'Кнопка "Сбросить" внизу формы — сбрасывает без подтверждения (проверить на живом сайте)' },
         note: 'Локально сброс двухшаговый (confirm-диалог с data-test-id="reset-equipment-confirm"), на mhtest.ru — предположительно однократный клик.',
     },
     {
         section: '0. Общие действия',
-        local: { testId: null, description: 'Кнопка "Построить схему" (нет data-test-id)' },
+        local: { testId: null, description: 'Кнопка "Конструктор" в шапке (нет data-test-id)' },
         live: { description: 'Кнопка "Подобрать оборудование" внизу формы' },
         note: 'Семантика совпадает (финальный submit подбора). Локальной кнопке стоит добавить data-test-id, аналогично остальным.',
     },
@@ -125,8 +125,7 @@ export const SELECTION_BUTTON_MAP = [
     {
         section: '3. Гидравлика — Насосы',
         local: [
-            { testId: null, title: 'Насос 220V', description: 'Карточка с кнопкой "Добавить"' },
-            { testId: null, title: 'Насос 0-10V', description: 'Карточка с кнопкой "Добавить"' },
+            { testId: 'add-pump', title: 'Насос', description: 'Одна карточка; тип задаётся переключателем pump-type-220 / pump-type-010, количество — счетчиками pump-220-qty-* и pump-010-qty-*' },
         ],
         live: { description: 'Два счётчика (+/-) под заголовком "Насосы": "Количество насосов 220V" и "Количество насосов 0-10V"' },
         soldByMyHeat: false,

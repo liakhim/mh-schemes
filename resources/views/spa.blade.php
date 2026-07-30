@@ -31,7 +31,7 @@
     window.__vite_plugin_react_preamble_installed__ = true;
     </script>
     @endif
-    @vite(['resources/css/app.css', 'resources/js/spa.jsx'])
+    @vite('resources/js/spa.jsx')
 </head>
 <body>
     <div id="app"></div>

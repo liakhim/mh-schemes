@@ -111,6 +111,16 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     };
 
     /**
+     * Добавляет count насосов выбранного типа: 220V и 0-10V живут в одной
+     * карточке, тип задаётся переключателем «Управление».
+     */
+    const addPumps = async (page, type, count = 1) => {
+        await page.getByTestId(`pump-type-${type}`).click();
+        await page.getByTestId('add-pump').click();
+        for (let i = 1; i < count; i += 1) await page.getByTestId(`pump-${type}-qty-inc`).click();
+    };
+
+    /**
      * Добавляет count датчиков температуры. Проводные и беспроводные датчики
      * живут в одной карточке: вариант набирается тумблерами «Проводной/
      * Беспроводной», «Настенный/В колбе» и «Цифровой/NTC».
@@ -331,11 +341,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     });
 
     test('одиночный насос 220V: не продаётся, помещается в GO без доп. модулей', async ({ page }) => {
-        const card = page.locator('div')
-            .filter({ hasText: 'Насос 220V' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить' }) })
-            .last();
-        await card.getByRole('button', { name: 'Добавить' }).click();
+        await addPumps(page, '220', 1);
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Насос 220V');
         expect(local.text).toContain('GO');
@@ -352,11 +358,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     });
 
     test('одиночный насос 0-10V: требует PRO + модуль IO4 (di-канал, не relay)', async ({ page }) => {
-        const card = page.locator('div')
-            .filter({ hasText: 'Насос 0-10V' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить' }) })
-            .last();
-        await card.getByRole('button', { name: 'Добавить' }).click();
+        await addPumps(page, '010', 1);
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Насос 0-10V');
         expect(local.text).toContain('Модуль IO4');
@@ -549,11 +551,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     test('комбинация 5 зон + 5 насосов 220V + 5 проводных термостатов: PRO + один RL6', async ({ page }) => {
         await addZones(page, 5);
 
-        const pumpCard = page.locator('div')
-            .filter({ hasText: 'Насос 220V' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить' }) })
-            .last();
-        for (let i = 0; i < 5; i += 1) await pumpCard.getByRole('button', { name: 'Добавить' }).click();
+        await addPumps(page, '220', 5);
 
         const wiredThermostatAdd = page.getByRole('button', { name: 'Добавить термостат' }).first();
         for (let i = 0; i < 5; i += 1) await wiredThermostatAdd.click();
@@ -715,11 +713,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
             .last();
         for (let i = 0; i < 2; i += 1) await mixCard.getByRole('button', { name: 'Добавить' }).click();
 
-        const pumpCard = page.locator('div')
-            .filter({ hasText: 'Насос 0-10V' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить' }) })
-            .last();
-        for (let i = 0; i < 3; i += 1) await pumpCard.getByRole('button', { name: 'Добавить' }).click();
+        await addPumps(page, '010', 3);
 
         await addPressureSensors(page, 2);
 
@@ -968,11 +962,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     test('комбинация 4 насоса 220V + 3 термостата + беспроводной уличный датчик: Smart2 + 2×RL2 + RDT2', async ({ page }) => {
         // Уличный датчик на live задаётся бинарным тумблером (ровно 1 шт),
         // поэтому локально тоже берём один — иначе схемы будут несопоставимы.
-        const pumpCard = page.locator('div')
-            .filter({ hasText: 'Насос 220V' })
-            .filter({ has: page.getByRole('button', { name: 'Добавить' }) })
-            .last();
-        for (let i = 0; i < 4; i += 1) await pumpCard.getByRole('button', { name: 'Добавить' }).click();
+        await addPumps(page, '220', 4);
         const wiredThermostatAdd = page.getByRole('button', { name: 'Добавить термостат' }).first();
         for (let i = 0; i < 3; i += 1) await wiredThermostatAdd.click();
         await page.getByTestId('outdoor-sensor-toggle').locator('input').check();
