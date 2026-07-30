@@ -297,9 +297,14 @@ const CONTROLLER_LABELS = {
     ecosmart: 'ECOsmart',
 };
 
-// Заглушка описания в карточках панели «Подобранный контроллер»:
-// ждём реальные тексты под каждый контроллер.
-const CONTROLLER_CARD_DESCRIPTION = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+/** Описания контроллеров в карточках панели «Подобранный контроллер». */
+const CONTROLLER_CARD_DESCRIPTIONS = {
+    go: 'Предназначен для удалённого управления котлом отопления.',
+    'go+': 'Предназначен для удалённого управления котлом отопления, дополнен встроенным аккумулятором и активированным радиомодулем.',
+    smart2: 'Предназначен для автоматизации небольших систем отопления с гибкой настройкой инженерного оборудования.',
+    pro: 'Обеспечивает широкие возможности настройки, управления контурами, каскадом до 13 котлов по цифровой шине, бойлером и дополнительным инженерным оборудованием до 80 единиц для построения гибкой системы автоматики.',
+    ecosmart: 'Оснащён встроенным аккумулятором и радиоприёмником, имеет простую коммутацию и поддерживает автонастройку системы при первом включении без подключения к интернету.',
+};
 
 // Подсветка смены подобранного контроллера. Длительность должна совпадать с
 // анимациями `sel-controller-*` в app.css, иначе класс снимут раньше времени.
@@ -1848,6 +1853,20 @@ const writeSelectionDraft = (draft) => {
         window.localStorage?.setItem(SELECTION_DRAFT_STORAGE_KEY, JSON.stringify(draft));
     } catch {
         // Selection remains usable when storage quota or browser policy blocks persistence.
+    }
+};
+
+/**
+ * Отладочный показ `incomingScheme` в карточках. Чекбокс скрыт от обычного
+ * пользователя и появляется, только если в localStorage вручную выставлено
+ * `incomingScheme = '1'`.
+ */
+const isJsonToggleEnabled = () => {
+    try {
+        return window.localStorage?.getItem('incomingScheme') === '1';
+    } catch {
+        // localStorage can be unavailable in private browsing or restricted contexts.
+        return false;
     }
 };
 
@@ -3663,6 +3682,7 @@ const SelectionApp = () => {
     const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
     const [incomingScheme, setIncomingScheme] = useState(createInitialSelectionScheme);
     const [showJsonDetails, setShowJsonDetails] = useState(false);
+    const [jsonToggleEnabled] = useState(isJsonToggleEnabled);
     const [thermostatConnection, setThermostatConnection] = useState('wired');
     const [wiredThermostatColor, setWiredThermostatColor] = useState('black');
     const [wiredThermostatHasFloorSensor, setWiredThermostatHasFloorSensor] = useState(false);
@@ -4589,31 +4609,15 @@ const SelectionApp = () => {
             <div className="sel-header">
                 <h1>Подбор оборудования</h1>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
-                    <label className="sel-json-toggle">
-                        <input
-                            type="checkbox"
-                            checked={showJsonDetails}
-                            onChange={(event) => setShowJsonDetails(event.target.checked)}
-                        />
-                    </label>
-                    <button
-                        type="button"
-                        className="selection-secondary-button"
-                        data-test-id="open-commercial-offer"
-                        onClick={() => setIsOfferModalOpen(true)}
-                        style={{
-                            padding: '10px 16px',
-                            border: '1px solid #d7dbe4',
-                            borderRadius: 8,
-                            background: '#fff',
-                            color: '#202738',
-                            cursor: 'pointer',
-                            fontSize: 14,
-                            fontWeight: 700,
-                        }}
-                    >
-                        Коммерческое предложение
-                    </button>
+                    {jsonToggleEnabled && (
+                        <label className="sel-json-toggle">
+                            <input
+                                type="checkbox"
+                                checked={showJsonDetails}
+                                onChange={(event) => setShowJsonDetails(event.target.checked)}
+                            />
+                        </label>
+                    )}
                     <button
                         onClick={buildScheme}
                         disabled={isBuildingScheme || controllerCompatibilityIssues.length > 0}
@@ -5355,14 +5359,17 @@ const SelectionApp = () => {
                                 aria-disabled={!isCompatible}
                                 title={isCompatible ? undefined : 'Этот контроллер не поддерживает текущую конфигурацию'}
                                 style={{
+                                    // Снимок и название — строкой сверху, описание под ними во всю
+                                    // ширину: рядом со снимком колонка текста была слишком узкой
+                                    // и длинные описания вытягивали карточку.
                                     display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
+                                    flexDirection: 'column',
+                                    gap: 6,
                                     width: '100%',
                                     boxSizing: 'border-box',
                                     border: `2px solid ${isActive ? ORANGE : '#d7dbe4'}`,
                                     borderRadius: 8,
-                                    padding: '6px 8px 6px 6px',
+                                    padding: '8px',
                                     background: isActive ? '#fff7ed' : '#fff',
                                     cursor: isCompatible ? 'pointer' : 'not-allowed',
                                     fontSize: 13,
@@ -5370,16 +5377,16 @@ const SelectionApp = () => {
                                     opacity: isCompatible ? 1 : 0.45,
                                 }}
                             >
-                                <img
-                                    src={controllerImagePaths[item.value.type]}
-                                    alt={item.label}
-                                    style={{ display: 'block', width: 56, height: 42, flexShrink: 0, objectFit: 'contain' }}
-                                />
-                                <span style={{ minWidth: 0 }}>
-                                    <span style={{ display: 'block', fontWeight: 700, lineHeight: 1.25 }}>{item.label}</span>
-                                    <span style={{ display: 'block', marginTop: 2, fontSize: 11, lineHeight: 1.3, color: '#64748b' }}>
-                                        {CONTROLLER_CARD_DESCRIPTION}
-                                    </span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <img
+                                        src={controllerImagePaths[item.value.type]}
+                                        alt={item.label}
+                                        style={{ display: 'block', width: 56, height: 42, flexShrink: 0, objectFit: 'contain' }}
+                                    />
+                                    <span style={{ minWidth: 0, fontWeight: 700, lineHeight: 1.25 }}>{item.label}</span>
+                                </span>
+                                <span style={{ display: 'block', fontSize: 11, lineHeight: 1.35, color: '#64748b' }}>
+                                    {CONTROLLER_CARD_DESCRIPTIONS[item.value.type] || ''}
                                 </span>
                             </div>
                         );
@@ -5463,16 +5470,26 @@ const SelectionApp = () => {
                         </div>
                     </div>
                 )}
-                {/* Сброс живёт под выбором контроллера, а не в шапке: действие
-                    разрушительное, поэтому убрано от кнопок навигации. */}
-                <button
-                    type="button"
-                    className="selection-danger-button sel-stuck-controllers-reset"
-                    data-test-id="reset-equipment"
-                    onClick={() => setIsResetConfirmOpen(true)}
-                >
-                    Сбросить схему
-                </button>
+                {/* Действия над подбором живут под панелью, а не в шапке: сброс
+                    разрушителен, а спецификация относится к собранному составу. */}
+                <div className="sel-stuck-actions">
+                    <button
+                        type="button"
+                        className="selection-secondary-button sel-stuck-actions-button"
+                        data-test-id="open-commercial-offer"
+                        onClick={() => setIsOfferModalOpen(true)}
+                    >
+                        Спецификация
+                    </button>
+                    <button
+                        type="button"
+                        className="selection-danger-button sel-stuck-actions-button"
+                        data-test-id="reset-equipment"
+                        onClick={() => setIsResetConfirmOpen(true)}
+                    >
+                        Сбросить схему
+                    </button>
+                </div>
             </aside>
             </div>{/* /sel-layout */}
 

@@ -3035,12 +3035,20 @@ body {
     line-height: 1;
 }
 
-/* Сброс подбора: отдельная кнопка внизу панели контроллера, во всю её ширину. */
-.selection-page button.sel-stuck-controllers-reset {
-    width: 100%;
+/* Действия над подбором внизу панели контроллера: спецификация и сброс, обе во
+   всю ширину панели. Цвет задают классы `selection-secondary-button` и
+   `selection-danger-button`, здесь только геометрия. */
+.sel-stuck-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     margin-top: 12px;
+}
+
+.selection-page button.sel-stuck-actions-button {
+    width: 100%;
     padding: 8px 12px;
-    border: 1px solid #dc2626;
+    border: 1px solid transparent;
     border-radius: 8px;
     cursor: pointer;
     font-size: 13px;
@@ -3203,9 +3211,16 @@ body {
         width: 34px;
     }
 
-    /* В нижней ленте кнопка сброса компактнее, чтобы лента не съедала экран. */
-    .selection-page button.sel-stuck-controllers-reset {
+    /* В нижней ленте кнопки действий компактнее и в один ряд, чтобы лента не
+       съедала экран. */
+    .sel-stuck-actions {
+        flex-direction: row;
+        gap: 8px;
         margin-top: 8px;
+    }
+
+    .selection-page button.sel-stuck-actions-button {
+        flex: 1 1 0;
         padding: 7px 12px;
         font-size: 12.5px;
     }
