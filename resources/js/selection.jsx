@@ -4661,6 +4661,7 @@ const SelectionApp = () => {
             )}
             {selectionMode === 'manual' && <div className="sel-layout-spacer" aria-hidden="true" />}
             <div className="sel-layout-content">
+            <div key={selectionMode} className="sel-mode-view">
 
             {selectionMode === 'automatic' ? (
             <>
@@ -5412,6 +5413,7 @@ const SelectionApp = () => {
                     </div>
                 </div>
             )}
+            </div>
             </div>{/* /sel-layout-content */}
             {/* Единственное место выбора контроллера: липкая колонка справа,
                 видна на всём протяжении подбора. */}
