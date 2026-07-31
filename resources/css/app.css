@@ -2515,7 +2515,9 @@ body {
 }
 
 .selection-page {
+    --sel-header-height: 108px;
     font-family: "Segoe UI", Tahoma, sans-serif;
+    padding-top: 132px !important;
 }
 
 .selection-page section > div {
@@ -2635,7 +2637,7 @@ body {
 /* Двухколоночная раскладка: слева липкая навигация по разделам,
    справа — основной контент подбора. */
 .sel-layout {
-    --sel-sidebar-top: 24px;
+    --sel-sidebar-top: calc(var(--sel-header-height) + 20px);
     display: flex;
     align-items: flex-start;
     gap: 24px;
@@ -2651,43 +2653,131 @@ body {
     width: 240px;
 }
 
+.sel-liquid-header {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    z-index: 1000;
+    width: min(calc(100% - 32px), 1452px);
+    box-sizing: border-box;
+    overflow: visible;
+    border: 1px solid rgba(255, 255, 255, 0.76);
+    border-radius: 26px;
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(242, 246, 252, 0.58)),
+        rgba(255, 255, 255, 0.48);
+    box-shadow:
+        0 18px 55px rgba(32, 39, 56, 0.14),
+        0 3px 12px rgba(32, 39, 56, 0.07),
+        inset 0 1px 0 rgba(255, 255, 255, 0.96),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.38);
+    backdrop-filter: blur(24px) saturate(165%);
+    -webkit-backdrop-filter: blur(24px) saturate(165%);
+    transform: translateX(-50%);
+    isolation: isolate;
+}
+
+.sel-liquid-header::before,
+.sel-liquid-header::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    border-radius: 999px;
+    filter: blur(18px);
+    pointer-events: none;
+}
+
+.sel-liquid-header::before {
+    top: -22px;
+    left: 18%;
+    width: 260px;
+    height: 58px;
+    background: rgba(255, 174, 89, 0.18);
+}
+
+.sel-liquid-header::after {
+    right: 14%;
+    bottom: -22px;
+    width: 220px;
+    height: 54px;
+    background: rgba(107, 151, 255, 0.13);
+}
+
+.sel-liquid-header-shine {
+    position: absolute;
+    inset: 1px 16% auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.98), transparent);
+    pointer-events: none;
+}
+
+.sel-liquid-header-inner {
+    display: grid;
+    grid-template-columns: 210px minmax(480px, 1fr) 210px;
+    align-items: center;
+    gap: 24px;
+    padding: 10px 16px;
+}
+
+.sel-header-brand {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-decoration: none;
+    text-transform: uppercase;
+}
+
+.sel-header-brand img {
+    display: block;
+    width: 148px;
+    max-width: 100%;
+    height: auto;
+}
+
 .sel-mode-panel {
-    padding: 8px 0 24px;
-    border-bottom: 1px solid #e2e8f0;
+    min-width: 0;
 }
 
 .sel-mode-title {
-    margin-bottom: 20px;
+    margin-bottom: 5px;
     color: #475569;
-    font-size: 14px;
-    font-weight: 700;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
 }
 
 .sel-mode-controls {
     display: flex;
     align-items: center;
-    gap: 40px;
+    gap: 0;
 }
 
 .sel-mode-switch {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    flex: 1 1 540px;
-    max-width: 590px;
-    padding: 0;
-    border: 1px solid #d7dbe4;
+    width: 100%;
+    max-width: 620px;
+    padding: 3px;
+    border: 1px solid rgba(203, 213, 225, 0.8);
     border-radius: 999px;
-    background: #fff;
+    background: rgba(241, 245, 249, 0.7);
+    box-shadow: inset 0 1px 3px rgba(32, 39, 56, 0.06);
 }
 
 .selection-page button.sel-mode-option {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 16px;
+    gap: 11px;
     min-width: 0;
-    min-height: 80px;
-    padding: 14px 28px !important;
+    min-height: 54px;
+    padding: 8px 18px !important;
     border: 1px solid transparent;
     border-radius: 999px;
     background: transparent;
@@ -2699,15 +2789,15 @@ body {
 
 .selection-page button.sel-mode-option[data-active="true"] {
     border-color: #e07020;
-    background: #fff;
+    background: rgba(255, 255, 255, 0.92);
     color: #e07020;
-    box-shadow: 0 7px 18px rgba(224, 112, 32, 0.2);
+    box-shadow: 0 8px 22px rgba(224, 112, 32, 0.18), inset 0 1px rgba(255, 255, 255, 0.9);
 }
 
 .sel-mode-option svg {
-    width: 28px;
-    height: 28px;
-    flex: 0 0 28px;
+    width: 23px;
+    height: 23px;
+    flex: 0 0 23px;
     fill: currentColor;
 }
 
@@ -2715,73 +2805,19 @@ body {
     display: flex;
     min-width: 0;
     flex-direction: column;
-    gap: 5px;
+    gap: 3px;
 }
 
 .sel-mode-option strong {
     color: #202738;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.2;
 }
 
 .sel-mode-option small {
     color: #94a3b8;
-    font-size: 12px;
+    font-size: 10px;
     line-height: 1.2;
-}
-
-.sel-mode-help {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    flex: 0 0 auto;
-    padding: 10px 0;
-    color: #64748b;
-    font-size: 13px;
-    cursor: help;
-    outline: none;
-}
-
-.sel-mode-help-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border: 1.5px solid #94a3b8;
-    border-radius: 50%;
-    font-size: 12px;
-    font-weight: 700;
-}
-
-.sel-mode-tooltip {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 10px);
-    z-index: 300;
-    width: min(360px, calc(100vw - 32px));
-    padding: 18px 20px;
-    border: 1px solid #d7dbe4;
-    border-radius: 12px;
-    background: #202738;
-    color: #fff;
-    box-shadow: 0 16px 40px rgba(32, 39, 56, 0.24);
-    font-size: 14px;
-    line-height: 1.55;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(5px);
-    pointer-events: none;
-    transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
-}
-
-.sel-mode-help:hover .sel-mode-tooltip,
-.sel-mode-help:focus .sel-mode-tooltip,
-.sel-mode-help:focus-within .sel-mode-tooltip {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
 }
 
 .sel-manual-controller-picker {
@@ -2867,6 +2903,58 @@ body {
     font-size: 12px;
     line-height: 1.55;
     text-align: center;
+}
+
+.sel-manual-info-card {
+    justify-content: center;
+    border-color: rgba(240, 180, 126, 0.85);
+    background:
+        radial-gradient(circle at 20% 0%, rgba(255, 194, 133, 0.28), transparent 42%),
+        linear-gradient(155deg, #fffaf5 0%, #fff4e8 100%);
+    color: #202738;
+}
+
+.sel-manual-info-card:hover {
+    transform: none;
+    box-shadow: 0 10px 26px rgba(224, 112, 32, 0.12);
+}
+
+.sel-manual-info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    border: 1px solid rgba(224, 112, 32, 0.28);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.76);
+    color: #e07020;
+    box-shadow: 0 8px 20px rgba(224, 112, 32, 0.12);
+}
+
+.sel-manual-info-icon svg {
+    width: 28px;
+    height: 28px;
+}
+
+.sel-manual-info-card small {
+    color: #c85e18;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.sel-manual-info-card ul {
+    align-self: stretch;
+    margin: 4px 0 0;
+    padding: 12px 14px 12px 30px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.58);
+    color: #64748b;
+    font-size: 11px;
+    line-height: 1.65;
+    text-align: left;
 }
 
 .selection-page button.sel-manual-card-build-button {
@@ -3407,6 +3495,22 @@ body {
 
 /* ===== Selection: мобильная адаптация ===== */
 
+@media (max-width: 1100px) and (min-width: 761px) {
+    .sel-liquid-header-inner {
+        grid-template-columns: 150px minmax(0, 1fr) 150px;
+        gap: 14px;
+    }
+
+    .sel-header-brand img {
+        width: 126px;
+    }
+
+    .sel-header-brand span,
+    .sel-mode-title {
+        display: none;
+    }
+}
+
 /* Инлайновый width: min(1120px, 100%) + padding: 24 без border-box давал бы
    горизонтальный скролл на узких экранах. */
 .selection-page {
@@ -3415,25 +3519,48 @@ body {
 
 @media (max-width: 760px) {
     .selection-page {
+        --sel-header-height: 116px;
         padding: 12px !important;
+        padding-top: 132px !important;
         /* Место под закреплённую снизу ленту выбора контроллера вместе с
            плитками модулей и кнопкой сброса под ней. */
         padding-bottom: 184px !important;
     }
 
-    .sel-mode-panel {
-        padding: 4px 0 18px;
+    .sel-liquid-header {
+        top: 8px;
+        width: calc(100% - 16px);
+        border-radius: 20px;
     }
 
+    .sel-liquid-header-inner {
+        grid-template-columns: 1fr auto;
+        gap: 7px 10px;
+        padding: 8px 10px;
+    }
+
+    .sel-header-brand {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .sel-header-brand img {
+        width: 112px;
+    }
+
+    .sel-header-brand span,
     .sel-mode-title {
-        margin-bottom: 12px;
-        font-size: 13px;
+        display: none;
+    }
+
+    .sel-mode-panel {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        padding: 0;
     }
 
     .sel-mode-controls {
-        align-items: stretch;
-        flex-direction: column;
-        gap: 8px;
+        display: block;
     }
 
     .sel-mode-switch {
@@ -3442,9 +3569,9 @@ body {
     }
 
     .selection-page button.sel-mode-option {
-        min-height: 64px;
+        min-height: 50px;
         gap: 9px;
-        padding: 10px 12px !important;
+        padding: 7px 12px !important;
     }
 
     .sel-mode-option svg {
@@ -3458,18 +3585,7 @@ body {
     }
 
     .sel-mode-option small {
-        font-size: 10px;
-    }
-
-    .sel-mode-help {
-        align-self: flex-end;
-        padding: 4px 0;
-        font-size: 12px;
-    }
-
-    .sel-mode-tooltip {
-        right: 0;
-        top: calc(100% + 8px);
+        display: none;
     }
 
     .sel-layout-spacer {
@@ -3508,6 +3624,24 @@ body {
     .sel-manual-controller-card span {
         align-self: center;
         text-align: left;
+    }
+
+    .sel-manual-info-card {
+        display: flex;
+        align-items: center;
+        min-height: 0;
+        padding: 18px !important;
+        text-align: center;
+    }
+
+    .sel-manual-info-card strong,
+    .sel-manual-info-card span {
+        text-align: center;
+    }
+
+    .sel-manual-info-card ul {
+        width: 100%;
+        box-sizing: border-box;
     }
 
     .selection-page button.sel-manual-card-build-button {

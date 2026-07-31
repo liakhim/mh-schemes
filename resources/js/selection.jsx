@@ -4600,6 +4600,59 @@ const SelectionApp = () => {
                 <EquipmentOfferModal sections={equipmentOfferSections} onClose={() => setIsOfferModalOpen(false)} />
             )}
 
+            <header className="sel-liquid-header">
+                <div className="sel-liquid-header-shine" aria-hidden="true" />
+                <div className="sel-liquid-header-inner">
+                    <a className="sel-header-brand" href="/" aria-label="MyHeat, на главную">
+                        <img src={MYHEAT_LOGO_PATH} alt="MyHeat" />
+                        <span>Подбор оборудования</span>
+                    </a>
+                    <div className="sel-mode-panel">
+                        <div className="sel-mode-title">Режим подбора оборудования</div>
+                        <div className="sel-mode-controls">
+                            <div className="sel-mode-switch" role="group" aria-label="Режим подбора оборудования">
+                                <button
+                                    type="button"
+                                    className="selection-option-button sel-mode-option"
+                                    data-active={selectionMode === 'automatic'}
+                                    aria-pressed={selectionMode === 'automatic'}
+                                    onClick={() => {
+                                        setSelectionMode('automatic');
+                                        setBuildSchemeError('');
+                                    }}
+                                >
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M9 3h6v3h2.5A2.5 2.5 0 0 1 20 8.5V11h2v6h-2v2.5a2.5 2.5 0 0 1-2.5 2.5H15v-2H9v2H6.5A2.5 2.5 0 0 1 4 19.5V17H2v-6h2V8.5A2.5 2.5 0 0 1 6.5 6H9V3Z" />
+                                    </svg>
+                                    <span>
+                                        <strong>Автоматический</strong>
+                                        <small>Подбор по параметрам</small>
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className="selection-option-button sel-mode-option"
+                                    data-active={selectionMode === 'manual'}
+                                    aria-pressed={selectionMode === 'manual'}
+                                    onClick={() => {
+                                        setSelectionMode('manual');
+                                        setBuildSchemeError('');
+                                    }}
+                                >
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M4 6h5m4 0h7M4 12h9m4 0h3M4 18h2m4 0h10M9 3v6m6 0v6m-7 0v6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                    </svg>
+                                    <span>
+                                        <strong>Ручной</strong>
+                                        <small>Самостоятельный выбор</small>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
             <div className="sel-layout">
             {selectionMode === 'automatic' && (
                 <aside className="sel-side-nav">
@@ -4608,57 +4661,6 @@ const SelectionApp = () => {
             )}
             {selectionMode === 'manual' && <div className="sel-layout-spacer" aria-hidden="true" />}
             <div className="sel-layout-content">
-
-            <div className="sel-mode-panel">
-                <div className="sel-mode-title">Режим подбора оборудования</div>
-                <div className="sel-mode-controls">
-                    <div className="sel-mode-switch" role="group" aria-label="Режим подбора оборудования">
-                        <button
-                            type="button"
-                            className="selection-option-button sel-mode-option"
-                            data-active={selectionMode === 'automatic'}
-                            aria-pressed={selectionMode === 'automatic'}
-                            onClick={() => {
-                                setSelectionMode('automatic');
-                                setBuildSchemeError('');
-                            }}
-                        >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M9 3h6v3h2.5A2.5 2.5 0 0 1 20 8.5V11h2v6h-2v2.5a2.5 2.5 0 0 1-2.5 2.5H15v-2H9v2H6.5A2.5 2.5 0 0 1 4 19.5V17H2v-6h2V8.5A2.5 2.5 0 0 1 6.5 6H9V3Z" />
-                            </svg>
-                            <span>
-                                <strong>Автоматический</strong>
-                                <small>Подбор по параметрам</small>
-                            </span>
-                        </button>
-                        <button
-                            type="button"
-                            className="selection-option-button sel-mode-option"
-                            data-active={selectionMode === 'manual'}
-                            aria-pressed={selectionMode === 'manual'}
-                            onClick={() => {
-                                setSelectionMode('manual');
-                                setBuildSchemeError('');
-                            }}
-                        >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M4 6h5m4 0h7M4 12h9m4 0h3M4 18h2m4 0h10M9 3v6m6 0v6m-7 0v6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                            </svg>
-                            <span>
-                                <strong>Ручной</strong>
-                                <small>Самостоятельный выбор</small>
-                            </span>
-                        </button>
-                    </div>
-                    <div className="sel-mode-help" tabIndex="0">
-                        <span className="sel-mode-help-icon" aria-hidden="true">?</span>
-                        <span>Какой режим выбрать?</span>
-                        <div className="sel-mode-tooltip" role="tooltip">
-                            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             {selectionMode === 'automatic' ? (
             <>
@@ -5353,10 +5355,25 @@ const SelectionApp = () => {
             ) : (
                 <div className="sel-manual-controller-picker">
                     <div className="sel-manual-controller-heading">
-                        <h2>Выберите контроллер</h2>
-                        <p>Схема откроется с выбранным контроллером без автоматически подобранного оборудования.</p>
+                        <h2>Ручная сборка схемы</h2>
+                        <p>Выберите контроллер, с которого хотите начать работу в конструкторе.</p>
                     </div>
                     <div className="sel-manual-controller-grid">
+                        <article className="sel-manual-controller-card sel-manual-info-card">
+                            <div className="sel-manual-info-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M4 6h5m4 0h7M4 12h9m4 0h3M4 18h2m4 0h10M9 3v6m6 0v6m-7 0v6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                                </svg>
+                            </div>
+                            <small>Ручной режим</small>
+                            <strong>Начните с контроллера</strong>
+                            <span>Вы сами выбираете базовый контроллер. Конструктор откроет чистую схему без автоматически подобранного оборудования, чтобы вы могли собрать подключения вручную.</span>
+                            <ul>
+                                <li>Выберите подходящую модель</li>
+                                <li>Откройте чистую схему</li>
+                                <li>Добавьте оборудование вручную</li>
+                            </ul>
+                        </article>
                         {CONTROLLER_TEMPLATES.map((item) => {
                             const controllerName = {
                                 go: 'Go',
