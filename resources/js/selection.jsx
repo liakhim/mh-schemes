@@ -4390,7 +4390,7 @@ const SelectionApp = () => {
     }, [startSelectionFromScratch]);
 
     /** Сохраняет согласованную схему и открывает ее редактор в новой вкладке. */
-    const buildScheme = useCallback(async (schemeOverride = null) => {
+    const buildScheme = useCallback(async (schemeOverride = null, openOptions = null) => {
         const hasSchemeOverride = schemeOverride && typeof schemeOverride === 'object';
         const sourceScheme = hasSchemeOverride ? schemeOverride : incomingScheme;
         if (!hasSchemeOverride && controllerCompatibilityIssues.length > 0) {
@@ -4453,10 +4453,18 @@ const SelectionApp = () => {
 
             const schemeRecord = await response.json();
             removeSelectionDraft();
+            const schemeUrl = new URL(`/scheme/${schemeRecord.id}`, window.location.origin);
+            if (openOptions?.view === 'scheme' || openOptions?.view === 'installation') {
+                schemeUrl.searchParams.set('view', openOptions.view);
+            }
+            if (typeof openOptions?.showEmptySlots === 'boolean') {
+                schemeUrl.searchParams.set('showEmptySlots', openOptions.showEmptySlots ? '1' : '0');
+            }
+            const schemePath = `${schemeUrl.pathname}${schemeUrl.search}`;
             if (newTab) {
-                newTab.location.href = `/scheme/${schemeRecord.id}`;
+                newTab.location.href = schemePath;
             } else {
-                window.open(`/scheme/${schemeRecord.id}`, '_blank');
+                window.open(schemePath, '_blank');
             }
             setIsBuildingScheme(false);
         } catch (error) {
@@ -5402,7 +5410,10 @@ const SelectionApp = () => {
                                                 item.value.type === 'go+',
                                                 true,
                                             );
-                                            buildScheme(manualScheme);
+                                            buildScheme(manualScheme, {
+                                                view: 'scheme',
+                                                showEmptySlots: true,
+                                            });
                                         }}
                                     >
                                         {isBuildingScheme ? 'Сохраняем...' : `Собрать схему ${preposition} ${controllerName}`}

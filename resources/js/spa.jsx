@@ -1472,10 +1472,32 @@ const getRequestedControllerOnlyScheme = () => {
     return buildControllerOnlyScheme(new URLSearchParams(window.location.search).get('controller'));
 };
 
+const getSchemeViewOptions = () => {
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view');
+    const showEmptySlots = params.get('showEmptySlots');
+    return {
+        installationMode: view === 'scheme' ? false : (view === 'installation' ? true : null),
+        showEmptySlots: showEmptySlots === '1' ? true : (showEmptySlots === '0' ? false : null),
+    };
+};
+
+const updateSchemeViewOptions = (changes) => {
+    const url = new URL(window.location.href);
+    if (changes.installationMode != null) {
+        url.searchParams.set('view', changes.installationMode ? 'installation' : 'scheme');
+    }
+    if (changes.showEmptySlots != null) {
+        url.searchParams.set('showEmptySlots', changes.showEmptySlots ? '1' : '0');
+    }
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+};
+
 const App = () => {
     const routeSchemeId = getRouteSchemeId();
     const initialSchemeRecord = getInitialSchemeRecord();
     const requestedControllerOnlyScheme = getRequestedControllerOnlyScheme();
+    const initialViewOptions = getSchemeViewOptions();
     const initialIncomingScheme = normalizeSchemeIds(initialSchemeRecord?.incoming_scheme
         || (routeSchemeId ? {} : (requestedControllerOnlyScheme || incomingScheme)));
     const stageRef = useRef(null);
@@ -1490,7 +1512,7 @@ const App = () => {
     const [wirelessPortsByType, setWirelessPortsByType] = useState({});
     const [ports, setPorts] = useState([]);
     const [showPorts, setShowPorts] = useState(false);
-    const [showEmptySlots, setShowEmptySlots] = useState(false);
+    const [showEmptySlots, setShowEmptySlots] = useState(initialViewOptions.showEmptySlots ?? false);
     const [showGrid, setShowGrid] = useState(true);
     const [showLineFrames, setShowLineFrames] = useState(false);
     const [showIncomingScheme, setShowIncomingScheme] = useState(false);
@@ -1500,7 +1522,9 @@ const App = () => {
     const [showUnusedBundledSensors, setShowUnusedBundledSensors] = useState(false);
     const [showSaveActions, setShowSaveActions] = useState(false);
     const [showDeveloperToolsPanel, setShowDeveloperToolsPanel] = useState(false);
-    const [installationMode, setInstallationMode] = useState(!requestedControllerOnlyScheme);
+    const [installationMode, setInstallationMode] = useState(
+        initialViewOptions.installationMode ?? !requestedControllerOnlyScheme,
+    );
     const [displayedToolsInstallationMode, setDisplayedToolsInstallationMode] = useState(installationMode);
     const [rightToolsTransitionPhase, setRightToolsTransitionPhase] = useState('idle');
     const [morphImages, setMorphImages] = useState([]);
@@ -1895,6 +1919,7 @@ const App = () => {
         setShowSaveActions(false);
         setShowDeveloperToolsPanel(false);
         setInstallationMode(enabled);
+        updateSchemeViewOptions({ installationMode: enabled });
         if (!enabled) return;
         setShowIncomingScheme(false);
         if (stage) {
@@ -4829,7 +4854,11 @@ const App = () => {
                         aria-label={showEmptySlots ? 'Скрыть доступные слоты' : 'Отобразить доступные слоты'}
                         aria-pressed={showEmptySlots}
                         data-tooltip={showEmptySlots ? 'Скрыть доступные слоты' : 'Отобразить доступные слоты'}
-                        onClick={() => setShowEmptySlots((current) => !current)}
+                        onClick={() => {
+                            const nextShowEmptySlots = !showEmptySlots;
+                            setShowEmptySlots(nextShowEmptySlots);
+                            updateSchemeViewOptions({ showEmptySlots: nextShowEmptySlots });
+                        }}
                     >
                         <svg viewBox="0 0 32 32" aria-hidden="true">
                             <rect x="4.5" y="6.5" width="9" height="9" rx="1.5" />
