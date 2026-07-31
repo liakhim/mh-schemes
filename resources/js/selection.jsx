@@ -1765,7 +1765,7 @@ const PRESSURE_TEMPLATES = [
 const THERMOSTAT_COLORS = [
     { value: 'black', label: 'Черный' },
     { value: 'white', label: 'Белый' },
-    { value: 'gray', label: 'Серый' },
+    { value: 'gray', label: 'Серебристый' },
 ];
 
 const THERMOSTAT_CONNECTIONS = [
