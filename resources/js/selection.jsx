@@ -2667,12 +2667,12 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                     </span>
                 </ThermostatFieldLabel>
                 {/* Кружки-образцы: название выбранного цвета выведено в подписи группы. */}
-                <div style={{ display: 'flex', gap: 10 }}>
+                <div className="sel-thermostat-color-options" style={{ display: 'flex', gap: 10 }}>
                     {THERMOSTAT_COLORS.map((item) => {
                         const isActive = color === item.value;
                         return (
                             <button
-                                className="selection-option-button"
+                                className="selection-option-button sel-thermostat-color-button"
                                 key={item.value}
                                 type="button"
                                 title={item.label}
@@ -4492,7 +4492,7 @@ const SelectionApp = () => {
     return (
         <div
             className={showJsonDetails ? 'selection-page selection-show-json' : 'selection-page selection-hide-json'}
-            style={{ padding: 24, width: 'min(1500px, 100%)', margin: '0 auto' }}
+            style={{ width: 'min(1500px, 100%)', margin: '0 auto' }}
         >
             {pendingDraft && (
                 <div className="selection-draft-backdrop">
@@ -5402,7 +5402,7 @@ const SelectionApp = () => {
                                     <span>{CONTROLLER_CARD_DESCRIPTIONS[item.value.type]}</span>
                                     <button
                                         type="button"
-                                        className="sel-manual-card-build-button"
+                                        className="selection-option-button sel-controller-primary-action sel-manual-card-build-button"
                                         disabled={isBuildingScheme}
                                         onClick={() => {
                                             const manualScheme = resolveControllerAndRequiredModules(
@@ -5416,7 +5416,22 @@ const SelectionApp = () => {
                                             });
                                         }}
                                     >
-                                        {isBuildingScheme ? 'Сохраняем...' : `Собрать схему ${preposition} ${controllerName}`}
+                                        <span className="sel-controller-action-icon">
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <circle cx="5" cy="6" r="2" />
+                                                <circle cx="19" cy="6" r="2" />
+                                                <circle cx="12" cy="18" r="2" />
+                                                <path d="M7 6h10M6.5 7.5l4.2 8.7m6.8-8.7-4.2 8.7" />
+                                            </svg>
+                                        </span>
+                                        <span className="sel-controller-action-copy">
+                                            <strong>
+                                                {isBuildingScheme ? 'Сохраняем...' : <>Собрать схему<br />{preposition} {controllerName}</>}
+                                            </strong>
+                                        </span>
+                                        <svg className="sel-controller-action-arrow" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="m9 5 7 7-7 7" />
+                                        </svg>
                                     </button>
                                 </article>
                             );
@@ -5552,6 +5567,8 @@ const SelectionApp = () => {
                             type="button"
                             className="selection-option-button sel-controller-spec-action"
                             data-test-id="open-commercial-offer"
+                            aria-label="Спецификация"
+                            title="Спецификация"
                             onClick={() => setIsOfferModalOpen(true)}
                         >
                             <svg viewBox="0 0 24 24" aria-hidden="true">
