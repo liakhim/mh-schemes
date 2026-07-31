@@ -3680,6 +3680,7 @@ const RADIO_MODULE_ACTIVATION_LABEL = 'Активация радиомодуля
 const SelectionApp = () => {
     const [pendingDraft, setPendingDraft] = useState(readSelectionDraft);
     const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+    const [selectionMode, setSelectionMode] = useState('automatic');
     const [incomingScheme, setIncomingScheme] = useState(createInitialSelectionScheme);
     const [showJsonDetails, setShowJsonDetails] = useState(false);
     const [jsonToggleEnabled] = useState(isJsonToggleEnabled);
@@ -3709,7 +3710,6 @@ const SelectionApp = () => {
     const upsRequestedRef = useRef(false);
     const upsRequestSourceRef = useRef(null);
     const controllerSelectionSourceRef = useRef('default');
-    const stickyTopRef = useRef(null);
     const controllerPanelRef = useRef(null);
     const previousControllerTypeRef = useRef(null);
     const startSelectionFromScratch = useCallback(() => {
@@ -4025,24 +4025,6 @@ const SelectionApp = () => {
         })));
     }, [incomingScheme]);
 
-
-    // Держит --sel-sticky-height в актуальном состоянии: боковые колонки
-    // прилипают под липкой шапкой и должны следовать за её высотой.
-    useEffect(() => {
-        const sticky = stickyTopRef.current;
-        if (!sticky) return undefined;
-        const applyHeight = () => {
-            const height = Math.round(sticky.getBoundingClientRect().height);
-            document.documentElement.style.setProperty('--sel-sticky-height', `${height}px`);
-        };
-        applyHeight();
-        const observer = new ResizeObserver(applyHeight);
-        observer.observe(sticky);
-        return () => {
-            observer.disconnect();
-            document.documentElement.style.removeProperty('--sel-sticky-height');
-        };
-    }, []);
 
     // После паузы во вводе ищет котлы по текущему запросу;
     // cleanup отменяет debounce и предыдущий HTTP-запрос при изменении строки.
@@ -4408,8 +4390,10 @@ const SelectionApp = () => {
     }, [startSelectionFromScratch]);
 
     /** Сохраняет согласованную схему и открывает ее редактор в новой вкладке. */
-    const buildScheme = useCallback(async () => {
-        if (controllerCompatibilityIssues.length > 0) {
+    const buildScheme = useCallback(async (schemeOverride = null) => {
+        const hasSchemeOverride = schemeOverride && typeof schemeOverride === 'object';
+        const sourceScheme = hasSchemeOverride ? schemeOverride : incomingScheme;
+        if (!hasSchemeOverride && controllerCompatibilityIssues.length > 0) {
             setBuildSchemeError('Сначала устраните несовместимость оборудования с выбранным контроллером.');
             return;
         }
@@ -4426,13 +4410,15 @@ const SelectionApp = () => {
         }
 
         try {
-            const normalizedScheme = normalizeSchemeIds(incomingScheme);
+            const normalizedScheme = normalizeSchemeIds(sourceScheme);
+            const sourceControllerType = getControllerType(normalizedScheme);
+            const sourceUpsRequested = hasSchemeOverride ? sourceControllerType === 'go+' : upsRequested;
             const selectionConfig = buildSelectionConfig({
                 selectionState: normalizedScheme,
-                requestedControllerType,
-                controllerSelectionSource,
-                upsRequested,
-                upsRequestSource: upsRequestSourceRef.current,
+                requestedControllerType: hasSchemeOverride ? sourceControllerType : requestedControllerType,
+                controllerSelectionSource: hasSchemeOverride ? 'manual' : controllerSelectionSource,
+                upsRequested: sourceUpsRequested,
+                upsRequestSource: hasSchemeOverride && sourceUpsRequested ? 'manual' : upsRequestSourceRef.current,
                 editor: {
                     wiredThermostatColor,
                     wiredThermostatHasFloorSensor,
@@ -4559,7 +4545,7 @@ const SelectionApp = () => {
                     </div>
                 </div>
             )}
-            {controllerCompatibilityIssues.length > 0 && (
+            {selectionMode === 'automatic' && controllerCompatibilityIssues.length > 0 && (
                 <div
                     style={{
                         position: 'fixed',
@@ -4605,37 +4591,6 @@ const SelectionApp = () => {
                     </div>
                 </div>
             )}
-            <div className="sel-sticky-top" ref={stickyTopRef}>
-            <div className="sel-header">
-                <h1>Подбор оборудования</h1>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
-                    {jsonToggleEnabled && (
-                        <label className="sel-json-toggle">
-                            <input
-                                type="checkbox"
-                                checked={showJsonDetails}
-                                onChange={(event) => setShowJsonDetails(event.target.checked)}
-                            />
-                        </label>
-                    )}
-                    <button
-                        onClick={buildScheme}
-                        disabled={isBuildingScheme || controllerCompatibilityIssues.length > 0}
-                        style={{
-                            padding: '10px 16px',
-                            border: '1px solid #c85e18',
-                            borderRadius: 8,
-                            cursor: isBuildingScheme || controllerCompatibilityIssues.length > 0 ? 'not-allowed' : 'pointer',
-                            fontSize: 14,
-                            fontWeight: 700,
-                            opacity: isBuildingScheme || controllerCompatibilityIssues.length > 0 ? 0.72 : 1,
-                        }}
-                    >
-                        {isBuildingScheme ? 'Сохраняем...' : 'Конструктор'}
-                    </button>
-                </div>
-            </div>
-            </div>
             {buildSchemeError && (
                 <div style={{ marginBottom: 20, padding: '12px 14px', border: '1px solid #fecaca', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 14 }}>
                     {buildSchemeError}
@@ -4646,11 +4601,67 @@ const SelectionApp = () => {
             )}
 
             <div className="sel-layout">
-            <aside className="sel-side-nav">
-                <SelectionQuickNav />
-            </aside>
+            {selectionMode === 'automatic' && (
+                <aside className="sel-side-nav">
+                    <SelectionQuickNav />
+                </aside>
+            )}
+            {selectionMode === 'manual' && <div className="sel-layout-spacer" aria-hidden="true" />}
             <div className="sel-layout-content">
 
+            <div className="sel-mode-panel">
+                <div className="sel-mode-title">Режим подбора оборудования</div>
+                <div className="sel-mode-controls">
+                    <div className="sel-mode-switch" role="group" aria-label="Режим подбора оборудования">
+                        <button
+                            type="button"
+                            className="selection-option-button sel-mode-option"
+                            data-active={selectionMode === 'automatic'}
+                            aria-pressed={selectionMode === 'automatic'}
+                            onClick={() => {
+                                setSelectionMode('automatic');
+                                setBuildSchemeError('');
+                            }}
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M9 3h6v3h2.5A2.5 2.5 0 0 1 20 8.5V11h2v6h-2v2.5a2.5 2.5 0 0 1-2.5 2.5H15v-2H9v2H6.5A2.5 2.5 0 0 1 4 19.5V17H2v-6h2V8.5A2.5 2.5 0 0 1 6.5 6H9V3Z" />
+                            </svg>
+                            <span>
+                                <strong>Автоматический</strong>
+                                <small>Подбор по параметрам</small>
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            className="selection-option-button sel-mode-option"
+                            data-active={selectionMode === 'manual'}
+                            aria-pressed={selectionMode === 'manual'}
+                            onClick={() => {
+                                setSelectionMode('manual');
+                                setBuildSchemeError('');
+                            }}
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 6h5m4 0h7M4 12h9m4 0h3M4 18h2m4 0h10M9 3v6m6 0v6m-7 0v6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                            </svg>
+                            <span>
+                                <strong>Ручной</strong>
+                                <small>Самостоятельный выбор</small>
+                            </span>
+                        </button>
+                    </div>
+                    <div className="sel-mode-help" tabIndex="0">
+                        <span className="sel-mode-help-icon" aria-hidden="true">?</span>
+                        <span>Какой режим выбрать?</span>
+                        <div className="sel-mode-tooltip" role="tooltip">
+                            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {selectionMode === 'automatic' ? (
+            <>
             <div className="sel-group-label" id="chapter-boilers">Котлы</div>
             <section>
                 <div
@@ -5338,11 +5349,67 @@ const SelectionApp = () => {
 
             </section>
             </div>{/* /Питание */}
+            </>
+            ) : (
+                <div className="sel-manual-controller-picker">
+                    <div className="sel-manual-controller-heading">
+                        <h2>Выберите контроллер</h2>
+                        <p>Схема откроется с выбранным контроллером без автоматически подобранного оборудования.</p>
+                    </div>
+                    <div className="sel-manual-controller-grid">
+                        {CONTROLLER_TEMPLATES.map((item) => {
+                            const controllerName = {
+                                go: 'Go',
+                                'go+': 'Go+',
+                                smart2: 'Smart2',
+                                pro: 'PRO',
+                                ecosmart: 'ECOsmart',
+                            }[item.value.type];
+                            const preposition = item.value.type === 'smart2' ? 'со' : 'с';
+                            return (
+                                <article
+                                    key={item.value.type}
+                                    className="sel-manual-controller-card"
+                                >
+                                    <img src={controllerImagePaths[item.value.type]} alt="" />
+                                    <strong>{item.label}</strong>
+                                    <span>{CONTROLLER_CARD_DESCRIPTIONS[item.value.type]}</span>
+                                    <button
+                                        type="button"
+                                        className="sel-manual-card-build-button"
+                                        disabled={isBuildingScheme}
+                                        onClick={() => {
+                                            const manualScheme = resolveControllerAndRequiredModules(
+                                                withControllerValue(createInitialSelectionScheme(), item.value),
+                                                item.value.type === 'go+',
+                                                true,
+                                            );
+                                            buildScheme(manualScheme);
+                                        }}
+                                    >
+                                        {isBuildingScheme ? 'Сохраняем...' : `Собрать схему ${preposition} ${controllerName}`}
+                                    </button>
+                                </article>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
             </div>{/* /sel-layout-content */}
             {/* Единственное место выбора контроллера: липкая колонка справа,
                 видна на всём протяжении подбора. */}
+            {selectionMode === 'automatic' && (
             <aside className="sel-stuck-controllers-panel" ref={controllerPanelRef}>
                 <div className="sel-stuck-controllers-title" style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Подобранный контроллер</div>
+                {jsonToggleEnabled && (
+                    <label className="sel-json-toggle">
+                        <input
+                            type="checkbox"
+                            checked={showJsonDetails}
+                            onChange={(event) => setShowJsonDetails(event.target.checked)}
+                        />
+                    </label>
+                )}
                 <div className="sel-stuck-controllers" style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8 }}>
                     {panelControllerTemplates.map((item, index) => {
                         const isActive = incomingScheme.controller?.type === item.value.type;
@@ -5470,9 +5537,21 @@ const SelectionApp = () => {
                         </div>
                     </div>
                 )}
-                {/* Действия над подбором живут под панелью, а не в шапке: сброс
-                    разрушителен, а спецификация относится к собранному составу. */}
+                {/* Действия над собранным составом живут под панелью контроллера. */}
                 <div className="sel-stuck-actions">
+                    <button
+                        type="button"
+                        className="sel-stuck-actions-button"
+                        onClick={() => buildScheme()}
+                        disabled={isBuildingScheme || controllerCompatibilityIssues.length > 0}
+                        style={{
+                            borderColor: '#c85e18',
+                            cursor: isBuildingScheme || controllerCompatibilityIssues.length > 0 ? 'not-allowed' : 'pointer',
+                            opacity: isBuildingScheme || controllerCompatibilityIssues.length > 0 ? 0.72 : 1,
+                        }}
+                    >
+                        {isBuildingScheme ? 'Сохраняем...' : 'Схема подключения'}
+                    </button>
                     <button
                         type="button"
                         className="selection-secondary-button sel-stuck-actions-button"
@@ -5491,6 +5570,8 @@ const SelectionApp = () => {
                     </button>
                 </div>
             </aside>
+            )}
+            {selectionMode === 'manual' && <div className="sel-layout-spacer" aria-hidden="true" />}
             </div>{/* /sel-layout */}
 
             {showJsonDetails && (
