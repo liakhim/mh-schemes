@@ -5539,8 +5539,9 @@ const SelectionApp = () => {
                             </svg>
                         </span>
                         <span className="sel-controller-action-copy">
-                            <small>Перейти к результату</small>
-                            <strong>{isBuildingScheme ? 'Сохраняем...' : 'Схема подключения'}</strong>
+                            <strong>
+                                {isBuildingScheme ? 'Сохраняем...' : <>Схема<br />подключения</>}
+                            </strong>
                         </span>
                         <svg className="sel-controller-action-arrow" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="m9 5 7 7-7 7" />
@@ -5681,6 +5682,9 @@ const SelectionApp = () => {
                     </div>
                 </div>
             )}
+            <footer className="sel-footer">
+                © MyHeat 2026, Все права защищены
+            </footer>
         </div>
     );
 };
