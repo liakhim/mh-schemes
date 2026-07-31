@@ -5430,7 +5430,13 @@ const SelectionApp = () => {
                 видна на всём протяжении подбора. */}
             {selectionMode === 'automatic' && (
             <aside className="sel-stuck-controllers-panel" ref={controllerPanelRef}>
-                <div className="sel-stuck-controllers-title" style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Подобранный контроллер</div>
+                <div className="sel-controller-panel-glow" aria-hidden="true" />
+                <div className="sel-controller-panel-header">
+                    <div>
+                        <span>Результат подбора</span>
+                        <strong>Подобранный контроллер</strong>
+                    </div>
+                </div>
                 {jsonToggleEnabled && (
                     <label className="sel-json-toggle">
                         <input
@@ -5440,105 +5446,54 @@ const SelectionApp = () => {
                         />
                     </label>
                 )}
-                <div className="sel-stuck-controllers" style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8 }}>
+                <div className="sel-stuck-controllers">
                     {panelControllerTemplates.map((item, index) => {
                         const isActive = incomingScheme.controller?.type === item.value.type;
                         const isGoFamilySwitch = (controllerType === 'go' && item.value.type === 'go+')
                             || (controllerType === 'go+' && item.value.type === 'go');
                         const isCompatible = compatibleControllerTypes.has(item.value.type) || isGoFamilySwitch;
                         return (
-                            <div
+                            <button
+                                type="button"
                                 key={index}
-                                className="sel-stuck-controller-card"
+                                className="selection-option-button sel-stuck-controller-card"
                                 data-test-id={`controller-card-${item.value.type}`}
                                 data-active={isActive}
                                 onClick={isCompatible ? () => setController(item.value) : undefined}
+                                disabled={!isCompatible}
                                 aria-disabled={!isCompatible}
                                 title={isCompatible ? undefined : 'Этот контроллер не поддерживает текущую конфигурацию'}
-                                style={{
-                                    // Снимок и название — строкой сверху, описание под ними во всю
-                                    // ширину: рядом со снимком колонка текста была слишком узкой
-                                    // и длинные описания вытягивали карточку.
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 6,
-                                    width: '100%',
-                                    boxSizing: 'border-box',
-                                    border: `2px solid ${isActive ? ORANGE : '#d7dbe4'}`,
-                                    borderRadius: 8,
-                                    padding: '8px',
-                                    background: isActive ? '#fff7ed' : '#fff',
-                                    cursor: isCompatible ? 'pointer' : 'not-allowed',
-                                    fontSize: 13,
-                                    transition: 'border-color 0.15s, background 0.15s',
-                                    opacity: isCompatible ? 1 : 0.45,
-                                }}
                             >
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span className="sel-stuck-controller-visual">
                                     <img
                                         src={controllerImagePaths[item.value.type]}
                                         alt={item.label}
-                                        style={{ display: 'block', width: 56, height: 42, flexShrink: 0, objectFit: 'contain' }}
                                     />
-                                    <span style={{ minWidth: 0, fontWeight: 700, lineHeight: 1.25 }}>{item.label}</span>
                                 </span>
-                                <span style={{ display: 'block', fontSize: 11, lineHeight: 1.35, color: '#64748b' }}>
-                                    {CONTROLLER_CARD_DESCRIPTIONS[item.value.type] || ''}
+                                <span className="sel-stuck-controller-copy">
+                                    <strong>{item.label}</strong>
+                                    <small>{CONTROLLER_CARD_DESCRIPTIONS[item.value.type] || ''}</small>
                                 </span>
-                            </div>
+                            </button>
                         );
                     })}
                 </div>
                 {proAndEcosmartOptions && (
-                    <div
-                        className="sel-stuck-controllers-note"
-                        style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'stretch',
-                            gap: 8,
-                            marginTop: 8,
-                            padding: '8px 10px',
-                            border: '1px solid #fed7aa',
-                            borderRadius: 8,
-                            background: '#fff7ed',
-                            color: '#9a3412',
-                            fontSize: 12,
-                            lineHeight: 1.35,
-                        }}
-                    >
+                    <div className="sel-stuck-controllers-note">
                         <span>Для этой конфигурации подходят два контроллера: <strong>PRO</strong> и <strong>ECOsmart</strong>.</span>
                         <button
-                            className="selection-option-button"
+                            className="selection-option-button sel-controller-choice-button"
                             type="button"
+                            data-active={controllerType === 'pro'}
                             onClick={() => setController(getControllerTemplateValue('pro'))}
-                            style={{
-                                padding: '4px 10px',
-                                border: '1px solid #ea580c',
-                                borderRadius: 8,
-                                background: controllerType === 'pro' ? '#e07020' : '#fff',
-                                color: controllerType === 'pro' ? '#fff' : '#9a3412',
-                                cursor: 'pointer',
-                                fontSize: 12,
-                                fontWeight: 700,
-                            }}
                         >
                             Использовать PRO
                         </button>
                         <button
-                            className="selection-option-button"
+                            className="selection-option-button sel-controller-choice-button"
                             type="button"
+                            data-active={controllerType === 'ecosmart'}
                             onClick={() => setController(getControllerTemplateValue('ecosmart'))}
-                            style={{
-                                padding: '4px 10px',
-                                border: '1px solid #ea580c',
-                                borderRadius: 8,
-                                background: controllerType === 'ecosmart' ? '#e07020' : '#fff',
-                                color: controllerType === 'ecosmart' ? '#fff' : '#9a3412',
-                                cursor: 'pointer',
-                                fontSize: 12,
-                                fontWeight: 700,
-                            }}
                         >
                             Использовать ECOsmart
                         </button>
@@ -5571,33 +5526,51 @@ const SelectionApp = () => {
                 <div className="sel-stuck-actions">
                     <button
                         type="button"
-                        className="sel-stuck-actions-button"
+                        className="selection-option-button sel-controller-primary-action"
                         onClick={() => buildScheme()}
                         disabled={isBuildingScheme || controllerCompatibilityIssues.length > 0}
-                        style={{
-                            borderColor: '#c85e18',
-                            cursor: isBuildingScheme || controllerCompatibilityIssues.length > 0 ? 'not-allowed' : 'pointer',
-                            opacity: isBuildingScheme || controllerCompatibilityIssues.length > 0 ? 0.72 : 1,
-                        }}
                     >
-                        {isBuildingScheme ? 'Сохраняем...' : 'Схема подключения'}
+                        <span className="sel-controller-action-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <circle cx="5" cy="6" r="2" />
+                                <circle cx="19" cy="6" r="2" />
+                                <circle cx="12" cy="18" r="2" />
+                                <path d="M7 6h10M6.5 7.5l4.2 8.7m6.8-8.7-4.2 8.7" />
+                            </svg>
+                        </span>
+                        <span className="sel-controller-action-copy">
+                            <small>Перейти к результату</small>
+                            <strong>{isBuildingScheme ? 'Сохраняем...' : 'Схема подключения'}</strong>
+                        </span>
+                        <svg className="sel-controller-action-arrow" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m9 5 7 7-7 7" />
+                        </svg>
                     </button>
-                    <button
-                        type="button"
-                        className="selection-secondary-button sel-stuck-actions-button"
-                        data-test-id="open-commercial-offer"
-                        onClick={() => setIsOfferModalOpen(true)}
-                    >
-                        Спецификация
-                    </button>
-                    <button
-                        type="button"
-                        className="selection-danger-button sel-stuck-actions-button"
-                        data-test-id="reset-equipment"
-                        onClick={() => setIsResetConfirmOpen(true)}
-                    >
-                        Сбросить схему
-                    </button>
+                    <div className="sel-controller-secondary-actions">
+                        <button
+                            type="button"
+                            className="selection-option-button sel-controller-spec-action"
+                            data-test-id="open-commercial-offer"
+                            onClick={() => setIsOfferModalOpen(true)}
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M6 3h9l4 4v14H6zM15 3v5h4M9 12h7m-7 4h7" />
+                            </svg>
+                            <span>Спецификация</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="selection-option-button sel-controller-reset-action"
+                            data-test-id="reset-equipment"
+                            aria-label="Сбросить схему"
+                            title="Сбросить схему"
+                            onClick={() => setIsResetConfirmOpen(true)}
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 7h16M9 7V4h6v3m-9 0 1 14h10l1-14M10 11v6m4-6v6" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </aside>
             )}
