@@ -1599,6 +1599,7 @@ const App = () => {
     const [schemeJsonError, setSchemeJsonError] = useState(null);
     const [schemeMetadataEditor, setSchemeMetadataEditor] = useState(null);
     const [selectedDevicePreview, setSelectedDevicePreview] = useState(null);
+    const selectedPreviewSlotNodeRef = useRef(null);
     const [previewTitleEditor, setPreviewTitleEditor] = useState(false);
     const [previewTitleDraft, setPreviewTitleDraft] = useState('');
     const [titleEditor, setTitleEditor] = useState(null);
@@ -1615,7 +1616,9 @@ const App = () => {
     const selectedPreviewImagePath = selectedPreviewDevice
         ? wirelessDeviceImagePaths[getWirelessDeviceImageKey(selectedPreviewDevice)]
         : null;
-    const selectedPreviewType = selectedPreviewDevice ? canonicalDeviceType(selectedPreviewDevice.type) : '';
+    const selectedPreviewComment = typeof selectedPreviewDevice?.comment === 'string'
+        ? selectedPreviewDevice.comment.trim()
+        : '';
     const canUseInstallationMode = INSTALLATION_CONTROLLERS.has(controllerType);
     const applyInstallationLayout = (sourceScheme) => {
         const layout = readInstallationLayout(sourceScheme);
@@ -2591,6 +2594,85 @@ const App = () => {
         setPreviewTitleDraft(title);
     };
 
+    useEffect(() => {
+        const node = selectedPreviewSlotNodeRef.current;
+        if (!selectedDevicePreview || !node || node.isDestroyed?.()) return undefined;
+
+        const originalStyle = {
+            stroke: node.stroke(),
+            strokeWidth: node.strokeWidth(),
+            dash: node.dash(),
+            shadowColor: node.shadowColor(),
+            shadowBlur: node.shadowBlur(),
+            shadowOpacity: node.shadowOpacity(),
+        };
+        node.setAttrs({
+            stroke: '#2563eb',
+            strokeWidth: 2,
+            dash: [5, 3],
+            shadowColor: '#2563eb',
+            shadowBlur: 5,
+            shadowOpacity: 0.35,
+        });
+        node.getLayer()?.batchDraw();
+
+        return () => {
+            if (node.isDestroyed?.()) return;
+            node.setAttrs(originalStyle);
+            node.getLayer()?.batchDraw();
+        };
+    }, [selectedDevicePreview]);
+
+    const selectDevicePreviewFromSlot = (event) => {
+        const target = event?.target;
+        if (!target || target.getClassName?.() === 'Circle') return;
+        if (target.findAncestor?.(`.${COMMENT_ICON_NODE_NAME}`, true)) return;
+
+        let current = target;
+        for (let depth = 0; current && depth < 5; depth += 1) {
+            const previewSource = current.hasName?.('device-preview-source')
+                ? current
+                : current.findOne?.('.device-preview-source');
+            const device = previewSource?.getAttr?.('previewDevice');
+            if (device) {
+                const sourceParent = previewSource.getParent?.();
+                const targetInsideSource = target === previewSource || previewSource.isAncestorOf?.(target);
+                const targetIsSiblingRect = target.getClassName?.() === 'Rect'
+                    && target.getParent?.() === sourceParent;
+                if (!targetInsideSource && !targetIsSiblingRect) {
+                    current = current.getParent?.();
+                    continue;
+                }
+                const sourceBox = sourceParent
+                    ? previewSource.getClientRect({ relativeTo: sourceParent })
+                    : null;
+                const slotRects = sourceParent?.find?.('Rect').filter((rect) => (
+                    !rect.isAncestorOf?.(previewSource)
+                    && !previewSource.isAncestorOf?.(rect)
+                )) || [];
+                const targetBox = targetIsSiblingRect
+                    ? target.getClientRect({ relativeTo: sourceParent })
+                    : null;
+                const targetIsSlotBody = targetIsSiblingRect
+                    && (!sourceBox || targetBox.y >= sourceBox.y + sourceBox.height - 1);
+                const bodyRect = targetIsSlotBody
+                    ? target
+                    : slotRects
+                        .map((rect) => ({ rect, box: rect.getClientRect({ relativeTo: sourceParent }) }))
+                        .filter(({ box }) => !sourceBox || box.y >= sourceBox.y + sourceBox.height - 1)
+                        .sort((a, b) => {
+                            const aDistance = sourceBox ? Math.abs((a.box.x + a.box.width / 2) - (sourceBox.x + sourceBox.width / 2)) : 0;
+                            const bDistance = sourceBox ? Math.abs((b.box.x + b.box.width / 2) - (sourceBox.x + sourceBox.width / 2)) : 0;
+                            return aDistance - bDistance;
+                        })[0]?.rect;
+                selectedPreviewSlotNodeRef.current = bodyRect || null;
+                selectDevicePreview(device, previewSource.getAttr('previewTitle') || '');
+                return;
+            }
+            current = current.getParent?.();
+        }
+    };
+
     const savePreviewTitle = () => {
         if (!selectedDevicePreview?.device) return;
         const title = String(previewTitleDraft || '').trim();
@@ -2673,6 +2755,14 @@ const App = () => {
         const normalizedComment = String(commentEditor.value || '').trim();
         if (normalizedComment !== commentEditor.currentComment) {
             setScheme((currentScheme) => updateDeviceCommentInValue(currentScheme, commentEditor.device, normalizedComment));
+            setSelectedDevicePreview((current) => {
+                if (!current || !isSameTitleTargetDevice(current.device, commentEditor.device)) return current;
+                if (normalizedComment) {
+                    return { ...current, device: { ...current.device, comment: normalizedComment } };
+                }
+                const { comment: removedComment, ...deviceWithoutComment } = current.device;
+                return { ...current, device: deviceWithoutComment };
+            });
         }
         closeCommentEditor();
     };
@@ -2708,7 +2798,13 @@ const App = () => {
         };
 
         return (
-            <Group onClick={() => selectDevicePreview(device, title)} onTap={() => selectDevicePreview(device, title)}>
+            <Group
+                name="device-preview-source"
+                previewDevice={device}
+                previewTitle={title}
+                onClick={() => selectDevicePreview(device, title)}
+                onTap={() => selectDevicePreview(device, title)}
+            >
                 <Rect
                     x={x}
                     y={y}
@@ -4750,7 +4846,6 @@ const App = () => {
                 </div>
                 {selectedPreviewDevice ? (
                     <>
-                        <span className="spa-device-preview-type">{selectedPreviewType || 'устройство'}</span>
                         <div className="spa-device-preview-image">
                             {selectedPreviewImagePath ? (
                                 <img src={selectedPreviewImagePath} alt="" />
@@ -4797,6 +4892,21 @@ const App = () => {
                                 </button>
                             )}
                         </div>
+                        <button
+                            type="button"
+                            className={`spa-device-preview-comment${selectedPreviewComment ? ' has-comment' : ''}`}
+                            title="Изменить комментарий устройства"
+                            onClick={() => editDeviceComment(selectedPreviewDevice)}
+                        >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M5 5h14v10H9l-4 4z" />
+                                <path d="M8 9h8M8 12h5" />
+                            </svg>
+                            <span>{selectedPreviewComment || 'Добавить комментарий'}</span>
+                            <svg className="spa-device-preview-edit-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m5 16.5-.7 3.2 3.2-.7L18 8.5 15.5 6zM14 7.5l2.5 2.5" />
+                            </svg>
+                        </button>
                     </>
                 ) : (
                     <div className="spa-device-preview-empty">
@@ -4804,7 +4914,7 @@ const App = () => {
                             <circle cx="10.5" cy="10.5" r="5.5" />
                             <path d="m15 15 5 5M10.5 8v5m-2.5-2.5h5" />
                         </svg>
-                        <span>Нажмите на инфоблок устройства на схеме</span>
+                        <span>Нажмите на занятый слот или инфоблок устройства на схеме</span>
                     </div>
                 )}
             </aside>
@@ -5250,6 +5360,8 @@ const App = () => {
                     onTouchMove={moveStagePan}
                     onTouchEnd={() => { isPanningRef.current = false; }}
                     onTouchCancel={() => { isPanningRef.current = false; }}
+                    onClick={selectDevicePreviewFromSlot}
+                    onTap={selectDevicePreviewFromSlot}
                      onWheel={(event) => {
                          event.evt.preventDefault();
                          const stage = stageRef.current;
@@ -13100,6 +13212,7 @@ const App = () => {
                                                                           image={bl2BoilerImage}
                                                                           x={bl2BusSlotX}
                                                                           y={bl2BusSlotY}
+                                                                          listening={false}
                                                                       />
                                                                   )}
                                                                   {hasBl2RinnaiAdapter && bl2RinnaiAdapterImage && (

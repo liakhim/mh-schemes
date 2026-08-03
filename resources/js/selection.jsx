@@ -1907,6 +1907,7 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     {
         key: 'wireless-outdoor',
         label: 'Беспроводной Уличный датчик температуры',
+        addLabel: 'Добавить беспроводной уличный датчик температуры',
         target: 'wireless_devices',
         data: {
             id: 3,
@@ -1918,6 +1919,7 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     {
         key: 'wireless-wall',
         label: 'Беспроводной Настенный датчик температуры',
+        addLabel: 'Добавить беспроводной настенный датчик температуры',
         target: 'wireless_devices',
         data: {
             id: 4,
@@ -1929,6 +1931,7 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     {
         key: 'wired-wall-digital',
         label: 'Проводной Настенный цифровой датчик',
+        addLabel: 'Добавить проводной цифровой настенный датчик температуры',
         target: 'sensors',
         data: {
             id: 13,
@@ -1940,6 +1943,7 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     {
         key: 'wired-flask-digital',
         label: 'Проводной Цифровой датчик в колбе',
+        addLabel: 'Добавить проводной цифровой датчик температуры в колбе',
         target: 'sensors',
         data: {
             id: 12,
@@ -1951,6 +1955,7 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     {
         key: 'wired-flask-ntc',
         label: 'Проводной NTC-датчик в колбе',
+        addLabel: 'Добавить проводной NTC-датчик температуры в колбе',
         target: 'sensors',
         data: {
             id: 3,
@@ -1962,6 +1967,7 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
     {
         key: 'wired-wall-ntc',
         label: 'Проводной Настенный NTC-датчик',
+        addLabel: 'Добавить проводной настенный NTC-датчик температуры',
         target: 'sensors',
         disabled: true,
         data: {
@@ -2523,7 +2529,7 @@ const ThermostatFieldLabel = ({ children }) => (
 );
 
 /** Карточка термостата: callbacks меняют тип подключения, цвет, датчик пола и добавляют устройство. */
-const ThermostatCard = ({ template, connection, onConnectionChange, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, addedRows = [], onRemoveRow, onAddRow, showJsonDetails = false }) => (
+const ThermostatCard = ({ template, connection, onConnectionChange, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, showAdd = true, addedRows = [], onRemoveRow, onAddRow, showJsonDetails = false }) => (
     <div
         className="sel-card sel-card-static sel-card-section"
         style={{
@@ -2582,6 +2588,8 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                                     count={row.count}
                                     onDecrement={() => onRemoveRow(row)}
                                     onIncrement={() => onAddRow(row)}
+                                    decTestId={`thermostat-${String(row.templateKey || '').replace(/\|/g, '-')}-qty-dec`}
+                                    incTestId={`thermostat-${String(row.templateKey || '').replace(/\|/g, '-')}-qty-inc`}
                                 />
                             )}
                         />
@@ -2713,22 +2721,29 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                 <pre className="sel-card-json">{JSON.stringify(template.data, null, 4)}</pre>
             )}
 
-            <button
-                onClick={onAdd}
-                style={{
-                    alignSelf: 'flex-start',
-                    padding: '12px 26px',
-                    border: '1px solid #c85e18',
-                    borderRadius: 10,
-                    background: '#e07020',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontSize: 14,
-                    fontWeight: 700,
-                }}
-            >
-                {`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
-            </button>
+            {/* Как в карточке бойлера ГВС: уже добавленная конфигурация меняет
+                количество счетчиком в списке, кнопка добавления для нее не нужна.
+                Переключение цвета, типа подключения или датчика пола на еще не
+                добавленный вариант возвращает кнопку. */}
+            {showAdd && (
+                <button
+                    onClick={onAdd}
+                    data-test-id="add-thermostat"
+                    style={{
+                        alignSelf: 'flex-start',
+                        padding: '12px 26px',
+                        border: '1px solid #c85e18',
+                        borderRadius: 10,
+                        background: '#e07020',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontSize: 14,
+                        fontWeight: 700,
+                    }}
+                >
+                    {`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
+                </button>
+            )}
         </div>
 
         {/* Изображение термостата: вместо плашки-фона под устройством мягкое
@@ -3703,6 +3718,10 @@ const SelectionApp = () => {
     // Запрос, по которому поиск уже завершился. Нужен, чтобы «Котлы не найдены»
     // показывалось только для отработанного запроса, а не в паузе перед ним.
     const [boilerSearchedQuery, setBoilerSearchedQuery] = useState('');
+    // Видимость выпадашки отделена от самих результатов: выбор котла закрывает
+    // список, но найденное и текст запроса остаются. Новый поиск инициирует
+    // только изменение строки поиска, поэтому список сам не открывается заново.
+    const [boilerDropdownOpen, setBoilerDropdownOpen] = useState(false);
     const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
     const [upsRequested, setUpsRequested] = useState(false);
     const [requestedControllerType, setRequestedControllerType] = useState('go');
@@ -3945,6 +3964,14 @@ const SelectionApp = () => {
     const pumpCardRows = getGroupedDeviceRows(incomingScheme, 'pump', PUMP_TEMPLATES);
     const zoneRows = getGroupedDeviceRows(incomingScheme, 'zone', ZONE_TEMPLATES);
     const otherEquipmentRows = getGroupedDeviceRows(incomingScheme, 'other', OTHER_EQUIP_TEMPLATES);
+    const thermostatRows = getThermostatRows(incomingScheme);
+    // Ключ текущей конфигурации карточки в том же формате, что и templateKey
+    // строк списка: по нему видно, добавлен ли уже такой термостат.
+    const thermostatTemplateKey = [
+        isWirelessThermostat ? 'wireless' : 'wired',
+        (isWirelessThermostat ? wirelessThermostatColor : wiredThermostatColor) || 'black',
+        (isWirelessThermostat ? wirelessThermostatHasFloorSensor : wiredThermostatHasFloorSensor) ? 'floor' : 'no-floor',
+    ].join('|');
     // Список добавленного отдельно по каждому типу дискретного входа.
     const discreteInputRows = useMemo(() => {
         const wiredDevices = Array.isArray(incomingScheme?.wired_devices) ? incomingScheme.wired_devices : [];
@@ -4034,6 +4061,7 @@ const SelectionApp = () => {
             setBoilerResults([]);
             setBoilerSearchLoading(false);
             setBoilerSearchedQuery('');
+            setBoilerDropdownOpen(false);
             return;
         }
         // Флаг поднимается сразу, а не внутри debounce: иначе между вводом и
@@ -4062,6 +4090,9 @@ const SelectionApp = () => {
                 if (!controller.signal.aborted) {
                     setBoilerSearchedQuery(query);
                     setBoilerSearchLoading(false);
+                    // Список открывается по завершении запроса: пока идет поиск
+                    // после выбора котла, старые результаты не всплывают обратно.
+                    setBoilerDropdownOpen(true);
                 }
             }
         }, BOILER_SEARCH_DEBOUNCE_MS);
@@ -4071,7 +4102,22 @@ const SelectionApp = () => {
         };
     }, [boilerQuery]);
 
+    // Выпадашка поиска котлов: либо список найденного, либо «Котлы не найдены»
+    // для уже отработанного запроса. Скругление поля ввода снимается, пока
+    // что-то из этого раскрыто, поэтому условия собраны в одном месте.
+    const boilerSearchQuery = boilerQuery.trim();
+    const boilerResultsVisible = boilerDropdownOpen && boilerResults.length > 0;
+    const boilerNotFoundVisible = boilerDropdownOpen
+        && !boilerSearchLoading
+        && boilerResults.length === 0
+        && Boolean(boilerSearchQuery)
+        && boilerSearchedQuery === boilerSearchQuery;
+    const boilerDropdownVisible = boilerResultsVisible || boilerNotFoundVisible;
+
     const addBoilerFromSearch = useCallback((result) => {
+        // Выбор котла закрывает выпадашку. Строка поиска и найденное сохраняются:
+        // повторный поиск инициирует только изменение текста в поле.
+        setBoilerDropdownOpen(false);
         const isStupid = result.bus_type === 127;
         setIncomingScheme((prev) => {
             const boilers = Array.isArray(prev.boilers) ? [...prev.boilers] : [];
@@ -4795,7 +4841,7 @@ const SelectionApp = () => {
                                             width: '100%',
                                             padding: '10px 44px 10px 14px',
                                             border: '1px solid #d7dbe4',
-                                            borderRadius: boilerResults.length > 0 || (!boilerSearchLoading && boilerResults.length === 0 && boilerSearchedQuery === boilerQuery.trim() && boilerQuery.trim()) ? '10px 10px 0 0' : 10,
+                                            borderRadius: boilerDropdownVisible ? '10px 10px 0 0' : 10,
                                             fontSize: 14,
                                             fontFamily: 'inherit',
                                             outline: 'none',
@@ -4846,8 +4892,8 @@ const SelectionApp = () => {
                                 </div>
                                 {/* Выпадашка висит поверх контента и не входит
                                     в поток, чтобы высота карточки от нее не зависела. */}
-                                {boilerResults.length > 0 && (
-                                    <div style={{
+                                {boilerResultsVisible && (
+                                    <div data-test-id="boiler-search-results" style={{
                                         position: 'absolute',
                                         top: '100%',
                                         left: 0,
@@ -4866,6 +4912,7 @@ const SelectionApp = () => {
                                             return (
                                                 <div
                                                     key={result.name}
+                                                    data-test-id="boiler-search-option"
                                                     onClick={() => addBoilerFromSearch(result)}
                                                     style={{
                                                         display: 'flex',
@@ -4899,8 +4946,8 @@ const SelectionApp = () => {
                                         })}
                                     </div>
                                 )}
-                                {!boilerSearchLoading && boilerResults.length === 0 && boilerQuery.trim() && boilerSearchedQuery === boilerQuery.trim() && (
-                                    <div style={{
+                                {boilerNotFoundVisible && (
+                                    <div data-test-id="boiler-search-empty" style={{
                                         position: 'absolute',
                                         top: '100%',
                                         left: 0,
@@ -5016,7 +5063,8 @@ const SelectionApp = () => {
                         hasFloorSensor={isWirelessThermostat ? wirelessThermostatHasFloorSensor : wiredThermostatHasFloorSensor}
                         onFloorSensorChange={isWirelessThermostat ? setWirelessThermostatHasFloorSensor : setWiredThermostatHasFloorSensor}
                         onAdd={() => addThermostat(thermostatTemplate)}
-                        addedRows={getThermostatRows(incomingScheme)}
+                        showAdd={!thermostatRows.some((row) => row.templateKey === thermostatTemplateKey)}
+                        addedRows={thermostatRows}
                         onRemoveRow={(row) => {
                             const removeKey = row.removeKeys[row.removeKeys.length - 1];
                             removeSchemeItemById(removeKey.target, removeKey.id);
@@ -5083,6 +5131,7 @@ const SelectionApp = () => {
                         onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
                         addLabel="Добавить оборудование"
                         onAdd={() => addMixingUnit(OTHER_EQUIP_TEMPLATES[0], 'other')}
+                        showAdd={otherEquipmentRows.length === 0}
                         addTestId="add-other-equipment"
                         qtyTestId="other-equipment-qty"
                         jsonData={OTHER_EQUIP_TEMPLATES[0].wiredDevice}
@@ -5116,9 +5165,11 @@ const SelectionApp = () => {
                             const removeKey = row.removeKeys[row.removeKeys.length - 1];
                             removeSchemeItemById(removeKey.target, removeKey.id);
                         }}
-                        addLabel="Добавить датчик"
+                        addLabel={temperatureSensorTemplate?.addLabel || 'Добавить датчик'}
                         onAdd={() => addTemperatureSensor(temperatureSensorTemplate)}
+                        showAdd={!temperatureSensorRows.some((row) => row.templateKey === temperatureSensorTemplate?.key)}
                         addTestId="add-temperature-sensor"
+                        qtyTestId={(row) => `temperature-sensor-${row.templateKey}-qty`}
                         jsonData={temperatureSensorTemplate?.data}
                         showJsonDetails={showJsonDetails}
                     >

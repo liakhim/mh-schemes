@@ -143,7 +143,8 @@ export const SELECTION_BUTTON_MAP = [
     {
         section: 'Климат — Термостаты (одна карточка с выбором типа)',
         local: [
-            { testId: 'thermostat-connection-{wired|wireless}', description: 'Одна карточка термостата: переключатель типа "Проводной"/"Беспроводной", кнопки цвета "Черный"/"Белый"/"Серый" и кнопка "Добавить термостат"' },
+            { testId: 'thermostat-connection-{wired|wireless}', description: 'Одна карточка термостата: переключатель типа "Проводной"/"Беспроводной", кнопки цвета "Черный"/"Белый"/"Серый" и кнопка add-thermostat ("Добавить проводной черный термостат" и т.п. — подпись зависит от выбранной конфигурации)' },
+            { testId: 'add-thermostat', description: 'Кнопка добавления; исчезает, как только выбранная конфигурация попала в список "Добавленные термостаты" — дальше количество набирается счётчиком thermostat-{wired|wireless}-{color}-{floor|no-floor}-qty-{inc|dec}. Переключение на ещё не добавленную конфигурацию возвращает кнопку' },
         ],
         live: {
             description: '"+" у "Термостат" открывает модалку "Добавление нового термостата": select "Выберите тип термостата" (Проводной/Беспроводной), select "Выберите цвет термостата", toggle "Датчик пола", кнопка "Добавить"',
@@ -156,7 +157,7 @@ export const SELECTION_BUTTON_MAP = [
     // --- 5. Прочее оборудование ---
     {
         section: '5. Прочее оборудование',
-        local: { testId: 'add-other-equipment', title: 'Прочее оборудование' },
+        local: { testId: 'add-other-equipment', title: 'Прочее оборудование', description: 'Кнопка исчезает после первого добавления — дальше количество набирается счётчиком other-equipment-qty-{inc|dec}' },
         live: { description: 'Счётчик "Количество прочего оборудования" (+/-)' },
         soldByMyHeat: false,
         note: 'Прямое соответствие 1:1. otherEquipment не продаётся MyHeat (otherRows без unitPrice) — генерическая сторонняя нагрузка на реле (сирены и т.п.).',
@@ -165,7 +166,7 @@ export const SELECTION_BUTTON_MAP = [
         section: '5. Прочее — Беспроводной уличный/настенный датчик температуры',
         local: [
             { testId: 'outdoor-sensor-toggle', description: 'Уличный датчик — отдельная карточка с тумблером (вкл/выкл, ровно 1 шт), кнопки "Добавить" и счётчика нет' },
-            { testId: 'temperature-sensor-connection-wireless', description: 'Настенный беспроводной датчик добавляется из общей карточки "Датчики температуры": тумблер "Беспроводной" + "Добавить датчик"' },
+            { testId: 'temperature-sensor-connection-wireless', description: 'Настенный беспроводной датчик добавляется из общей карточки "Датчики температуры": тумблер "Беспроводной" + "Добавить беспроводной настенный датчик температуры"' },
         ],
         live: { description: 'Простой toggle "Беспроводной уличный датчик температуры" (вкл/выкл, без выбора типа)' },
         soldByMyHeat: true,
@@ -179,7 +180,7 @@ export const SELECTION_BUTTON_MAP = [
             { testId: 'temperature-sensor-connection-wired|-wireless', description: 'Тумблер "Проводной / Беспроводной"' },
             { testId: 'temperature-sensor-placement-wall|-flask', description: 'Тумблер "Настенный / В колбе"; "В колбе" гаснет для беспроводного' },
             { testId: 'temperature-sensor-kind-digital|-ntc', description: 'Тумблер "Цифровой / NTC", только для проводного; NTC гаснет для настенного' },
-            { testId: 'add-temperature-sensor', description: 'Кнопка "Добавить датчик" добавляет выбранную комбинацию' },
+            { testId: 'add-temperature-sensor', description: 'Кнопка добавляет выбранную комбинацию; подпись зависит от неё ("Добавить проводной цифровой настенный датчик температуры" и т.п.). Исчезает, как только комбинация попала в список — дальше количество набирается счётчиком temperature-sensor-{templateKey}-qty-{inc|dec}' },
         ],
         combinations: [
             { title: 'Настенный цифровой датчик', templateKey: 'wired-wall-digital', soldByMyHeat: true, price: 1650 },

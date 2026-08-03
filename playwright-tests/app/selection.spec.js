@@ -48,9 +48,11 @@ test.describe('/selection — подбор оборудования', () => { //
     });
 
     test('добавление 5 "Прочего оборудования" отражается в коммерческом предложении', async ({ page }) => {
-        const addOtherButton = page.getByTestId('add-other-equipment'); // кнопка "Добавить" в карточке "Прочее оборудование"
-        for (let i = 0; i < 5; i += 1) { // кликаем 5 раз подряд
-            await addOtherButton.click(); // каждый клик добавляет одно устройство otherEquipment (connection_type: relay)
+        // Большая кнопка "Добавить оборудование" исчезает после первого добавления —
+        // дальше количество набирается "+" в списке "Добавленное оборудование".
+        await page.getByTestId('add-other-equipment').click(); // добавляет одно устройство otherEquipment (connection_type: relay)
+        for (let i = 1; i < 5; i += 1) { // добираем до 5 счётчиком
+            await page.getByTestId('other-equipment-qty-inc').click();
         }
 
         // 5 устройств relay так же, как и 5 зон, превышают релейную ёмкость go/go+ (1 слот)

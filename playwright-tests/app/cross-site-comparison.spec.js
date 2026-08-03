@@ -129,7 +129,15 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
         await page.getByTestId(`temperature-sensor-connection-${connection}`).click();
         await page.getByTestId(`temperature-sensor-placement-${placement}`).click();
         if (connection === 'wired') await page.getByTestId(`temperature-sensor-kind-${kind}`).click();
-        for (let i = 0; i < count; i += 1) await page.getByTestId('add-temperature-sensor').click();
+        // Кнопка добавления исчезает, как только выбранная комбинация попала в
+        // список: дальше количество набирается "+" в её строке.
+        const templateKey = connection === 'wireless' ? 'wireless-wall' : `wired-${placement}-${kind}`;
+        const addButton = page.getByTestId('add-temperature-sensor');
+        const qtyInc = page.getByTestId(`temperature-sensor-${templateKey}-qty-inc`);
+        for (let i = 0; i < count; i += 1) {
+            if (await addButton.isVisible()) await addButton.click();
+            else await qtyInc.click();
+        }
     };
 
     /**
@@ -183,7 +191,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
         await page.getByTestId('controller-card-go').click();
         const addLabel = page.getByText('Добавить датчик пола').first();
         await addLabel.locator('input[type=checkbox]').check();
-        await page.getByRole('button', { name: 'Добавить термостат' }).first().click();
+        await page.getByTestId('add-thermostat').click();
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Датчик пола (в колбе, 3 м)');
         // GO (16 990) + термостат (9 490) + датчик пола 3м (3 690, код 6304).
@@ -430,7 +438,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
     test('беспроводной термостат: обе стороны переходят на GO+ (встроенный радиодатчик в комплекте)', async ({ page }) => {
         // Локально: карточка термостата одна, тип подключения переключается внутри неё.
         await page.getByTestId('thermostat-connection-wireless').click();
-        await page.getByRole('button', { name: 'Добавить термостат' }).click();
+        await page.getByTestId('add-thermostat').click();
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Термостат беспроводной, черный');
         expect(local.text).toContain('GO+');
@@ -553,8 +561,10 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
 
         await addPumps(page, '220', 5);
 
-        const wiredThermostatAdd = page.getByRole('button', { name: 'Добавить термостат' }).first();
-        for (let i = 0; i < 5; i += 1) await wiredThermostatAdd.click();
+        // Кнопка добавления исчезает после первого термостата этой конфигурации —
+        // остальные набираются "+" в строке списка.
+        await page.getByTestId('add-thermostat').click();
+        for (let i = 1; i < 5; i += 1) await page.getByTestId('thermostat-wired-black-no-floor-qty-inc').click();
 
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Модуль реле RL6'); // 15 relay-потребителей закрываются одним RL6 поверх PRO
@@ -753,10 +763,15 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
         // Беспроводные термостаты на Smart2 требуют радиомодуль RDT2 (4 990) —
         // единственный сценарий в наборе, где подбирается именно радиомодуль.
         // Карточка термостата одна: сначала добавляем проводные, потом переключаем тип.
-        const thermostatAdd = page.getByRole('button', { name: 'Добавить термостат' });
-        for (let i = 0; i < 3; i += 1) await thermostatAdd.click();
+        // Кнопка добавления исчезает, как только выбранная конфигурация попала в
+        // список: дальше количество набирается "+" в её строке. Переключение на
+        // ещё не добавленный вариант возвращает кнопку.
+        const thermostatAdd = page.getByTestId('add-thermostat');
+        await thermostatAdd.click();
+        for (let i = 1; i < 3; i += 1) await page.getByTestId('thermostat-wired-black-no-floor-qty-inc').click();
         await page.getByTestId('thermostat-connection-wireless').click();
-        for (let i = 0; i < 2; i += 1) await thermostatAdd.click();
+        await thermostatAdd.click();
+        await page.getByTestId('thermostat-wireless-black-no-floor-qty-inc').click();
         const addLeak = page.getByTestId('add-leak-sensor');
         for (let i = 0; i < 4; i += 1) await addLeak.click();
 
@@ -839,8 +854,8 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
         for (let i = 0; i < 5; i += 1) await addLeak.click();
         const addValve = page.getByTestId('add-valve');
         for (let i = 0; i < 3; i += 1) await addValve.click();
-        const addOther = page.getByTestId('add-other-equipment');
-        for (let i = 0; i < 2; i += 1) await addOther.click();
+        await page.getByTestId('add-other-equipment').click();
+        await page.getByTestId('other-equipment-qty-inc').click();
 
         const local = await readLocalOffer(page);
         expect(local.text).toContain('Модуль DI6');
@@ -963,8 +978,8 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
         // Уличный датчик на live задаётся бинарным тумблером (ровно 1 шт),
         // поэтому локально тоже берём один — иначе схемы будут несопоставимы.
         await addPumps(page, '220', 4);
-        const wiredThermostatAdd = page.getByRole('button', { name: 'Добавить термостат' }).first();
-        for (let i = 0; i < 3; i += 1) await wiredThermostatAdd.click();
+        await page.getByTestId('add-thermostat').click();
+        for (let i = 1; i < 3; i += 1) await page.getByTestId('thermostat-wired-black-no-floor-qty-inc').click();
         await page.getByTestId('outdoor-sensor-toggle').locator('input').check();
 
         const local = await readLocalOffer(page);

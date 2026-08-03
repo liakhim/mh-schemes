@@ -1008,9 +1008,11 @@ body {
     z-index: 89;
     display: grid;
     width: 240px;
-    height: 240px;
-    grid-template-rows: auto auto 1fr auto;
-    overflow: hidden;
+    min-height: 240px;
+    max-height: calc(100vh - var(--nav-height) - 96px);
+    grid-template-rows: auto minmax(0, auto) auto auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     border: 1px solid #cbd5e1;
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.94);
@@ -1052,20 +1054,6 @@ body {
     background: #f1f5f9;
 }
 
-.spa-device-preview-type {
-    justify-self: center;
-    max-width: calc(100% - 24px);
-    margin-top: 8px;
-    overflow: hidden;
-    color: #2e7d32;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-overflow: ellipsis;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
 .spa-device-preview-image {
     display: grid;
     min-height: 0;
@@ -1075,8 +1063,10 @@ body {
 
 .spa-device-preview-image img {
     display: block;
-    width: 100%;
-    height: 100%;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: calc(100vh - var(--nav-height) - 190px);
     object-fit: contain;
 }
 
@@ -1087,6 +1077,7 @@ body {
 
 .spa-device-preview-info-block {
     margin: 0 10px 10px;
+    overflow: hidden;
     border: 1px solid #2f08af;
     border-radius: 5px;
     background: #fff;
@@ -1112,6 +1103,10 @@ body {
     cursor: pointer;
 }
 
+.spa-device-preview-info-block form {
+    padding: 0;
+}
+
 .spa-device-preview-info-block > button:hover {
     background: #f5f3ff;
 }
@@ -1133,10 +1128,11 @@ body {
 
 .spa-device-preview-info-block input {
     min-width: 0;
+    align-self: stretch;
     flex: 1 1 auto;
-    padding: 4px 5px;
-    border: 1px solid #a5b4fc;
-    border-radius: 3px;
+    padding: 6px 9px;
+    border: 0;
+    border-radius: 0;
     color: #334155;
     font: inherit;
     outline: none;
@@ -1149,7 +1145,8 @@ body {
 
 .spa-device-preview-info-block form button {
     width: 25px;
-    height: 25px;
+    height: auto;
+    align-self: stretch;
     flex: 0 0 auto;
     padding: 0;
     border: 0;
@@ -1158,6 +1155,58 @@ body {
     background: #4f46e5;
     cursor: pointer;
     font-size: 14px;
+}
+
+.spa-device-preview-comment {
+    display: flex;
+    width: calc(100% - 20px);
+    min-height: 38px;
+    align-items: center;
+    gap: 7px;
+    margin: 0 10px 10px;
+    padding: 6px 8px;
+    border: 1px solid #d7dbe4;
+    border-radius: 5px;
+    color: #64748b;
+    background: #f8fafc;
+    cursor: pointer;
+    font: 600 11px/1.3 "Segoe UI", Tahoma, sans-serif;
+    text-align: left;
+}
+
+.spa-device-preview-comment:hover {
+    border-color: #a5b4fc;
+    color: #4338ca;
+    background: #f5f3ff;
+}
+
+.spa-device-preview-comment.has-comment {
+    color: #475569;
+    background: #fff;
+}
+
+.spa-device-preview-comment span {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spa-device-preview-comment svg {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
+}
+
+.spa-device-preview-comment .spa-device-preview-edit-icon {
+    width: 15px;
+    height: 15px;
 }
 
 .spa-device-preview-empty {
