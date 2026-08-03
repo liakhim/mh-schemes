@@ -1126,6 +1126,10 @@ body {
     object-fit: contain;
 }
 
+.spa-device-preview-image.is-boiler img {
+    width: 72%;
+}
+
 .spa-device-preview-image > span {
     color: #94a3b8;
     font-size: 12px;
@@ -4238,6 +4242,122 @@ body {
 
 /* ===== Selection: мобильная адаптация ===== */
 
+/* Ниже 1200px трёх колонок уже не выходит: боковая навигация по разделам
+   убирается совсем, а не превращается в ленту над контентом. Разделы никуда не
+   деваются — они остаются заголовками по ходу страницы. В ручном режиме вместе
+   с навигацией уходит и левая распорка, иначе слева осталась бы пустая колонка
+   240px, которой в автоматическом режиме уже нет. */
+@media (max-width: 1200px) {
+    .sel-side-nav {
+        display: none;
+    }
+
+    .sel-layout > .sel-layout-spacer:first-child {
+        display: none;
+    }
+}
+
+/* Ноутбук и планшет-альбом: колонки две — контент и панель контроллера.
+   Карточке остаётся заметно меньше ширины, и текстовая колонка (до 560px)
+   доезжает до непрозрачной части фонового снимка — описание становилось
+   нечитаемым. Снимок приглушается, дальше по шагам вниз гасится сильнее.
+   Кегли уменьшаются, но описание не опускается ниже 13px. */
+@media (max-width: 1100px) {
+    .sel-layout {
+        gap: 16px;
+    }
+
+    .selection-page .sel-card-photo {
+        opacity: 0.42;
+    }
+
+    .sel-card-section {
+        gap: 24px;
+        padding: 20px;
+    }
+
+    .selection-page h2,
+    .sel-card-heading {
+        font-size: 17px;
+    }
+
+    .sel-subtitle {
+        font-size: 13.5px;
+    }
+
+    .sel-card-desc {
+        font-size: 13px;
+    }
+
+    .sel-added-title {
+        font-size: 16px;
+    }
+}
+
+/* Планшет-портрет: панель ещё справа, но контенту остаётся совсем мало.
+   Панель сужается до 210px, поля страницы поджимаются — всё освободившееся
+   отдаётся карточкам. */
+@media (max-width: 900px) {
+    .selection-page {
+        padding: 0 16px !important;
+    }
+
+    .sel-stuck-controllers-panel,
+    .sel-layout-spacer {
+        flex-basis: 210px;
+        width: 210px;
+    }
+
+    .selection-page .sel-card-photo {
+        opacity: 0.26;
+    }
+
+    .sel-card-section {
+        gap: 20px;
+        padding: 18px;
+    }
+
+    .selection-page h2,
+    .sel-card-heading {
+        font-size: 16px;
+    }
+
+    .sel-subtitle {
+        font-size: 13px;
+    }
+
+    .sel-card-desc {
+        font-size: 12.5px;
+    }
+
+    .sel-added-title {
+        font-size: 15px;
+    }
+
+    .sel-group-label {
+        font-size: 14px;
+    }
+}
+
+/* Самые узкие экраны: строка списка добавленного не влезает в одну линию —
+   на 320px счётчик выходил за карточку. Пунктирная выноска здесь только
+   декоративная, поэтому убирается, строка получает перенос, а счётчик
+   прижимается вправо и при нехватке места уходит под название. */
+@media (max-width: 400px) {
+    .sel-added-line {
+        flex-wrap: wrap;
+        row-gap: 6px;
+    }
+
+    .sel-added-leader {
+        display: none;
+    }
+
+    .sel-added-line > :last-child {
+        margin-left: auto;
+    }
+}
+
 @media (max-width: 1100px) and (min-width: 761px) {
     .sel-liquid-header-inner {
         grid-template-columns: 150px minmax(0, 1fr) 150px;
@@ -4571,20 +4691,11 @@ body {
         font-size: 12px !important;
     }
 
-    /* На узких экранах боковая колонка не помещается: раскладка
-       схлопывается в одну колонку, а навигация снова становится
-       горизонтальной лентой со свайпом над контентом. */
+    /* На узких экранах боковая колонка не помещается: раскладка схлопывается
+       в одну колонку. Навигации по разделам здесь уже нет — она скрыта выше,
+       начиная с 1200px. */
     .sel-layout {
         display: block;
-    }
-
-    .sel-side-nav {
-        position: static;
-        width: auto;
-        max-height: none;
-        overflow: visible;
-        margin-bottom: 16px;
-        padding: 8px;
     }
 
     /* Колонки справа на узком экране нет: панель превращается
@@ -4756,6 +4867,15 @@ body {
        возвращаем перенос, снимок уходит под текст. */
     .selection-page .sel-card-with-device {
         flex-wrap: wrap !important;
+    }
+
+    /* Фиксированная высота нужна на десктопе, где карточки дискретных входов
+       стоят парами в ряд и снимок не должен дёргаться при добавлении строки.
+       На телефоне они идут в одну колонку, и заданные 158px оставляли под
+       кнопкой пустое поле — высота возвращается к содержимому. Значение
+       приходит инлайном, поэтому перебивается через !important. */
+    .selection-page .sel-card-fixed-height {
+        min-height: 0 !important;
     }
 
     /* Ряды карточек, свёрстанные без переноса (дискретные входы),

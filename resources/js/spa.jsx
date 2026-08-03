@@ -1620,6 +1620,8 @@ const App = () => {
     const selectedPreviewComment = typeof selectedPreviewDevice?.comment === 'string'
         ? selectedPreviewDevice.comment.trim()
         : '';
+    const selectedPreviewIsBoiler = selectedPreviewDevice?.device_type === 'boiler'
+        || ['smart', 'stupid'].includes(canonicalDeviceType(selectedPreviewDevice?.type));
     const canUseInstallationMode = INSTALLATION_CONTROLLERS.has(controllerType);
     const applyInstallationLayout = (sourceScheme) => {
         const layout = readInstallationLayout(sourceScheme);
@@ -4859,7 +4861,7 @@ const App = () => {
                 </div>
                 {selectedPreviewDevice ? (
                     <>
-                        <div className="spa-device-preview-image">
+                        <div className={`spa-device-preview-image${selectedPreviewIsBoiler ? ' is-boiler' : ''}`}>
                             {selectedPreviewImagePath ? (
                                 <img src={selectedPreviewImagePath} alt="" />
                             ) : (

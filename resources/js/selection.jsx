@@ -2356,7 +2356,7 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove 
                 <span>{label}</span>
             </span>
         ) : <span>{label}</span>}
-        <span style={{ flex: 1, borderBottom: '1px dotted #6b7f95', transform: badgeAbove ? 'none' : 'translateY(-3px)' }} />
+        <span className="sel-added-leader" style={{ flex: 1, borderBottom: '1px dotted #6b7f95', transform: badgeAbove ? 'none' : 'translateY(-3px)' }} />
         {removeFirst && removeButton}
         {control}
         {!hideCount && <span style={{ whiteSpace: 'nowrap' }}>{count} шт</span>}
@@ -2930,7 +2930,8 @@ const SectionEquipmentCard = ({
     // Половинная ширина: две карточки в ряду (дискретные входы).
     half = false,
     // Фиксированная высота карточки: держит фон-снимок неподвижным, когда
-    // содержимое карточки меняется.
+    // содержимое карточки меняется. Ставит класс `sel-card-fixed-height` —
+    // на телефоне высота возвращается к содержимому (см. app.css).
     minHeight = null,
     title,
     description = null,
@@ -2997,7 +2998,7 @@ const SectionEquipmentCard = ({
 
     return (
     <div
-        className={`sel-card sel-card-static sel-card-section${deviceImage ? ' sel-card-with-device' : ''}`}
+        className={`sel-card sel-card-static sel-card-section${deviceImage ? ' sel-card-with-device' : ''}${minHeight ? ' sel-card-fixed-height' : ''}`}
         style={{
             flex: half ? '1 1 calc(50% - 8px)' : '1 1 100%',
             width: half ? 'auto' : '100%',
