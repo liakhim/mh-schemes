@@ -38,8 +38,5 @@
         <div id="selection-app"></div>
     </main>
 
-    <footer class="old-shell-footer">
-        © MyHeat {{ date('Y') }}, Все права защищены
-    </footer>
 </body>
 </html>

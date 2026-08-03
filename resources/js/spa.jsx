@@ -6,6 +6,7 @@ import '../css/app.css';
 import { din, incomingScheme, indent, module_height } from './constants';
 import { canonicalDeviceType } from './scheme/domain/deviceTypes';
 import { getDeviceStoredTitle, getWirelessDeviceTitle, getOneWireDeviceTitle } from './scheme/domain/deviceTitles';
+import { collectEquipmentTableRows } from './scheme/domain/equipmentTable';
 import { getInitialWirelessDevices, getOneWireDevicesFromScheme } from './scheme/domain/initialState';
 import { balanceOneWireDevices } from './scheme/domain/oneWireBalancer';
 import { materializeBalancedOneWireScheme } from './scheme/domain/oneWireMaterializer';
@@ -1849,14 +1850,27 @@ const App = () => {
         const gridLayer = gridLayerRef.current;
         const shouldHideGrid = showGrid && gridLayer;
         const commentIconNodes = stage.find(`.${COMMENT_ICON_NODE_NAME}`).filter((node) => node.visible());
+        const selectedSlotHighlightNode = selectedPreviewSlotNodeRef.current;
+        const shouldHideSelectedSlotHighlight = selectedSlotHighlightNode
+            && !selectedSlotHighlightNode.isDestroyed?.()
+            && selectedSlotHighlightNode.visible();
+        const stagePosition = stage.position();
+        const stageScale = stage.scale();
         try {
+            const { downloadStagePdf } = await import('./scheme/export/pdfExport');
             if (shouldHideGrid) {
                 gridLayer.visible(false);
             }
             commentIconNodes.forEach((node) => node.visible(false));
+            if (shouldHideSelectedSlotHighlight) selectedSlotHighlightNode.visible(false);
+            stage.position({ x: 0, y: 0 });
+            stage.scale({ x: 1, y: 1 });
             stage.draw();
-            const { downloadStagePdf } = await import('./scheme/export/pdfExport');
-            downloadStagePdf(stage);
+            const equipmentRows = collectEquipmentTableRows(serializePublicScheme(scheme));
+            await downloadStagePdf(stage, equipmentRows, {
+                name: schemeName,
+                description: schemeDescription,
+            });
         } catch (error) {
             console.error('PDF export failed', error);
             alert('Download PDF failed. Please try again.');
@@ -1865,6 +1879,11 @@ const App = () => {
                 gridLayer.visible(true);
             }
             commentIconNodes.forEach((node) => node.visible(true));
+            if (shouldHideSelectedSlotHighlight && !selectedSlotHighlightNode.isDestroyed?.()) {
+                selectedSlotHighlightNode.visible(true);
+            }
+            stage.position(stagePosition);
+            stage.scale(stageScale);
             stage.batchDraw();
         }
     };

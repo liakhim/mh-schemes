@@ -19,7 +19,8 @@
     "controller_selection_source": "automatic",
     "ups_requested": true,
     "ups_request_source": "manual",
-    "unified_leak_loop": false
+    "leak_zone_count": 2,
+    "leak_valve_count": 3
   },
   "editor": {},
   "selection_state": {}
@@ -29,6 +30,7 @@
 - `selection_state` содержит нормализованный state `/selection` с `id_schema_version: 2`.
 - `requested_controller_type` сохраняет выбор пользователя до автоматического согласования совместимости.
 - `resolved_controller_type` содержит контроллер, с которым была создана схема.
+- `leak_zone_count` содержит число независимых шлейфов датчиков протечки, а `leak_valve_count` - общее число независимых запорных клапанов.
 - `editor` хранит настройки карточек добавления оборудования, но не временное UI-состояние.
 - Котлы из интеграции могут содержать `catalog_ref` с `source`, `catalog_id` и `bus_type`.
 - `POST /api/schemes` принимает снимок. Обычный `PATCH /api/schemes/{id}` его игнорирует.

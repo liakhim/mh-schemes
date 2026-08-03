@@ -8,7 +8,7 @@ import {
     createLeakValve,
     createLeakZone,
     getLeakZoneSensors,
-    getLeakZoneValves,
+    getLeakValves,
     getLeakZones,
     isLeakLoop,
     materializeLeakZones,
@@ -110,7 +110,6 @@ const LEAK_ZONE_JSON_EXAMPLE = {
         type: 'valve',
         device_type: 'equipment',
         connection_type: 'double_relay',
-        leak_zone_id: '<id зоны>',
     }],
 };
 
@@ -2074,7 +2073,7 @@ const PUMP_TEMPLATES = [
     {
         label: 'Насос 220V',
         pump: '220',
-        description: 'Циркуляционный насос с питанием 220 В предназначен для обеспечения стабильной циркуляции теплоносителя в системах отопления и горячего водоснабжения. Простое подключение и надежная работа делают его оптимальным решением для большинства стандартных систем.',
+        description: 'Простое подключение и надежная работа делают его оптимальным решением для большинства стандартных систем.',
         wiredDevice: {
             id: 12,
             device_type: 'equipment',
@@ -2087,7 +2086,7 @@ const PUMP_TEMPLATES = [
     {
         label: 'Насос 0-10V',
         pump: '010',
-        description: 'Циркуляционный насос с управлением 0–10 В обеспечивает плавное регулирование производительности по внешнему сигналу. Подходит для автоматизированных систем, где требуется точное поддержание заданных параметров и повышение энергоэффективности.',
+        description: 'Подходит для автоматизированных систем, где требуется точное поддержание заданных параметров и повышение энергоэффективности.',
         wiredDevice: {
             id: 13,
             device_type: 'equipment',
@@ -2159,7 +2158,7 @@ const MIXING_TEMPLATES = [
         label: 'Сервопривод 0-10V с NTC-датчиком',
         servo: '010',
         sensor: 'ntc',
-        description: 'Предназначен для плавного управления исполнительным механизмом по аналоговому сигналу 0–10 В.',
+        description: 'Предназначен для плавного управления механизмом по аналоговому сигналу 0–10 В.',
         wiredDevice: {
             id: 13,
             device_type: 'equipment',
@@ -3292,9 +3291,10 @@ const QTY_STEPPER_DENSE_STYLE = {
     fontSize: 12,
 };
 
-const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false, dense = false, decTestId = null, incTestId = null }) => {
-    if (!count) return null;
+const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false, allowZero = false, dense = false, decTestId = null, incTestId = null }) => {
+    if (!count && !allowZero) return null;
     const blockStyle = dense ? QTY_STEPPER_DENSE_STYLE : QTY_STEPPER_BLOCK_STYLE;
+    const decrementDisabled = disabled || (allowZero && count <= 0);
     return (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: dense ? 3 : 4, flexShrink: 0 }}>
             <button
@@ -3302,8 +3302,8 @@ const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false, dense =
                 title="Убрать одно"
                 data-test-id={decTestId || undefined}
                 onClick={onDecrement}
-                disabled={disabled}
-                style={{ ...blockStyle, cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#94a3b8' : '#e74c3c', opacity: disabled ? 0.6 : 1 }}
+                disabled={decrementDisabled}
+                style={{ ...blockStyle, cursor: decrementDisabled ? 'not-allowed' : 'pointer', color: decrementDisabled ? '#94a3b8' : '#e74c3c', opacity: decrementDisabled ? 0.6 : 1 }}
             >
                 −
             </button>
@@ -3628,7 +3628,7 @@ const getEquipmentOfferSections = (incomingSchemeValue, controllerType) => {
 
     const leakRows = getLeakProtectionRows(incomingSchemeValue)
         .map((row) => ({ ...row, unitPrice: row.label === 'Датчик протечки' ? MYHEAT_PRICES.leakSensor : null }));
-    if (leakRows.length > 0) sections.push({ title: 'Зоны контроля протечки воды', rows: leakRows });
+    if (leakRows.length > 0) sections.push({ title: 'Контроль протечки воды', rows: leakRows });
 
     const discreteDevices = wiredDevices.filter((device) => DISCRETE_TEMPLATES.some((template) => template.data.type === device.type));
     if (discreteDevices.length > 0) {
@@ -3885,12 +3885,12 @@ const SelectionApp = () => {
         wirelessTemperatureSensorKey,
         temperatureSensorConnection,
     ]);
-    // Строки списка зон: у каждой свой шлейф датчиков и свои клапаны.
+    // В зонах группируются только датчики; клапаны задаются общим количеством.
     const leakZoneRows = useMemo(() => getLeakZones(incomingScheme).map((zone) => ({
         id: zone.id,
         sensorCount: getLeakZoneSensors(zone).length,
-        valveCount: getLeakZoneValves(incomingScheme, zone.id).length,
     })), [incomingScheme]);
+    const leakValveCount = useMemo(() => getLeakValves(incomingScheme).length, [incomingScheme]);
     const equipmentOfferSections = useMemo(
         () => (isOfferModalOpen ? getEquipmentOfferSections(incomingScheme, controllerType) : []),
         [incomingScheme, controllerType, isOfferModalOpen],
@@ -4316,26 +4316,23 @@ const SelectionApp = () => {
         });
     }, []);
 
-    /** Добавляет зону контроля протечки: шлейф с одним датчиком плюс один клапан. */
+    /** Добавляет зону контроля протечки как шлейф с одним датчиком. */
     const addLeakZone = useCallback(() => {
         setIncomingScheme((prev) => {
-            const { loop, valves } = createLeakZone({ id: generateId(), sensors: 1, valves: 1 });
+            const { loop } = createLeakZone({ id: generateId(), sensors: 1 });
             return resolveSelectionScheme({
                 ...prev,
                 sensors: [...(Array.isArray(prev.sensors) ? prev.sensors : []), loop],
-                wired_devices: [...(Array.isArray(prev.wired_devices) ? prev.wired_devices : []), ...valves],
             });
         });
     }, []);
 
-    /** Удаляет зону вместе с её датчиками и привязанными клапанами. */
+    /** Удаляет только шлейф датчиков; общее количество клапанов не меняется. */
     const removeLeakZone = useCallback((zoneId) => {
         setIncomingScheme((prev) => resolveSelectionScheme({
             ...prev,
             sensors: (Array.isArray(prev.sensors) ? prev.sensors : [])
                 .filter((sensor) => !(isLeakLoop(sensor) && String(sensor.id) === String(zoneId))),
-            wired_devices: (Array.isArray(prev.wired_devices) ? prev.wired_devices : [])
-                .filter((device) => String(device?.leak_zone_id ?? '') !== String(zoneId)),
         }));
     }, []);
 
@@ -4357,21 +4354,19 @@ const SelectionApp = () => {
         }));
     }, []);
 
-    /** Меняет количество запорных клапанов зоны: минимум один клапан. */
-    const changeLeakZoneValves = useCallback((zoneId, delta) => {
+    /** Меняет общее количество независимых запорных клапанов. */
+    const changeLeakValves = useCallback((delta) => {
         setIncomingScheme((prev) => {
             const wiredDevices = Array.isArray(prev.wired_devices) ? prev.wired_devices : [];
-            const zoneValves = wiredDevices.filter((device) => (
-                canonicalType(device?.type) === 'valve' && String(device?.leak_zone_id ?? '') === String(zoneId)
-            ));
+            const valves = wiredDevices.filter((device) => canonicalType(device?.type) === 'valve');
             if (delta > 0) {
                 return resolveSelectionScheme({
                     ...prev,
-                    wired_devices: [...wiredDevices, createLeakValve(zoneId, generateId())],
+                    wired_devices: [...wiredDevices, createLeakValve(generateId())],
                 });
             }
-            if (zoneValves.length <= 1) return prev;
-            const removedValve = zoneValves[zoneValves.length - 1];
+            if (valves.length === 0) return prev;
+            const removedValve = valves[valves.length - 1];
             return resolveSelectionScheme({
                 ...prev,
                 wired_devices: wiredDevices.filter((device) => device !== removedValve),
@@ -4759,7 +4754,8 @@ const SelectionApp = () => {
                         minWidth: 260,
                         border: '1px solid #d7dbe4',
                         borderRadius: 16,
-                        padding: 24,
+                        // padding задаёт .sel-card-section: на десктопе те же 24px,
+                        // но на телефоне он ужимается до 12px по медиазапросам.
                         background: '#fff',
                         display: 'flex',
                         flexDirection: 'row',
@@ -4799,7 +4795,7 @@ const SelectionApp = () => {
                     >
                         <div style={{ fontWeight: 700, fontSize: 18, lineHeight: 1.3 }}>Котлы</div>
 
-                        <p style={{ margin: 0, color: '#667089', fontSize: 13.5, lineHeight: 1.5 }}>
+                        <p className="sel-card-desc sel-boilers-lead">
                             Найдите котел по названию. Тип подключения определяется автоматически:
                             котлы с цифровой шиной подключаются через BUS, остальные — через реле
                             с датчиком подающей линии.
@@ -5289,27 +5285,28 @@ const SelectionApp = () => {
             </div>{/* /Датчики и защита flex */}
 
             <section>
-                <h2>Зоны контроля протечки воды</h2>
+                <h2>Контроль протечки воды</h2>
                 <SectionSubtitle>
-                    Зона — это шлейф датчиков протечки и запорные клапаны, которые он перекрывает.
-                    Все датчики одной зоны занимают один дискретный вход контроллера или модуля.
+                    Все датчики одной группы занимают один дискретный вход контроллера или модуля.
+                    Количество запорных клапанов задаётся отдельно.
                 </SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <SectionEquipmentCard
                         image={LEAK_ZONE_BACKGROUND_PATH}
                         backgroundWidth={520}
                         backgroundColor={CARD_PHOTO_TAIL_COLOR.standardRoom}
-                        title="Зоны контроля протечки воды"
-                        description="Датчики зоны собираются в один шлейф и занимают один дискретный вход. Клапаны перекрывают воду по сигналу этого шлейфа, каждый занимает два соседних релейных порта."
-                        addLabel="Добавить зону"
+                        title="Контроль протечки воды"
+                        description="Датчики каждой зоны собираются в один шлейф и занимают один дискретный вход. Запорные клапаны задаются общим количеством, каждый занимает два соседних релейных порта."
+                        addLabel="Добавить группу датчиков протечки"
                         onAdd={addLeakZone}
                         addTestId="add-leak-zone"
                         jsonData={LEAK_ZONE_JSON_EXAMPLE}
                         showJsonDetails={showJsonDetails}
                     >
-                        {leakZoneRows.length > 0 && (
-                            <AddedDevicesBlock marginTop={0}>
-                                <AddedDevicesTitle>Добавленные зоны:</AddedDevicesTitle>
+                        <AddedDevicesBlock marginTop={0}>
+                            {leakZoneRows.length > 0 && (
+                                <>
+                                <AddedDevicesTitle>Добавленные устройства контроля протечки воды:</AddedDevicesTitle>
                                 {leakZoneRows.map((zone, index) => (
                                     <div
                                         key={zone.id}
@@ -5323,7 +5320,7 @@ const SelectionApp = () => {
                                         }}
                                     >
                                         <span style={{ flex: '1 1 130px', fontWeight: 700, fontSize: 14 }}>
-                                            {`Зона ${index + 1}`}
+                                            {`Группа датчиков протечки ${index + 1}`}
                                         </span>
                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                                             <span style={{ color: '#475569', fontSize: 13 }}>Датчики</span>
@@ -5335,18 +5332,6 @@ const SelectionApp = () => {
                                                 incTestId={`leak-zone-sensor-qty-inc-${index}`}
                                             />
                                         </span>
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                                            <span style={{ color: '#475569', fontSize: 13 }}>Клапаны</span>
-                                            <QtyStepper
-                                                count={zone.valveCount}
-                                                onDecrement={() => changeLeakZoneValves(zone.id, -1)}
-                                                onIncrement={() => changeLeakZoneValves(zone.id, 1)}
-                                                decTestId={`leak-zone-valve-qty-dec-${index}`}
-                                                incTestId={`leak-zone-valve-qty-inc-${index}`}
-                                            />
-                                        </span>
-                                        {/* Крестик прижат к правому краю строки, чтобы зона,
-                                            её счетчики и удаление читались одной строкой. */}
                                         <button
                                             type="button"
                                             className="selection-remove-icon"
@@ -5360,8 +5345,30 @@ const SelectionApp = () => {
                                         </button>
                                     </div>
                                 ))}
-                            </AddedDevicesBlock>
-                        )}
+                                </>
+                            )}
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                    padding: '10px 0 2px',
+                                    borderTop: leakZoneRows.length > 0 ? '1px solid #d3dfeb' : 'none',
+                                }}
+                            >
+                                <span style={{ flex: '1 1 160px', fontWeight: 700, fontSize: 14 }}>
+                                    Запорные клапаны
+                                </span>
+                                <QtyStepper
+                                    count={leakValveCount}
+                                    allowZero
+                                    onDecrement={() => changeLeakValves(-1)}
+                                    onIncrement={() => changeLeakValves(1)}
+                                    decTestId="leak-valve-qty-dec"
+                                    incTestId="leak-valve-qty-inc"
+                                />
+                            </div>
+                        </AddedDevicesBlock>
                     </SectionEquipmentCard>
                 </div>
 
@@ -5641,7 +5648,9 @@ const SelectionApp = () => {
                         </span>
                         <span className="sel-controller-action-copy">
                             <strong>
-                                {isBuildingScheme ? 'Сохраняем...' : <>Схема<br />подключения</>}
+                                {/* Перенос нужен узкой панели на десктопе; на телефоне `br`
+                                    скрывается стилями, и пробел склеивает подпись в строку. */}
+                                {isBuildingScheme ? 'Сохраняем...' : <>Схема<br /> подключения</>}
                             </strong>
                         </span>
                         <svg className="sel-controller-action-arrow" viewBox="0 0 24 24" aria-hidden="true">
@@ -5785,9 +5794,6 @@ const SelectionApp = () => {
                     </div>
                 </div>
             )}
-            <footer className="sel-footer">
-                © MyHeat 2026, Все права защищены
-            </footer>
         </div>
     );
 };

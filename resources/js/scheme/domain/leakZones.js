@@ -1,16 +1,15 @@
 import { canonicalDeviceType } from './deviceTypes.js';
 
 /**
- * Зона контроля протечки — шлейф датчиков плюс привязанные к нему запорные
- * клапаны. Физически все датчики зоны сидят на одном дискретном входе, поэтому
+ * Зона контроля протечки — шлейф датчиков. Физически все датчики зоны сидят
+ * на одном дискретном входе, поэтому
  * в схеме зона представлена ОДНИМ устройством `leak-loop` в публичном `sensors`:
  * так «одно устройство = один слот» остаётся верным для DI-балансировщика,
  * `connection_layout` и отрисовки слотов.
  *
  * Датчики лежат внутри `additions` и намеренно не имеют `connection_type`:
- * самостоятельного подключения у них нет. Клапаны остаются в `wired_devices`
- * (каждый занимает два соседних relay-порта) и ссылаются на зону через
- * `leak_zone_id`.
+ * самостоятельного подключения у них нет. Клапаны остаются независимыми
+ * устройствами в `wired_devices` и каждый занимает два соседних relay-порта.
  */
 export const LEAK_LOOP_TYPE = 'leak-loop';
 export const LEAK_SENSOR_TYPE = 'leak-sensor';
@@ -34,9 +33,8 @@ export const isLeakValve = (device) => canonicalDeviceType(device?.type) === LEA
 /** Датчики внутри шлейфа зоны. */
 export const getLeakZoneSensors = (loop) => asArray(loop?.additions).filter(isLeakSensor);
 
-/** Клапаны схемы, привязанные к зоне. */
-export const getLeakZoneValves = (scheme, zoneId) => asArray(scheme?.wired_devices)
-    .filter((device) => isLeakValve(device) && String(device?.leak_zone_id ?? '') === String(zoneId));
+/** Все независимые запорные клапаны схемы. */
+export const getLeakValves = (scheme) => asArray(scheme?.wired_devices).filter(isLeakValve);
 
 /** Все зоны схемы в порядке их появления в `sensors`. */
 export const getLeakZones = (scheme) => asArray(scheme?.sensors).filter(isLeakLoop);
@@ -47,22 +45,20 @@ export const createLeakSensor = (id = null) => ({
     type: LEAK_SENSOR_TYPE,
 });
 
-export const createLeakValve = (zoneId, id = null) => ({
+export const createLeakValve = (id = null) => ({
     id: id ?? generateLeakId(),
     device_type: 'equipment',
     type: LEAK_VALVE_TYPE,
     connection_type: 'double_relay',
-    leak_zone_id: zoneId,
     additions: [],
 });
 
 /**
- * Собирает объект зоны. Датчиков и клапанов минимум по одному: зона без датчика
- * не имеет источника сигнала, а без клапана — исполнительного механизма.
+ * Собирает шлейф датчиков и, при необходимости, независимые клапаны.
  * @param {object} options Состав зоны.
  * @returns {{loop: object, valves: Array<object>}} Шлейф и клапаны зоны.
  */
-export const createLeakZone = ({ id = null, sensors = 1, valves = 1, sensorItems = null, valveItems = null } = {}) => {
+export const createLeakZone = ({ id = null, sensors = 1, valves = 0, sensorItems = null, valveItems = null } = {}) => {
     const zoneId = id ?? generateLeakId();
     const loopSensors = Array.isArray(sensorItems) && sensorItems.length > 0
         ? sensorItems.map((sensor) => ({ ...createLeakSensor(sensor?.id ?? null), ...sensor, connection_type: undefined }))
@@ -70,8 +66,11 @@ export const createLeakZone = ({ id = null, sensors = 1, valves = 1, sensorItems
     // valves: 0 допустимо и означает «клапаны не создавать» — так мигрируют
     // старые схемы, где клапанов не было: выдумывать оборудование нельзя.
     const zoneValves = Array.isArray(valveItems) && valveItems.length > 0
-        ? valveItems.map((valve) => ({ ...valve, leak_zone_id: zoneId }))
-        : Array.from({ length: Math.max(0, valves) }, () => createLeakValve(zoneId));
+        ? valveItems.map((valve) => {
+            const { leak_zone_id: removedZoneId, ...independentValve } = valve;
+            return independentValve;
+        })
+        : Array.from({ length: Math.max(0, valves) }, () => createLeakValve());
 
     return {
         loop: {
@@ -95,7 +94,7 @@ export const createLeakZone = ({ id = null, sensors = 1, valves = 1, sensorItems
  * `unified_leak_loop`. При включённом флаге все датчики физически сидели на
  * одном входе — это одна зона. Без флага каждый датчик занимал свой вход, то
  * есть каждому соответствует своя зона: так сохраняется исходная загрузка DI.
- * Клапаны старых схем ни к чему не привязаны — они уходят в первую зону.
+ * Клапаны не входят в зоны; устаревшая ссылка `leak_zone_id` удаляется.
  *
  * @param {object} scheme Схема во входном или уже новом формате.
  * @returns {object} Схема с зонами и без legacy-полей протечки.
@@ -110,22 +109,24 @@ export const materializeLeakZones = (scheme) => {
         ...wiredDevices.filter(isLeakSensor),
     ];
     const hasLegacyFlag = Object.prototype.hasOwnProperty.call(scheme, 'unified_leak_loop');
-    if (legacySensors.length === 0 && !hasLegacyFlag) return scheme;
+    const hasAttachedValves = wiredDevices.some((device) => isLeakValve(device) && device?.leak_zone_id != null);
+    if (legacySensors.length === 0 && !hasLegacyFlag && !hasAttachedValves) return scheme;
 
     const { unified_leak_loop: legacyUnifiedLoop, ...restScheme } = scheme;
-    if (legacySensors.length === 0) return restScheme;
+    const independentWiredDevices = wiredDevices.map((device) => {
+        if (!isLeakValve(device) || device?.leak_zone_id == null) return device;
+        const { leak_zone_id: removedZoneId, ...independentValve } = device;
+        return independentValve;
+    });
+    if (legacySensors.length === 0) return { ...restScheme, wired_devices: independentWiredDevices };
 
-    const unattachedValves = wiredDevices.filter((device) => isLeakValve(device) && device?.leak_zone_id == null);
     const zoneSensorGroups = legacyUnifiedLoop === true
         ? [legacySensors]
         : legacySensors.map((sensor) => [sensor]);
-    const zones = zoneSensorGroups.map((groupSensors, index) => createLeakZone({
+    const zones = zoneSensorGroups.map((groupSensors) => createLeakZone({
         sensorItems: groupSensors,
-        valveItems: index === 0 ? unattachedValves : [],
         valves: 0,
     }));
-
-    const attachedValveIds = new Set(zones.flatMap(({ valves }) => valves.map((valve) => String(valve.id))));
 
     return {
         ...restScheme,
@@ -133,12 +134,6 @@ export const materializeLeakZones = (scheme) => {
             ...sensors.filter((sensor) => !isLeakSensor(sensor)),
             ...zones.map(({ loop }) => loop),
         ],
-        wired_devices: [
-            ...wiredDevices.filter((device) => (
-                !isLeakSensor(device)
-                && !(isLeakValve(device) && attachedValveIds.has(String(device.id)))
-            )),
-            ...zones.flatMap(({ valves }) => valves),
-        ],
+        wired_devices: independentWiredDevices.filter((device) => !isLeakSensor(device)),
     };
 };

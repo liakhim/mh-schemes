@@ -3997,7 +3997,7 @@ body {
     color: #fff;
     box-shadow: 0 10px 24px rgba(200, 94, 24, 0.25), inset 0 1px rgba(255, 255, 255, 0.25);
     cursor: pointer;
-    text-align: left;
+    text-align: center;
     transition: box-shadow 0.2s, transform 0.2s, filter 0.2s;
 }
 
@@ -4091,26 +4091,31 @@ body {
     transition: border-color 0.18s, background 0.18s, color 0.18s, transform 0.18s;
 }
 
+/* Отступы поджаты под увеличенные иконки: высота кнопок остаётся прежней
+   (40px), крупнее становится только графика. */
 .selection-page button.sel-controller-spec-action {
     gap: 7px;
-    padding: 8px 10px;
+    padding: 5px 10px;
     font-size: 11px;
     font-weight: 800;
 }
 
+/* Графика иконок не заполняет свой viewBox 24x24 (лист занимает 13 единиц по
+   ширине, корзина 16), поэтому коробка берётся заметно крупнее видимого глифа:
+   при 17px от кнопки высотой 40px оставался мелкий значок. */
 .selection-page button.sel-controller-spec-action svg {
-    width: 17px;
-    height: 17px;
+    width: 26px;
+    height: 26px;
 }
 
 .selection-page button.sel-controller-reset-action {
-    padding: 8px;
+    padding: 5px;
     color: #b45353;
 }
 
 .selection-page button.sel-controller-reset-action svg {
-    width: 18px;
-    height: 18px;
+    width: 28px;
+    height: 28px;
 }
 
 .selection-page button.sel-controller-spec-action:hover,
@@ -4624,11 +4629,13 @@ body {
     }
 
     /* В нижней ленте кнопки действий компактнее и в один ряд, чтобы лента не
-       съедала экран. */
+       съедала экран. Единая высота ряда задаётся переменной: по ней равняются
+       и главная кнопка, и обе квадратные — иначе они стояли вразнобой. */
     .sel-stuck-actions {
+        --sel-mobile-action-height: 38px;
         flex: 1 0 100%;
         flex-direction: row;
-        align-items: stretch;
+        align-items: center;
         gap: 8px;
         margin-top: 8px;
         padding-top: 8px;
@@ -4636,58 +4643,76 @@ body {
 
     .selection-page button.sel-controller-primary-action {
         flex: 1 1 0;
-        grid-template-columns: 38px minmax(0, 1fr) 22px;
+        grid-template-columns: 26px minmax(0, 1fr) 16px;
+        gap: 7px;
         width: auto;
         min-width: 0;
-        padding: 6px 8px;
+        min-height: var(--sel-mobile-action-height);
+        /* Кнопка несёт и класс `selection-option-button`, у которого в этом же
+           блоке padding с !important — без него отступ не перебить. */
+        padding: 4px 8px !important;
         border-radius: 11px;
     }
 
     .sel-controller-action-icon {
-        width: 38px;
-        height: 38px;
-        border-radius: 10px;
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
     }
 
     .sel-controller-action-icon svg {
-        width: 24px;
-        height: 24px;
+        width: 16px;
+        height: 16px;
     }
 
     .sel-controller-action-arrow {
-        width: 22px;
-        height: 22px;
+        width: 16px;
+        height: 16px;
     }
 
+    /* Подпись в одну строку: двухстрочная версия нужна только узкой панели
+       на десктопе. Пробел перед «подключения» стоит в разметке, поэтому при
+       скрытом `br` строка склеивается правильно. */
     .sel-controller-action-copy strong {
-        font-size: 12px;
-        line-height: 1.18;
+        font-size: 11.5px;
+        line-height: 1.15;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    .sel-controller-action-copy strong br {
+        display: none;
     }
 
     .sel-controller-secondary-actions {
-        grid-template-columns: 48px 48px;
+        grid-template-columns: repeat(2, var(--sel-mobile-action-height));
         flex: 0 0 auto;
         gap: 6px;
     }
 
     .selection-page button.sel-controller-spec-action,
     .selection-page button.sel-controller-reset-action {
-        width: 48px;
-        height: 48px;
-        min-height: 48px;
+        width: var(--sel-mobile-action-height);
+        height: var(--sel-mobile-action-height);
+        min-height: var(--sel-mobile-action-height);
         padding: 0;
         border-radius: 11px;
     }
 
     .selection-page button.sel-controller-spec-action {
-        width: 48px;
+        width: var(--sel-mobile-action-height);
         padding: 0;
     }
 
+    /* Иконка занимает большую часть квадратной кнопки: подписей у них на
+       телефоне нет, и мелкий значок в поле 38px читается плохо. Сама графика
+       не заполняет свой viewBox 24x24 (лист — 13 единиц в ширину), поэтому
+       коробку приходится брать заметно крупнее видимого глифа. */
     .selection-page button.sel-controller-spec-action svg,
     .selection-page button.sel-controller-reset-action svg {
-        width: 26px;
-        height: 26px;
+        width: 30px;
+        height: 30px;
     }
 
     .sel-controller-spec-action span {
@@ -4811,7 +4836,7 @@ body {
     /* Компактнее по всем внутренним отступам: на 360px каждые 8px заметны. */
     .selection-page .sel-card-section {
         gap: 18px;
-        padding: 16px;
+        padding: 12px;
         border-radius: 14px;
     }
 
@@ -4825,7 +4850,12 @@ body {
     }
 
     .sel-card-desc {
-        font-size: 12.5px;
+        font-size: 12px;
+    }
+
+    /* Лид карточки котлов длиннее прочих описаний — на телефоне ещё мельче. */
+    .sel-boilers-lead {
+        font-size: 12px;
     }
 
     .sel-card-title {
@@ -4857,9 +4887,9 @@ body {
     }
 
     .selection-page button.selection-add-button {
-        padding: 10px 18px;
+        padding: 10px 12px;
         border-radius: 9px;
-        font-size: 13px;
+        font-size: 12px;
     }
 
     .selection-page button.selection-add-button-sm {
@@ -4868,8 +4898,9 @@ body {
     }
 
     /* Сегментированные переключатели: на телефоне их в ряду до трёх. */
-    .selection-page .selection-option-button {
-        padding: 7px 12px !important;
+    .selection-page .selection-option-button:not(.sel-mode-option) {
+        flex-direction: column !important;
+        padding: 7px 9px !important;
         font-size: 12.5px !important;
     }
 
@@ -4932,6 +4963,7 @@ body {
 
     .sel-group-label {
         margin-bottom: 14px;
+        padding-top: 10px;
         padding-bottom: 8px;
         font-size: 10px;
     }

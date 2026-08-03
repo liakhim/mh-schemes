@@ -89,6 +89,10 @@ const SelectionConfigModal = ({ config, onClose }) => {
                         <span>Зоны контроля протечки</span>
                         <strong>{intent.leak_zone_count ?? (intent.unified_leak_loop ? 1 : 0)}</strong>
                     </div>
+                    <div>
+                        <span>Запорные клапаны</span>
+                        <strong>{intent.leak_valve_count ?? 0}</strong>
+                    </div>
                 </div>
 
                 {createdAt && <div className="selection-config-date">Подбор сохранён: {createdAt}</div>}

@@ -404,6 +404,37 @@ sensors: [
 
 Для `ecosmart` вложенные `mixing-ntc-sensor` из `220servo.additions` материализуются во внутреннюю линию `controller.mixing_ntc_devices` только для отрисовки. Эта линия не должна попадать в публичный `incomingScheme`; при сериализации датчики возвращаются в `sensors`, а исходные wired-устройства остаются в `wired_devices`.
 
+## Зоны контроля протечки
+
+Датчики одной зоны группируются в один `leak-loop`, который занимает один DI-вход:
+
+```js
+sensors: [{
+    id: 'leak-zone-1',
+    type: 'leak-loop',
+    device_type: 'sensor',
+    connection_type: 'di',
+    additions: [
+        { id: 'leak-sensor-1', type: 'leak-sensor', device_type: 'sensor' },
+        { id: 'leak-sensor-2', type: 'leak-sensor', device_type: 'sensor' },
+    ],
+}]
+```
+
+Запорные клапаны не входят в зоны и задаются независимым общим количеством в `wired_devices`. Каждый клапан занимает два соседних relay-порта:
+
+```js
+wired_devices: [{
+    id: 'leak-valve-1',
+    type: 'valve',
+    device_type: 'equipment',
+    connection_type: 'double_relay',
+    additions: [],
+}]
+```
+
+Legacy-поле `leak_zone_id` у клапанов удаляется при загрузке без потери самих клапанов.
+
 ## Внутренние линии `ecosmart`
 
 Следующие поля могут существовать во внутреннем состоянии `scheme` после балансировки, но не должны быть видны в публичном `incomingScheme` даже после распределения:

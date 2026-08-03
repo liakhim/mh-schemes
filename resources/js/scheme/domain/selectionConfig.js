@@ -41,6 +41,8 @@ export const buildSelectionConfig = ({
             // Заменило булев unified_leak_loop прежней модели.
             leak_zone_count: (Array.isArray(normalizedSelectionState?.sensors) ? normalizedSelectionState.sensors : [])
                 .filter((sensor) => String(sensor?.type || '').toLowerCase() === 'leak-loop').length,
+            leak_valve_count: (Array.isArray(normalizedSelectionState?.wired_devices) ? normalizedSelectionState.wired_devices : [])
+                .filter((device) => canonicalDeviceType(device?.type) === 'valve').length,
         },
         editor: {
             wired_thermostat_color: editor?.wiredThermostatColor || 'black',

@@ -7,6 +7,7 @@ test('builds a versioned selection snapshot with normalized IDs', () => {
         selectionState: {
             controller: { type: 'go+' },
             boilers: [{ id: 10, type: 'smart' }],
+            wired_devices: [{ id: 20, type: 'valve' }, { id: 21, type: 'valve' }],
         },
         requestedControllerType: 'go',
         controllerSelectionSource: 'default',
@@ -22,6 +23,7 @@ test('builds a versioned selection snapshot with normalized IDs', () => {
     assert.equal(config.intent.controller_selection_source, 'automatic');
     assert.equal(config.selection_state.boilers[0].id, '10');
     assert.equal(config.editor.wired_thermostat_color, 'white');
+    assert.equal(config.intent.leak_valve_count, 2);
 });
 
 test('records a manual controller choice when it remains selected', () => {

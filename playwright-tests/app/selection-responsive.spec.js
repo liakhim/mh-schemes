@@ -107,6 +107,44 @@ test.describe('/selection — адаптив', () => {
         }
     });
 
+    test('на телефоне кнопки нижней ленты одной высоты и в одну строку', async ({ page }) => {
+        const actions = () => page.evaluate(() => {
+            const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+            const primary = box('.sel-controller-primary-action');
+            const spec = box('.sel-controller-spec-action');
+            const reset = box('.sel-controller-reset-action');
+            const label = document.querySelector('.sel-controller-action-copy strong');
+            return {
+                heights: [primary.height, spec.height, reset.height].map(Math.round),
+                tops: [primary.top, spec.top, reset.top].map(Math.round),
+                // Высота подписи в строках: на телефоне `br` скрыт и она одна.
+                labelLines: Math.round(
+                    label.getBoundingClientRect().height
+                    / parseFloat(getComputedStyle(label).lineHeight),
+                ),
+                labelText: label.textContent,
+            };
+        });
+
+        for (const width of [414, 375, 320]) {
+            await page.setViewportSize({ width, height: 800 });
+            await page.waitForTimeout(250);
+            const a = await actions();
+
+            expect(new Set(a.heights).size, `разная высота кнопок при ${width}px: ${a.heights}`).toBe(1);
+            expect(new Set(a.tops).size, `кнопки не выровнены по горизонтали при ${width}px`).toBe(1);
+            expect(a.heights[0], `кнопки слишком высокие при ${width}px`).toBeLessThanOrEqual(40);
+            expect(a.labelLines, `подпись в две строки при ${width}px`).toBe(1);
+            // Пробел из разметки должен склеить подпись при скрытом `br`.
+            expect(a.labelText).toBe('Схема подключения');
+        }
+
+        // На десктопе подпись остаётся двухстрочной: панель узкая.
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.waitForTimeout(250);
+        expect((await actions()).labelLines).toBe(2);
+    });
+
     test('на телефоне рендер термостата не крупнее настроек карточки', async ({ page }) => {
         const visual = page.locator('.sel-thermostat-visual');
 

@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     createLeakZone,
+    getLeakValves,
     getLeakZones,
     getLeakZoneSensors,
-    getLeakZoneValves,
     materializeLeakZones,
 } from './leakZones.js';
 
-test('зона состоит из шлейфа в sensors и клапанов в wired_devices', () => {
+test('зона группирует датчики, а клапаны остаются независимыми', () => {
     const { loop, valves } = createLeakZone({ id: 'zone-1', sensors: 3, valves: 2 });
 
     assert.equal(loop.type, 'leak-loop');
@@ -21,7 +21,7 @@ test('зона состоит из шлейфа в sensors и клапанов �
 
     assert.equal(valves.length, 2);
     assert.ok(valves.every((valve) => valve.connection_type === 'double_relay'));
-    assert.ok(valves.every((valve) => valve.leak_zone_id === 'zone-1'));
+    assert.ok(valves.every((valve) => valve.leak_zone_id === undefined));
 });
 
 test('единый шлейф старой схемы сворачивается в одну зону', () => {
@@ -38,7 +38,8 @@ test('единый шлейф старой схемы сворачивается
     const zones = getLeakZones(migrated);
     assert.equal(zones.length, 1);
     assert.equal(getLeakZoneSensors(zones[0]).length, 2);
-    assert.equal(getLeakZoneValves(migrated, zones[0].id).length, 1);
+    assert.equal(getLeakValves(migrated).length, 1);
+    assert.equal(getLeakValves(migrated)[0].leak_zone_id, undefined);
     // Плоских датчиков в публичных массивах не остаётся.
     assert.equal(migrated.sensors.filter((item) => item.type === 'leak-sensor').length, 0);
 });
@@ -71,7 +72,7 @@ test('схема без протечки и уже мигрированная с
     const untouched = { sensors: [{ id: 1, type: 'pressure-sensor', connection_type: '4-20' }], wired_devices: [] };
     assert.equal(materializeLeakZones(untouched), untouched);
 
-    const { loop, valves } = createLeakZone({ id: 'zone-1', sensors: 2, valves: 1 });
+    const { loop, valves } = createLeakZone({ id: 'zone-1', sensors: 2, valves: 0 });
     const alreadyMigrated = { sensors: [loop], wired_devices: valves };
     assert.equal(materializeLeakZones(alreadyMigrated), alreadyMigrated);
 });
@@ -90,6 +91,19 @@ test('прочие датчики и оборудование остаются �
 
     assert.equal(migrated.sensors.filter((item) => item.type === 'pressure-sensor').length, 1);
     assert.equal(migrated.wired_devices.filter((item) => item.type === 'pump-220v').length, 1);
-    const zones = getLeakZones(migrated);
-    assert.equal(getLeakZoneValves(migrated, zones[0].id).length, 1);
+    assert.equal(getLeakValves(migrated).length, 1);
+    assert.equal(getLeakValves(migrated)[0].leak_zone_id, undefined);
+});
+
+test('уже сгруппированная схема отвязывает клапаны от зон без потерь', () => {
+    const migrated = materializeLeakZones({
+        sensors: [{ id: 'zone-1', type: 'leak-loop', connection_type: 'di', additions: [] }],
+        wired_devices: [
+            { id: 'valve-1', type: 'valve', connection_type: 'double_relay', leak_zone_id: 'zone-1' },
+            { id: 'valve-2', type: 'valve', connection_type: 'double_relay' },
+        ],
+    });
+
+    assert.equal(getLeakValves(migrated).length, 2);
+    assert.ok(getLeakValves(migrated).every((valve) => valve.leak_zone_id === undefined));
 });
