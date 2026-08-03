@@ -1599,6 +1599,7 @@ const App = () => {
     const [schemeJsonError, setSchemeJsonError] = useState(null);
     const [schemeMetadataEditor, setSchemeMetadataEditor] = useState(null);
     const [selectedDevicePreview, setSelectedDevicePreview] = useState(null);
+    const [devicePreviewCollapsed, setDevicePreviewCollapsed] = useState(false);
     const selectedPreviewSlotNodeRef = useRef(null);
     const [previewTitleEditor, setPreviewTitleEditor] = useState(false);
     const [previewTitleDraft, setPreviewTitleDraft] = useState('');
@@ -4830,19 +4831,31 @@ const App = () => {
                     <span>Инсталляция</span>
                 </button>
             </div>
-            {!displayedToolsInstallationMode && (
+            {!displayedToolsInstallationMode && !devicePreviewCollapsed && (
             <aside className={`spa-device-preview${selectedPreviewDevice ? ' has-device' : ''}`} aria-label="Увеличенный просмотр устройства">
                 <div className="spa-device-preview-header">
-                    <span>Лупа устройства</span>
-                    {selectedPreviewDevice && (
+                    <span>Детали устройства</span>
+                    <div className="spa-device-preview-header-actions">
                         <button
                             type="button"
-                            aria-label="Закрыть просмотр устройства"
-                            onClick={() => setSelectedDevicePreview(null)}
+                            aria-label="Свернуть детали устройства"
+                            title="Свернуть"
+                            onClick={() => setDevicePreviewCollapsed(true)}
                         >
-                            ×
+                            <svg viewBox="0 0 20 20" aria-hidden="true">
+                                <path d="m7 4 6 6-6 6" />
+                            </svg>
                         </button>
-                    )}
+                        {selectedPreviewDevice && (
+                            <button
+                                type="button"
+                                aria-label="Закрыть просмотр устройства"
+                                onClick={() => setSelectedDevicePreview(null)}
+                            >
+                                ×
+                            </button>
+                        )}
+                    </div>
                 </div>
                 {selectedPreviewDevice ? (
                     <>
@@ -4933,6 +4946,22 @@ const App = () => {
             </aside>
             )}
             <div className={`spa-right-tools is-${rightToolsTransitionPhase}`}>
+                {!displayedToolsInstallationMode && devicePreviewCollapsed && (
+                    <button
+                        type="button"
+                        className={`spa-floating-tool-button spa-device-details-button${selectedPreviewDevice ? ' has-device' : ''}`}
+                        aria-label="Развернуть детали устройства"
+                        data-tooltip="Детали устройства"
+                        onClick={() => setDevicePreviewCollapsed(false)}
+                    >
+                        <svg viewBox="0 0 32 32" aria-hidden="true">
+                            <rect x="5" y="5" width="15" height="20" rx="2" />
+                            <path d="M9 10h7M9 14h7M9 18h5" />
+                            <circle cx="22.5" cy="21.5" r="4.5" />
+                            <path d="m26 25 3 3" />
+                        </svg>
+                    </button>
+                )}
                 {displayedToolsInstallationMode && (
                     <div
                         className="spa-floating-tool-button spa-installation-din-indicator"

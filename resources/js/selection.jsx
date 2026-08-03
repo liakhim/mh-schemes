@@ -309,6 +309,7 @@ const CONTROLLER_CARD_DESCRIPTIONS = {
 // Подсветка смены подобранного контроллера. Длительность должна совпадать с
 // анимациями `sel-controller-*` в app.css, иначе класс снимут раньше времени.
 const CONTROLLER_CHANGE_CLASS = 'is-controller-changed';
+const CONTROLLER_CHANGE_ANIMATION_NAME = 'sel-controller-panel-pop';
 const CONTROLLER_CHANGE_ANIMATION_MS = 520;
 
 const CONTROLLER_KIT_TEMPERATURE_DEVICES = {
@@ -3825,12 +3826,17 @@ const SelectionApp = () => {
         // дольше самого движения. Таймер — страховка на случай, когда анимации
         // нет вовсе (prefers-reduced-motion) и события не будет.
         const stop = () => {
-            panel.removeEventListener('animationend', stop);
+            panel.removeEventListener('animationend', onAnimationEnd);
             clearTimeout(timer);
             panel.classList.remove(CONTROLLER_CHANGE_CLASS);
         };
+        // Класс снимает только конец самого подъёма: в списке анимаций панели
+        // есть и входная, а `animationend` вдобавок всплывает от потомков.
+        const onAnimationEnd = (event) => {
+            if (event.animationName === CONTROLLER_CHANGE_ANIMATION_NAME) stop();
+        };
         const timer = setTimeout(stop, CONTROLLER_CHANGE_ANIMATION_MS + 200);
-        panel.addEventListener('animationend', stop);
+        panel.addEventListener('animationend', onAnimationEnd);
         return stop;
     }, [controllerType]);
     useEffect(() => {
