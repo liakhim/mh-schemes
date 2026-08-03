@@ -2741,6 +2741,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             свечение и тень, все цвета лежат стопкой и переключаются
             прозрачностью — кроссфейд без подгрузки картинки в момент клика. */}
         <div
+            className="sel-thermostat-visual"
             style={{
                 position: 'relative',
                 display: 'flex',

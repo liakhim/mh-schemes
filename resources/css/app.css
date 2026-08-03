@@ -4382,22 +4382,44 @@ body {
 
 @media (max-width: 760px) {
     .selection-page {
-        --sel-header-height: 116px;
+        /* Шапка прибита к верху, поэтому её высота и есть занятая полоса. */
+        --sel-header-height: 50px;
         padding: 0 12px 184px !important;
         /* Место под закреплённую снизу ленту выбора контроллера вместе с
            плитками модулей и кнопкой сброса под ней. */
     }
 
-    .sel-liquid-header {
-        top: 8px;
-        width: calc(100% - 16px);
-        border-radius: 14px;
+    /* Распорка под фиксированной шапкой считается от её реальной высоты:
+       со сжатой шапкой прежние 132px оставляли пустую полосу. */
+    .selection-page::before {
+        height: 58px;
     }
 
+    /* На телефоне шапка прижата к самому верху и во всю ширину: отступ по 8px
+       с трёх сторон и скругление сверху съедали высоту и ширину, которых на
+       узком экране и так мало. Скругление остаётся только снизу. */
+    .sel-liquid-header {
+        top: 0;
+        width: 100%;
+        /* Боковые и верхняя рамки уходят за край экрана — от них остаётся
+           только полоска в углу, поэтому снимаем. */
+        border-top: 0;
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0 0 14px 14px;
+    }
+
+    /* Шапка в одну строку: лого слева, переключатель режима прижат вправо и
+       занимает ровно свою ширину. Раньше он уезжал на вторую строку и растягивался
+       во всю ширину — шапка выходила вдвое выше, чем нужно. */
     .sel-liquid-header-inner {
-        grid-template-columns: 1fr auto;
-        gap: 7px 10px;
-        padding: 8px 10px;
+        /* Колонка лого сжимаемая (minmax(0, auto)): на самых узких экранах
+           логотип масштабируется по `max-width: 100%`, а не обрезается краем
+           шапки. */
+        grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px;
     }
 
     .sel-header-brand {
@@ -4406,7 +4428,7 @@ body {
     }
 
     .sel-header-brand img {
-        width: 112px;
+        width: 104px;
     }
 
     .sel-header-brand span,
@@ -4415,8 +4437,10 @@ body {
     }
 
     .sel-mode-panel {
-        grid-column: 1 / -1;
-        grid-row: 2;
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+        min-width: 0;
         padding: 0;
     }
 
@@ -4424,25 +4448,30 @@ body {
         display: block;
     }
 
+    /* Ширина по содержимому вместо двух равных колонок во всю строку. */
     .sel-mode-switch {
+        display: inline-flex;
         flex-basis: auto;
-        width: 100%;
+        width: auto;
+        max-width: 100%;
+        padding: 2px;
     }
 
     .selection-page button.sel-mode-option {
-        min-height: 50px;
-        gap: 9px;
-        padding: 7px 12px !important;
+        min-height: 30px;
+        gap: 6px;
+        padding: 3px 10px !important;
     }
 
     .sel-mode-option svg {
-        width: 22px;
-        height: 22px;
-        flex-basis: 22px;
+        width: 16px;
+        height: 16px;
+        flex-basis: 16px;
     }
 
     .sel-mode-option strong {
-        font-size: 12px;
+        font-size: 11.5px;
+        white-space: nowrap;
     }
 
     .sel-mode-option small {
@@ -4869,6 +4898,19 @@ body {
         flex-wrap: wrap !important;
     }
 
+    /* Рендер термостата на телефоне уходит под настройки во всю ширину карточки
+       и в исходных 255px занимал больше места, чем все переключатели над ним.
+       Ограничиваем колонку: свечение и тень заданы в процентах от неё, поэтому
+       уменьшаются вместе с изображением и пропорции сохраняются. */
+    .sel-thermostat-visual {
+        flex: 0 0 auto !important;
+        width: 100%;
+        max-width: 176px;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        margin: 0 auto;
+    }
+
     /* Фиксированная высота нужна на десктопе, где карточки дискретных входов
        стоят парами в ряд и снимок не должен дёргаться при добавлении строки.
        На телефоне они идут в одну колонку, и заданные 158px оставляли под
@@ -4931,5 +4973,53 @@ body {
         padding: 5px 8px !important;
         font-size: 12px !important;
         gap: 6px !important;
+    }
+}
+
+/* Переключатель режима поджимается ещё на шаг: иначе на 320px он съедает всю
+   строку шапки и логотипу остаётся ширина, на которой он уже не читается.
+   Блок обязан идти после мобильного — там те же свойства с !important. */
+@media (max-width: 400px) {
+    .selection-page button.sel-mode-option {
+        gap: 5px;
+        padding: 3px 8px !important;
+    }
+
+    .sel-mode-option svg {
+        width: 14px;
+        height: 14px;
+        flex-basis: 14px;
+    }
+
+    .sel-mode-option strong {
+        font-size: 11px;
+    }
+
+    .sel-header-brand img {
+        width: 92px;
+    }
+}
+
+/* 320px — последняя ступень: логотипу и переключателю вместе остаётся 284px,
+   поэтому обоим срезается ещё по несколько пикселей. Ниже опускать кегль
+   переключателя уже нельзя — подписи режимов перестанут читаться. */
+@media (max-width: 340px) {
+    .selection-page button.sel-mode-option {
+        gap: 4px;
+        padding: 3px 6px !important;
+    }
+
+    .sel-mode-option svg {
+        width: 13px;
+        height: 13px;
+        flex-basis: 13px;
+    }
+
+    .sel-mode-option strong {
+        font-size: 10.5px;
+    }
+
+    .sel-header-brand img {
+        width: 84px;
     }
 }

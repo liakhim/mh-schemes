@@ -66,6 +66,64 @@ test.describe('/selection — адаптив', () => {
         await expect(nav).toBeHidden();
     });
 
+    test('на телефоне шапка в одну строку, переключатель режима по контенту', async ({ page }) => {
+        const geometry = () => page.evaluate(() => {
+            const box = (selector) => document.querySelector(selector).getBoundingClientRect();
+            const inner = box('.sel-liquid-header-inner');
+            const modeSwitch = box('.sel-mode-switch');
+            const header = box('.sel-liquid-header');
+            return {
+                headerTop: Math.round(header.top),
+                headerWidth: Math.round(header.width),
+                viewportWidth: document.documentElement.clientWidth,
+                headerHeight: Math.round(box('.sel-liquid-header').height),
+                buttonHeight: Math.round(box('.sel-mode-option').height),
+                switchWidth: Math.round(modeSwitch.width),
+                innerWidth: Math.round(inner.width),
+                // Переключатель и лого на одной строке, если верх переключателя
+                // выше низа лого.
+                sameRow: modeSwitch.top < box('.sel-header-brand').bottom,
+                // Положительный запас = переключатель не срезан краем шапки.
+                slack: Math.round(inner.right - modeSwitch.right),
+            };
+        });
+
+        for (const width of [760, 480, 414, 375, 360, 320]) {
+            await page.setViewportSize({ width, height: 800 });
+            await page.waitForTimeout(250);
+            const g = await geometry();
+
+            expect(g.sameRow, `лого и переключатель на разных строках при ${width}px`).toBe(true);
+            expect(g.buttonHeight, `высота кнопки режима при ${width}px`).toBe(30);
+            expect(g.slack, `переключатель срезан краем шапки при ${width}px`).toBeGreaterThanOrEqual(0);
+            // Ширина по содержимому, а не во всю строку шапки.
+            expect(g.switchWidth, `переключатель растянут на всю шапку при ${width}px`)
+                .toBeLessThan(g.innerWidth);
+            expect(g.headerHeight, `шапка выше одной строки при ${width}px`).toBeLessThanOrEqual(56);
+            // Прибита к верху и во всю ширину: отступы по краям на телефоне
+            // съедали высоту и ширину впустую.
+            expect(g.headerTop, `шапка не прижата к верху при ${width}px`).toBe(0);
+            expect(g.headerWidth, `шапка не во всю ширину при ${width}px`).toBe(g.viewportWidth);
+        }
+    });
+
+    test('на телефоне рендер термостата не крупнее настроек карточки', async ({ page }) => {
+        const visual = page.locator('.sel-thermostat-visual');
+
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.waitForTimeout(250);
+        const desktop = await visual.boundingBox();
+        expect(desktop.width, 'на десктопе рендер остаётся крупным').toBeGreaterThan(240);
+
+        await page.setViewportSize({ width: 375, height: 900 });
+        await page.waitForTimeout(250);
+        const mobile = await visual.boundingBox();
+        expect(mobile.width, 'рендер термостата на телефоне').toBeLessThanOrEqual(176);
+        // Квадрат: свечение и тень заданы в процентах от колонки, поэтому
+        // пропорции должны сохраниться.
+        expect(Math.abs(mobile.height - mobile.width)).toBeLessThan(2);
+    });
+
     test('карточки дискретных входов: фиксированная высота на десктопе, по контенту на телефоне', async ({ page }) => {
         const cards = page.locator('.sel-card-fixed-height');
         const minHeights = () => cards.evaluateAll((els) => els.map((el) => getComputedStyle(el).minHeight));
