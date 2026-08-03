@@ -34,7 +34,7 @@ const EquipmentOfferModal = ({ sections, onClose }) => {
                         {sections.length > 0 && (
                             <button
                                 type="button"
-                                className="equipment-offer-download"
+                                className="equipment-offer-download selection-primary-button"
                                 onClick={handleDownloadPdf}
                                 disabled={isDownloading}
                             >

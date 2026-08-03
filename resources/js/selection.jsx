@@ -3226,6 +3226,9 @@ const PumpCard = ({ template, pumpType, onPumpTypeChange, onAdd, addedRows = [],
     <SectionEquipmentCard
         image={PUMP_BACKGROUND_PATH}
         backgroundColor={CARD_PHOTO_TAIL_COLOR.pumpRoom}
+        // Кадр приподнят: при верхней привязке в карточку попадали потолок и
+        // пустая стена, а сама насосная группа оставалась за нижней границей.
+        backgroundPosition="right -150px"
         title={template.label}
         description={template.description}
         addedTitle="Добавленные насосы:"
@@ -4572,7 +4575,12 @@ const SelectionApp = () => {
                             >
                                 Начать заново
                             </button>
-                            <button type="button" onClick={continueSelectionDraft} autoFocus>
+                            <button
+                                type="button"
+                                className="selection-primary-button"
+                                onClick={continueSelectionDraft}
+                                autoFocus
+                            >
                                 Продолжить
                             </button>
                         </div>
