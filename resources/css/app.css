@@ -1010,7 +1010,7 @@ body {
     width: 240px;
     min-height: 240px;
     max-height: calc(100vh - var(--nav-height) - 96px);
-    grid-template-rows: auto minmax(0, auto) auto auto;
+    grid-template-rows: auto minmax(0, auto) auto;
     overflow-x: hidden;
     overflow-y: auto;
     border: 1px solid #cbd5e1;
@@ -1056,17 +1056,17 @@ body {
 
 .spa-device-preview-image {
     display: grid;
+    grid-row: 3;
     min-height: 0;
-    padding: 8px 18px 6px;
+    padding: 8px 8px 10px;
     place-items: center;
 }
 
 .spa-device-preview-image img {
     display: block;
-    width: auto;
+    width: 92%;
     height: auto;
     max-width: 100%;
-    max-height: calc(100vh - var(--nav-height) - 190px);
     object-fit: contain;
 }
 
@@ -1076,6 +1076,7 @@ body {
 }
 
 .spa-device-preview-info-block {
+    align-self: start;
     margin: 0 10px 10px;
     overflow: hidden;
     border: 1px solid #2f08af;
@@ -1209,9 +1210,170 @@ body {
     height: 15px;
 }
 
+.spa-device-preview-meta-card {
+    position: relative;
+    display: flex;
+    grid-row: 2;
+    min-height: 62px;
+    align-self: start;
+    align-items: flex-start;
+    gap: 9px;
+    margin: 0 10px 10px;
+    padding: 7px 7px 7px 8px;
+    overflow: hidden;
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+    color: #1e293b;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 5px 16px rgba(15, 23, 42, 0.1);
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.spa-device-preview-meta-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: #2e7d32;
+}
+
+.spa-device-preview-meta-card:hover {
+    border-color: #86b879;
+    box-shadow: 0 7px 20px rgba(46, 125, 50, 0.16);
+}
+
+.spa-device-preview-meta-icon {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    border-radius: 7px;
+    color: #2e7d32;
+    background: #edf7e9;
+    place-items: center;
+}
+
+.spa-device-preview-meta-icon svg,
+.spa-device-preview-meta-edit svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.6;
+}
+
+.spa-device-preview-meta-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.spa-device-preview-meta-kicker {
+    margin-bottom: 2px;
+    color: #2e7d32;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.spa-device-preview-meta-title,
+.spa-device-preview-meta-comment {
+    display: block;
+    max-width: 100%;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.spa-device-preview-meta-title {
+    color: #1f2937;
+    font: 700 14px/1.25 "Segoe UI", Tahoma, sans-serif;
+}
+
+.spa-device-preview-meta-comment {
+    margin-top: 2px;
+    overflow: visible;
+    color: #64748b;
+    font: 400 12px/1.3 "Segoe UI", Tahoma, sans-serif;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.spa-device-preview-meta-comment.is-empty {
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 600;
+    font-style: italic;
+}
+
+.spa-device-preview-meta-title:hover,
+.spa-device-preview-meta-comment:hover {
+    color: #2e7d32;
+}
+
+.spa-device-preview-meta-copy form {
+    display: flex;
+    min-width: 0;
+    gap: 4px;
+}
+
+.spa-device-preview-meta-copy form input {
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: 3px 5px;
+    border: 1px solid #86b879;
+    border-radius: 4px;
+    color: #1f2937;
+    font: 700 11px/1.2 "Segoe UI", Tahoma, sans-serif;
+    outline: none;
+}
+
+.spa-device-preview-meta-copy form button {
+    width: 24px;
+    flex: 0 0 auto;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    color: #fff;
+    background: #2e7d32;
+    cursor: pointer;
+}
+
+.spa-device-preview-meta-edit {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    color: #64748b;
+    background: transparent;
+    cursor: pointer;
+    place-items: center;
+}
+
+.spa-device-preview-meta-card:hover .spa-device-preview-meta-edit,
+.spa-device-preview-meta-edit:hover {
+    color: #2e7d32;
+    background: #edf7e9;
+}
+
 .spa-device-preview-empty {
     display: grid;
-    grid-row: 2 / span 3;
+    grid-row: 2 / span 2;
     align-content: center;
     justify-items: center;
     gap: 12px;
@@ -2587,14 +2749,18 @@ body {
     display: none;
 }
 
-.selection-page button:not([title="Удалить"]):not(.selection-option-button):not(.selection-danger-button):not(.selection-secondary-button):not(.selection-remove-icon):not(:disabled) {
+/* Кнопки добавления выведены из общей плоской заливки: у них собственная
+   градиентная подача, одинаковая с «Схемой подключения» в панели контроллера
+   (см. .selection-add-button ниже). Иначе `background !important` отсюда
+   перекрыл бы градиент. */
+.selection-page button:not([title="Удалить"]):not(.selection-option-button):not(.selection-danger-button):not(.selection-secondary-button):not(.selection-remove-icon):not(.selection-add-button):not(:disabled) {
     border-color: #c85e18 !important;
     background: #e07020 !important;
     color: #fff !important;
     transition: background 0.15s, border-color 0.15s !important;
 }
 
-.selection-page button:not([title="Удалить"]):not(.selection-option-button):not(.selection-danger-button):not(.selection-secondary-button):not(.selection-remove-icon):not(:disabled):hover {
+.selection-page button:not([title="Удалить"]):not(.selection-option-button):not(.selection-danger-button):not(.selection-secondary-button):not(.selection-remove-icon):not(.selection-add-button):not(:disabled):hover {
     background: #c85e18 !important;
 }
 
@@ -3360,16 +3526,43 @@ body {
 }
 
 /* Кнопки добавления: крупная — в карточках-разделах, компактная — в карточках
-   шаблонов. Цвет задаёт общее правило .selection-page button выше, здесь только
-   геометрия — раньше она была раскидана по инлайн-стилям и разъезжалась. */
+   шаблонов. Подача общая с «Схемой подключения» в панели контроллера
+   (.sel-controller-primary-action): градиент, скруглённый угол, мягкая тень и
+   подъём по наведению. Кнопка не тянется на всю ширину — она стоит в текстовой
+   колонке карточки, поэтому ширина по содержимому. */
 .selection-page button.selection-add-button {
+    position: relative;
     align-self: flex-start;
+    overflow: hidden;
     padding: 12px 26px;
-    border: 1px solid #c85e18;
-    border-radius: 10px;
+    border: 1px solid rgba(200, 94, 24, 0.8);
+    border-radius: 14px;
+    background: linear-gradient(135deg, #ed7a2d, #cf5612);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(200, 94, 24, 0.25), inset 0 1px rgba(255, 255, 255, 0.25);
     font-size: 14px;
     font-weight: 700;
     cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.2s, filter 0.2s;
+}
+
+/* Блик в углу — та же деталь, что у «Схемы подключения». */
+.selection-page button.selection-add-button::after {
+    content: '';
+    position: absolute;
+    top: -34px;
+    right: -20px;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    pointer-events: none;
+}
+
+.selection-page button.selection-add-button:hover:not(:disabled) {
+    box-shadow: 0 14px 30px rgba(200, 94, 24, 0.32), inset 0 1px rgba(255, 255, 255, 0.3);
+    filter: saturate(1.08);
+    transform: translateY(-2px);
 }
 
 .selection-page button.selection-add-button-sm {

@@ -5,8 +5,9 @@ import { test, expect } from '@playwright/test';
  * заглушкой на /api/integration, поэтому тест локальный и детерминированный:
  * проверяется поведение выпадашки, а не содержимое каталога mhtest.
  *
- * Правила: выбор котла закрывает список, строка поиска и найденное при этом
- * сохраняются, а новый запрос уходит только при изменении текста в поле.
+ * Правила: выбор котла убирает только сам список, строка поиска и найденное
+ * при этом сохраняются, возврат в поле ввода раскрывает результаты последнего
+ * поиска заново, а новый запрос уходит только при изменении текста в поле.
  */
 test.describe('/selection — поиск котлов', () => {
     /** Счетчик ушедших запросов: по нему видно, что поиск не перезапускается сам. */
@@ -53,6 +54,42 @@ test.describe('/selection — поиск котлов', () => {
         await page.waitForTimeout(1200);
         expect(searchCount).toBe(1);
         await expect(dropdown).toBeHidden();
+    });
+
+    test('возврат в поле ввода раскрывает результаты последнего поиска без запроса', async ({ page }) => {
+        const input = page.getByPlaceholder('Введите название котла...');
+        const dropdown = page.getByTestId('boiler-search-results');
+
+        await input.fill('Baxi');
+        await dropdown.getByTestId('boiler-search-option').first().click();
+        await expect(dropdown).toBeHidden();
+
+        await input.click();                                          // текст не меняли
+        await expect(dropdown).toBeVisible();
+        await expect(dropdown.getByTestId('boiler-search-option')).toHaveCount(2);
+        expect(searchCount).toBe(1);                                  // нового запроса не было
+
+        // Клик мимо блока поиска снова убирает выпадашку.
+        await page.getByText('Смесительные узлы').click();
+        await expect(dropdown).toBeHidden();
+        expect(searchCount).toBe(1);
+    });
+
+    test('Escape закрывает выпадашку, не трогая запрос и результаты', async ({ page }) => {
+        const input = page.getByPlaceholder('Введите название котла...');
+        const dropdown = page.getByTestId('boiler-search-results');
+
+        await input.fill('Baxi');
+        await expect(dropdown).toBeVisible();
+
+        await input.press('Escape');
+        await expect(dropdown).toBeHidden();
+        await expect(input).toHaveValue('Baxi');                      // запрос сохранился
+        expect(searchCount).toBe(1);                                  // повторного поиска не было
+
+        await input.click();                                          // и список возвращается тем же
+        await expect(dropdown.getByTestId('boiler-search-option')).toHaveCount(2);
+        expect(searchCount).toBe(1);
     });
 
     test('изменение текста в поле снова открывает выпадашку', async ({ page }) => {

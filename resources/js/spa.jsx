@@ -4853,60 +4853,73 @@ const App = () => {
                                 <span>Нет изображения</span>
                             )}
                         </div>
-                        <div className="spa-device-preview-info-block">
-                            {previewTitleEditor ? (
-                                <form
-                                    onSubmit={(event) => {
-                                        event.preventDefault();
-                                        savePreviewTitle();
-                                    }}
-                                >
-                                    <input
-                                        value={previewTitleDraft}
-                                        autoFocus
-                                        aria-label="Текст инфоблока"
-                                        onChange={(event) => setPreviewTitleDraft(event.target.value)}
-                                        onKeyDown={(event) => {
-                                            if (event.key === 'Escape') {
-                                                event.preventDefault();
-                                                setPreviewTitleEditor(false);
-                                                setPreviewTitleDraft(selectedDevicePreview.title);
-                                            }
+                        <div className="spa-device-preview-meta-card">
+                            <div className="spa-device-preview-meta-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <rect x="5" y="5" width="14" height="14" rx="2" />
+                                    <path d="M8 9h8M8 12h8M8 15h5" />
+                                </svg>
+                            </div>
+                            <div className="spa-device-preview-meta-copy">
+                                <span className="spa-device-preview-meta-kicker">Устройство</span>
+                                {previewTitleEditor ? (
+                                    <form
+                                        onSubmit={(event) => {
+                                            event.preventDefault();
+                                            savePreviewTitle();
                                         }}
-                                    />
-                                    <button type="submit" aria-label="Сохранить текст инфоблока">✓</button>
-                                </form>
-                            ) : (
+                                    >
+                                        <input
+                                            value={previewTitleDraft}
+                                            autoFocus
+                                            aria-label="Текст инфоблока"
+                                            onChange={(event) => setPreviewTitleDraft(event.target.value)}
+                                            onKeyDown={(event) => {
+                                                if (event.key === 'Escape') {
+                                                    event.preventDefault();
+                                                    setPreviewTitleEditor(false);
+                                                    setPreviewTitleDraft(selectedDevicePreview.title);
+                                                }
+                                            }}
+                                        />
+                                        <button type="submit" aria-label="Сохранить текст инфоблока">✓</button>
+                                    </form>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        className="spa-device-preview-meta-title"
+                                        title="Изменить текст инфоблока"
+                                        onClick={() => {
+                                            setPreviewTitleDraft(selectedDevicePreview.title);
+                                            setPreviewTitleEditor(true);
+                                        }}
+                                    >
+                                        {selectedDevicePreview.title}
+                                    </button>
+                                )}
                                 <button
                                     type="button"
-                                    title="Изменить текст инфоблока"
-                                    onClick={() => {
-                                        setPreviewTitleDraft(selectedDevicePreview.title);
-                                        setPreviewTitleEditor(true);
-                                    }}
+                                    className={`spa-device-preview-meta-comment${selectedPreviewComment ? '' : ' is-empty'}`}
+                                    title="Изменить комментарий устройства"
+                                    onClick={() => editDeviceComment(selectedPreviewDevice)}
                                 >
-                                    <span>{selectedDevicePreview.title}</span>
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="m5 16.5-.7 3.2 3.2-.7L18 8.5 15.5 6zM14 7.5l2.5 2.5" />
-                                    </svg>
+                                    {selectedPreviewComment || 'Добавить комментарий'}
                                 </button>
-                            )}
+                            </div>
+                            <button
+                                type="button"
+                                className="spa-device-preview-meta-edit"
+                                aria-label="Изменить название устройства"
+                                onClick={() => {
+                                    setPreviewTitleDraft(selectedDevicePreview.title);
+                                    setPreviewTitleEditor(true);
+                                }}
+                            >
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="m5 16.5-.7 3.2 3.2-.7L18 8.5 15.5 6zM14 7.5l2.5 2.5" />
+                                </svg>
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            className={`spa-device-preview-comment${selectedPreviewComment ? ' has-comment' : ''}`}
-                            title="Изменить комментарий устройства"
-                            onClick={() => editDeviceComment(selectedPreviewDevice)}
-                        >
-                            <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M5 5h14v10H9l-4 4z" />
-                                <path d="M8 9h8M8 12h5" />
-                            </svg>
-                            <span>{selectedPreviewComment || 'Добавить комментарий'}</span>
-                            <svg className="spa-device-preview-edit-icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="m5 16.5-.7 3.2 3.2-.7L18 8.5 15.5 6zM14 7.5l2.5 2.5" />
-                            </svg>
-                        </button>
                     </>
                 ) : (
                     <div className="spa-device-preview-empty">

@@ -2727,19 +2727,9 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                 добавленный вариант возвращает кнопку. */}
             {showAdd && (
                 <button
+                    className="selection-add-button"
                     onClick={onAdd}
                     data-test-id="add-thermostat"
-                    style={{
-                        alignSelf: 'flex-start',
-                        padding: '12px 26px',
-                        border: '1px solid #c85e18',
-                        borderRadius: 10,
-                        background: '#e07020',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        fontSize: 14,
-                        fontWeight: 700,
-                    }}
                 >
                     {`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
                 </button>
@@ -3720,8 +3710,10 @@ const SelectionApp = () => {
     const [boilerSearchedQuery, setBoilerSearchedQuery] = useState('');
     // Видимость выпадашки отделена от самих результатов: выбор котла закрывает
     // список, но найденное и текст запроса остаются. Новый поиск инициирует
-    // только изменение строки поиска, поэтому список сам не открывается заново.
+    // только изменение строки поиска — возврат в поле ввода просто раскрывает
+    // результаты последнего поиска заново, без запроса.
     const [boilerDropdownOpen, setBoilerDropdownOpen] = useState(false);
+    const boilerSearchRef = useRef(null);
     const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
     const [upsRequested, setUpsRequested] = useState(false);
     const [requestedControllerType, setRequestedControllerType] = useState('go');
@@ -4114,9 +4106,31 @@ const SelectionApp = () => {
         && boilerSearchedQuery === boilerSearchQuery;
     const boilerDropdownVisible = boilerResultsVisible || boilerNotFoundVisible;
 
+    // Клик мимо блока поиска и Escape убирают выпадашку. Слушатели висят только
+    // пока она раскрыта; клик по самой строке результата попадает внутрь
+    // контейнера, поэтому выбор котла обрабатывается обычным onClick и не
+    // срывается. Escape закрывает только список: текст запроса и найденное
+    // остаются, поле ввода не теряет фокус.
+    useEffect(() => {
+        if (!boilerDropdownOpen) return undefined;
+        const onDocumentMouseDown = (event) => {
+            if (!boilerSearchRef.current?.contains(event.target)) setBoilerDropdownOpen(false);
+        };
+        const onDocumentKeyDown = (event) => {
+            if (event.key === 'Escape') setBoilerDropdownOpen(false);
+        };
+        document.addEventListener('mousedown', onDocumentMouseDown);
+        document.addEventListener('keydown', onDocumentKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', onDocumentMouseDown);
+            document.removeEventListener('keydown', onDocumentKeyDown);
+        };
+    }, [boilerDropdownOpen]);
+
     const addBoilerFromSearch = useCallback((result) => {
-        // Выбор котла закрывает выпадашку. Строка поиска и найденное сохраняются:
-        // повторный поиск инициирует только изменение текста в поле.
+        // Выбор котла убирает только саму выпадашку. Строка поиска и найденное
+        // сохраняются: возврат в поле ввода снова раскрывает тот же список, а
+        // новый запрос инициирует только изменение текста.
         setBoilerDropdownOpen(false);
         const isStupid = result.bus_type === 127;
         setIncomingScheme((prev) => {
@@ -4830,13 +4844,18 @@ const SelectionApp = () => {
                                 })}
                             </div>
 
-                            <div style={{ position: 'relative' }}>
+                            <div style={{ position: 'relative' }} ref={boilerSearchRef}>
+                                {/* Возврат в поле ввода снова раскрывает результаты последнего
+                                    поиска, нового запроса при этом не уходит. onClick стоит рядом
+                                    с onFocus: если поле уже в фокусе, событие focus не повторяется. */}
                                 <div style={{ position: 'relative' }}>
                                     <input
                                         type="text"
                                         placeholder="Введите название котла..."
                                         value={boilerQuery}
                                         onChange={(e) => setBoilerQuery(e.target.value)}
+                                        onFocus={() => setBoilerDropdownOpen(true)}
+                                        onClick={() => setBoilerDropdownOpen(true)}
                                         style={{
                                             width: '100%',
                                             padding: '10px 44px 10px 14px',
