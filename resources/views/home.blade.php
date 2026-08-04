@@ -7,18 +7,6 @@
     @vite(['resources/css/app.css'])
 </head>
 <body class="home-page">
-    <nav class="spa-navbar home-navbar">
-        <div class="spa-navbar-brand home-navbar-brand">
-            <a href="{{ route('home') }}" aria-label="MyHeat — главная">
-                <img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat" class="spa-navbar-logo">
-            </a>
-            <div class="spa-alpha-notice">
-                <span>Приложение находится <u>в стадии альфа-тестирования</u>, все вопросы к разработчику:</span>
-                <a href="https://t.me/mmingareev" target="_blank" rel="noreferrer">Telegram</a>
-            </div>
-        </div>
-    </nav>
-
     <main class="home-main">
         <header class="home-intro">
             <span class="home-kicker">Инструменты MyHeat</span>

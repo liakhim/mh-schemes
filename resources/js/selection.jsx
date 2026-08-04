@@ -2541,6 +2541,9 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             flexWrap: 'wrap',
             gap: 32,
             alignItems: 'stretch',
+            // Действует только на перенесённой строке: пока рендер стоит справа,
+            // свободного места нет — его целиком разбирает flex-grow колонок.
+            justifyContent: 'center',
             position: 'relative',
             overflow: 'hidden',
         }}
@@ -2555,17 +2558,24 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
         />
 
         <div
+            className="sel-thermostat-settings"
             style={{
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
                 gap: 20,
-                // Колонке настроек нужно заметно больше места, чем колонке с
-                // рендером: в одном ряду стоят капсула типа подключения и
-                // чекбокс датчика пола, при базовых 340px они не помещались.
-                flex: '2 1 420px',
-                minWidth: 260,
+                // Базис задан по фактическому минимуму колонки, а не по
+                // комфортной ширине: на flex-basis считается перенос строки, и
+                // прежние 420px роняли рендер вниз уже на 1300px экрана, хотя
+                // места хватало. Ширину сверх минимума добирает flex-grow.
+                // Пол колонки задан содержимым, а не числом: у карточки
+                // `overflow: hidden`, и фиксированные 310px обрезали бы строку
+                // списка добавленных термостатов на длинном названии. С
+                // `min-content` колонка вместо обрезки роняет рендер вниз, а на
+                // коротком названии дольше держит его справа.
+                flex: '1.5 1 310px',
+                minWidth: 'min-content',
                 maxWidth: 540,
             }}
         >
@@ -2746,9 +2756,17 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flex: '1 1 300px',
-                minWidth: 240,
-                minHeight: 290,
+                // Рендер держится справа, пока позволяет ширина, поэтому базис и
+                // минимум взяты по нижней границе читаемого размера картинки:
+                // сжиматься для него приоритетнее, чем уезжать под настройки.
+                flex: '1 1 170px',
+                minWidth: 170,
+                // Потолок ниже ширины карточки: он не срабатывает, пока колонка
+                // стоит справа (там она не шире 332px), и ограничивает рендер
+                // на перенесённой строке - иначе колонка растягивалась во всю
+                // карточку и картинка висела в пустой полосе.
+                maxWidth: 380,
+                minHeight: 200,
             }}
         >
             <div
