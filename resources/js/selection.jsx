@@ -5570,7 +5570,9 @@ const SelectionApp = () => {
                                         </span>
                                         <span className="sel-controller-action-copy">
                                             <strong>
-                                                {isBuildingScheme ? 'Сохраняем...' : <>Собрать схему<br />{preposition} {controllerName}</>}
+                                                {/* Подпись держится в одну строку: перенос здесь сжимал бы
+                                                    карточку по высоте и ломал ритм сетки. */}
+                                                {isBuildingScheme ? 'Сохраняем...' : `Собрать схему ${preposition} ${controllerName}`}
                                             </strong>
                                         </span>
                                         <svg className="sel-controller-action-arrow" viewBox="0 0 24 24" aria-hidden="true">

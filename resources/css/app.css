@@ -3248,10 +3248,14 @@ body {
     gap: 16px;
 }
 
+/* Базис в пикселях, а не в трети ряда: на широком экране три карточки в ряд
+   по-прежнему помещаются и растягиваются на всю ширину, а на ноутбучных
+   ширинах ряд честно распадается на две карточки вместо трёх голодных по
+   230px, куда подпись кнопки в одну строку уже не влезает. */
 .sel-manual-controller-card {
     position: relative;
     display: flex;
-    flex: 0 1 calc((100% - 32px) / 3);
+    flex: 1 1 280px;
     box-sizing: border-box;
     align-items: center;
     justify-content: flex-start;
@@ -4138,6 +4142,45 @@ body {
     z-index: 1;
     width: 18px;
     height: 18px;
+}
+
+/* Кнопка карточки ручного режима. Подпись «Собрать схему с …» идёт одной
+   строкой, поэтому у кнопки свои пропорции: иконка 30px вместо 34px, стрелка
+   уже и прижата к правому краю меньшим правым отступом, зазоры плотнее — всё
+   освободившееся место уходит тексту. Многоточие — страховка для самых узких
+   карточек. Блок обязан стоять ниже `.sel-controller-primary-action`: у правил
+   одинаковая специфичность, и порядок в файле решает, чьи колонки применятся. */
+.selection-page button.sel-manual-card-build-button {
+    grid-template-columns: 30px minmax(0, 1fr) 14px;
+    gap: 7px;
+    padding: 11px 8px 11px 10px;
+}
+
+.selection-page button.sel-manual-card-build-button .sel-controller-action-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+}
+
+.selection-page button.sel-manual-card-build-button .sel-controller-action-icon svg {
+    width: 17px;
+    height: 17px;
+}
+
+.selection-page button.sel-manual-card-build-button .sel-controller-action-arrow {
+    width: 14px;
+    height: 14px;
+}
+
+.selection-page button.sel-manual-card-build-button .sel-controller-action-copy strong {
+    /* Без `stretch` подпись — flex-элемент с `align-self: center`, то есть
+       шириной по содержимому: на узких карточках она вылезала бы на стрелку
+       вместо многоточия. */
+    align-self: stretch;
+    overflow: hidden;
+    font-size: 11px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .sel-controller-secondary-actions {
