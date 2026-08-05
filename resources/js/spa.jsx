@@ -13974,6 +13974,9 @@ const App = () => {
                                                                     {owDevice && owImage && (
                                                                         <Image image={owImage} x={owX} y={owY} width={owWidth} height={owHeight} listening={false} />
                                                                     )}
+                                                                    {owDevice && isBundledSensorDevice(memoBundledSensorDevices, owDevice) && (
+                                                                        <KitBadge x={owX} y={owY + 1} />
+                                                                    )}
                                                                     {canonicalDeviceType(owDevice?.type) === 'ntc-1-wire' && (() => {
                                                                         const ntcSensorImage = wirelessImages['ntc-sensor'] || null;
                                                                         const ntcSensorPorts = wirelessPortsByType['ntc-sensor'] || [];
