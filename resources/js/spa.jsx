@@ -967,12 +967,11 @@ const getIo4SharedTerminalDevices = (data, indexes, portName) => {
             return type === 'pressure-sensor' || connectionTypes.includes('4-20');
         }
         if (normalizedPortName.endsWith('-GND')) {
-            return type === 'ntc-sensor'
-                || type === 'boiler-ntc-sensor'
-                || type === 'mixing-ntc-sensor'
-                || type === '010pump'
-                || type === '010servo'
-                || connectionTypes.includes('ntc');
+                 return type === 'ntc-sensor'
+                     || type === 'boiler-ntc-sensor'
+                     || type === 'mixing-ntc-sensor'
+                     || type === '010servo'
+                     || connectionTypes.includes('ntc');
         }
         return true;
     });

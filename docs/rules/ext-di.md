@@ -51,6 +51,7 @@
 - Если у `010pump.additions` есть `mixing-ntc-sensor` с `connection_type='ntc'`, pump и NTC sensor размещаются на одном `io4`.
 - На `/selection` `010pump`/`010servo` с вложенным `mixing-ntc-sensor` считается как 2 `io4` channel-слота: один под устройство и один под NTC.
 - `010servo`/`010pump` занимает один канал, вложенный NTC sensor следующий канал.
+- В режиме инсталляции `010pump` не занимает общую GND-клемму пары каналов `io4`; GND-лычка отображается только если она нужна другому устройству этой пары.
 - Размещённый NTC sensor удаляется из `additions` servo в материализованной схеме.
 - SVG `010servo`: `resources/assets/servo/010servoLeftPorts.svg`.
 - Логические каналы `1..4` расположены сверху вниз, чтобы линии коммутации пересекались реже.
