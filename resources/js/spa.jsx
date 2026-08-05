@@ -7,6 +7,13 @@ import { din, incomingScheme, indent, module_height } from './constants';
 import { canonicalDeviceType } from './scheme/domain/deviceTypes';
 import { getDeviceStoredTitle, getWirelessDeviceTitle, getOneWireDeviceTitle } from './scheme/domain/deviceTitles';
 import { collectEquipmentTableRows } from './scheme/domain/equipmentTable';
+import {
+    CONTROLLER_KIT_SENSOR_LIMITS,
+    CONTROLLER_KIT_SENSOR_PRODUCTS,
+    getControllerKitSensorBucket,
+    getControllerKitSensorState,
+    isBundledSensorDevice,
+} from './scheme/domain/controllerKitSensors';
 import { getInitialWirelessDevices, getOneWireDevicesFromScheme } from './scheme/domain/initialState';
 import { balanceOneWireDevices } from './scheme/domain/oneWireBalancer';
 import { materializeBalancedOneWireScheme } from './scheme/domain/oneWireMaterializer';
@@ -546,58 +553,6 @@ const ECOSMART_FIRST_ONE_WIRE_EXTRA_DOWN = {
 };
 const getEcosmartFirstOneWireExtraDown = (device) => (
     ECOSMART_FIRST_ONE_WIRE_EXTRA_DOWN[canonicalDeviceType(device?.type)] || 0
-);
-const CONTROLLER_KIT_SENSOR_LIMITS = {
-    pro: { wall: 1, flask: 2 },
-    smart2: { wall: 1 },
-    ecosmart: { ntc: 3 },
-    go: { wall: 1 },
-    'go+': { wireless: 1 },
-};
-const CONTROLLER_KIT_SENSOR_PRODUCTS = {
-    wall: 'Датчик температуры настенный проводной',
-    flask: 'Датчик температуры в колбе проводной',
-    ntc: 'Датчик температуры в колбе NTC 10K',
-    wireless: 'Радиодатчик температуры и влажности комнатный',
-};
-const getControllerKitSensorBucket = (controllerType, type) => {
-    if (controllerType === 'pro') {
-        if (type === 'wall-digital-sensor') return 'wall';
-        if (['flask-sensor', 'flask-sensor-temperature', 'flask-sensor-gvs-boiler', 'flask-sensor-strategy', 'flask-sensor-mixing-unit', 'flask-sensor-stupid-boiler'].includes(type)) return 'flask';
-    }
-    if ((controllerType === 'smart2' || controllerType === 'go') && type === 'wall-digital-sensor') return 'wall';
-    if (controllerType === 'ecosmart' && ['ntc-sensor', 'mixing-ntc-sensor', 'flask-sensor-gvs-boiler', 'flask-sensor-strategy'].includes(type)) return 'ntc';
-    if (controllerType === 'go+' && type === 'wall-temperature-sensor') return 'wireless';
-    return null;
-};
-const getSensorIdentity = (device) => (
-    device?.id != null ? `${canonicalDeviceType(device.type)}:${device.id}` : null
-);
-const getControllerKitSensorState = (scheme, controllerType) => {
-    const limits = CONTROLLER_KIT_SENSOR_LIMITS[controllerType] || {};
-    const remaining = { ...limits };
-    const controller = scheme?.controller || {};
-    const candidates = [
-        ...(Array.isArray(scheme?.wireless_devices) ? scheme.wireless_devices : []),
-        ...(Array.isArray(controller?.one_wire_devices) ? controller.one_wire_devices : []),
-        ...(Array.isArray(scheme?.sensors) ? scheme.sensors : []),
-        ...(Array.isArray(scheme?.wired_devices) ? scheme.wired_devices.flatMap((device) => device?.additions || []) : []),
-        ...['mixing_ntc_devices', 'boiler_sensor_devices', 'strategy_sensor_devices'].flatMap((key) => controller?.[key] || []),
-    ];
-    const bundled = new Set();
-    candidates.forEach((device) => {
-        const type = canonicalDeviceType(device?.type);
-        const bucket = getControllerKitSensorBucket(controllerType, type);
-        if (!bucket || !remaining[bucket]) return;
-        bundled.add(device);
-        const identity = getSensorIdentity(device);
-        if (identity) bundled.add(identity);
-        remaining[bucket] -= 1;
-    });
-    return { bundled, remaining };
-};
-const isBundledSensorDevice = (bundledSensors, device) => (
-    bundledSensors.has(device) || bundledSensors.has(getSensorIdentity(device))
 );
 const KitBadge = ({ x, y }) => (
     <>
