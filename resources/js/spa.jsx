@@ -4941,7 +4941,7 @@ const App = () => {
                 </button>
             </div>
             {!displayedToolsInstallationMode && !devicePreviewCollapsed && (
-            <aside className={`spa-device-preview is-${rightToolsTransitionPhase}${selectedPreviewDevice ? ' has-device' : ''}`} aria-label="Увеличенный просмотр устройства">
+            <aside id="spa-device-preview" className={`spa-device-preview is-${rightToolsTransitionPhase}${selectedPreviewDevice ? ' has-device' : ''}`} aria-label="Увеличенный просмотр устройства">
                 <div className="spa-device-preview-header">
                     <span>Детали устройства</span>
                     <div className="spa-device-preview-header-actions">
@@ -5055,6 +5055,24 @@ const App = () => {
             </aside>
             )}
             <div className={`spa-right-tools is-${rightToolsTransitionPhase}`}>
+                {!displayedToolsInstallationMode && (
+                    <button
+                        type="button"
+                        className={`spa-floating-tool-button spa-device-details-button${devicePreviewCollapsed ? '' : ' is-active'}${selectedPreviewDevice ? ' has-device' : ''}`}
+                        aria-label={devicePreviewCollapsed ? 'Развернуть детали устройства' : 'Свернуть детали устройства'}
+                        aria-expanded={!devicePreviewCollapsed}
+                        aria-controls="spa-device-preview"
+                        data-tooltip="Детали устройства"
+                        onClick={() => setDevicePreviewCollapsed((current) => !current)}
+                    >
+                        <svg viewBox="0 0 32 32" aria-hidden="true">
+                            <rect x="5" y="5" width="15" height="20" rx="2" />
+                            <path d="M9 10h7M9 14h7M9 18h5" />
+                            <circle cx="22.5" cy="21.5" r="4.5" />
+                            <path d="m26 25 3 3" />
+                        </svg>
+                    </button>
+                )}
                 {displayedToolsInstallationMode && (
                     <div
                         className="spa-floating-tool-button spa-installation-din-indicator"
@@ -5066,18 +5084,6 @@ const App = () => {
                         <span>DIN</span>
                     </div>
                 )}
-                <button
-                    type="button"
-                    className="spa-floating-tool-button spa-pdf-download-button"
-                    aria-label="Скачать схему в PDF"
-                    data-tooltip="Скачать схему в PDF"
-                    onClick={handleDownloadPdf}
-                >
-                    <svg viewBox="0 0 32 32" aria-hidden="true">
-                        <path d="M8 3.5h11l5 5v20H8z" />
-                        <path d="M19 3.5v5h5M16 11.5v10m-4-4 4 4 4-4M11.5 25h9" />
-                    </svg>
-                </button>
                 {!displayedToolsInstallationMode && (
                     <button
                         type="button"
@@ -5230,22 +5236,18 @@ const App = () => {
                     </section>
                     </div>
                 )}
-                {!displayedToolsInstallationMode && devicePreviewCollapsed && (
-                    <button
-                        type="button"
-                        className={`spa-floating-tool-button spa-device-details-button${selectedPreviewDevice ? ' has-device' : ''}`}
-                        aria-label="Развернуть детали устройства"
-                        data-tooltip="Детали устройства"
-                        onClick={() => setDevicePreviewCollapsed(false)}
-                    >
-                        <svg viewBox="0 0 32 32" aria-hidden="true">
-                            <rect x="5" y="5" width="15" height="20" rx="2" />
-                            <path d="M9 10h7M9 14h7M9 18h5" />
-                            <circle cx="22.5" cy="21.5" r="4.5" />
-                            <path d="m26 25 3 3" />
-                        </svg>
-                    </button>
-                )}
+                <button
+                    type="button"
+                    className="spa-floating-tool-button spa-pdf-download-button"
+                    aria-label="Скачать схему в PDF"
+                    data-tooltip="Скачать схему в PDF"
+                    onClick={handleDownloadPdf}
+                >
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <path d="M8 3.5h11l5 5v20H8z" />
+                        <path d="M19 3.5v5h5M16 11.5v10m-4-4 4 4 4-4M11.5 25h9" />
+                    </svg>
+                </button>
             </div>
             {!displayedToolsInstallationMode && (
                 <button
