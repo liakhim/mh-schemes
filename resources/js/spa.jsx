@@ -31,6 +31,7 @@ import { materializePowerModules } from './scheme/domain/powerModules';
 import { normalizeWifiModules, WIFI_ONE_WIRE_CAPACITY, WIFI_RELAY_CAPACITY } from './scheme/domain/wifiModules';
 import { getLeakZoneSensors, isLeakLoop, materializeLeakZones } from './scheme/domain/leakZones';
 import { getRinnaiBusSlotYOffset, RINNAI_ADAPTER_LABEL, RINNAI_ADAPTER_PRICE, usesRinnaiAdapter, withRinnaiAdapter } from './scheme/domain/rinnaiAdapter';
+import { getRl6RelayTerminalNames } from './scheme/domain/relaySlots';
 import { restorePublicDevicesFromModules, serializePublicScheme } from './scheme/publicSchemeSerializer';
 import { controllerImagePaths, wirelessDeviceImagePaths, getWirelessDeviceImageKey, aerialImagePath, goAerialImagePath } from './scheme/assets/imageRegistry';
 import { getOneWireDirectionForDevice, getOneWireLineGeometry, getOneWireSlotPosition } from './scheme/layout/oneWireLayout';
@@ -811,6 +812,8 @@ const getInstallationPortLineColor = (name, item) => {
     const [terminal, ...tags] = String(name || '').toUpperCase().trim().split(/\s+/);
     const tag = tags.join(' ');
     const itemType = canonicalDeviceType(item?.type || item?.data?.type);
+
+    if (getGroupedRelaySupplyLabel(terminal)) return '#d32f2f';
 
     if (itemType === 'io4') {
         if (/^CHANNEL-\d+-\d+-V\+$/.test(terminal)) return '#d32f2f';
@@ -8849,7 +8852,7 @@ const App = () => {
                                                             const endY = relaySAStub.fromY - 5 * indentSize;
                                                             return (
                                                                 <Group>
-                                                                    <Line points={[relaySAStub.fromX, relaySAStub.fromY, relaySAStub.fromX, endY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                    <Line points={[relaySAStub.fromX, relaySAStub.fromY, relaySAStub.fromX, endY]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                                     <Text x={relaySAStub.fromX - 8} y={endY - 12} width={16} text="L" fontSize={10} align="center" fill="#212121" listening={false} />
                                                                 </Group>
                                                             );
@@ -8913,7 +8916,7 @@ const App = () => {
                                                                                   const endY = feedY - 5 * indentSize;
                                                                                   return (
                                                                                       <>
-                                                                                          <Line points={[feedX, feedY, feedX, endY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                          <Line points={[feedX, feedY, feedX, endY]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                                                           <Text x={feedX - 8} y={endY - 12} width={16} text="L" fontSize={10} align="center" fill="#212121" listening={false} />
                                                                                       </>
                                                                                   );
@@ -8924,7 +8927,7 @@ const App = () => {
                                                                                   const endY = feedY - 5 * indentSize;
                                                                                   return (
                                                                                       <>
-                                                                                          <Line points={[feedX, feedY, feedX, endY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                                          <Line points={[feedX, feedY, feedX, endY]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                                                           <Text x={feedX - 8} y={endY - 12} width={16} text="L" fontSize={10} align="center" fill="#212121" listening={false} />
                                                                                       </>
                                                                                   );
@@ -9484,7 +9487,7 @@ const App = () => {
                                                              const endY = controllerImage.height + feedIndent * indentSize;
                                                             return (
                                                                 <Group>
-                                                                    <Line points={[fromX, fromY, fromX, endY]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                    <Line points={[fromX, fromY, fromX, endY]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                                     <EditableInfoTitle x={fromX - 8} y={endY + 2} width={16} text="L" fontSize={10} align="center" fill="#212121" listening={false} />
                                                                 </Group>
                                                             );
@@ -11000,7 +11003,7 @@ const App = () => {
                                                                                    : null;
                                                                                const nextModuleAPortX = nextAPort ? slotX + nextAPort.x * size.width : null;
                                                                                const nextModuleAPortY = nextAPort ? slotY + nextAPort.y * size.height : null;
-                                                                                const relayContactStroke = relayType === 'valve' ? '#d32f2f' : '#212121';
+                                                                                const relayContactStroke = '#d32f2f';
                                                                                 return (
                                                                                     <>
                                                                                         <Line points={[moduleAPortX, moduleAPortY, moduleAPortX, lRouteY]} stroke={relayContactStroke} strokeWidth={1} lineCap="round" listening={false} />
@@ -11189,19 +11192,14 @@ const App = () => {
                                                                   const slotDevice = slotState?.device || null;
                                                                   return slotDevice && !isStupidBoilerType(slotDevice?.type);
                                                               });
-                                                              const hasValveRelaySlot = relayOccupancy.some((slotState) => (
-                                                                  canonicalDeviceType(slotState?.device?.type) === 'valve'
-                                                              ));
-
-                                                             return (
+                                                              return (
                                                                  <>
                                                                       {hasOccupiedNonBoilerRelaySlot && groupedAPort && (() => {
                                                                          const moduleAPortX = slotX + groupedAPort.x * size.width;
                                                                          const moduleAPortY = slotY + groupedAPort.y * size.height;
-                                                                          const relayContactStroke = hasValveRelaySlot ? '#d32f2f' : '#212121';
                                                                           return (
                                                                               <>
-                                                                                  <Line points={[moduleAPortX, moduleAPortY, moduleAPortX, slotY - 3 * indentSize]} stroke={relayContactStroke} strokeWidth={1} lineCap="round" listening={false} />
+                                                                                  <Line points={[moduleAPortX, moduleAPortY, moduleAPortX, slotY - 3 * indentSize]} stroke="#d32f2f" strokeWidth={1} lineCap="round" listening={false} />
                                                                                   <EditableInfoTitle x={moduleAPortX - 8} y={slotY - 3 * indentSize - 14} width={16} text="L" fontSize={10} align="center" fill="#212121" listening={false} />
                                                                               </>
                                                                          );
@@ -12885,9 +12883,13 @@ const App = () => {
                                                                 const bPort = extPorts.find((port) => port.name === `${relayPortPrefix}-${relayIndex}-B`);
                                                                 const relayPorts = imageKeyRelay ? (wirelessPortsByType[imageKeyRelay] || []) : [];
                                                                 const relayInPort = getRelayInputPort(relayPorts, relayType, imageKeyRelay);
-                                                                const boilerBusAPort = relayPorts.find((port) => port.name === 'BUS-A') || null;
-                                                                const boilerBusBPort = relayPorts.find((port) => port.name === 'BUS-B') || null;
-                                                                const moduleAPortX = aPort ? slotX + aPort.x * slotWidth : null;
+                                                                 const boilerBusAPort = relayPorts.find((port) => port.name === 'BUS-A') || null;
+                                                                 const boilerBusBPort = relayPorts.find((port) => port.name === 'BUS-B') || null;
+                                                                 const boilerTerminalNames = getRl6RelayTerminalNames(relayPortPrefix, relayIndex);
+                                                                 const boilerModuleAPort = boilerTerminalNames
+                                                                     ? extPorts.find((port) => port.name === boilerTerminalNames.a) || null
+                                                                     : null;
+                                                                 const moduleAPortX = aPort ? slotX + aPort.x * slotWidth : null;
                                                                 const moduleAPortY = aPort ? slotY + aPort.y * slotHeight : null;
                                                                 const moduleBPortX = bPort ? slotX + bPort.x * slotWidth : null;
                                                                 const moduleBPortY = bPort ? slotY + bPort.y * slotHeight : null;
@@ -13022,13 +13024,9 @@ const App = () => {
                                                                                  />
                                                                              );
                                                                          })()}
-                                                                        {relayDevice && bPort && (aPort || relayType === 'stupid') && isRelayBoilerType(relayType) && boilerBusAPort && boilerBusBPort && (() => {
-                                                                            const stupidSecondPort = relayType === 'stupid'
-                                                                                ? extPorts.find((port) => port.name === `${relayPortPrefix}-${relayIndex + 1}-B`)
-                                                                                : null;
-                                                                            const firstModulePort = relayType === 'stupid' ? bPort : aPort;
-                                                                            const secondModulePort = relayType === 'stupid' ? stupidSecondPort : bPort;
-                                                                            if (!firstModulePort || !secondModulePort) return null;
+                                                                        {relayDevice && boilerModuleAPort && bPort && isRelayBoilerType(relayType) && boilerBusAPort && boilerBusBPort && (() => {
+                                                                            const firstModulePort = boilerModuleAPort;
+                                                                            const secondModulePort = bPort;
                                                                             const firstModulePortX = slotX + firstModulePort.x * slotWidth;
                                                                             const firstModulePortY = slotY + firstModulePort.y * slotHeight;
                                                                             const secondModulePortX = slotX + secondModulePort.x * slotWidth;
@@ -13100,7 +13098,7 @@ const App = () => {
                                                                      <Group key={`${extNormalizedType}-relay-power-feed-${slotIndex}-${groupPortName}`}>
                                                                          <Line
                                                                              points={[fromX, fromY, fromX, endY]}
-                                                                             stroke="#212121"
+                                                                             stroke="#d32f2f"
                                                                              strokeWidth={1}
                                                                              lineCap="round"
                                                                              listening={false}

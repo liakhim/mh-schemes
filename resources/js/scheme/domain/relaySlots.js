@@ -2,6 +2,21 @@ const getRelaySpan = (device) => (
     String(device?.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1
 );
 
+export const getRl6RelayTerminalNames = (prefix, relayIndex) => {
+    const normalizedPrefix = String(prefix || '').toUpperCase();
+    const normalizedIndex = Number(relayIndex);
+    if (!['RELAY', 'RELAY-S'].includes(normalizedPrefix)
+        || !Number.isInteger(normalizedIndex)
+        || normalizedIndex < 1
+        || normalizedIndex > 6) return null;
+
+    const group = normalizedIndex <= 3 ? '1-2-3' : '4-5-6';
+    return {
+        a: `${normalizedPrefix}-${group}-A`,
+        b: `${normalizedPrefix}-${normalizedIndex}-B`,
+    };
+};
+
 const findFreeSpan = (occupied, capacity, span) => {
     for (let start = 0; start + span <= capacity; start += 1) {
         let free = true;
