@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSmart2InstallationDiConnections } from './installationDi.js';
+import { buildSmart2InstallationDiConnections, getSmart2InstallationPowerChainHead } from './installationDi.js';
+
+test('excludes RDT2 and other 1-wire devices from the Smart2 12VDC chain', () => {
+    const rdt = { type: 'rdt2' };
+    const rl2 = { type: 'rl2' };
+
+    assert.equal(getSmart2InstallationPowerChainHead([rdt]), null);
+    assert.equal(getSmart2InstallationPowerChainHead([rdt, rl2]), rl2);
+});
 
 test('assigns two Smart2 DI pairs to two relay modules without UPS', () => {
     assert.deepEqual(buildSmart2InstallationDiConnections({

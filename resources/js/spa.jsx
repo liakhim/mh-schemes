@@ -19,7 +19,7 @@ import { balanceOneWireDevices } from './scheme/domain/oneWireBalancer';
 import { materializeBalancedOneWireScheme } from './scheme/domain/oneWireMaterializer';
 import { normalizeSchemeIds } from './scheme/domain/schemeIds';
 import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './scheme/domain/oneWireMutations';
-import { buildSmart2InstallationDiConnections } from './scheme/domain/installationDi';
+import { buildSmart2InstallationDiConnections, getSmart2InstallationPowerChainHead } from './scheme/domain/installationDi';
 import { shouldIncludeCollisionSlot, translateRect, unionRects } from './scheme/domain/collisionGeometry';
 import { getInstallationDinTotal } from './scheme/domain/installationDin';
 import { buildControllerOnlyScheme, isControllerOnlyScheme } from './scheme/domain/controllerOnlyScheme';
@@ -15997,7 +15997,7 @@ const App = () => {
                                     return { ...item, installationDiPortLabels };
                                 });
                                 const poweredInstallationModules = installationModuleItems.filter((item) => !powerTypes.has(item.type));
-                                const firstPoweredModule = poweredInstallationModules[0] || null;
+                                const smart2PowerChainHead = getSmart2InstallationPowerChainHead(poweredInstallationModules);
                                 const firstExtInstallationModule = installationModuleItems.find((item) => (
                                     memoExtModules[0]
                                     && (item.data === memoExtModules[0]
@@ -16025,10 +16025,10 @@ const App = () => {
                                             : (memoExtLineThermostatDevices[0]
                                                 ? getInstallationDeviceLabel(memoExtLineThermostatDevices[0], 'Термостат')
                                                 : null),
-                                        powerPreviousLabel: isSmart2Installation && firstPoweredModule
-                                            ? getInstallationItemLabel(firstPoweredModule)
+                                        powerPreviousLabel: isSmart2Installation && smart2PowerChainHead
+                                            ? getInstallationItemLabel(smart2PowerChainHead)
                                             : (hasInstallationUps ? 'UPS' : POWER_UNIT_LABEL),
-                                        powerNextLabel: !isSmart2Installation && firstPoweredModule ? getInstallationItemLabel(firstPoweredModule) : null,
+                                        powerNextLabel: !isSmart2Installation && poweredInstallationModules[0] ? getInstallationItemLabel(poweredInstallationModules[0]) : null,
                                     } : null,
                                     ...poweredInstallationModules,
                                 ].filter((item) => item?.image?.width && item?.image?.height);

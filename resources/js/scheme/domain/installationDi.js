@@ -1,3 +1,13 @@
+import { canonicalDeviceType } from './deviceTypes.js';
+
+const SMART2_POWER_CHAIN_MODULE_TYPES = new Set(['bl2', 'rl6', 'rl6s', 'io4', 'di6', 'rl2', 'rl2s']);
+
+export const getSmart2InstallationPowerChainHead = (items) => (
+    (Array.isArray(items) ? items : []).find((item) => (
+        SMART2_POWER_CHAIN_MODULE_TYPES.has(canonicalDeviceType(item?.type || item?.data?.type))
+    )) || null
+);
+
 export const buildSmart2InstallationDiConnections = ({
     hasUps,
     moduleLabels,
