@@ -1484,6 +1484,7 @@ const App = () => {
     const [showUnusedBundledSensors, setShowUnusedBundledSensors] = useState(false);
     const [showSaveActions, setShowSaveActions] = useState(false);
     const [showDeveloperToolsPanel, setShowDeveloperToolsPanel] = useState(false);
+    const [wifiLineEnabled, setWifiLineEnabled] = useState(false);
     const [installationMode, setInstallationMode] = useState(
         initialViewOptions.installationMode ?? !requestedControllerOnlyScheme,
     );
@@ -3306,6 +3307,7 @@ const App = () => {
     };
 
     const addWifiModuleAtSlot = (type, slotIndex) => {
+        if (!wifiLineEnabled) return;
         setScheme((s) => {
             const wifiModules = getWifiModules(s);
             if (wifiModules.length >= getWifiCapacity(getControllerType(s))) return s;
@@ -4416,7 +4418,10 @@ const App = () => {
     };
 
     const memoExtModules = useMemo(() => getExtModules(scheme), [scheme]);
-    const memoWifiModules = useMemo(() => getWifiModules(scheme), [scheme]);
+    const memoWifiModules = useMemo(
+        () => (wifiLineEnabled ? getWifiModules(scheme) : []),
+        [scheme, wifiLineEnabled],
+    );
     const schemeOfferSections = useMemo(
         () => (showOfferModal ? getSchemeOfferSections(scheme) : []),
         [scheme, showOfferModal],
@@ -4684,7 +4689,7 @@ const App = () => {
             ...getPowerLabelsForModule(item),
             });
         });
-        getWifiModules(scheme).forEach((item, index, modules) => {
+        memoWifiModules.forEach((item, index, modules) => {
             const labelInfo = getChainLabelInfo(modules, index);
             addUnique(items, seen, item, `wifi:${index}`, {
                 layoutKey: getInstallationLayoutItemKey('wifi', item, getItemType(item), index),
@@ -4743,7 +4748,7 @@ const App = () => {
             });
 
         return items;
-    }, [scheme, memoExtModules, memoExtLineThermostatDevices]);
+    }, [scheme, memoExtModules, memoExtLineThermostatDevices, memoWifiModules]);
 
     const installationDinTotal = useMemo(() => {
         if (!canUseInstallationMode) return null;
@@ -5200,6 +5205,24 @@ const App = () => {
                             <label className="scheme-settings-switch-row">
                                 <span>Отображать отладочную панель</span>
                                 <input type="checkbox" checked={showIncomingScheme} onChange={(event) => setShowIncomingScheme(event.target.checked)} />
+                                <span className="scheme-settings-switch" aria-hidden="true" />
+                            </label>
+                            <label className="scheme-settings-switch-row">
+                                <span>Включить Wi-Fi-линию</span>
+                                <input
+                                    type="checkbox"
+                                    checked={wifiLineEnabled}
+                                    onChange={(event) => {
+                                        const enabled = event.target.checked;
+                                        setWifiLineEnabled(enabled);
+                                        if (!enabled) {
+                                            setWifiMenuPos(null);
+                                            setWifiOneWireMenuPos(null);
+                                            setRelayMenuPos((current) => (current?.moduleGroup === 'wifi' ? null : current));
+                                        }
+                                    }}
+                                    data-test-id="developer-wifi-line-toggle"
+                                />
                                 <span className="scheme-settings-switch" aria-hidden="true" />
                             </label>
                         </div>
@@ -16994,7 +17017,7 @@ const App = () => {
                     </div>
                 </div>
             )}
-            {wifiMenuPos && (
+            {wifiLineEnabled && wifiMenuPos && (
                 <div className="ctx-menu-backdrop" onClick={() => setWifiMenuPos(null)}>
                     <div className="ctx-menu" style={{ left: wifiMenuPos.x, top: wifiMenuPos.y }} onClick={(event) => event.stopPropagation()}>
                         <div className="ctx-menu-item" onClick={() => addWifiModuleAtSlot('rl6w', wifiMenuPos.slotIndex)}>Модуль RL6W</div>
@@ -17004,7 +17027,7 @@ const App = () => {
                     </div>
                 </div>
             )}
-            {wifiOneWireMenuPos && (
+            {wifiLineEnabled && wifiOneWireMenuPos && (
                 <div className="ctx-menu-backdrop" onClick={() => setWifiOneWireMenuPos(null)}>
                     <div className="ctx-menu" style={{ left: wifiOneWireMenuPos.x, top: wifiOneWireMenuPos.y }} onClick={(event) => event.stopPropagation()}>
                         <div className="ctx-menu-item" onClick={() => addWifiOneWireDeviceAtSlot(wifiOneWireMenuPos.moduleIndex, wifiOneWireMenuPos.slotIndex, 'wall-temperature-sensor')}>Настенный проводной датчик</div>
