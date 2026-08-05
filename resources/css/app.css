@@ -5032,10 +5032,27 @@ body {
         opacity: 0.16;
     }
 
-    /* На телефоне двухколоночная карточка со снимком устройства не помещается:
-       возвращаем перенос, снимок уходит под текст. */
+    /* Карточка со снимком устройства ведёт себя как карточка термостата: снимок
+       остаётся справа от заголовка, описания и кнопки на любой ширине, а не
+       уезжает под текст. Колонки при этом сжимаются — как `.sel-thermostat-*`
+       ниже. */
     .selection-page .sel-card-with-device {
-        flex-wrap: wrap !important;
+        column-gap: 16px;
+    }
+
+    .selection-page .sel-card-with-device .sel-card-section-copy {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+    }
+
+    /* Базис взят по нижней границе, а не по желаемому размеру: до `max-width`
+       колонку дотягивает flex-grow из остатка ширины. Свечение и тень заданы в
+       процентах от колонки, поэтому уменьшаются вместе со снимком. */
+    .selection-page .sel-card-with-device .sel-card-device-visual {
+        flex: 1 1 48px !important;
+        min-width: 0 !important;
+        max-width: 132px !important;
+        align-self: center !important;
     }
 
     /* Рендер термостата остаётся справа и на телефоне — вниз он не уезжает,

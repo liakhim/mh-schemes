@@ -3059,6 +3059,7 @@ const SectionEquipmentCard = ({
         )}
 
         <div
+            className="sel-card-section-copy"
             style={{
                 position: 'relative',
                 display: 'flex',
@@ -3098,6 +3099,7 @@ const SectionEquipmentCard = ({
             /* Тот же приём, что в карточке уличного датчика: мягкое свечение и
                тень под устройством, снимок лежит поверх размытой подложки. */
             <div
+                className="sel-card-device-visual"
                 style={{
                     position: 'relative',
                     display: 'flex',
