@@ -2285,7 +2285,7 @@ const BoilerConnectionSwitch = ({ connectionType, onChange }) => {
     );
 };
 
-const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, price = null, disabled = false, control = null, hideCount = false, removeFirst = false }) => {
+const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, price = null, disabled = false, control = null, hideCount = false, removeFirst = false, align = 'flex-end' }) => {
     const removeButton = onRemove ? (
         <button
             onClick={onRemove}
@@ -2300,10 +2300,12 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove 
     <div
         className="sel-added-line"
         style={{
-            // По нижнему краю, а не по базовой линии: у названия из двух строк
-            // базовая линия — первая строка, и счётчик вставал напротив неё,
-            // отрываясь от низа строки списка.
-            alignItems: 'flex-end',
+            // По умолчанию по нижнему краю, а не по базовой линии: у названия из
+            // двух строк базовая линия — первая строка, и счётчик вставал
+            // напротив неё, отрываясь от низа строки списка. Списку, где все
+            // элементы одной высоты, подходит `center` — он ровняет крестик со
+            // счётчиком.
+            alignItems: align,
             color: disabled ? '#94a3b8' : '#203040',
             opacity: disabled ? 0.7 : 1,
         }}
@@ -2345,7 +2347,9 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove 
                 <span>{label}</span>
             </span>
         ) : <span className="sel-added-label">{label}</span>}
-        <span className="sel-added-leader" style={{ flex: 1, borderBottom: '1px dotted #6b7f95', transform: badgeAbove ? 'none' : 'translateY(-3px)' }} />
+        {/* Подъём нужен только прижатой к низу строке: по центру пунктир и так
+            попадает на середину. */}
+        <span className="sel-added-leader" style={{ flex: 1, borderBottom: '1px dotted #6b7f95', transform: badgeAbove || align === 'center' ? 'none' : 'translateY(-3px)' }} />
         {removeFirst && removeButton}
         {control}
         {!hideCount && <span style={{ whiteSpace: 'nowrap' }}>{count} шт</span>}
@@ -2519,7 +2523,7 @@ const ThermostatFieldLabel = ({ children }) => (
 );
 
 /** Карточка термостата: callbacks меняют тип подключения, цвет, датчик пола и добавляют устройство. */
-const ThermostatCard = ({ template, connection, onConnectionChange, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, showAdd = true, addedRows = [], onRemoveRow, onAddRow, showJsonDetails = false }) => (
+const ThermostatCard = ({ template, connection, onConnectionChange, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, showAdd = true, addedRows = [], onRemoveRow, onRemoveRowCompletely, onAddRow, showJsonDetails = false }) => (
     <div
         className="sel-card sel-card-static sel-card-section sel-thermostat-card"
         style={{
@@ -2563,7 +2567,9 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                         count={row.count}
                         hideCount
                         removeFirst
-                        onRemove={() => onRemoveRow(row)}
+                        align="center"
+                        // Крестик убирает позицию целиком, минус у счётчика — по одному.
+                        onRemove={() => onRemoveRowCompletely(row)}
                         control={(
                             <QtyStepper
                                 count={row.count}
@@ -4465,6 +4471,44 @@ const SelectionApp = () => {
         });
     }, []);
 
+    /**
+     * Удаляет разом все устройства строки списка. Одним обновлением состояния, а
+     * не циклом по `removeSchemeItemById`: иначе на каждую штуку пришлось бы по
+     * прогону автоподбора модулей.
+     * @param {Array<{target: string, id: string|number}>} keys Ключи удаления строки.
+     */
+    const removeSchemeItemsByKeys = useCallback((keys) => {
+        const removeKeys = (Array.isArray(keys) ? keys : []).filter((key) => key && key.target);
+        if (removeKeys.length === 0) return;
+        setIncomingScheme((prev) => {
+            const idsByTarget = new Map();
+            removeKeys.forEach(({ target, id }) => {
+                if (!idsByTarget.has(target)) idsByTarget.set(target, new Set());
+                idsByTarget.get(target).add(id);
+            });
+            let next = prev;
+            idsByTarget.forEach((ids, target) => {
+                if (target === 'ext_devices') {
+                    const controller = next?.controller && typeof next.controller === 'object' ? next.controller : {};
+                    next = {
+                        ...next,
+                        controller: {
+                            ...controller,
+                            ext_devices: (Array.isArray(controller.ext_devices) ? controller.ext_devices : [])
+                                .filter((item) => !ids.has(item.id)),
+                        },
+                    };
+                    return;
+                }
+                next = {
+                    ...next,
+                    [target]: (Array.isArray(next[target]) ? next[target] : []).filter((item) => !ids.has(item.id)),
+                };
+            });
+            return resolveSelectionScheme(next);
+        });
+    }, []);
+
     /** Строит счетчик составных устройств указанного шаблона и группы. */
     /** Строит счетчик однотипных элементов массива target. */
     const renderItemStepper = (target, type, onIncrement, disabled = false) => {
@@ -5151,6 +5195,7 @@ const SelectionApp = () => {
                             const removeKey = row.removeKeys[row.removeKeys.length - 1];
                             removeSchemeItemById(removeKey.target, removeKey.id);
                         }}
+                        onRemoveRowCompletely={(row) => removeSchemeItemsByKeys(row.removeKeys)}
                         onAddRow={(row) => {
                             // Конфигурация берётся из самой строки, а не из текущих
                             // переключателей карточки: «+» повторяет именно эту позицию.
