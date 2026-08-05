@@ -50,7 +50,7 @@ const ACTIVE_INDICATOR_SHADOW_BLUR = 6;
 const INFO_BLOCK_STROKE_WIDTH = 0.2;
 const INFO_BLOCK_FONT_SIZE = 6;
 const INFO_BLOCK_HEIGHT = 18;
-const CHANNEL_LEAK_SENSOR_IMAGE_SCALE = 1.25;
+const LEAK_DI_DEVICE_IMAGE_SCALE = 1.25;
 const COMMENT_ICON_NODE_NAME = 'comment-icon-export-hidden';
 const GRID_MIN = -4000;
 const GRID_MAX = 4000;
@@ -6293,18 +6293,23 @@ const App = () => {
                                                 const device = proDiDevices[0];
                                                 const hoverKey = 'controller-di:0';
                                                 const isHovered = hoveredNtcSlotKey === hoverKey;
-                                                const visualDevice = isDiscreteDiDeviceType(device?.type)
-                                                    ? { ...device, port_side: 'left' }
-                                                    : device;
-                                                const deviceType = canonicalDeviceType(device?.type);
-                                                const imageKey = deviceType === 'leak-sensor' || deviceType === 'leak-loop'
-                                                    ? 'leak-sensor'
-                                                    : getWirelessDeviceImageKey(visualDevice);
+                                                 const deviceType = canonicalDeviceType(device?.type);
+                                                 const isLeakDevice = isLeakDiDeviceType(deviceType);
+                                                 const visualDevice = isDiscreteDiDeviceType(deviceType) || isLeakDevice
+                                                     ? { ...device, port_side: 'left' }
+                                                     : device;
+                                                 const imageKey = getWirelessDeviceImageKey(visualDevice);
                                                 const image = imageKey ? wirelessImages[imageKey] : null;
                                                 if (!image) return null;
                                                 const portsForDevice = wirelessPortsByType[imageKey] || [];
                                                 const diInputPort = (getPortsByClassToken(portsForDevice, 'DI-IN') || [])[0] || null;
-                                                const size = getContainSize(image, diSlotWidth, diSlotHeight);
+                                                 const imageBoxWidth = isLeakDevice
+                                                     ? diSlotWidth * LEAK_DI_DEVICE_IMAGE_SCALE
+                                                     : diSlotWidth;
+                                                 const imageBoxHeight = isLeakDevice
+                                                     ? diSlotHeight * LEAK_DI_DEVICE_IMAGE_SCALE
+                                                     : diSlotHeight;
+                                                 const size = getContainSize(image, imageBoxWidth, imageBoxHeight);
                                                 const x = diSlotX + (diSlotWidth - size.width) / 2;
                                                 const y = diSlot2Y + (diSlotHeight - size.height) / 2;
                                                  const toX = diInputPort ? (x + diInputPort.x * size.width) : diSlot2TargetX;
@@ -6323,10 +6328,10 @@ const App = () => {
                                                          />
                                                           <Image image={image} x={x} y={y} width={size.width} height={size.height} listening={false} />
                                                           <Rect
-                                                              x={diSlotX}
-                                                              y={diSlot2Y}
-                                                              width={diSlotWidth}
-                                                              height={diSlotHeight}
+                                                               x={isLeakDevice ? x : diSlotX}
+                                                               y={isLeakDevice ? y : diSlot2Y}
+                                                               width={isLeakDevice ? size.width : diSlotWidth}
+                                                               height={isLeakDevice ? size.height : diSlotHeight}
                                                               cornerRadius={6}
                                                               fill="rgba(0,0,0,0)"
                                                               stroke="rgba(0,0,0,0)"
@@ -6337,7 +6342,7 @@ const App = () => {
                                                           {showDiInfoBlock && (
                                                              <>
                                                                   <Rect x={diSlotX} y={diSlot2Y - (INFO_BLOCK_HEIGHT + 4)} width={diSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                                  <EditableInfoTitle x={diSlotX + 3} y={diSlot2Y - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, diSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={diInfoTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={device} title={diInfoTitle} />
+                                                                  <EditableInfoTitle x={diSlotX + 3} y={diSlot2Y - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, diSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={diInfoTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={visualDevice} title={diInfoTitle} />
                                                              </>
                                                          )}
                                                          {showPorts && portsForDevice.map((port) => (
@@ -6366,18 +6371,23 @@ const App = () => {
                                                 const device = proDiDevices[1];
                                                 const hoverKey = 'controller-di:1';
                                                 const isHovered = hoveredNtcSlotKey === hoverKey;
-                                                const visualDevice = isDiscreteDiDeviceType(device?.type)
-                                                    ? { ...device, port_side: 'left' }
-                                                    : device;
-                                                const deviceType = canonicalDeviceType(device?.type);
-                                                const imageKey = deviceType === 'leak-sensor' || deviceType === 'leak-loop'
-                                                    ? 'leak-sensor'
-                                                    : getWirelessDeviceImageKey(visualDevice);
+                                                 const deviceType = canonicalDeviceType(device?.type);
+                                                 const isLeakDevice = isLeakDiDeviceType(deviceType);
+                                                 const visualDevice = isDiscreteDiDeviceType(deviceType) || isLeakDevice
+                                                     ? { ...device, port_side: 'left' }
+                                                     : device;
+                                                 const imageKey = getWirelessDeviceImageKey(visualDevice);
                                                 const image = imageKey ? wirelessImages[imageKey] : null;
                                                 if (!image) return null;
                                                 const portsForDevice = wirelessPortsByType[imageKey] || [];
                                                 const diInputPort = (getPortsByClassToken(portsForDevice, 'DI-IN') || [])[0] || null;
-                                                const size = getContainSize(image, diSlotWidth, diSlotHeight);
+                                                 const imageBoxWidth = isLeakDevice
+                                                     ? diSlotWidth * LEAK_DI_DEVICE_IMAGE_SCALE
+                                                     : diSlotWidth;
+                                                 const imageBoxHeight = isLeakDevice
+                                                     ? diSlotHeight * LEAK_DI_DEVICE_IMAGE_SCALE
+                                                     : diSlotHeight;
+                                                 const size = getContainSize(image, imageBoxWidth, imageBoxHeight);
                                                 const x = diSlotX + (diSlotWidth - size.width) / 2;
                                                 const y = diSlot1Y + (diSlotHeight - size.height) / 2;
                                                  const toX = diInputPort ? (x + diInputPort.x * size.width) : diSlot1TargetX;
@@ -6396,10 +6406,10 @@ const App = () => {
                                                          />
                                                           <Image image={image} x={x} y={y} width={size.width} height={size.height} listening={false} />
                                                           <Rect
-                                                              x={diSlotX}
-                                                              y={diSlot1Y}
-                                                              width={diSlotWidth}
-                                                              height={diSlotHeight}
+                                                               x={isLeakDevice ? x : diSlotX}
+                                                               y={isLeakDevice ? y : diSlot1Y}
+                                                               width={isLeakDevice ? size.width : diSlotWidth}
+                                                               height={isLeakDevice ? size.height : diSlotHeight}
                                                               cornerRadius={6}
                                                               fill="rgba(0,0,0,0)"
                                                               stroke="rgba(0,0,0,0)"
@@ -6410,7 +6420,7 @@ const App = () => {
                                                           {showDiInfoBlock && (
                                                              <>
                                                                   <Rect x={diSlotX} y={diSlot1Y - (INFO_BLOCK_HEIGHT + 4)} width={diSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                                  <EditableInfoTitle x={diSlotX + 3} y={diSlot1Y - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, diSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={diInfoTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={device} title={diInfoTitle} />
+                                                                  <EditableInfoTitle x={diSlotX + 3} y={diSlot1Y - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, diSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={diInfoTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={visualDevice} title={diInfoTitle} />
                                                              </>
                                                          )}
                                                          {showPorts && portsForDevice.map((port) => (
@@ -6497,7 +6507,9 @@ const App = () => {
                                     const imageKey = controllerPortCenterX > slotX + slotWidth / 2 ? 'leak-sensor-right-port' : 'leak-sensor';
                                     const image = wirelessImages[imageKey] || null;
                                     const leakSensorPorts = wirelessPortsByType[imageKey] || [];
-                                    const renderSize = { width: slotWidth, height: slotHeight };
+                                    const renderSize = image
+                                        ? getContainSize(image, slotWidth, slotHeight)
+                                        : { width: slotWidth, height: slotHeight };
                                     const renderX = slotX + (slotWidth - renderSize.width) / 2;
                                     const renderY = slotY + (slotHeight - renderSize.height) / 2;
                                     const getLeakSensorPort = (name, fallbackY) => {
@@ -6529,8 +6541,8 @@ const App = () => {
                                             {(leakSensor || showEmptySlots) && (
                                                 <>
                                                     <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, leakPorts.gnd.x, targetPorts.gnd.y, leakPorts.gnd.x, leakPorts.gnd.y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.di.x, targetPorts.di.y, leakPorts.di.x, targetPorts.di.y, leakPorts.di.x, leakPorts.di.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, leakPorts.vplus.y]} stroke="#fbc02d" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.di.x, targetPorts.di.y, leakPorts.di.x, targetPorts.di.y, leakPorts.di.x, leakPorts.di.y]} stroke="#1976d2" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, leakPorts.vplus.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                 </>
                                             )}
                                             <Rect
@@ -13194,9 +13206,9 @@ const App = () => {
                                                                 ? 2 * indentSize
                                                                 : (slotDeviceType === '010pump' || slotDeviceType === '010servo' ? 8 * indentSize : channelSlotHeight);
                                                             const imageBoxWidth = isLeakDiDeviceType(slotDeviceType)
-                                                                ? visualSlotWidth * CHANNEL_LEAK_SENSOR_IMAGE_SCALE
+                                                                ? visualSlotWidth * LEAK_DI_DEVICE_IMAGE_SCALE
                                                                 : (slotDeviceType === '010servo' ? visualSlotWidth - indentSize : visualSlotWidth);
-                                                            const imageBoxHeight = isLeakDiDeviceType(slotDeviceType) ? visualSlotHeight * CHANNEL_LEAK_SENSOR_IMAGE_SCALE : visualSlotHeight;
+                                                            const imageBoxHeight = isLeakDiDeviceType(slotDeviceType) ? visualSlotHeight * LEAK_DI_DEVICE_IMAGE_SCALE : visualSlotHeight;
                                                             const renderSize = (hasDevice && slotDeviceImage)
                                                                 ? getContainSize(slotDeviceImage, imageBoxWidth, imageBoxHeight)
                                                                 : { width: visualSlotWidth, height: visualSlotHeight };
@@ -13529,8 +13541,8 @@ const App = () => {
                                                                 const channelIndex = channelPortStart + localIndex - 1;
                                                                 const fromPort = extPorts.find((port) => port.name === modulePortName);
                                                                 const slotYLine = getDi6SlotY(visualIndex);
-                                                                const imageBoxWidth = isLeakDiDeviceType(slotDeviceType) ? di6SlotWidth * CHANNEL_LEAK_SENSOR_IMAGE_SCALE : di6SlotWidth;
-                                                                const imageBoxHeight = isLeakDiDeviceType(slotDeviceType) ? di6SlotHeight * CHANNEL_LEAK_SENSOR_IMAGE_SCALE : di6SlotHeight;
+                                                                const imageBoxWidth = isLeakDiDeviceType(slotDeviceType) ? di6SlotWidth * LEAK_DI_DEVICE_IMAGE_SCALE : di6SlotWidth;
+                                                                const imageBoxHeight = isLeakDiDeviceType(slotDeviceType) ? di6SlotHeight * LEAK_DI_DEVICE_IMAGE_SCALE : di6SlotHeight;
                                                                 const renderSize = (hasDevice && slotDeviceImage)
                                                                     ? getContainSize(slotDeviceImage, imageBoxWidth, imageBoxHeight)
                                                                     : { width: di6SlotWidth, height: di6SlotHeight };

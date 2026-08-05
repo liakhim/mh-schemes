@@ -72,7 +72,7 @@
 - У `pro` при наличии UPS controller DI-входы заняты UPS, поэтому DI-устройства должны распределяться в `di6`/`io4`; на `/selection` это создаёт потребность в `di6`, если нет свободных module DI/channel слотов.
 - Пустые controller DI-слоты `pro` при `Show empty slots` показывают кнопку `+`; через меню можно добавить `discrete_pool`, `discrete_fire_alarm`, `discrete_signal`, `discrete_ventilation`, `leak-sensor` в конкретный индекс `controller.di_devices[0..1]`.
 - Занятые controller DI-слоты `pro` на hover показывают кнопку удаления; удаление очищает конкретный индекс `controller.di_devices` без сдвига соседних устройств.
-- Если `leak-sensor` занимает controller DI-слот `pro`, используется изображение `resources/assets/sensors/leakSensorLeftPort.svg`.
+- Если `leak-sensor` занимает controller DI-слот `pro`, используется изображение `resources/assets/sensors/leakSensorLeftPort.svg`; занятое изображение отображается с масштабом `1.25` относительно обычного DI-слота без изменения геометрии самого слота. Рамка выбора повторяет увеличенные границы изображения, а блок «Детали устройства» использует тот же вариант SVG с портами слева.
 - У `smart2` controller DI использует свободные порты `DI-OUT-1..4`: UPS занимает 2 порта, каждый DI-модуль `rl2`/`rl2s` занимает 2 порта, оставшиеся порты доступны для отдельных DI-устройств в `controller.di_devices`.
 - Пустые отдельные controller DI-слоты `smart2` (не слоты `di_modules`) при `Show empty slots` показывают кнопку `+`; через меню можно добавить `discrete_pool`, `discrete_fire_alarm`, `discrete_signal`, `discrete_ventilation`, `leak-sensor`.
 - Занятые отдельные controller DI-слоты `smart2` на hover показывают кнопку удаления; удаление очищает конкретный индекс `controller.di_devices` без сдвига соседних устройств.
@@ -82,8 +82,9 @@
 - `leak-sensor` с `connection_type='di'` является датчиком протечки и участвует в DI-балансировке для всех контроллеров.
 - Для `ecosmart` первый `leak-sensor` распределяется в собственную `controller.leak_sensor_devices[0]` (`leak_sensor_line`).
 - `controller.leak_sensor_devices` является внутренней render-линией `ecosmart`; в публичном `incomingScheme` датчик должен оставаться/сериализоваться в `sensors`, а не сохраняться в controller-line.
-- `ecosmart leak_sensor_line` подключается к портам controller `DI-IN-2-DI`, `DI-IN-2-V+`, `DI-IN-2-GND`.
+- `ecosmart leak_sensor_line` подключается к портам controller `DI-IN-2-DI`, `DI-IN-2-V+`, `DI-IN-2-GND`: линия `DI` синяя, `V+` красная, `GND` чёрная.
 - Слот `ecosmart leak_sensor_line` расположен над контроллером: нижняя грань на `12 * indent` выше верхней грани контроллера, размер `7 * indent` на `7 * indent`.
+- Изображение датчика в `ecosmart leak_sensor_line` вписывается в слот с сохранением исходных пропорций и не растягивается по высоте.
 - Над занятым слотом отображается инфоблок `Датчик протечки N`, где `N` - порядковый номер датчика протечки в системе.
 - Линии от портов датчика протечки сначала выходят горизонтально в сторону до вертикали соответствующего порта controller, затем спускаются в порт controller.
 - Если порты controller правее слота, используется `resources/assets/sensors/leakSensorRightPort.svg`; если левее слота, используется `resources/assets/sensors/leakSensorLeftPort.svg`.
