@@ -11480,6 +11480,7 @@ const App = () => {
                                     );
                                 })()}
                                 {(() => {
+                                    if (!wifiLineEnabled) return null;
                                     const wifiModules = memoWifiModules;
                                     const capacity = getWifiCapacity(controllerType);
                                     const showAddSlot = showEmptySlots && wifiModules.length < capacity;
