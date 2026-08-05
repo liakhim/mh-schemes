@@ -1,6 +1,11 @@
 import { canonicalDeviceType } from './deviceTypes.js';
 
 const SMART2_POWER_CHAIN_MODULE_TYPES = new Set(['bl2', 'rl6', 'rl6s', 'io4', 'di6', 'rl2', 'rl2s']);
+const GROUPED_RELAY_SUPPLY_PORT_PATTERN = /^RELAY(?:-S)?-(?:1-2-3|4-5-6)-A$/i;
+
+export const getGroupedRelaySupplyLabel = (portName) => (
+    GROUPED_RELAY_SUPPLY_PORT_PATTERN.test(String(portName || '').trim()) ? 'L' : null
+);
 
 export const getSmart2InstallationPowerChainHead = (items) => (
     (Array.isArray(items) ? items : []).find((item) => (

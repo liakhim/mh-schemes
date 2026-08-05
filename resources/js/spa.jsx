@@ -19,7 +19,11 @@ import { balanceOneWireDevices } from './scheme/domain/oneWireBalancer';
 import { materializeBalancedOneWireScheme } from './scheme/domain/oneWireMaterializer';
 import { normalizeSchemeIds } from './scheme/domain/schemeIds';
 import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './scheme/domain/oneWireMutations';
-import { buildSmart2InstallationDiConnections, getSmart2InstallationPowerChainHead } from './scheme/domain/installationDi';
+import {
+    buildSmart2InstallationDiConnections,
+    getGroupedRelaySupplyLabel,
+    getSmart2InstallationPowerChainHead,
+} from './scheme/domain/installationDi';
 import { shouldIncludeCollisionSlot, translateRect, unionRects } from './scheme/domain/collisionGeometry';
 import { getInstallationDinTotal } from './scheme/domain/installationDin';
 import { buildControllerOnlyScheme, isControllerOnlyScheme } from './scheme/domain/controllerOnlyScheme';
@@ -1070,6 +1074,8 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
     const slot = parseInstallationPortSlot(port?.name);
     const data = item?.data;
     const normalizedPortName = String(port?.name || '').toUpperCase();
+    const groupedRelaySupplyLabel = getGroupedRelaySupplyLabel(normalizedPortName);
+    if (groupedRelaySupplyLabel) return groupedRelaySupplyLabel;
     if (slot?.line === 'di'
         && item?.installationDiPortLabels
         && Object.prototype.hasOwnProperty.call(item.installationDiPortLabels, slot.index)) {

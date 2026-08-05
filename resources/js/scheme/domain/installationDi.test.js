@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSmart2InstallationDiConnections, getSmart2InstallationPowerChainHead } from './installationDi.js';
+import {
+    buildSmart2InstallationDiConnections,
+    getGroupedRelaySupplyLabel,
+    getSmart2InstallationPowerChainHead,
+} from './installationDi.js';
+
+test('labels grouped RL6 and RL6S supply terminals as L', () => {
+    assert.equal(getGroupedRelaySupplyLabel('RELAY-1-2-3-A'), 'L');
+    assert.equal(getGroupedRelaySupplyLabel('RELAY-4-5-6-A'), 'L');
+    assert.equal(getGroupedRelaySupplyLabel('RELAY-S-1-2-3-A'), 'L');
+    assert.equal(getGroupedRelaySupplyLabel('RELAY-S-4-5-6-A'), 'L');
+    assert.equal(getGroupedRelaySupplyLabel('RELAY-1-B'), null);
+});
 
 test('excludes RDT2 and other 1-wire devices from the Smart2 12VDC chain', () => {
     const rdt = { type: 'rdt2' };
