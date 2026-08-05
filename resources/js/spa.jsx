@@ -1568,6 +1568,7 @@ const App = () => {
     const [schemeJsonDirty, setSchemeJsonDirty] = useState(false);
     const [schemeJsonError, setSchemeJsonError] = useState(null);
     const [schemeMetadataEditor, setSchemeMetadataEditor] = useState(null);
+    const [schemeMetaCollapsed, setSchemeMetaCollapsed] = useState(true);
     const [selectedDevicePreview, setSelectedDevicePreview] = useState(null);
     const [devicePreviewCollapsed, setDevicePreviewCollapsed] = useState(false);
     const selectedPreviewSlotNodeRef = useRef(null);
@@ -5269,7 +5270,22 @@ const App = () => {
             >
                 ?
             </button>
-            <div className={`spa-scheme-meta${schemeMetadataEditor ? ' is-open' : ''}`}>
+            <div className={`spa-scheme-meta${schemeMetadataEditor ? ' is-open' : ''}${schemeMetaCollapsed ? ' is-collapsed' : ''}`}>
+                {schemeMetaCollapsed ? (
+                    <button
+                        type="button"
+                        className="spa-floating-tool-button spa-scheme-meta-expand-button"
+                        aria-label="Развернуть текущую схему"
+                        data-tooltip="Текущая схема"
+                        data-test-id="expand-current-scheme"
+                        onClick={() => setSchemeMetaCollapsed(false)}
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M6 3.5h9l3 3v14H6zM15 3.5v3h3M9 11h6m-6 3h6m-6 3h4" />
+                        </svg>
+                    </button>
+                ) : (
+                    <>
                 <button
                     type="button"
                     className="spa-scheme-meta-card"
@@ -5302,6 +5318,20 @@ const App = () => {
                             </svg>
                         </span>
                     )}
+                </button>
+                <button
+                    type="button"
+                    className="spa-scheme-meta-collapse-button"
+                    aria-label="Свернуть текущую схему"
+                    title="Свернуть"
+                    onClick={() => {
+                        setSchemeMetadataEditor(null);
+                        setSchemeMetaCollapsed(true);
+                    }}
+                >
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="m13 4-6 6 6 6" />
+                    </svg>
                 </button>
                 {schemeMetadataEditor && (
                     <form
@@ -5359,6 +5389,8 @@ const App = () => {
                         </button>
                     </div>
                     </form>
+                )}
+                    </>
                 )}
             </div>
             {schemeLoadError && (

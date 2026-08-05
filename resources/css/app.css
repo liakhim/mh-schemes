@@ -385,6 +385,59 @@ body {
     max-width: calc(100vw - 28px);
 }
 
+.spa-scheme-meta.is-collapsed {
+    width: 56px;
+}
+
+.spa-scheme-meta-expand-button {
+    position: relative;
+    inset: auto;
+    color: var(--ui-green);
+}
+
+.spa-scheme-meta:not(.is-collapsed) .spa-scheme-meta-card {
+    width: calc(100% - 38px);
+}
+
+.spa-scheme-meta-collapse-button {
+    position: absolute;
+    top: 11px;
+    right: 0;
+    z-index: 2;
+    display: grid;
+    width: 30px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    color: #64748b;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 5px 16px rgba(15, 23, 42, 0.1);
+    cursor: pointer;
+    place-items: center;
+}
+
+.spa-scheme-meta-collapse-button:hover {
+    border-color: #86b879;
+    color: var(--ui-green);
+    background: var(--ui-green-soft);
+}
+
+.spa-scheme-meta-collapse-button:focus-visible {
+    outline: 3px solid rgba(46, 125, 50, 0.24);
+    outline-offset: 2px;
+}
+
+.spa-scheme-meta-collapse-button svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
 .spa-scheme-meta-card {
     position: relative;
     display: flex;
