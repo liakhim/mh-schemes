@@ -6,6 +6,7 @@ import {
     isMixingUnitSensor,
     MIXING_OWNER_FIELD,
 } from './mixingUnitOwnership.js';
+import { getWifiOneWireOwner, isWifiOneWireSensor, WIFI_ONE_WIRE_CAPACITY } from './wifiModules.js';
 
 const LINE_CAPACITY = 6;
 const EXT_LINE_CAPACITY = 12;
@@ -121,7 +122,7 @@ const makeExtThermostatFromGroup = (group) => {
     };
 };
 
-export const balanceOneWireDevices = (scheme, extModules) => {
+export const balanceOneWireDevices = (scheme, extModules, wifiModules = []) => {
     const lines = getPotentialOneWireLines(scheme, extModules);
     if (lines.length === 0) return { controllerDevices: [], extDevicesByModuleIndex: {}, extThermostatDevices: [] };
 
@@ -157,6 +158,11 @@ export const balanceOneWireDevices = (scheme, extModules) => {
     });
 
     const lineBuckets = lines.map(() => []);
+    const wifiLines = (Array.isArray(wifiModules) ? wifiModules : []).map((moduleItem, moduleIndex) => ({
+        moduleIndex,
+        ownerKey: getWifiOneWireOwner(moduleItem, moduleIndex),
+    }));
+    const wifiLineBuckets = wifiLines.map(() => []);
     const extThermostatDevices = [];
     const extThermostatPlacedDevices = [];
     const proExtThermostatSlotsFree = getControllerType(scheme) === 'pro'
@@ -169,6 +175,18 @@ export const balanceOneWireDevices = (scheme, extModules) => {
             || (device?.ownerExtModuleId != null ? `ext:${device.ownerExtModuleId}` : null);
         const lineIndex = lines.findIndex((line) => line.ownerKey === ownerKey);
         return lineIndex >= 0 && tryPushGroupToLine(lineBuckets, lineIndex, [device]);
+    };
+    const placeWifiDevice = (device) => {
+        const ownerKey = device?.ownerWifiModuleId != null ? `wifi:${device.ownerWifiModuleId}` : null;
+        const preferredIndex = wifiLines.findIndex((line) => line.ownerKey === ownerKey);
+        if (preferredIndex >= 0 && wifiLineBuckets[preferredIndex].length < WIFI_ONE_WIRE_CAPACITY) {
+            wifiLineBuckets[preferredIndex].push(device);
+            return true;
+        }
+        const targetIndex = wifiLineBuckets.findIndex((bucket) => bucket.length < WIFI_ONE_WIRE_CAPACITY);
+        if (targetIndex < 0) return false;
+        wifiLineBuckets[targetIndex].push(device);
+        return true;
     };
     rdtModules.forEach((device) => {
         if (device?.ownerExtModuleId != null) placePinnedDevice(device);
@@ -190,7 +208,7 @@ export const balanceOneWireDevices = (scheme, extModules) => {
         placeGroupPreferController(lineBuckets, group, cursorRef);
     });
 
-    const sortedRemaining = [...remaining].sort((a, b) => {
+    const sortedRemaining = remaining.filter((device) => !isWifiOneWireSensor(device)).sort((a, b) => {
         const aType = canonicalDeviceType(a?.type);
         const bType = canonicalDeviceType(b?.type);
         const aPriority = aType === 'thermostat' ? 0 : 1;
@@ -204,19 +222,33 @@ export const balanceOneWireDevices = (scheme, extModules) => {
         placeGroupRoundRobin(lineBuckets, [device], oneWireRoundRobinRef);
     });
 
+    const wifiEligible = remaining.filter(isWifiOneWireSensor);
+    wifiEligible.filter((device) => device?.ownerWifiModuleId != null).forEach(placeWifiDevice);
+    wifiEligible.filter((device) => device?.ownerWifiModuleId == null && (device?.[MIXING_OWNER_FIELD] || device?.ownerExtModuleId != null))
+        .forEach(placePinnedDevice);
+    wifiEligible.filter((device) => device?.ownerWifiModuleId == null && !device?.[MIXING_OWNER_FIELD] && device?.ownerExtModuleId == null)
+        .forEach((device) => {
+            if (!placeGroupRoundRobin(lineBuckets, [device], oneWireRoundRobinRef)) placeWifiDevice(device);
+        });
+
     const extDevicesByModuleIndex = {};
     lines.forEach((line, index) => {
         if (line.kind === 'ext' && Number.isInteger(line.moduleIndex)) {
             extDevicesByModuleIndex[line.moduleIndex] = lineBuckets[index];
         }
     });
+    const wifiDevicesByModuleIndex = Object.fromEntries(
+        wifiLines.map((line, index) => [line.moduleIndex, wifiLineBuckets[index]]),
+    );
 
     return {
         controllerDevices: lineBuckets[0] || [],
         extDevicesByModuleIndex,
+        wifiDevicesByModuleIndex,
         extThermostatDevices,
         unplacedDevices: devices.filter((device) => ![
             ...lineBuckets.flat(),
+            ...wifiLineBuckets.flat(),
             ...extThermostatDevices,
             ...extThermostatPlacedDevices,
         ].some((placed) => placed === device || (

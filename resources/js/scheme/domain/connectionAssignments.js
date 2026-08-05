@@ -118,6 +118,13 @@ const getDiModuleLine = (moduleItem, line) => {
     return null;
 };
 
+const getWifiModuleLine = (moduleItem, line) => {
+    const type = getDeviceType(moduleItem);
+    if (type === 'rl6w' && line === 'relay_devices') return { capacity: 6, accepts: supportsRelay };
+    if (type === 'rl6sw' && line === 'relay_s_devices') return { capacity: 6, accepts: supportsRelayS };
+    return null;
+};
+
 const getOwnerLine = (scheme, ownerKind, owner, line) => {
     if (ownerKind === 'controller') return getControllerLine(scheme, line);
     if (ownerKind === 'ext_module') {
@@ -128,6 +135,7 @@ const getOwnerLine = (scheme, ownerKind, owner, line) => {
     if (ownerKind === 'di_module') {
         return getControllerType(scheme) === 'smart2' ? getDiModuleLine(owner, line) : null;
     }
+    if (ownerKind === 'wifi_module') return getWifiModuleLine(owner, line);
     return null;
 };
 
@@ -198,6 +206,11 @@ export const collectConnectionLayout = (scheme) => {
             collectOwnerAssignments(scheme, 'di_module', moduleItem, seen, assignments);
         }
     });
+    (Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : []).forEach((moduleItem) => {
+        if (moduleItem?.id != null && !moduleItem.connectionAssignmentGeneratedId) {
+            collectOwnerAssignments(scheme, 'wifi_module', moduleItem, seen, assignments);
+        }
+    });
     return assignments.length > 0 ? { version: CONNECTION_LAYOUT_VERSION, assignments } : null;
 };
 
@@ -218,6 +231,7 @@ const getOwner = (scheme, assignment) => {
     }
     const bucket = assignment?.owner_kind === 'ext_module' ? 'ext_modules'
         : assignment?.owner_kind === 'di_module' ? 'di_modules'
+            : assignment?.owner_kind === 'wifi_module' ? 'wifi_modules'
             : null;
     if (!bucket || assignment?.owner_id == null) return null;
     return (Array.isArray(scheme?.[bucket]) ? scheme[bucket] : [])
@@ -339,6 +353,9 @@ export const restoreConnectionAssignments = (scheme) => {
         di_modules: Array.isArray(scheme?.di_modules)
             ? scheme.di_modules.map((item) => (item && typeof item === 'object' ? { ...item } : item))
             : scheme?.di_modules,
+        wifi_modules: Array.isArray(scheme?.wifi_modules)
+            ? scheme.wifi_modules.map((item) => (item && typeof item === 'object' ? { ...item } : item))
+            : scheme?.wifi_modules,
         ...Object.fromEntries(PUBLIC_BUCKETS.map((bucket) => [bucket, Array.isArray(scheme?.[bucket]) ? [...scheme[bucket]] : scheme?.[bucket]])),
     };
     const seen = new Set();

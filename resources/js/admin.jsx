@@ -14,6 +14,8 @@ const moduleImagePaths = {
     ecosmartbl2: new URL('../assets/modules/bl2/ecosmartbl2.svg', import.meta.url).href,
     rl6: new URL('../assets/modules/rl6/rl6.svg', import.meta.url).href,
     rl6s: new URL('../assets/modules/rl6s/rl6s.svg', import.meta.url).href,
+    rl6w: new URL('../assets/modules/rl6w/rl6w.svg', import.meta.url).href,
+    rl6sw: new URL('../assets/modules/rl6sw/rl6sw.svg', import.meta.url).href,
     io4: new URL('../assets/modules/io4/io4.svg', import.meta.url).href,
     di6: new URL('../assets/modules/di6/di6.svg', import.meta.url).href,
     rl2: new URL('../assets/modules/rl2/rl2.svg', import.meta.url).href,
@@ -62,6 +64,8 @@ const moduleConnections = {
     ecosmartbl2: 'ecosmart only, field: controller.ecosmart_bl2',
     rl6: 'pro, ecosmart',
     rl6s: 'pro, ecosmart',
+    rl6w: 'go, go+, smart2, pro, ecosmart',
+    rl6sw: 'go, go+, smart2, pro, ecosmart',
     io4: 'pro, ecosmart',
     di6: 'pro, ecosmart',
     rl2: 'pro',
@@ -116,6 +120,7 @@ const splitConnections = (value) => String(value || '')
     .filter(Boolean);
 
 const getModulePorts = (moduleType, target) => {
+    if (moduleType === 'rl6w' || moduleType === 'rl6sw') return 'Wi-Fi / 12VDC';
     if (['bl2', 'rl6', 'rl6s', 'io4', 'di6'].includes(moduleType)) return 'EXT';
     if (moduleType === 'ecosmartbl2') return 'controller.ecosmart_bl2';
     if (moduleType === 'rl2' || moduleType === 'rl2s') return 'DI';
@@ -311,6 +316,32 @@ const modules = [
     device_type: 'module',
     type: 'rl6s',
     connection_type: 'EXT',
+    one_wire_devices: [],
+    relay_s_devices: []
+}`,
+    },
+    {
+        type: 'rl6w',
+        title: 'RL6W',
+        group: 'Wi-Fi',
+        object: `{
+    id: 0,
+    device_type: 'module',
+    type: 'rl6w',
+    connection_type: 'WIFI',
+    one_wire_devices: [],
+    relay_devices: []
+}`,
+    },
+    {
+        type: 'rl6sw',
+        title: 'RL6SW',
+        group: 'Wi-Fi',
+        object: `{
+    id: 0,
+    device_type: 'module',
+    type: 'rl6sw',
+    connection_type: 'WIFI',
     one_wire_devices: [],
     relay_s_devices: []
 }`,

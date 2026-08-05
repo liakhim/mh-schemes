@@ -227,6 +227,40 @@ sensors: [
 
 NTC-датчики из `sensors` с `type: 'ntc-sensor'` и `connection_type: 'ntc'` после первичной балансировки распределяются между модулями `ntc-1-wire` и сохраняются внутри этих модулей в полях `ntc1_devices` и `ntc2_devices`.
 
+## Wi-Fi-модули
+
+`wifi_modules` - отдельная публичная линия модулей, не являющаяся частью `ext_modules`:
+
+```js
+wifi_modules: [
+    {
+        id: 'wifi-1',
+        type: 'rl6w',
+        device_type: 'module',
+        connection_type: 'WIFI',
+        one_wire_devices: [],
+        relay_devices: [],
+    },
+    {
+        id: 'wifi-2',
+        type: 'rl6sw',
+        device_type: 'module',
+        connection_type: 'WIFI',
+        one_wire_devices: [],
+        relay_s_devices: [],
+    },
+]
+```
+
+- Линия доступна для всех контроллеров: `go`, `go+`, `smart2`, `pro`, `ecosmart`.
+- Максимум для `go`, `go+`, `smart2` - один Wi-Fi-модуль; для `pro`, `ecosmart` - шесть.
+- Порядок и размещение модулей задаёт пользователь; элементы линии не перераспределяются как EXT-модули.
+- Каждый слот является горизонтальной парой: отдельный `power-unit` слева и `rl6w`/`rl6sw` справа. От блока питания к модулю идут два провода 12V; соседние Wi-Fi-модули между собой не соединяются.
+- Одна такая пара занимает `4` DIN-юнита.
+- `rl6w` использует семантику RELAY модуля `rl6`, включая шесть каналов; `rl6sw` использует семантику RELAY-S модуля `rl6s`, включая шесть каналов и правила совместимости RELAY-S.
+- Собственная 1-wire линия Wi-Fi-модуля вмещает до шести датчиков и принимает только `wall-temperature-sensor`, `wall-digital-sensor`, `flask-sensor-temperature` с `device_type: 'sensor'` и `connection_type: '1-wire'`. Произвольные 1-wire устройства не должны попадать в `one_wire_devices` такого модуля; проверка whitelist применяется одинаково при автоматическом и ручном размещении.
+- Подробные правила отрисовки и соединений: [`docs/rules/wifi.md`](docs/rules/wifi.md).
+
 ## Хранение 1-wire устройств
 
 В сыром входе legacy 1-wire устройства могут находиться в поле:

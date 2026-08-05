@@ -1,5 +1,6 @@
 import { canonicalDeviceType } from './deviceTypes.js';
 import { appendRelayDeviceToFreeSpan } from './relaySlots.js';
+import { normalizeWifiModules, WIFI_RELAY_CAPACITY } from './wifiModules.js';
 
 const RELAY_LINE_CAPACITY = 6;
 const PRO_CONTROLLER_RELAY_CAPACITY = 4;
@@ -128,6 +129,7 @@ export const balanceRelayDevices = (scheme) => {
     const diModules = controllerType === 'smart2'
         ? (Array.isArray(scheme?.di_modules) ? scheme.di_modules : []).map((item, index) => normalizeDiModule(item, index) || item)
         : scheme?.di_modules;
+    const wifiModules = normalizeWifiModules(scheme?.wifi_modules);
 
     const controllerRelaySDevices = Array.isArray(controller.relay_s_devices)
         ? controller.relay_s_devices
@@ -162,6 +164,7 @@ export const balanceRelayDevices = (scheme) => {
     };
     if (controllerType === 'pro' || controllerType === 'ecosmart') extModules.forEach(stripStupidBoilersFromRelayS);
     if (controllerType === 'smart2') diModules.forEach(stripStupidBoilersFromRelayS);
+    if (Array.isArray(wifiModules)) wifiModules.forEach(stripStupidBoilersFromRelayS);
 
     const unplacedStupidBoilers = [];
     if (strayStupidBoilers.length > 0) {
@@ -170,6 +173,9 @@ export const balanceRelayDevices = (scheme) => {
             ...(controllerType === 'pro' || controllerType === 'ecosmart' ? extModules : [])
                 .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6')
                 .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: RELAY_LINE_CAPACITY })),
+            ...(Array.isArray(wifiModules) ? wifiModules : [])
+                .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6w')
+                .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: WIFI_RELAY_CAPACITY })),
         ].filter((line) => line.capacity > 0);
         strayStupidBoilers.forEach((boiler) => {
             const device = { ...boiler, connection_type: 'relay' };
@@ -199,6 +205,12 @@ export const balanceRelayDevices = (scheme) => {
         ...(controllerType === 'smart2' ? diModules : [])
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl2s')
             .map((moduleItem) => ({ devices: moduleItem.relay_s_devices, capacity: 2, accepts: supportsRelayS })),
+        ...(Array.isArray(wifiModules) ? wifiModules : [])
+            .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6w')
+            .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: WIFI_RELAY_CAPACITY, accepts: supportsRelay })),
+        ...(Array.isArray(wifiModules) ? wifiModules : [])
+            .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6sw')
+            .map((moduleItem) => ({ devices: moduleItem.relay_s_devices, capacity: WIFI_RELAY_CAPACITY, accepts: supportsRelayS })),
     ].filter((line) => line.capacity > 0);
 
     const relayDeviceEntries = (Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [])
@@ -224,6 +236,7 @@ export const balanceRelayDevices = (scheme) => {
         controller,
         ext_modules: extModules,
         di_modules: diModules,
+        wifi_modules: wifiModules,
         wired_devices: Array.isArray(scheme?.wired_devices)
             ? scheme.wired_devices.filter((device, index) => !placedKeys.has(getDeviceKey(device, index)))
             : scheme?.wired_devices,

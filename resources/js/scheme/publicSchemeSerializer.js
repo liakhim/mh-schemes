@@ -6,6 +6,8 @@ const INTERNAL_METADATA_KEYS = new Set([
     'ownerThermostatKey',
     'ownerExtModuleIndex',
     'ownerExtModuleId',
+    'ownerWifiModuleIndex',
+    'ownerWifiModuleId',
     'ownerServo010Id',
     'mixing_owner_key',
     'relay_slot_index',
@@ -250,6 +252,7 @@ export const serializePublicScheme = (scheme) => {
     collectMaterializedLines(controllerSource, buckets);
     (Array.isArray(scheme.ext_modules) ? scheme.ext_modules : []).forEach((moduleItem) => collectMaterializedLines(moduleItem, buckets));
     (Array.isArray(scheme.di_modules) ? scheme.di_modules : []).forEach((moduleItem) => collectMaterializedLines(moduleItem, buckets));
+    (Array.isArray(scheme.wifi_modules) ? scheme.wifi_modules : []).forEach((moduleItem) => collectMaterializedLines(moduleItem, buckets));
 
     const controller = withoutMaterializedLines(controllerSource);
     const {
@@ -266,6 +269,9 @@ export const serializePublicScheme = (scheme) => {
         di_modules: Array.isArray(scheme.di_modules)
             ? scheme.di_modules.map(withoutMaterializedLines)
             : scheme.di_modules,
+        wifi_modules: Array.isArray(scheme.wifi_modules)
+            ? scheme.wifi_modules.map(withoutMaterializedLines)
+            : scheme.wifi_modules,
         ...(connectionLayout ? { connection_layout: connectionLayout } : {}),
         ...finalizeBuckets(buckets),
     });

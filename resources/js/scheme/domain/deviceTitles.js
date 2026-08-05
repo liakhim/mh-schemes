@@ -173,10 +173,23 @@ export const assignMaterializedDeviceTitles = (scheme) => {
         })
         : scheme?.di_modules;
 
+    const wifiModules = Array.isArray(scheme?.wifi_modules)
+        ? scheme.wifi_modules.map((moduleItem) => {
+            if (!moduleItem || typeof moduleItem !== 'object') return moduleItem;
+            return {
+                ...moduleItem,
+                relay_devices: mapDeviceLine(moduleItem.relay_devices, counters),
+                relay_s_devices: mapDeviceLine(moduleItem.relay_s_devices, counters),
+                one_wire_devices: mapOneWireLine(moduleItem.one_wire_devices, counters),
+            };
+        })
+        : scheme?.wifi_modules;
+
     return {
         ...scheme,
         controller,
         ext_modules: extModules,
         di_modules: diModules,
+        wifi_modules: wifiModules,
     };
 };

@@ -148,3 +148,21 @@ test('restores an occupied IO4 servo and owned sensor as one public device', () 
     assert.deepEqual(result.wired_devices[0].additions.map((item) => item.id), [41]);
     assert.equal(result.sensors.length, 0);
 });
+
+test('collects and strips WIFI materialized lines while preserving module identity', () => {
+    const result = serializePublicScheme({
+        controller: { type: 'go' },
+        wifi_modules: [{
+            id: 'wifi-a',
+            type: 'rl6w',
+            device_type: 'module',
+            connection_type: 'WIFI',
+            relay_devices: [{ id: 'pump', type: 'pump-220v', connection_type: 'relay' }],
+            one_wire_devices: [{ id: 'sensor', type: 'wall-temperature-sensor', device_type: 'sensor', connection_type: '1-wire' }],
+        }],
+    });
+
+    assert.deepEqual(result.wifi_modules, [{ id: 'wifi-a', type: 'rl6w', device_type: 'module', connection_type: 'WIFI' }]);
+    assert.deepEqual(result.wired_devices.map(({ id }) => id), ['pump']);
+    assert.deepEqual(result.sensors.map(({ id }) => id), ['sensor']);
+});

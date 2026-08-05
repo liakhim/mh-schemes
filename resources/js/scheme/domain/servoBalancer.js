@@ -6,6 +6,7 @@ import {
     MIXING_OWNER_FIELD,
 } from './mixingUnitOwnership.js';
 import { appendRelayDeviceToFreeSpan } from './relaySlots.js';
+import { normalizeWifiModules, WIFI_RELAY_CAPACITY } from './wifiModules.js';
 
 const RELAY_LINE_CAPACITY = 6;
 const PRO_CONTROLLER_RELAY_CAPACITY = 4;
@@ -74,6 +75,7 @@ const normalizeDoubleRelayEquipment = (device, index) => ({
 
 const pushDoubleRelayEquipmentToLine = (line, device) => {
     if (line.onlyTypes && !line.onlyTypes.has(canonicalDeviceType(device?.type))) return false;
+    if (line.accepts && !line.accepts(device)) return false;
     if (line.capacityMode === 'device') {
         if (!Array.isArray(line.devices) || line.devices.length >= line.capacity) return false;
         line.devices.push(device);
@@ -84,7 +86,7 @@ const pushDoubleRelayEquipmentToLine = (line, device) => {
 
 export const balanceServos = (scheme) => {
     const controllerType = getControllerType(scheme);
-    if (controllerType !== 'pro' && controllerType !== 'ecosmart' && controllerType !== 'smart2') return scheme;
+    if (!['pro', 'ecosmart', 'smart2', 'go', 'go+'].includes(controllerType)) return scheme;
 
     const controller = scheme?.controller && typeof scheme.controller === 'object'
         ? { ...scheme.controller }
@@ -95,6 +97,38 @@ export const balanceServos = (scheme) => {
     const diModules = controllerType === 'smart2'
         ? (Array.isArray(scheme?.di_modules) ? scheme.di_modules : []).map((item, index) => normalizeDiModule(item, index) || item)
         : scheme?.di_modules;
+    let wifiModules = normalizeWifiModules(scheme?.wifi_modules);
+    const linkedMixingUnitKeys = new Set([
+        ...(Array.isArray(scheme?.sensors) ? scheme.sensors : []),
+        ...(Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [])
+            .flatMap((device) => (Array.isArray(device?.additions) ? device.additions : [])),
+    ].filter((device) => String(device?.type || '').toLowerCase().includes('mixing'))
+        .map(getMixingUnitKey)
+        .filter((key) => key != null));
+    const acceptsWifiServo = (device) => canonicalDeviceType(device?.type) !== '220servo'
+        || !linkedMixingUnitKeys.has(getMixingUnitKey(device));
+    const forbiddenWifiServos = [];
+    if (Array.isArray(wifiModules)) {
+        wifiModules = wifiModules.map((moduleItem) => {
+            if (canonicalDeviceType(moduleItem?.type) === 'rl6w') {
+                const devices = Array.isArray(moduleItem.relay_devices) ? moduleItem.relay_devices : [];
+                forbiddenWifiServos.push(...devices.filter((device) => canonicalDeviceType(device?.type) === '220servo'));
+                return {
+                    ...moduleItem,
+                    relay_devices: devices.filter((device) => canonicalDeviceType(device?.type) !== '220servo'),
+                };
+            }
+            if (canonicalDeviceType(moduleItem?.type) !== 'rl6sw') return moduleItem;
+            const devices = Array.isArray(moduleItem.relay_s_devices) ? moduleItem.relay_s_devices : [];
+            forbiddenWifiServos.push(...devices.filter((device) => !acceptsWifiServo(device)));
+            return { ...moduleItem, relay_s_devices: devices.filter(acceptsWifiServo) };
+        });
+    }
+    const sourceWiredDevices = [...(Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [])];
+    forbiddenWifiServos.forEach((device) => {
+        if (device?.id != null && sourceWiredDevices.some((item) => item?.id === device.id)) return;
+        sourceWiredDevices.push(device);
+    });
 
     controller.relay_s_devices = Array.isArray(controller.relay_s_devices) ? [...controller.relay_s_devices] : [];
     controller.relay_devices = Array.isArray(controller.relay_devices) ? [...controller.relay_devices] : [];
@@ -132,6 +166,17 @@ export const balanceServos = (scheme) => {
         ...(controllerType === 'smart2' ? diModules : [])
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl2')
             .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: 2, onlyTypes: new Set(['valve']) })),
+        ...(Array.isArray(wifiModules) ? wifiModules : [])
+            .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6sw')
+            .map((moduleItem) => ({
+                devices: moduleItem.relay_s_devices,
+                capacity: WIFI_RELAY_CAPACITY,
+                onlyTypes: new Set(['220servo', 'valve']),
+                accepts: acceptsWifiServo,
+            })),
+        ...(Array.isArray(wifiModules) ? wifiModules : [])
+            .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6w')
+            .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: WIFI_RELAY_CAPACITY, onlyTypes: new Set(['valve']) })),
     ].filter((line) => line.capacity > 0);
 
     const placedKeys = new Set();
@@ -153,7 +198,7 @@ export const balanceServos = (scheme) => {
     });
     const doubleRelayEntries = [
         ...legacyRelaySValveDevices.map((device, index) => ({ device, index, legacy: true })),
-        ...(Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [])
+        ...sourceWiredDevices
             .map((device, index) => ({ device, index, legacy: false })),
     ];
     doubleRelayEntries.forEach(({ device, index, legacy }) => {
@@ -178,14 +223,13 @@ export const balanceServos = (scheme) => {
         controller,
         ext_modules: extModules,
         di_modules: diModules,
+        wifi_modules: wifiModules,
         sensors: Array.isArray(scheme?.sensors)
             ? scheme.sensors.map((sensor) => {
                 const ownerKey = mixingOwnersByUnitKey.get(getMixingUnitKey(sensor));
                 return ownerKey ? { ...sensor, [MIXING_OWNER_FIELD]: ownerKey } : sensor;
             })
             : scheme?.sensors,
-        wired_devices: Array.isArray(scheme?.wired_devices)
-            ? scheme.wired_devices.filter((device, index) => !placedKeys.has(getDeviceKey(device, index)))
-            : scheme?.wired_devices,
+        wired_devices: sourceWiredDevices.filter((device, index) => !placedKeys.has(getDeviceKey(device, index))),
     };
 };

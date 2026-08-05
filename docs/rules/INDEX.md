@@ -8,6 +8,13 @@
 - Основная реализация: `resources/js/spa.jsx`
 - Assets: `resources/js/scheme/assets/imageRegistry.js`, `resources/assets/thermostats/*`, `resources/assets/sensors/wireless*.svg`
 
+## Wi-Fi Modules
+
+- Файл правил: `docs/rules/wifi.md`
+- Публичный источник: `incomingScheme.wifi_modules`
+- Assets: `resources/assets/modules/rl6w/rl6w.svg`, `resources/assets/modules/rl6sw/rl6sw.svg`
+- Типы: `rl6w` с RELAY и `rl6sw` с RELAY-S
+
 ## 1-wire
 
 - Файл правил: `docs/rules/one-wire.md`

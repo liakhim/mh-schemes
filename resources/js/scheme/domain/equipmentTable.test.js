@@ -56,3 +56,16 @@ test('adds controller and numbered expansion modules with placeholder comments',
         { title: 'Модуль расширения NTC-1-wire', comment: '—' },
     ]);
 });
+
+test('includes WIFI modules in the equipment table', () => {
+    const rows = collectEquipmentTableRows({
+        controller: { type: 'go' },
+        wifi_modules: [{ id: 'w1', type: 'rl6w' }, { id: 'w2', type: 'rl6sw' }],
+    });
+
+    assert.deepEqual(rows, [
+        { title: 'Контроллер GO', comment: '—' },
+        { title: 'Модуль расширения RL6W', comment: '—' },
+        { title: 'Модуль расширения RL6SW', comment: '—' },
+    ]);
+});

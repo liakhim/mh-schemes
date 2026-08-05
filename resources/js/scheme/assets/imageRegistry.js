@@ -38,6 +38,8 @@ export const wirelessDeviceImagePaths = {
     ecosmartbl2: new URL('../../../assets/modules/bl2/ecosmartbl2.svg', import.meta.url).href,
     rl6: new URL('../../../assets/modules/rl6/rl6.svg', import.meta.url).href,
     rl6s: new URL('../../../assets/modules/rl6s/rl6s.svg', import.meta.url).href,
+    rl6w: new URL('../../../assets/modules/rl6w/rl6w.svg', import.meta.url).href,
+    rl6sw: new URL('../../../assets/modules/rl6sw/rl6sw.svg', import.meta.url).href,
     io4: new URL('../../../assets/modules/io4/io4.svg', import.meta.url).href,
     di6: new URL('../../../assets/modules/di6/di6.svg', import.meta.url).href,
     rl2: new URL('../../../assets/modules/rl2/rl2.svg', import.meta.url).href,
@@ -78,6 +80,9 @@ export const goAerialImagePath = new URL('../../../assets/other/go-aerial.svg', 
 
 export const getWirelessDeviceImageKey = (device) => {
     const normalizedType = canonicalDeviceType(device?.type);
+    if (normalizedType === 'wall-temperature-sensor' && String(device?.connection_type || '').toLowerCase() === '1-wire') {
+        return 'wall-digital-sensor';
+    }
     if (normalizedType === 'thermostat') {
         return `thermostat:${getThermostatColor(device)}`;
     }

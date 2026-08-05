@@ -125,15 +125,6 @@ const BOILER_BRAND_TAGS = ['Baxi', 'Ariston', 'Arderia', 'Rinnai', 'Zota'];
 
 const MYHEAT_LOGO_PATH = new URL('../assets/logo/logo.svg', import.meta.url).href;
 
-const MyHeatBadge = ({ size = 16 }) => (
-    <img
-        src={MYHEAT_LOGO_PATH}
-        alt="MyHeat"
-        title="Оборудование MyHeat"
-        style={{ height: size, width: 'auto', flexShrink: 0, alignSelf: 'center' }}
-    />
-);
-
 const ORANGE = '#e07020';
 
 const CONTROLLER_TEMPLATES = [
@@ -2293,7 +2284,7 @@ const BoilerConnectionSwitch = ({ connectionType, onChange }) => {
     );
 };
 
-const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, myheat = false, price = null, disabled = false, control = null, hideCount = false, removeFirst = false }) => {
+const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, price = null, disabled = false, control = null, hideCount = false, removeFirst = false }) => {
     const removeButton = onRemove ? (
         <button
             onClick={onRemove}
@@ -2308,12 +2299,14 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove 
     <div
         className="sel-added-line"
         style={{
-            alignItems: badgeAbove ? 'flex-end' : 'baseline',
+            // По нижнему краю, а не по базовой линии: у названия из двух строк
+            // базовая линия — первая строка, и счётчик вставал напротив неё,
+            // отрываясь от низа строки списка.
+            alignItems: 'flex-end',
             color: disabled ? '#94a3b8' : '#203040',
             opacity: disabled ? 0.7 : 1,
         }}
     >
-        {myheat && !badgeAbove && <MyHeatBadge />}
         {badge && !badgeAbove && (
             <span
                 style={{
@@ -2331,30 +2324,26 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove 
             </span>
         )}
         {badgeAbove ? (
-            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}>
-                {(myheat || badge) && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, minHeight: 14 }}>
-                        {myheat && <MyHeatBadge size={8} />}
-                        {badge && (
-                            <span
-                                style={{
-                                    padding: '2px 8px',
-                                    borderRadius: 999,
-                                    background: '#dcfce7',
-                                    color: '#166534',
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    whiteSpace: 'nowrap',
-                                }}
-                            >
-                                {badge}
-                            </span>
-                        )}
+            <span className="sel-added-label" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}>
+                {badge && (
+                    <span
+                        style={{
+                            minHeight: 14,
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            background: '#dcfce7',
+                            color: '#166534',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {badge}
                     </span>
                 )}
                 <span>{label}</span>
             </span>
-        ) : <span>{label}</span>}
+        ) : <span className="sel-added-label">{label}</span>}
         <span className="sel-added-leader" style={{ flex: 1, borderBottom: '1px dotted #6b7f95', transform: badgeAbove ? 'none' : 'translateY(-3px)' }} />
         {removeFirst && removeButton}
         {control}
@@ -2531,19 +2520,16 @@ const ThermostatFieldLabel = ({ children }) => (
 /** Карточка термостата: callbacks меняют тип подключения, цвет, датчик пола и добавляют устройство. */
 const ThermostatCard = ({ template, connection, onConnectionChange, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, showAdd = true, addedRows = [], onRemoveRow, onAddRow, showJsonDetails = false }) => (
     <div
-        className="sel-card sel-card-static sel-card-section"
+        className="sel-card sel-card-static sel-card-section sel-thermostat-card"
         style={{
             flex: '1 1 100%',
             width: '100%',
             minWidth: 260,
             display: 'flex',
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: 32,
-            alignItems: 'stretch',
-            // Действует только на перенесённой строке: пока рендер стоит справа,
-            // свободного места нет — его целиком разбирает flex-grow колонок.
-            justifyContent: 'center',
+            // Заголовок и список добавленного идут во всю ширину карточки,
+            // а настройки и рендер стоят рядом во вложенном ряду.
+            flexDirection: 'column',
+            gap: 20,
             position: 'relative',
             overflow: 'hidden',
         }}
@@ -2557,10 +2543,56 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             fallbackColor={CARD_PHOTO_TAIL_COLOR.thermostatRoom}
         />
 
+        {/* Содержимое карточки лежит одним позиционированным слоем: слой
+            размытия у `CardPhotoBackdrop` спозиционирован и растянут на всю
+            карточку, поэтому непозиционированные соседи красятся под ним и
+            уходят в размытие. Раньше `position: relative` стоял на колонке
+            настроек; теперь рядом с ней есть заголовок и список, и слой общий
+            на всех. */}
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div className="sel-card-heading">{template.label}</div>
+
+        {addedRows.length > 0 && (
+            <AddedDevicesBlock marginTop={0} compact>
+                <AddedDevicesTitle>Добавленные термостаты:</AddedDevicesTitle>
+                {addedRows.map((row) => (
+                    <AddedDeviceLine
+                        key={row.label}
+                        label={row.label}
+                        count={row.count}
+                        hideCount
+                        removeFirst
+                        onRemove={() => onRemoveRow(row)}
+                        control={(
+                            <QtyStepper
+                                count={row.count}
+                                onDecrement={() => onRemoveRow(row)}
+                                onIncrement={() => onAddRow(row)}
+                                decTestId={`thermostat-${String(row.templateKey || '').replace(/\|/g, '-')}-qty-dec`}
+                                incTestId={`thermostat-${String(row.templateKey || '').replace(/\|/g, '-')}-qty-inc`}
+                            />
+                        )}
+                    />
+                ))}
+            </AddedDevicesBlock>
+        )}
+
+        <div
+            className="sel-thermostat-row"
+            style={{
+                display: 'flex',
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 32,
+                alignItems: 'stretch',
+                // Действует только на перенесённой строке: пока рендер стоит
+                // справа, свободного места нет — его разбирает flex-grow колонок.
+                justifyContent: 'center',
+            }}
+        >
         <div
             className="sel-thermostat-settings"
             style={{
-                position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
@@ -2569,44 +2601,15 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                 // комфортной ширине: на flex-basis считается перенос строки, и
                 // прежние 420px роняли рендер вниз уже на 1300px экрана, хотя
                 // места хватало. Ширину сверх минимума добирает flex-grow.
-                // Пол колонки задан содержимым, а не числом: у карточки
-                // `overflow: hidden`, и фиксированные 310px обрезали бы строку
-                // списка добавленных термостатов на длинном названии. С
-                // `min-content` колонка вместо обрезки роняет рендер вниз, а на
-                // коротком названии дольше держит его справа.
+                // Пол колонки задан содержимым: у карточки `overflow: hidden`,
+                // и фиксированное число обрезало бы капсулу типа подключения на
+                // узкой колонке. С `min-content` колонка вместо обрезки роняет
+                // рендер вниз, а на коротком содержимом дольше держит его справа.
                 flex: '1.5 1 310px',
                 minWidth: 'min-content',
                 maxWidth: 540,
             }}
         >
-            <div className="sel-card-heading">{template.label}</div>
-
-            {addedRows.length > 0 && (
-                <AddedDevicesBlock marginTop={0} compact>
-                    <AddedDevicesTitle>Добавленные термостаты:</AddedDevicesTitle>
-                    {addedRows.map((row) => (
-                        <AddedDeviceLine
-                            key={row.label}
-                            label={row.label}
-                            count={row.count}
-                            myheat
-                            hideCount
-                            removeFirst
-                            onRemove={() => onRemoveRow(row)}
-                            control={(
-                                <QtyStepper
-                                    count={row.count}
-                                    onDecrement={() => onRemoveRow(row)}
-                                    onIncrement={() => onAddRow(row)}
-                                    decTestId={`thermostat-${String(row.templateKey || '').replace(/\|/g, '-')}-qty-dec`}
-                                    incTestId={`thermostat-${String(row.templateKey || '').replace(/\|/g, '-')}-qty-inc`}
-                                />
-                            )}
-                        />
-                    ))}
-                </AddedDevicesBlock>
-            )}
-
             {/* Тип подключения и датчик пола — в одном ряду; выравнивание по
                 нижнему краю, чтобы капсула и чекбокс стояли на одной линии. */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
@@ -2811,6 +2814,8 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                     />
                 ))}
             </div>
+        </div>
+        </div>
         </div>
     </div>
 );

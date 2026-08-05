@@ -23,6 +23,7 @@ const SECTIONS = [
     ['di_modules', 'Модули DI'],
     ['one_wire_modules', 'Модули 1-wire'],
     ['power_modules', 'Питание'],
+    ['wifi_modules', 'Модули Wi-Fi'],
 ];
 
 const getItemLabel = (item) => {

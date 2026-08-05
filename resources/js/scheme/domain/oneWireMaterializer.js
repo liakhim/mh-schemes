@@ -16,6 +16,7 @@ import {
     isMixingUnitSensor,
     MIXING_OWNER_FIELD,
 } from './mixingUnitOwnership.js';
+import { normalizeWifiModules } from './wifiModules.js';
 
 const EXT_MODULE_TYPES = ['bl2', 'rl6', 'rl6s', 'io4', 'di6'];
 const NTC_MODULE_CAPACITY = 6;
@@ -247,9 +248,9 @@ const ensureOwnedNtcOneWireModules = (scheme) => {
     return { ...scheme, controller, ext_modules: extModules, one_wire_modules: oneWireModules };
 };
 
-const getPlacedOneWireKeyCounts = (controllerDevices, extDevicesByModuleIndex) => {
+const getPlacedOneWireKeyCounts = (controllerDevices, extDevicesByModuleIndex, wifiDevicesByModuleIndex) => {
     const counts = new Map();
-    [...controllerDevices, ...Object.values(extDevicesByModuleIndex || {}).flat()]
+    [...controllerDevices, ...Object.values(extDevicesByModuleIndex || {}).flat(), ...Object.values(wifiDevicesByModuleIndex || {}).flat()]
         .map(getDeviceKey)
         .filter(Boolean)
         .forEach((key) => counts.set(key, (counts.get(key) || 0) + 1));
@@ -368,14 +369,19 @@ export const materializeBalancedOneWireScheme = (scheme) => {
     const extModules = supportsExt
         ? sourceExtModules.map((item, index) => normalizeExtModule(item, index) || item)
         : [];
-    const balanced = balanceOneWireDevices(ntcModuleBalancedScheme, extModules);
+    const wifiModules = normalizeWifiModules(ntcModuleBalancedScheme?.wifi_modules) || [];
+    const balanced = balanceOneWireDevices(ntcModuleBalancedScheme, extModules, wifiModules);
     const controllerDevices = (balanced.controllerDevices || [])
         .map(normalizeOneWireDevice)
         .filter(Boolean);
     const balancedExtThermostatDevices = (balanced.extThermostatDevices || [])
         .map(normalizeExtThermostatDevice)
         .filter(Boolean);
-    const placedOneWireCounts = getPlacedOneWireKeyCounts(controllerDevices, balanced.extDevicesByModuleIndex);
+    const placedOneWireCounts = getPlacedOneWireKeyCounts(
+        controllerDevices,
+        balanced.extDevicesByModuleIndex,
+        balanced.wifiDevicesByModuleIndex,
+    );
     const placedExtThermostatCounts = getPlacedDeviceKeyCounts(balancedExtThermostatDevices);
     const placedMovedCounts = mergeKeyCounts(placedOneWireCounts, placedExtThermostatCounts);
 
@@ -412,6 +418,12 @@ export const materializeBalancedOneWireScheme = (scheme) => {
                 };
             })
             : sourceExtModules,
+        wifi_modules: wifiModules.map((moduleItem, moduleIndex) => ({
+            ...moduleItem,
+            one_wire_devices: (balanced.wifiDevicesByModuleIndex[moduleIndex] || [])
+                .map(normalizeOneWireDevice)
+                .filter(Boolean),
+        })),
     }, balanced.unplacedDevices);
 
     return assignMaterializedDeviceTitles(compactEcosmartNtcOneWireModules(removeEmptyNtcOneWireModules(balanceNtcSensors(oneWireBalancedScheme))));

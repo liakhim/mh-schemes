@@ -381,3 +381,21 @@ test('round trip restores relay assignment to a smart2 DI module', () => {
     assert.equal(reopened.di_modules[0].relay_devices[0].relay_slot_index, 1);
     assert.equal(countDevice(reopened, device.id), 1);
 });
+
+test('round trip keeps relay owner and slot on a WIFI module', () => {
+    const device = { id: 'wifi-pump', type: 'pump-220v', connection_type: 'relay', relay_slot_index: 4 };
+    const scheme = {
+        controller: { type: 'go', relay_devices: [] },
+        wifi_modules: [{ id: 'wifi-relay', type: 'rl6w', relay_devices: [device] }],
+    };
+
+    const saved = serializePublicScheme(scheme);
+    const assignment = saved.connection_layout.assignments.find(({ device_id }) => device_id === device.id);
+    assert.equal(assignment.owner_kind, 'wifi_module');
+    assert.equal(assignment.owner_id, 'wifi-relay');
+    assert.equal(assignment.slot, 4);
+
+    const reopened = materializeBalancedOneWireScheme(saved);
+    assert.equal(reopened.wifi_modules[0].relay_devices[0].id, device.id);
+    assert.equal(reopened.wifi_modules[0].relay_devices[0].relay_slot_index, 4);
+});

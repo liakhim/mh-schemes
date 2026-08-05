@@ -1,4 +1,5 @@
 import { canonicalDeviceType } from './deviceTypes.js';
+import { normalizeWifiModules, WIFI_RELAY_CAPACITY } from './wifiModules.js';
 
 const RELAY_LINE_CAPACITY = 6;
 const BUS_LINE_CAPACITY = 1;
@@ -108,6 +109,7 @@ export const balanceBoilers = (scheme) => {
             normalizeDiModule(item, index) || item
         ))
         : scheme?.di_modules;
+    const wifiModules = normalizeWifiModules(scheme?.wifi_modules);
 
     controller.bus_devices = Array.isArray(controller.bus_devices) ? [...controller.bus_devices] : [];
     controller.relay_devices = Array.isArray(controller.relay_devices) ? [...controller.relay_devices] : [];
@@ -121,6 +123,9 @@ export const balanceBoilers = (scheme) => {
         ...(controllerType === 'smart2' ? diModules : [])
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl2')
             .map((moduleItem) => ({ kind: 'di', devices: moduleItem.relay_devices, capacity: 2 })),
+        ...(Array.isArray(wifiModules) ? wifiModules : [])
+            .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6w')
+            .map((moduleItem) => ({ kind: 'wifi', devices: moduleItem.relay_devices, capacity: WIFI_RELAY_CAPACITY })),
     ].filter((line) => line.capacity > 0);
 
     const busLines = [
@@ -155,5 +160,6 @@ export const balanceBoilers = (scheme) => {
             : scheme?.boilers,
         ext_modules: extModules,
         di_modules: diModules,
+        wifi_modules: wifiModules,
     };
 };

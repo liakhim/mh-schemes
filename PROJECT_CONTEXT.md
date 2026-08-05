@@ -44,6 +44,7 @@
 - `Show ports` влияет только на отображение портов, не на геометрию.
 - `Show empty slots` показывает только пустые слоты по правилам линии.
 - `Reset positions` сбрасывает пользовательские offsets.
+- `wifi_modules` образуют отдельную Wi-Fi-линию у любого из пяти контроллеров; правила парного питания и ёмкости описаны в `docs/rules/wifi.md`.
 - Занятые слоты могут скрывать фон/обводку по умолчанию и показывать их на hover, если это закреплено правилом линии.
 - Тупой котёл (`stupid`) не может садиться на RELAY-S порты: ни балансировкой, ни через слот-меню; детали в `docs/rules/relay.md`.
 
@@ -57,6 +58,7 @@
 - Controllers: `docs/rules/controllers.md`
 - Connection Layout: `docs/rules/connection-layout.md`
 - Selection Config: `docs/rules/selection-config.md`
+- Wi-Fi modules: `docs/rules/wifi.md`
 - Полный changelog: `JOURNAL.md`, раздел `Change log правил`
 
 ## Проверки

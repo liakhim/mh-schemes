@@ -15,6 +15,8 @@ const MODULE_LABELS = {
     bl2: 'BL2',
     rl6: 'RL6',
     rl6s: 'RL6S',
+    rl6w: 'RL6W',
+    rl6sw: 'RL6SW',
     io4: 'IO4',
     di6: 'DI6',
     rl2: 'RL2',
@@ -45,13 +47,14 @@ export const collectEquipmentTableRows = (publicScheme) => {
     }
 
     const moduleCounters = new Map();
-    ['ext_modules', 'di_modules', 'one_wire_modules'].forEach((bucket) => {
+    const moduleBuckets = ['ext_modules', 'di_modules', 'wifi_modules', 'one_wire_modules'];
+    moduleBuckets.forEach((bucket) => {
         (Array.isArray(publicScheme?.[bucket]) ? publicScheme[bucket] : []).forEach((moduleItem) => {
             const type = canonicalDeviceType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type);
             if (!type) return;
             const index = (moduleCounters.get(type) || 0) + 1;
             moduleCounters.set(type, index);
-            const sameTypeCount = ['ext_modules', 'di_modules', 'one_wire_modules']
+            const sameTypeCount = moduleBuckets
                 .flatMap((moduleBucket) => (Array.isArray(publicScheme?.[moduleBucket]) ? publicScheme[moduleBucket] : []))
                 .filter((item) => canonicalDeviceType(typeof item === 'string' ? item : item?.type) === type)
                 .length;

@@ -173,12 +173,33 @@ export const getExtOneWireDevicesByModuleIndex = (scheme) => {
     return out;
 };
 
+export const getWifiOneWireDevicesByModuleIndex = (scheme) => {
+    const wifiModules = Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : [];
+    const out = {};
+    wifiModules.forEach((moduleItem, moduleIndex) => {
+        if (!moduleItem || typeof moduleItem !== 'object') return;
+        const moduleType = canonicalDeviceType(moduleItem.type);
+        if (moduleType !== 'rl6w' && moduleType !== 'rl6sw') return;
+        const devices = Array.isArray(moduleItem.one_wire_devices) ? moduleItem.one_wire_devices : [];
+        if (!devices.length) return;
+        out[moduleIndex] = devices.filter((device) => device && typeof device === 'object').map((device) => ({
+            ...device,
+            type: canonicalDeviceType(device.type),
+            connection_type: '1-wire',
+            ownerWifiModuleId: moduleItem.id ?? null,
+            ownerWifiModuleIndex: moduleIndex,
+        }));
+    });
+    return out;
+};
+
 export const getAllOneWireDevicesForBalancing = (scheme) => {
     const controllerDevices = getOneWireDevicesFromScheme(scheme);
     const extByModule = getExtOneWireDevicesByModuleIndex(scheme);
     const extDevices = Object.values(extByModule).flat();
+    const wifiDevices = Object.values(getWifiOneWireDevicesByModuleIndex(scheme)).flat();
     const legacyDevices = getLegacyOneWireDevicesFromScheme(scheme);
-    return [...controllerDevices, ...extDevices, ...legacyDevices];
+    return [...controllerDevices, ...extDevices, ...wifiDevices, ...legacyDevices];
 };
 
 export const getInitialOneWireDevices = getOneWireDevicesFromScheme;
