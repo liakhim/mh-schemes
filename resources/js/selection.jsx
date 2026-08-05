@@ -44,6 +44,7 @@ const moduleImagePaths = {
     rl2s: new URL('../assets/modules/rl2s/rl2s.svg', import.meta.url).href,
     'ntc-1-wire': new URL('../assets/modules/ntc-1-wire/ntc-1-wire.svg', import.meta.url).href,
     rdt2: new URL('../assets/modules/rdt2/rdt2.svg', import.meta.url).href,
+    ups: new URL('../assets/modules/ups/ups.svg', import.meta.url).href,
 };
 
 const thermostatImagePaths = {
@@ -3573,6 +3574,30 @@ const getExpansionModuleRows = (incomingSchemeValue) => {
 };
 
 /**
+ * Модули питания, для которых в панели контроллера есть отдельная плитка.
+ * `circuit-breaker` и `power-unit` сюда не входят: они обязательны для smart2
+ * и pro, поэтому не являются результатом подбора.
+ */
+const POWER_MODULE_TILE_LABELS = {
+    ups: 'Источник бесперебойного питания (UPS)',
+};
+
+/**
+ * Формирует строки плиток для модулей питания из `power_modules`. Отдельно от
+ * `getExpansionModuleRows`, потому что в коммерческом предложении UPS уже
+ * учтён собственным разделом «Питание» и не должен дублироваться.
+ * @param {object} incomingSchemeValue Публичная схема.
+ * @returns {Array<object>} Строки плиток модулей питания.
+ */
+const getPowerModuleTileRows = (incomingSchemeValue) => {
+    const modules = Array.isArray(incomingSchemeValue?.power_modules) ? incomingSchemeValue.power_modules : [];
+    return aggregateAddedItems(modules
+        .map((moduleItem) => canonicalType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type))
+        .filter((type) => POWER_MODULE_TILE_LABELS[type])
+        .map((type) => ({ label: POWER_MODULE_TILE_LABELS[type], templateKey: type })));
+};
+
+/**
  * Формирует разделы коммерческого предложения из подобранной схемы.
  * @param {object} incomingSchemeValue Публичная схема.
  * @param {string} controllerType Тип контроллера для комплекта и цен.
@@ -3940,9 +3965,12 @@ const SelectionApp = () => {
         const selected = CONTROLLER_TEMPLATES.filter((item) => item.value.type === controllerType);
         return selected.length > 0 ? selected : CONTROLLER_TEMPLATES;
     }, [proAndEcosmartOptions, controllerType]);
-    /** Плитки модулей расширения под карточкой контроллера. */
+    /** Плитки модулей расширения и питания под карточкой контроллера. */
     const panelModuleTiles = useMemo(
-        () => getExpansionModuleRows(incomingScheme).filter((row) => moduleImagePaths[row.templateKey]),
+        () => [
+            ...getExpansionModuleRows(incomingScheme),
+            ...getPowerModuleTileRows(incomingScheme),
+        ].filter((row) => moduleImagePaths[row.templateKey]),
         [incomingScheme],
     );
     const ecosmartIncomingScheme = useMemo(() => {
