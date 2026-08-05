@@ -2531,7 +2531,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             width: '100%',
             minWidth: 260,
             display: 'flex',
-            // Заголовок и список добавленного идут во всю ширину карточки,
+            // Список добавленного идёт во всю ширину карточки,
             // а настройки и рендер стоят рядом во вложенном ряду.
             flexDirection: 'column',
             gap: 20,
@@ -2552,11 +2552,9 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             размытия у `CardPhotoBackdrop` спозиционирован и растянут на всю
             карточку, поэтому непозиционированные соседи красятся под ним и
             уходят в размытие. Раньше `position: relative` стоял на колонке
-            настроек; теперь рядом с ней есть заголовок и список, и слой общий
+            настроек; теперь рядом с ней есть список добавленного, и слой общий
             на всех. */}
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div className="sel-card-heading">{template.label}</div>
-
         {addedRows.length > 0 && (
             <AddedDevicesBlock marginTop={0} compact>
                 <AddedDevicesTitle>Добавленные термостаты:</AddedDevicesTitle>
