@@ -28,6 +28,13 @@ test('maps a double relay device to both physical relay ports', () => {
     assert.equal(getRelayDeviceAtPhysicalSlot([servo], 2), null);
 });
 
+test('preserves a sparse relay array index when no physical slot is stored', () => {
+    const servo = { id: 'servo', type: 'zoneServo', connection_type: 'relay-s' };
+
+    assert.equal(getRelayDeviceAtPhysicalSlot([null, null, servo], 0), null);
+    assert.equal(getRelayDeviceAtPhysicalSlot([null, null, servo], 2), servo);
+});
+
 test('resolves every device connected to a mixed RL6 supply group', () => {
     const pump = { id: 'pump', type: 'pump-220v', relay_slot_index: 0 };
     const boiler = { id: 'boiler', type: 'stupid', relay_slot_index: 1 };
@@ -49,6 +56,14 @@ test('labels each occupied RL2 A terminal as an L supply', () => {
     assert.equal(getRelaySupplyLabel('RELAY-2-A', 'rl2'), 'L');
     assert.equal(getRelaySupplyLabel('RELAY-1-B', 'rl2'), null);
     assert.equal(getRelaySupplyLabel('RELAY-1-A', 'rl2s'), null);
+});
+
+test('labels individual PRO RELAY-S A terminals as L supplies', () => {
+    for (let slot = 1; slot <= 4; slot += 1) {
+        assert.equal(getRelaySupplyLabel(`RELAY-S-${slot}-A`, 'pro'), 'L');
+        assert.equal(getRelaySupplyLabel(`RELAY-S-${slot}-B`, 'pro'), null);
+    }
+    assert.equal(getRelaySupplyLabel('RELAY-1-A', 'pro'), null);
 });
 
 test('excludes RDT2 and other 1-wire devices from the Smart2 12VDC chain', () => {

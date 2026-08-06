@@ -10,6 +10,7 @@ export const getGroupedRelaySupplyLabel = (portName) => (
 export const getRelaySupplyLabel = (portName, ownerType) => {
     if (getGroupedRelaySupplyLabel(portName)) return 'L';
     const normalizedPortName = String(portName || '').trim().toUpperCase();
+    if (canonicalDeviceType(ownerType) === 'pro' && /^RELAY-S-[1-4]-A$/.test(normalizedPortName)) return 'L';
     return canonicalDeviceType(ownerType) === 'rl2' && /^RELAY-[12]-A$/.test(normalizedPortName) ? 'L' : null;
 };
 
@@ -23,7 +24,7 @@ export const getRelayDeviceAtPhysicalSlot = (devices, targetSlot) => {
         const storedSlot = Number(device.relay_slot_index);
         let startSlot = device.relay_slot_index != null && Number.isInteger(storedSlot) && storedSlot >= 0
             ? storedSlot
-            : 0;
+            : index;
         while (occupied.has(startSlot)) startSlot += 1;
         const span = String(device.connection_type || '').toLowerCase() === 'double_relay' ? 2 : 1;
         for (let slot = startSlot; slot < startSlot + span; slot += 1) occupied.add(slot);
