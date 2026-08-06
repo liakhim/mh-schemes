@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     buildSmart2InstallationDiConnections,
+    getEcosmartMixingNtcIndex,
     getGroupedRelaySupplyLabel,
     getIo4SharedTerminalDevices,
     getRelayDeviceAtPhysicalSlot,
@@ -9,6 +10,14 @@ import {
     getRelaySupplyLabel,
     getSmart2InstallationPowerChainHead,
 } from './installationDi.js';
+
+test('maps the first ECOsmart mixing sensor to NTC-4 and the second to NTC-3', () => {
+    assert.equal(getEcosmartMixingNtcIndex('NTC-4-A MIXING'), 0);
+    assert.equal(getEcosmartMixingNtcIndex('NTC-4-B MIXING'), 0);
+    assert.equal(getEcosmartMixingNtcIndex('NTC-3-A MIXING'), 1);
+    assert.equal(getEcosmartMixingNtcIndex('NTC-3-B MIXING'), 1);
+    assert.equal(getEcosmartMixingNtcIndex('NTC-2-A BOILER'), null);
+});
 
 test('labels grouped RL6 and RL6S supply terminals as L', () => {
     assert.equal(getGroupedRelaySupplyLabel('RELAY-1-2-3-A'), 'L');

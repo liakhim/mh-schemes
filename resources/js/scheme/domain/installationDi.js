@@ -3,6 +3,13 @@ import { canonicalDeviceType } from './deviceTypes.js';
 const SMART2_POWER_CHAIN_MODULE_TYPES = new Set(['bl2', 'rl6', 'rl6s', 'io4', 'di6', 'rl2', 'rl2s']);
 const GROUPED_RELAY_SUPPLY_PORT_PATTERN = /^RELAY(?:-S)?-(?:1-2|1-2-3|4-5-6)-A$/i;
 
+export const getEcosmartMixingNtcIndex = (portName) => {
+    const normalizedPortName = String(portName || '').trim().toUpperCase();
+    if (/^NTC-4-[AB](?:\s+MIXING)?$/.test(normalizedPortName)) return 0;
+    if (/^NTC-3-[AB](?:\s+MIXING)?$/.test(normalizedPortName)) return 1;
+    return null;
+};
+
 export const getGroupedRelaySupplyLabel = (portName) => (
     GROUPED_RELAY_SUPPLY_PORT_PATTERN.test(String(portName || '').trim()) ? 'L' : null
 );

@@ -27,6 +27,7 @@
 - Правило действует только для controller `ecosmart`.
 - Обычный EXT-модуль `bl2` для `ecosmart` запрещён и не даёт дополнительную BUS-ёмкость. Если такой legacy/повреждённый модуль присутствует во входе, он сохраняется как данные, но BUS-котлы на него не назначаются; переполнение двух controller BUS-слотов остаётся в публичном `boilers`.
 - Если во внутреннем состоянии `controller.ecosmart_bl2` есть модуль, отрисовывается `resources/assets/modules/bl2/ecosmartbl2.svg` поверх изображения controller.
+- В режиме инсталляции `controller.ecosmart_bl2` также отображается поверх ECOsmart в той же anchor-позиции, а не как отдельный DIN-модуль.
 - `controller.ecosmart_bl2` является внутренним render-полем и не должен попадать в публичный `incomingScheme` при показе JSON или сохранении.
 - Корневое legacy-поле `ecosmart_bl2` при загрузке переносится в `controller.ecosmart_bl2`; новый код использует только поле controller.
 - В `/admin` модуль показывается как `Ecosmart BL2` в группе `ecosmart overlay`.
@@ -48,13 +49,13 @@
 - Размер каждого слота: `9 * indent` ширина и `2 * indent` высота.
 - Правая грань каждого слота совпадает с правой гранью контроллера.
 - Вертикальный gap между слотами: `3 * indent`.
-- Снизу вверх: `strategy-sensor-line`, `boiler-sensor-line`, `mixing-ntc-sensor`, `mixing-ntc-sensor`.
+- Снизу вверх: `strategy-sensor-line`, `boiler-sensor-line`, второй `mixing-ntc-sensor`, первый `mixing-ntc-sensor`.
 - Пустые слоты отображаются всегда, независимо от `Show empty slots`.
 - Верхние NTC-слоты `ecosmart` коммутируются к реальным NTC-портам controller:
 - `strategy-sensor-line`: `NTC-1-A CASCADE`, `NTC-1-B CASCADE`.
 - `boiler-sensor-line`: `NTC-2-A BOILER`, `NTC-2-B BOILER`.
-- Первый `mixing-ntc-sensor`: `NTC-3-A MIXING`, `NTC-3-B MIXING`.
-- Второй `mixing-ntc-sensor`: `NTC-4-A MIXING`, `NTC-4-B MIXING`.
+- Первый `mixing-ntc-sensor`: `NTC-4-A MIXING`, `NTC-4-B MIXING`.
+- Второй `mixing-ntc-sensor`: `NTC-3-A MIXING`, `NTC-3-B MIXING`.
 - Для всех занятых верхних слотов `ecosmart` всегда используется изображение `resources/assets/sensors/ntcSensorLeftPort.svg`, независимо от типа датчика.
 - Линии `strategy_sensor_devices`, `boiler_sensor_devices`, `mixing_ntc_devices` являются внутренней материализацией; в публичном `incomingScheme` соответствующие устройства должны находиться в `sensors`.
 

@@ -21,6 +21,7 @@ import { normalizeSchemeIds } from './scheme/domain/schemeIds';
 import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './scheme/domain/oneWireMutations';
 import {
     buildSmart2InstallationDiConnections,
+    getEcosmartMixingNtcIndex,
     getIo4SharedTerminalDevices,
     getRelayDeviceAtPhysicalSlot,
     getRelayDevicesAtPhysicalSlots,
@@ -242,6 +243,31 @@ const getFullWidthSize = (image, width, fallbackHeight) => {
     return {
         width,
         height: image.height * (width / image.width),
+    };
+};
+
+const getEcosmartBl2OverlayGeometry = ({ controllerWidth, controllerHeight, controllerPorts, modulePorts }) => {
+    const controllerAnchor1 = controllerPorts.find((port) => port.name === 'ECOSMART-ANCHOR-1');
+    const controllerAnchor2 = controllerPorts.find((port) => port.name === 'ECOSMART-ANCHOR-2');
+    const moduleAnchor1 = modulePorts.find((port) => port.name === 'ECOSMART-ANCHOR-1');
+    const moduleAnchor2 = modulePorts.find((port) => port.name === 'ECOSMART-ANCHOR-2');
+    if (!controllerAnchor1 || !controllerAnchor2 || !moduleAnchor1 || !moduleAnchor2) return null;
+
+    const moduleAnchorDeltaX = moduleAnchor2.x - moduleAnchor1.x;
+    const moduleAnchorDeltaY = moduleAnchor2.y - moduleAnchor1.y;
+    if (moduleAnchorDeltaX === 0 || moduleAnchorDeltaY === 0) return null;
+
+    const controllerAnchor1X = controllerAnchor1.x * controllerWidth;
+    const controllerAnchor1Y = controllerAnchor1.y * controllerHeight;
+    const width = ((controllerAnchor2.x - controllerAnchor1.x) * controllerWidth) / moduleAnchorDeltaX;
+    const height = ((controllerAnchor2.y - controllerAnchor1.y) * controllerHeight) / moduleAnchorDeltaY;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+
+    return {
+        x: controllerAnchor1X - moduleAnchor1.x * width,
+        y: controllerAnchor1Y - moduleAnchor1.y * height,
+        width,
+        height,
     };
 };
 
@@ -904,8 +930,8 @@ const parseInstallationPortSlot = (name) => {
         if (tag === 'CASCADE') return { line: 'ecosmartRole', key: 'strategy_sensor_devices', index: 0, fallback: 'Датчик стратегии' };
         if (tag === 'BOILER' && normalized.startsWith('NTC-')) return { line: 'ecosmartRole', key: 'boiler_sensor_devices', index: 0, fallback: 'Датчик бойлера' };
         if (tag === 'MIXING') {
-            if (normalized.startsWith('NTC-3-')) return { line: 'ecosmartRole', key: 'mixing_ntc_devices', index: 0, fallback: 'NTC смесителя' };
-            if (normalized.startsWith('NTC-4-')) return { line: 'ecosmartRole', key: 'mixing_ntc_devices', index: 1, fallback: 'NTC смесителя' };
+            const mixingNtcIndex = getEcosmartMixingNtcIndex(normalized);
+            if (mixingNtcIndex != null) return { line: 'ecosmartRole', key: 'mixing_ntc_devices', index: mixingNtcIndex, fallback: 'NTC смесителя' };
         }
     }
     let match;
@@ -5655,40 +5681,24 @@ const App = () => {
                                     const ecosmartBl2Ports = wirelessPortsByType.ecosmartbl2 || [];
                                     if (!ecosmartBl2Image?.width || !ecosmartBl2Image?.height) return null;
 
-                                    const controllerAnchor1 = ports.find((port) => port.name === 'ECOSMART-ANCHOR-1');
-                                    const controllerAnchor2 = ports.find((port) => port.name === 'ECOSMART-ANCHOR-2');
-                                    const moduleAnchor1 = ecosmartBl2Ports.find((port) => port.name === 'ECOSMART-ANCHOR-1');
-                                    const moduleAnchor2 = ecosmartBl2Ports.find((port) => port.name === 'ECOSMART-ANCHOR-2');
-                                    if (!controllerAnchor1 || !controllerAnchor2 || !moduleAnchor1 || !moduleAnchor2) return null;
-
-                                    const controllerAnchor1X = controllerAnchor1.x * controllerImage.width;
-                                    const controllerAnchor1Y = controllerAnchor1.y * controllerImage.height;
-                                    const controllerAnchor2X = controllerAnchor2.x * controllerImage.width;
-                                    const controllerAnchor2Y = controllerAnchor2.y * controllerImage.height;
-                                    const moduleAnchorDeltaX = moduleAnchor2.x - moduleAnchor1.x;
-                                    const moduleAnchorDeltaY = moduleAnchor2.y - moduleAnchor1.y;
-                                    if (moduleAnchorDeltaX === 0 || moduleAnchorDeltaY === 0) return null;
-
-                                    const width = (controllerAnchor2X - controllerAnchor1X) / moduleAnchorDeltaX;
-                                    const height = (controllerAnchor2Y - controllerAnchor1Y) / moduleAnchorDeltaY;
-                                    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
-
-                                    const x = controllerAnchor1X - moduleAnchor1.x * width;
-                                    const y = controllerAnchor1Y - moduleAnchor1.y * height;
+                                    const geometry = getEcosmartBl2OverlayGeometry({
+                                        controllerWidth: controllerImage.width,
+                                        controllerHeight: controllerImage.height,
+                                        controllerPorts: ports,
+                                        modulePorts: ecosmartBl2Ports,
+                                    });
+                                    if (!geometry) return null;
 
                                     return (
                                         <Image
                                             name={`morph:${getMorphImageKey(ecosmartBl2Modules[0])}`}
                                             image={ecosmartBl2Image}
-                                            x={x}
-                                            y={y}
-                                            width={width}
-                                            height={height}
+                                            {...geometry}
                                             shadowColor="blue"
                                             shadowBlur={5}
                                             draggable
                                             onDragEnd={(event) => {
-                                                event.target.position({ x, y });
+                                                event.target.position({ x: geometry.x, y: geometry.y });
                                                 event.target.getLayer()?.batchDraw();
                                             }}
                                         />
@@ -7237,26 +7247,26 @@ const App = () => {
                                     const slotHeight = 2 * indentSize;
                                     const slotGap = 3 * indentSize;
                                     const slotX = controllerImage.width - slotWidth;
-                                    const bottomSlotY = 4 * indentSize - slotHeight;
-                                    const slots = [
-                                        {
-                                            key: 'mixing-ntc-2',
-                                            lineKey: 'mixing_ntc_devices',
-                                            lineIndex: 1,
-                                            type: 'mixing-ntc-sensor',
-                                            title: 'NTC смесителя 2',
-                                            controllerPortA: 'NTC-4-A MIXING',
-                                            controllerPortB: 'NTC-4-B MIXING',
-                                        },
-                                        {
-                                            key: 'mixing-ntc-1',
-                                            lineKey: 'mixing_ntc_devices',
-                                            lineIndex: 0,
-                                            type: 'mixing-ntc-sensor',
-                                            title: 'NTC смесителя 1',
-                                            controllerPortA: 'NTC-3-A MIXING',
-                                            controllerPortB: 'NTC-3-B MIXING',
-                                        },
+                                     const bottomSlotY = 4 * indentSize - slotHeight;
+                                     const slots = [
+                                         {
+                                             key: 'mixing-ntc-1',
+                                             lineKey: 'mixing_ntc_devices',
+                                             lineIndex: 0,
+                                             type: 'mixing-ntc-sensor',
+                                             title: 'NTC смесителя 1',
+                                             controllerPortA: 'NTC-4-A MIXING',
+                                             controllerPortB: 'NTC-4-B MIXING',
+                                         },
+                                         {
+                                             key: 'mixing-ntc-2',
+                                             lineKey: 'mixing_ntc_devices',
+                                             lineIndex: 1,
+                                             type: 'mixing-ntc-sensor',
+                                             title: 'NTC смесителя 2',
+                                             controllerPortA: 'NTC-3-A MIXING',
+                                             controllerPortB: 'NTC-3-B MIXING',
+                                         },
                                         {
                                             key: 'boiler-sensor-line',
                                             lineKey: 'boiler_sensor_devices',
@@ -16575,8 +16585,36 @@ const App = () => {
                                                             shadowOffsetY: 10,
                                                             perfectDrawEnabled: false,
                                                         } : {})}
-                                                     />
-                                                     {item.isWifiPair && wirelessImages['power-unit'] && (
+                                                      />
+                                                     {item.key === 'controller' && controllerType === 'ecosmart' && (() => {
+                                                         const ecosmartBl2Module = Array.isArray(item?.data?.ecosmart_bl2)
+                                                             ? item.data.ecosmart_bl2[0]
+                                                             : null;
+                                                         const ecosmartBl2Image = wirelessImages.ecosmartbl2 || null;
+                                                         const ecosmartBl2Ports = wirelessPortsByType.ecosmartbl2 || [];
+                                                         if (!ecosmartBl2Module || !ecosmartBl2Image?.width || !ecosmartBl2Image?.height) return null;
+                                                         const geometry = getEcosmartBl2OverlayGeometry({
+                                                             controllerWidth: itemImageWidth,
+                                                             controllerHeight: item.image.height,
+                                                             controllerPorts: getInstallationAllPorts(item),
+                                                             modulePorts: ecosmartBl2Ports,
+                                                         });
+                                                         if (!geometry) return null;
+                                                         return (
+                                                             <Image
+                                                                 name={`morph:${getMorphImageKey(ecosmartBl2Module)}`}
+                                                                 image={ecosmartBl2Image}
+                                                                 x={itemImageX + geometry.x}
+                                                                 y={geometry.y}
+                                                                 width={geometry.width}
+                                                                 height={geometry.height}
+                                                                 shadowColor="blue"
+                                                                 shadowBlur={5}
+                                                                 listening={false}
+                                                             />
+                                                         );
+                                                     })()}
+                                                      {item.isWifiPair && wirelessImages['power-unit'] && (
                                                          <>
                                                              <Image image={wirelessImages['power-unit']} width={dinSize} height={item.image.height} listening={false} />
                                                              <Text x={0} y={-12} width={itemWidth} text={`${getInstallationItemLabel(item)} + ${POWER_UNIT_LABEL}`} fontSize={6} fill="#4a5568" align="center" listening={false} />
