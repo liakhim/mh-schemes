@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
     buildSmart2InstallationDiConnections,
     getGroupedRelaySupplyLabel,
+    getIo4SharedTerminalDevices,
     getRelayDeviceAtPhysicalSlot,
     getRelayDevicesAtPhysicalSlots,
     getRelaySupplyLabel,
@@ -33,6 +34,14 @@ test('resolves every device connected to a mixed RL6 supply group', () => {
     const servo = { id: 'servo', type: 'zoneServo', relay_slot_index: 2 };
 
     assert.deepEqual(getRelayDevicesAtPhysicalSlots([pump, boiler, servo], [0, 1, 2]), [pump, boiler, servo]);
+});
+
+test('connects an IO4 shared GND terminal to NTC but not its paired 0-10V servo', () => {
+    const servo = { id: 'servo', type: '010servo', connection_type: 'di' };
+    const ntc = { id: 'ntc', type: 'mixing-ntc-sensor', connection_type: 'ntc' };
+    const data = { channel_devices: [servo, ntc] };
+
+    assert.deepEqual(getIo4SharedTerminalDevices(data, [0, 1], 'CHANNEL-1-2-GND'), [ntc]);
 });
 
 test('labels each occupied RL2 A terminal as an L supply', () => {

@@ -21,6 +21,7 @@ import { normalizeSchemeIds } from './scheme/domain/schemeIds';
 import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './scheme/domain/oneWireMutations';
 import {
     buildSmart2InstallationDiConnections,
+    getIo4SharedTerminalDevices,
     getRelayDeviceAtPhysicalSlot,
     getRelayDevicesAtPhysicalSlots,
     getRelaySupplyLabel,
@@ -960,40 +961,6 @@ const getInstallationRelayPortDevice = (item, portName) => {
         return devices.find((device) => isStupidBoilerType(device?.type)) || devices[0] || null;
     }
     return null;
-};
-
-const getIo4SharedTerminalDevices = (data, indexes, portName) => {
-    const normalizedPortName = String(portName || '').toUpperCase();
-    const devices = indexes
-        .map((index) => (
-            (Array.isArray(data?.channel_devices) ? data.channel_devices[index] : null)
-            || (Array.isArray(data?.devices_420) ? data.devices_420[index] : null)
-            || (Array.isArray(data?.ai_devices) ? data.ai_devices[index] : null)
-        ))
-        .filter(Boolean);
-    const uniqueDevices = devices.filter((device, index, items) => items.findIndex((candidate) => (
-        candidate === device
-        || (candidate?.id != null && device?.id != null && candidate.id === device.id)
-    )) === index);
-
-    return uniqueDevices.filter((device) => {
-        const type = canonicalDeviceType(device?.type);
-        const connectionTypes = String(device?.connection_type || '')
-            .toLowerCase()
-            .split('|')
-            .map((value) => value.trim());
-        if (normalizedPortName.endsWith('-V+')) {
-            return type === 'pressure-sensor' || connectionTypes.includes('4-20');
-        }
-        if (normalizedPortName.endsWith('-GND')) {
-                 return type === 'ntc-sensor'
-                     || type === 'boiler-ntc-sensor'
-                     || type === 'mixing-ntc-sensor'
-                     || type === '010servo'
-                     || connectionTypes.includes('ntc');
-        }
-        return true;
-    });
 };
 
 /**
