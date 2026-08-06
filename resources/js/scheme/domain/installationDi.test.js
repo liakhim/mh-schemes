@@ -63,7 +63,13 @@ test('labels individual PRO RELAY-S A terminals as L supplies', () => {
         assert.equal(getRelaySupplyLabel(`RELAY-S-${slot}-A`, 'pro'), 'L');
         assert.equal(getRelaySupplyLabel(`RELAY-S-${slot}-B`, 'pro'), null);
     }
-    assert.equal(getRelaySupplyLabel('RELAY-1-A', 'pro'), null);
+});
+
+test('labels individual PRO RELAY A terminals as L supplies', () => {
+    for (let slot = 1; slot <= 4; slot += 1) {
+        assert.equal(getRelaySupplyLabel(`RELAY-${slot}-A`, 'pro'), 'L');
+        assert.equal(getRelaySupplyLabel(`RELAY-${slot}-B`, 'pro'), null);
+    }
 });
 
 test('excludes RDT2 and other 1-wire devices from the Smart2 12VDC chain', () => {

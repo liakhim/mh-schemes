@@ -1059,7 +1059,10 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
     const slot = parseInstallationPortSlot(port?.name);
     const data = item?.data;
     const normalizedPortName = String(port?.name || '').toUpperCase();
-    const relaySupplyLabel = getRelaySupplyLabel(normalizedPortName, item?.type || item?.data?.type);
+    const relayPortDevice = getInstallationRelayPortDevice(item, normalizedPortName);
+    const relaySupplyLabel = isStupidBoilerType(relayPortDevice?.type)
+        ? null
+        : getRelaySupplyLabel(normalizedPortName, item?.type || item?.data?.type);
     if (relaySupplyLabel) return relaySupplyLabel;
     if (slot?.line === 'di'
         && item?.installationDiPortLabels

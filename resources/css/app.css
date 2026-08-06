@@ -935,7 +935,8 @@ body {
     display: none;
 }
 
-.spa-floating-tools .spa-floating-tool-button[data-tooltip]::before {
+.spa-floating-tools .spa-floating-tool-button[data-tooltip]::before,
+.spa-scheme-meta .spa-floating-tool-button[data-tooltip]::before {
     right: auto;
     left: calc(100% + 5px);
     border-right: 7px solid #172033;
@@ -943,7 +944,8 @@ body {
     transform: translate(-4px, -50%);
 }
 
-.spa-floating-tools .spa-floating-tool-button[data-tooltip]::after {
+.spa-floating-tools .spa-floating-tool-button[data-tooltip]::after,
+.spa-scheme-meta .spa-floating-tool-button[data-tooltip]::after {
     right: auto;
     left: calc(100% + 12px);
     transform: translate(-6px, -50%);
@@ -952,7 +954,11 @@ body {
 .spa-floating-tools .spa-floating-tool-button[data-tooltip]:hover::before,
 .spa-floating-tools .spa-floating-tool-button[data-tooltip]:hover::after,
 .spa-floating-tools .spa-floating-tool-button[data-tooltip]:focus-visible::before,
-.spa-floating-tools .spa-floating-tool-button[data-tooltip]:focus-visible::after {
+.spa-floating-tools .spa-floating-tool-button[data-tooltip]:focus-visible::after,
+.spa-scheme-meta .spa-floating-tool-button[data-tooltip]:hover::before,
+.spa-scheme-meta .spa-floating-tool-button[data-tooltip]:hover::after,
+.spa-scheme-meta .spa-floating-tool-button[data-tooltip]:focus-visible::before,
+.spa-scheme-meta .spa-floating-tool-button[data-tooltip]:focus-visible::after {
     transform: translate(0, -50%);
 }
 
