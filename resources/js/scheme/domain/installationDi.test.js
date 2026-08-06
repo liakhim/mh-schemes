@@ -107,6 +107,35 @@ test('connects UPS without a relay module', () => {
     });
 });
 
+test('maps direct Smart2 DI devices after the UPS pair', () => {
+    const connections = buildSmart2InstallationDiConnections({
+        hasUps: true,
+        moduleLabels: [],
+        deviceLabels: ['Бассейн', 'Вентиляция'],
+    });
+
+    assert.deepEqual(connections.controllerPortLabels, {
+        0: 'UPS',
+        1: 'UPS',
+        2: 'Бассейн',
+        3: 'Вентиляция',
+    });
+});
+
+test('maps sparse direct Smart2 DI devices after a relay module pair', () => {
+    const connections = buildSmart2InstallationDiConnections({
+        hasUps: false,
+        moduleLabels: ['RL2'],
+        deviceLabels: [null, 'Сигнал'],
+    });
+
+    assert.deepEqual(connections.controllerPortLabels, {
+        0: 'RL2',
+        1: 'RL2',
+        3: 'Сигнал',
+    });
+});
+
 test('leaves relay modules beyond Smart2 DI capacity disconnected', () => {
     const connections = buildSmart2InstallationDiConnections({
         hasUps: true,

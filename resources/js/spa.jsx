@@ -16154,10 +16154,12 @@ const App = () => {
                                 const smart2DiModules = baseInstallationModuleItems.filter((item) => DI_MODULE_TYPES.includes(item.type));
                                 const smart2DiConnections = isSmart2Installation
                                     ? buildSmart2InstallationDiConnections({
-                                        hasUps: hasInstallationUps,
-                                        moduleLabels: smart2DiModules.map((item) => getInstallationItemLabel(item)),
-                                        controllerLabel: getInstallationItemLabel({ key: 'controller', type: controllerType, data: scheme?.controller }),
-                                    })
+                                         hasUps: hasInstallationUps,
+                                         moduleLabels: smart2DiModules.map((item) => getInstallationItemLabel(item)),
+                                         deviceLabels: (Array.isArray(scheme?.controller?.di_devices) ? scheme.controller.di_devices : [])
+                                             .map((device, index) => (device ? getInstallationDeviceLabel(device, `DI ${index + 1}`) : null)),
+                                         controllerLabel: getInstallationItemLabel({ key: 'controller', type: controllerType, data: scheme?.controller }),
+                                     })
                                     : null;
                                 let smart2DiModuleIndex = 0;
                                 const installationModuleItems = baseInstallationModuleItems.map((item) => {

@@ -77,6 +77,7 @@
 - Занятые controller DI-слоты `pro` draggable независимо друг от друга; `Reset positions` сбрасывает их offsets.
 - Если `leak-sensor` занимает controller DI-слот `pro`, используется изображение `resources/assets/sensors/leakSensorLeftPort.svg`; занятое изображение отображается с масштабом `1.25` относительно обычного DI-слота без изменения геометрии самого слота. Рамка выбора повторяет увеличенные границы изображения, а блок «Детали устройства» использует тот же вариант SVG с портами слева.
 - У `smart2` controller DI использует свободные порты `DI-OUT-1..4`: UPS занимает 2 порта, каждый DI-модуль `rl2`/`rl2s` занимает 2 порта, оставшиеся порты доступны для отдельных DI-устройств в `controller.di_devices`.
+- В режиме инсталляции подписи отдельных `controller.di_devices` отображаются на фактически свободных физических `DI-OUT` портах после пар, занятых UPS и `rl2`/`rl2s`; логический индекс устройства не считается физическим номером порта.
 - Пустые отдельные controller DI-слоты `smart2` (не слоты `di_modules`) при `Show empty slots` показывают кнопку `+`; через меню можно добавить `discrete_pool`, `discrete_fire_alarm`, `discrete_signal`, `discrete_ventilation`, `leak-sensor`.
 - Занятые отдельные controller DI-слоты `smart2` на hover показывают кнопку удаления; удаление очищает конкретный индекс `controller.di_devices` без сдвига соседних устройств.
 - Занятые отдельные controller DI-слоты `smart2` draggable независимо друг от друга; `Reset positions` сбрасывает их offsets.

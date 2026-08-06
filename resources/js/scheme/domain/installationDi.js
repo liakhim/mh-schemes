@@ -82,6 +82,7 @@ export const getSmart2InstallationPowerChainHead = (items) => (
 export const buildSmart2InstallationDiConnections = ({
     hasUps,
     moduleLabels,
+    deviceLabels = [],
     controllerLabel = 'SMART2',
 }) => {
     const controllerPortLabels = {};
@@ -105,6 +106,12 @@ export const buildSmart2InstallationDiConnections = ({
         modulePortLabels[moduleIndex][0] = controllerLabel;
         modulePortLabels[moduleIndex][1] = controllerLabel;
         pairIndex += 1;
+    });
+
+    const firstFreePortIndex = pairIndex * 2;
+    deviceLabels.forEach((label, deviceIndex) => {
+        const portIndex = firstFreePortIndex + deviceIndex;
+        if (label && portIndex < 4) controllerPortLabels[portIndex] = label;
     });
 
     return { controllerPortLabels, modulePortLabels, upsPortLabels };
