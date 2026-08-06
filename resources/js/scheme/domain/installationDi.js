@@ -33,6 +33,12 @@ export const getRelayDeviceAtPhysicalSlot = (devices, targetSlot) => {
     return null;
 };
 
+export const getRelayDevicesAtPhysicalSlots = (devices, targetSlots) => (
+    (Array.isArray(targetSlots) ? targetSlots : [])
+        .map((targetSlot) => getRelayDeviceAtPhysicalSlot(devices, targetSlot))
+        .filter(Boolean)
+);
+
 export const getSmart2InstallationPowerChainHead = (items) => (
     (Array.isArray(items) ? items : []).find((item) => (
         SMART2_POWER_CHAIN_MODULE_TYPES.has(canonicalDeviceType(item?.type || item?.data?.type))

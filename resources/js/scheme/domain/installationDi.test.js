@@ -4,6 +4,7 @@ import {
     buildSmart2InstallationDiConnections,
     getGroupedRelaySupplyLabel,
     getRelayDeviceAtPhysicalSlot,
+    getRelayDevicesAtPhysicalSlots,
     getRelaySupplyLabel,
     getSmart2InstallationPowerChainHead,
 } from './installationDi.js';
@@ -24,6 +25,14 @@ test('maps a double relay device to both physical relay ports', () => {
     assert.equal(getRelayDeviceAtPhysicalSlot([servo], 0), servo);
     assert.equal(getRelayDeviceAtPhysicalSlot([servo], 1), servo);
     assert.equal(getRelayDeviceAtPhysicalSlot([servo], 2), null);
+});
+
+test('resolves every device connected to a mixed RL6 supply group', () => {
+    const pump = { id: 'pump', type: 'pump-220v', relay_slot_index: 0 };
+    const boiler = { id: 'boiler', type: 'stupid', relay_slot_index: 1 };
+    const servo = { id: 'servo', type: 'zoneServo', relay_slot_index: 2 };
+
+    assert.deepEqual(getRelayDevicesAtPhysicalSlots([pump, boiler, servo], [0, 1, 2]), [pump, boiler, servo]);
 });
 
 test('labels each occupied RL2 A terminal as an L supply', () => {

@@ -22,6 +22,7 @@ import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './schem
 import {
     buildSmart2InstallationDiConnections,
     getRelayDeviceAtPhysicalSlot,
+    getRelayDevicesAtPhysicalSlots,
     getRelaySupplyLabel,
     getSmart2InstallationPowerChainHead,
 } from './scheme/domain/installationDi';
@@ -955,9 +956,7 @@ const getInstallationRelayPortDevice = (item, portName) => {
     if (!slot || !data || typeof data !== 'object') return null;
     if (slot.line === 'relay') return getRelayDeviceAtPhysicalSlot(data.relay_devices, slot.index);
     if (slot.line === 'relayRange') {
-        const devices = slot.indexes
-            .map((index) => getRelayDeviceAtPhysicalSlot(data.relay_devices, index))
-            .filter(Boolean);
+        const devices = getRelayDevicesAtPhysicalSlots(data.relay_devices, slot.indexes);
         return devices.find((device) => isStupidBoilerType(device?.type)) || devices[0] || null;
     }
     return null;
