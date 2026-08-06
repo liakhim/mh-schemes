@@ -79,6 +79,7 @@
 - У `smart2` controller DI использует свободные порты `DI-OUT-1..4`: UPS занимает 2 порта, каждый DI-модуль `rl2`/`rl2s` занимает 2 порта, оставшиеся порты доступны для отдельных DI-устройств в `controller.di_devices`.
 - Пустые отдельные controller DI-слоты `smart2` (не слоты `di_modules`) при `Show empty slots` показывают кнопку `+`; через меню можно добавить `discrete_pool`, `discrete_fire_alarm`, `discrete_signal`, `discrete_ventilation`, `leak-sensor`.
 - Занятые отдельные controller DI-слоты `smart2` на hover показывают кнопку удаления; удаление очищает конкретный индекс `controller.di_devices` без сдвига соседних устройств.
+- Занятые отдельные controller DI-слоты `smart2` draggable независимо друг от друга; `Reset positions` сбрасывает их offsets.
 - Слоты отдельных controller DI-устройств `smart2` отображаются отдельной вертикальной линией под RELAY-слотом контроллера и не являются линией `di_modules`.
 - DI-устройства `smart2` полноценно занимают `DI-OUT`: если свободной пары `DI-OUT` нет, добавление UPS или DI-модуля `rl2`/`rl2s` недоступно; если схема импортирована с конфликтом, лишние controller DI-устройства возвращаются в `wired_devices`.
 - Над занятыми controller DI-слотами `pro`, `smart2` и `ecosmart` отображается инфоблок с названием устройства и порядковым номером среди устройств этого типа.
