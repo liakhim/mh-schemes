@@ -26,6 +26,8 @@ export const calculateSelectionMixedIoModules = ({
     controllerDiOccupied = 0,
     existingIo4ChannelLengths = [],
     existingDi6ChannelLengths = [],
+    unplacedNtcDevices = 0,
+    allowNtcOnIo4 = false,
 } = {}) => {
     const normalizeLength = (length, capacity) => Math.min(capacity, Math.max(0, Number(length) || 0));
     const io4LineLengths = (Array.isArray(existingIo4ChannelLengths) ? existingIo4ChannelLengths : [])
@@ -53,25 +55,31 @@ export const calculateSelectionMixedIoModules = ({
     for (let index = 0; index < analog420ForIo4; index += 1) appendIo4Group(1);
 
     const freeControllerDi = Math.max(0, controllerDiCapacity - controllerDiOccupied);
-    let remainingDi = Math.max(0, unplacedGeneralDiDevices - freeControllerDi);
-    const appendSingles = (lineLengths, capacity) => {
-        for (let lineIndex = 0; lineIndex < lineLengths.length && remainingDi > 0; lineIndex += 1) {
+    const consumeSingles = (lineLengths, capacity, requestedCount) => {
+        let remaining = Math.max(0, Number(requestedCount) || 0);
+        for (let lineIndex = 0; lineIndex < lineLengths.length && remaining > 0; lineIndex += 1) {
             const free = Math.max(0, capacity - lineLengths[lineIndex]);
-            const placed = Math.min(free, remainingDi);
+            const placed = Math.min(free, remaining);
             lineLengths[lineIndex] += placed;
-            remainingDi -= placed;
+            remaining -= placed;
         }
+        return remaining;
     };
-    appendSingles(io4LineLengths, IO4_CHANNEL_CAPACITY);
-    appendSingles(di6LineLengths, DI6_CHANNEL_CAPACITY);
+    let remainingDi = Math.max(0, unplacedGeneralDiDevices - freeControllerDi);
+    remainingDi = consumeSingles(io4LineLengths, IO4_CHANNEL_CAPACITY, remainingDi);
+    remainingDi = consumeSingles(di6LineLengths, DI6_CHANNEL_CAPACITY, remainingDi);
 
     const additionalDi6Modules = Math.ceil(remainingDi / DI6_CHANNEL_CAPACITY);
+    const remainingNtcDevices = allowNtcOnIo4
+        ? consumeSingles(io4LineLengths, IO4_CHANNEL_CAPACITY, unplacedNtcDevices)
+        : Math.max(0, Number(unplacedNtcDevices) || 0);
 
     return {
         additionalIo4Modules,
         additionalDi6Modules,
         io4ChannelLengths: io4LineLengths,
         analog420ForIo4,
+        remainingNtcDevices,
     };
 };
 

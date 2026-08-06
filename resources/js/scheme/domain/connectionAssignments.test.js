@@ -69,6 +69,25 @@ test('round trip keeps a pressure sensor on its IO4 while controller 4-20 is fre
     assert.equal(countDevice(reopened, sensor.id), 1);
 });
 
+test('round trip keeps a standalone NTC sensor on its exact IO4 channel', () => {
+    const sensor = {
+        id: 'ntc-io4',
+        type: 'ntc-sensor',
+        device_type: 'sensor',
+        connection_type: 'ntc',
+    };
+    const channels = [];
+    channels[2] = sensor;
+    const { reopened } = serializeAndReopen({
+        controller: { type: 'pro', one_wire_devices: [] },
+        ext_modules: [{ id: 'io4-ntc', type: 'io4', channel_devices: channels }],
+        one_wire_modules: [],
+    });
+
+    assert.equal(reopened.ext_modules[0].channel_devices[2].id, sensor.id);
+    assert.equal(countDevice(reopened, sensor.id), 1);
+});
+
 test('numeric and string device ids remain distinct through serialization and reopen', () => {
     const numericSensor = pressureSensor(1);
     const stringSensor = pressureSensor('1');

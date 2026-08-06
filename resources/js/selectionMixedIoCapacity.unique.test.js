@@ -34,7 +34,37 @@ test('shares IO4 channels between an unplaced 0-10V group, 4-20 overflow and DI'
         additionalDi6Modules: 0,
         io4ChannelLengths: [4],
         analog420ForIo4: 1,
+        remainingNtcDevices: 0,
     });
+});
+
+test('uses remaining planned IO4 channels for NTC without adding another module', () => {
+    const result = calculateSelectionMixedIoModules({
+        unplacedIo4ChannelGroups: [2],
+        unplacedNtcDevices: 1,
+        allowNtcOnIo4: true,
+    });
+
+    assert.equal(result.additionalIo4Modules, 1);
+    assert.deepEqual(result.io4ChannelLengths, [3]);
+    assert.equal(result.remainingNtcDevices, 0);
+});
+
+test('uses existing IO4 tail for NTC but does not create IO4 only for NTC', () => {
+    const withIo4 = calculateSelectionMixedIoModules({
+        existingIo4ChannelLengths: [3],
+        unplacedNtcDevices: 1,
+        allowNtcOnIo4: true,
+    });
+    const withoutIo4 = calculateSelectionMixedIoModules({
+        unplacedNtcDevices: 1,
+        allowNtcOnIo4: true,
+    });
+
+    assert.deepEqual(withIo4.io4ChannelLengths, [4]);
+    assert.equal(withIo4.remainingNtcDevices, 0);
+    assert.equal(withoutIo4.additionalIo4Modules, 0);
+    assert.equal(withoutIo4.remainingNtcDevices, 1);
 });
 
 test('preserves grouped placement when existing IO4 free channels are fragmented', () => {

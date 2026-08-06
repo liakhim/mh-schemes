@@ -7,6 +7,7 @@ import { balance010Servos } from './servo010Balancer.js';
 import { balancePressureSensors } from './pressureSensorBalancer.js';
 import { balanceDiscreteDevices } from './discreteDeviceBalancer.js';
 import { balanceEcosmartNtcLines } from './ecosmartNtcLineBalancer.js';
+import { balanceNtcSensorsIntoIo4 } from './io4NtcSensorBalancer.js';
 import { balanceOneWireDevices } from './oneWireBalancer.js';
 import { balanceNtcSensors } from './ntcSensorBalancer.js';
 import { restoreConnectionAssignments } from './connectionAssignments.js';
@@ -362,7 +363,8 @@ export const materializeBalancedOneWireScheme = (scheme) => {
     const pressureBalancedScheme = balancePressureSensors(servo010BalancedScheme);
     const discreteBalancedScheme = balanceDiscreteDevices(pressureBalancedScheme);
     const ecosmartNtcBalancedScheme = balanceEcosmartNtcLines(discreteBalancedScheme);
-    const ownedNtcModuleScheme = ensureOwnedNtcOneWireModules(ecosmartNtcBalancedScheme);
+    const io4NtcBalancedScheme = balanceNtcSensorsIntoIo4(ecosmartNtcBalancedScheme);
+    const ownedNtcModuleScheme = ensureOwnedNtcOneWireModules(io4NtcBalancedScheme);
     const ntcModuleBalancedScheme = ensureNtcOneWireModules(ownedNtcModuleScheme);
     const sourceExtModules = Array.isArray(ntcModuleBalancedScheme?.ext_modules) ? ntcModuleBalancedScheme.ext_modules : [];
     const supportsExt = ['pro', 'ecosmart'].includes(getControllerType(ntcModuleBalancedScheme));

@@ -342,3 +342,21 @@ test('restores assigned sensors before deleting an NTC-1-wire module', () => {
     assert.deepEqual(result.controller.one_wire_devices, []);
     assert.deepEqual(result.sensors.map(({ id }) => id), ['existing', 'ntc-1', 'ntc-2']);
 });
+
+test('uses an existing IO4 tail for standalone NTC before creating NTC-1-wire', () => {
+    const servo = { id: 'servo-010', type: '010servo', device_type: 'equipment', connection_type: 'di' };
+    const mixingNtc = { id: 'mixing-ntc', type: 'mixing-ntc-sensor', device_type: 'sensor', connection_type: 'ntc' };
+    const standaloneNtc = { id: 'standalone-ntc', type: 'ntc-sensor', device_type: 'sensor', connection_type: 'ntc' };
+    const result = materializeBalancedOneWireScheme({
+        controller: { type: 'pro', one_wire_devices: [] },
+        ext_modules: [{ id: 'io4-1', type: 'io4', channel_devices: [servo, mixingNtc] }],
+        one_wire_modules: [],
+        sensors: [standaloneNtc],
+        wired_devices: [],
+    });
+
+    assert.deepEqual(result.ext_modules[0].channel_devices.map(({ id }) => id), ['servo-010', 'mixing-ntc', 'standalone-ntc']);
+    assert.equal(result.sensors.some(({ id }) => id === 'standalone-ntc'), false);
+    assert.equal(result.one_wire_modules.some(({ type }) => type === 'ntc-1-wire'), false);
+    assert.equal(result.controller.one_wire_devices.some(({ type }) => type === 'ntc-1-wire'), false);
+});

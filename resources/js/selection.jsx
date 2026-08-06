@@ -406,14 +406,16 @@ const getExistingNtcModuleFreeSlots = (scheme) => {
  * @param {object} scheme Анализируемая схема.
  * @returns {number} Число дополнительных модулей.
  */
-const getRequiredNtcOneWireModuleCount = (scheme) => {
-    const controllerType = getControllerType(scheme);
+const getDirectNtcSensorDemand = (scheme, controllerType = getControllerType(scheme)) => {
     const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
     const directNtcSensors = sensors.filter(isDirectNtcSensor);
     const ecosmartBuiltInMixingNtcCount = controllerType === 'ecosmart'
         ? Math.min(2, directNtcSensors.filter((sensor) => canonicalType(sensor?.type) === 'mixing-ntc-sensor').length)
         : 0;
-    const ntcSensorCount = Math.max(0, directNtcSensors.length - ecosmartBuiltInMixingNtcCount);
+    return Math.max(0, directNtcSensors.length - ecosmartBuiltInMixingNtcCount);
+};
+
+const getRequiredNtcOneWireModuleCount = (scheme, ntcSensorCount = getDirectNtcSensorDemand(scheme)) => {
     const deficit = ntcSensorCount - getExistingNtcModuleFreeSlots(scheme);
     return Math.ceil(Math.max(0, deficit) / NTC_MODULE_CAPACITY);
 };
@@ -692,7 +694,9 @@ const getCompatibilityStats = (scheme, controllerTypeOverride = null) => {
     const controllerOneWireDevices = Array.isArray(controller.one_wire_devices) ? controller.one_wire_devices : [];
     const oneWireThermostats = wiredDevices.filter(isOneWireThermostat).length
         + controllerOneWireDevices.filter(isOneWireThermostat).length;
-    const requiredNtcModules = getRequiredNtcOneWireModuleCount(scheme);
+    const ups = Array.isArray(scheme?.power_modules) && scheme.power_modules.includes('ups') ? 1 : 0;
+    const mixedIoPlan = getSelectionMixedIoPlan(scheme, { ups }, controllerType);
+    const requiredNtcModules = getRequiredNtcOneWireModuleCount(scheme, mixedIoPlan.remainingNtcDevices);
     const totalNtcModules = countNtcOneWireModules(scheme) + requiredNtcModules;
     const requiredNtcOneWireLines = Math.ceil(totalNtcModules / NTC_MODULES_PER_ONE_WIRE_LINE);
     const oneWireLines = getOneWireLineCount(scheme?.ext_modules);
@@ -724,7 +728,6 @@ const getCompatibilityStats = (scheme, controllerTypeOverride = null) => {
     const analog420 = sensors.filter((sensor) => hasConnectionType(sensor, '4-20')).length
         + controller420Devices.filter((sensor) => hasConnectionType(sensor, '4-20')).length
         + io4ChannelDevices.filter((sensor) => hasConnectionType(sensor, '4-20')).length;
-    const ups = Array.isArray(scheme?.power_modules) && scheme.power_modules.includes('ups') ? 1 : 0;
 
     return { oneWire, oneWireThermostats, bus, relay, relayS, di, io4Only, analog420, ups, requiredNtcModules, totalNtcModules, requiredNtcOneWireLines, oneWireLines, requiredRdt2Modules };
 };
@@ -764,6 +767,8 @@ const getSelectionMixedIoPlan = (scheme, stats, controllerType) => {
         existingDi6ChannelLengths: di6Modules.map((moduleItem) => (
             Array.isArray(moduleItem?.channel_devices) ? moduleItem.channel_devices.length : 0
         )),
+        unplacedNtcDevices: getDirectNtcSensorDemand(scheme, controllerType),
+        allowNtcOnIo4: controllerType === 'pro' || controllerType === 'ecosmart',
     });
 };
 
