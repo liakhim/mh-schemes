@@ -17,7 +17,8 @@
 - Между двумя EXT-термостатами `ecosmart` линии идут от порта предыдущего термостата вертикально вниз до уровня соответствующего порта следующего термостата и сразу вправо в порт следующего термостата.
 - Для `pro`, если controller 1-wire линия не пустая, к расстоянию до первого EXT-модуля добавляется `8 * indent`.
 - Пустой EXT-слот `pro` при `Show empty slots` коммутируется четырьмя линиями от контроллера либо последнего EXT-модуля; линии используют штатные выносы EXT-цепочки и заканчиваются на нижней грани пустого слота.
-- У пустого EXT-слота `pro` линия `EXT-B` выносится ровно на `3 * indent` ниже нижней грани предыдущего элемента: контроллера либо последнего EXT-модуля.
+- Если EXT-модулей нет, линии пустого EXT-слота `pro` имеют точные выносы ниже контроллера: `12VDC-OUT-GND` — `3 * indent`, `12VDC-OUT-V+` — `4 * indent`, `EXT-OUT-A` — `6 * indent`, `EXT-OUT-B` — `5 * indent`.
+- Если EXT-модули уже есть, линия `EXT-B` пустого EXT-слота `pro` выносится ровно на `3 * indent` ниже нижней грани последнего EXT-модуля.
 - Пустой котловой слот над `bl2` коммутируется прямыми вертикальными линиями от `BUS-A` и `BUS-B` модуля до нижней грани слота, без выносов и изломов.
 - У занятого котлового слота `bl2` BUS-линии рисуются ниже изображения котла и адаптера по z-index.
 - `di6` получает дополнительный левый зазор `10 * indent`, если хотя бы один его `channel_devices`/`di_devices` слот занят.
@@ -68,11 +69,12 @@
 - Controller 4-20 capacity есть у `pro` и `ecosmart`: первый 4-20 датчик попадает в `controller.devices_420`/`controller.devices420`, следующие уходят в `io4.channel_devices`.
 - Пустой controller 4-20 слот на `pro` и `ecosmart` отображается при `Show empty slots`, имеет размер `9 * indent` на `2 * indent`, порты находятся на левой грани друг над другом с расстоянием `1 * indent`, коммутируется двумя проводами от `4-20-OUT-V+` и `4-20-OUT-IN`, кликается через `+` и добавляет первый датчик в `controller.devices_420`/`controller.devices420`.
 - У `ecosmart` controller 4-20 слот расположен справа от контроллера с зазором `4 * indent`; верхняя грань слота на `9 * indent` ниже верхней грани контроллера.
-- Controller 4-20 слот `ecosmart` draggable; offset сохраняется отдельно и сбрасывается через `Reset positions`.
+- Controller 4-20 слот `pro` и `ecosmart` draggable; offset сохраняется отдельно и сбрасывается через `Reset positions`.
 - Discrete devices с `connection_type='di'` распределяются на controller DI, `io4.channel_devices`, `di6.channel_devices`.
 - У `pro` при наличии UPS controller DI-входы заняты UPS, поэтому DI-устройства должны распределяться в `di6`/`io4`; на `/selection` это создаёт потребность в `di6`, если нет свободных module DI/channel слотов.
 - Пустые controller DI-слоты `pro` при `Show empty slots` показывают кнопку `+`; через меню можно добавить `discrete_pool`, `discrete_fire_alarm`, `discrete_signal`, `discrete_ventilation`, `leak-sensor` в конкретный индекс `controller.di_devices[0..1]`.
 - Занятые controller DI-слоты `pro` на hover показывают кнопку удаления; удаление очищает конкретный индекс `controller.di_devices` без сдвига соседних устройств.
+- Занятые controller DI-слоты `pro` draggable независимо друг от друга; `Reset positions` сбрасывает их offsets.
 - Если `leak-sensor` занимает controller DI-слот `pro`, используется изображение `resources/assets/sensors/leakSensorLeftPort.svg`; занятое изображение отображается с масштабом `1.25` относительно обычного DI-слота без изменения геометрии самого слота. Рамка выбора повторяет увеличенные границы изображения, а блок «Детали устройства» использует тот же вариант SVG с портами слева.
 - У `smart2` controller DI использует свободные порты `DI-OUT-1..4`: UPS занимает 2 порта, каждый DI-модуль `rl2`/`rl2s` занимает 2 порта, оставшиеся порты доступны для отдельных DI-устройств в `controller.di_devices`.
 - Пустые отдельные controller DI-слоты `smart2` (не слоты `di_modules`) при `Show empty slots` показывают кнопку `+`; через меню можно добавить `discrete_pool`, `discrete_fire_alarm`, `discrete_signal`, `discrete_ventilation`, `leak-sensor`.

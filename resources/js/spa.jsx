@@ -6291,9 +6291,13 @@ const App = () => {
                                                      />
                                                  </>
                                              )}
-                                            {isDiIn1Occupied && proDiDevices[0] && (() => {
-                                                const device = proDiDevices[0];
-                                                const hoverKey = 'controller-di:0';
+                                             {isDiIn1Occupied && proDiDevices[0] && (() => {
+                                                 const device = proDiDevices[0];
+                                                 const offsetKey = getRuntimeOffsetKey(device, 0, 'controller-di');
+                                                 const offset = diSlotOffsets[offsetKey] || { x: 0, y: 0 };
+                                                 const slotX = diSlotX + offset.x;
+                                                 const slotY = diSlot2Y + offset.y;
+                                                 const hoverKey = 'controller-di:0';
                                                 const isHovered = hoveredNtcSlotKey === hoverKey;
                                                  const deviceType = canonicalDeviceType(device?.type);
                                                  const isLeakDevice = isLeakDiDeviceType(deviceType);
@@ -6312,14 +6316,35 @@ const App = () => {
                                                      ? diSlotHeight * LEAK_DI_DEVICE_IMAGE_SCALE
                                                      : diSlotHeight;
                                                  const size = getContainSize(image, imageBoxWidth, imageBoxHeight);
-                                                const x = diSlotX + (diSlotWidth - size.width) / 2;
-                                                const y = diSlot2Y + (diSlotHeight - size.height) / 2;
-                                                 const toX = diInputPort ? (x + diInputPort.x * size.width) : diSlot2TargetX;
-                                                 const toY = diInputPort ? (y + diInputPort.y * size.height) : diSlot2TargetY;
+                                                 const x = slotX + (diSlotWidth - size.width) / 2;
+                                                 const y = slotY + (diSlotHeight - size.height) / 2;
+                                                 const toX = diInputPort ? (x + diInputPort.x * size.width) : slotX;
+                                                 const toY = diInputPort ? (y + diInputPort.y * size.height) : slotY + diSlotHeight / 2;
                                                  const diInfoTitle = getDiDeviceTitle(scheme, device);
                                                  const showDiInfoBlock = shouldShowDiDeviceInfoBlock(device);
                                                  return (
-                                                     <Group>
+                                                     <Group
+                                                         draggable
+                                                         onDragStart={() => {
+                                                             diDragStartOffsetsRef.current[offsetKey] = diSlotOffsets[offsetKey] || { x: 0, y: 0 };
+                                                         }}
+                                                         onDragMove={(event) => {
+                                                             const delta = event.target.position();
+                                                             const startOffset = diDragStartOffsetsRef.current[offsetKey] || { x: 0, y: 0 };
+                                                             setDiSlotOffsets((prev) => ({
+                                                                 ...prev,
+                                                                 [offsetKey]: {
+                                                                     x: startOffset.x + delta.x,
+                                                                     y: startOffset.y + delta.y,
+                                                                 },
+                                                             }));
+                                                             event.target.position({ x: 0, y: 0 });
+                                                         }}
+                                                         onDragEnd={(event) => {
+                                                             delete diDragStartOffsetsRef.current[offsetKey];
+                                                             event.target.position({ x: 0, y: 0 });
+                                                         }}
+                                                     >
                                                         <Line
                                                             points={[diIn1Port.x, diIn1Port.y, diIn1Port.x, toY, toX, toY]}
                                                             stroke="#1565c0"
@@ -6330,8 +6355,8 @@ const App = () => {
                                                          />
                                                           <Image image={image} x={x} y={y} width={size.width} height={size.height} listening={false} />
                                                           <Rect
-                                                               x={isLeakDevice ? x : diSlotX}
-                                                               y={isLeakDevice ? y : diSlot2Y}
+                                                               x={isLeakDevice ? x : slotX}
+                                                               y={isLeakDevice ? y : slotY}
                                                                width={isLeakDevice ? size.width : diSlotWidth}
                                                                height={isLeakDevice ? size.height : diSlotHeight}
                                                               cornerRadius={6}
@@ -6343,8 +6368,8 @@ const App = () => {
                                                           />
                                                           {showDiInfoBlock && (
                                                              <>
-                                                                  <Rect x={diSlotX} y={diSlot2Y - (INFO_BLOCK_HEIGHT + 4)} width={diSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                                  <EditableInfoTitle x={diSlotX + 3} y={diSlot2Y - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, diSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={diInfoTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={visualDevice} title={diInfoTitle} />
+                                                                  <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={diSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
+                                                                  <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, diSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={diInfoTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={visualDevice} title={diInfoTitle} />
                                                              </>
                                                          )}
                                                          {showPorts && portsForDevice.map((port) => (
@@ -6361,17 +6386,21 @@ const App = () => {
                                                          ))}
                                                          {isHovered && (
                                                              <>
-                                                                 <Circle x={diSlotX + diSlotWidth - 2.5} y={diSlot2Y + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeControllerDiDeviceAtSlot(0)} onTap={() => removeControllerDiDeviceAtSlot(0)} />
-                                                                 <Line points={[diSlotX + diSlotWidth - 5, diSlot2Y - 1, diSlotX + diSlotWidth, diSlot2Y + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                 <Line points={[diSlotX + diSlotWidth, diSlot2Y - 1, diSlotX + diSlotWidth - 5, diSlot2Y + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
+                                                                 <Circle x={slotX + diSlotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeControllerDiDeviceAtSlot(0)} onTap={() => removeControllerDiDeviceAtSlot(0)} />
+                                                                 <Line points={[slotX + diSlotWidth - 5, slotY - 1, slotX + diSlotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
+                                                                 <Line points={[slotX + diSlotWidth, slotY - 1, slotX + diSlotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
                                                              </>
                                                          )}
                                                      </Group>
                                                 );
                                             })()}
-                                            {isDiIn2Occupied && proDiDevices[1] && (() => {
-                                                const device = proDiDevices[1];
-                                                const hoverKey = 'controller-di:1';
+                                             {isDiIn2Occupied && proDiDevices[1] && (() => {
+                                                 const device = proDiDevices[1];
+                                                 const offsetKey = getRuntimeOffsetKey(device, 1, 'controller-di');
+                                                 const offset = diSlotOffsets[offsetKey] || { x: 0, y: 0 };
+                                                 const slotX = diSlotX + offset.x;
+                                                 const slotY = diSlot1Y + offset.y;
+                                                 const hoverKey = 'controller-di:1';
                                                 const isHovered = hoveredNtcSlotKey === hoverKey;
                                                  const deviceType = canonicalDeviceType(device?.type);
                                                  const isLeakDevice = isLeakDiDeviceType(deviceType);
@@ -6390,14 +6419,35 @@ const App = () => {
                                                      ? diSlotHeight * LEAK_DI_DEVICE_IMAGE_SCALE
                                                      : diSlotHeight;
                                                  const size = getContainSize(image, imageBoxWidth, imageBoxHeight);
-                                                const x = diSlotX + (diSlotWidth - size.width) / 2;
-                                                const y = diSlot1Y + (diSlotHeight - size.height) / 2;
-                                                 const toX = diInputPort ? (x + diInputPort.x * size.width) : diSlot1TargetX;
-                                                 const toY = diInputPort ? (y + diInputPort.y * size.height) : diSlot1TargetY;
+                                                 const x = slotX + (diSlotWidth - size.width) / 2;
+                                                 const y = slotY + (diSlotHeight - size.height) / 2;
+                                                 const toX = diInputPort ? (x + diInputPort.x * size.width) : slotX;
+                                                 const toY = diInputPort ? (y + diInputPort.y * size.height) : slotY + diSlotHeight / 2;
                                                  const diInfoTitle = getDiDeviceTitle(scheme, device);
                                                  const showDiInfoBlock = shouldShowDiDeviceInfoBlock(device);
                                                  return (
-                                                     <Group>
+                                                     <Group
+                                                         draggable
+                                                         onDragStart={() => {
+                                                             diDragStartOffsetsRef.current[offsetKey] = diSlotOffsets[offsetKey] || { x: 0, y: 0 };
+                                                         }}
+                                                         onDragMove={(event) => {
+                                                             const delta = event.target.position();
+                                                             const startOffset = diDragStartOffsetsRef.current[offsetKey] || { x: 0, y: 0 };
+                                                             setDiSlotOffsets((prev) => ({
+                                                                 ...prev,
+                                                                 [offsetKey]: {
+                                                                     x: startOffset.x + delta.x,
+                                                                     y: startOffset.y + delta.y,
+                                                                 },
+                                                             }));
+                                                             event.target.position({ x: 0, y: 0 });
+                                                         }}
+                                                         onDragEnd={(event) => {
+                                                             delete diDragStartOffsetsRef.current[offsetKey];
+                                                             event.target.position({ x: 0, y: 0 });
+                                                         }}
+                                                     >
                                                         <Line
                                                             points={[diIn2Port.x, diIn2Port.y, diIn2Port.x, toY, toX, toY]}
                                                             stroke="#1565c0"
@@ -6408,8 +6458,8 @@ const App = () => {
                                                          />
                                                           <Image image={image} x={x} y={y} width={size.width} height={size.height} listening={false} />
                                                           <Rect
-                                                               x={isLeakDevice ? x : diSlotX}
-                                                               y={isLeakDevice ? y : diSlot1Y}
+                                                               x={isLeakDevice ? x : slotX}
+                                                               y={isLeakDevice ? y : slotY}
                                                                width={isLeakDevice ? size.width : diSlotWidth}
                                                                height={isLeakDevice ? size.height : diSlotHeight}
                                                               cornerRadius={6}
@@ -6421,8 +6471,8 @@ const App = () => {
                                                           />
                                                           {showDiInfoBlock && (
                                                              <>
-                                                                  <Rect x={diSlotX} y={diSlot1Y - (INFO_BLOCK_HEIGHT + 4)} width={diSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                                  <EditableInfoTitle x={diSlotX + 3} y={diSlot1Y - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, diSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={diInfoTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={visualDevice} title={diInfoTitle} />
+                                                                  <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={diSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
+                                                                  <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, diSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={diInfoTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={visualDevice} title={diInfoTitle} />
                                                              </>
                                                          )}
                                                          {showPorts && portsForDevice.map((port) => (
@@ -6439,9 +6489,9 @@ const App = () => {
                                                          ))}
                                                          {isHovered && (
                                                              <>
-                                                                 <Circle x={diSlotX + diSlotWidth - 2.5} y={diSlot1Y + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeControllerDiDeviceAtSlot(1)} onTap={() => removeControllerDiDeviceAtSlot(1)} />
-                                                                 <Line points={[diSlotX + diSlotWidth - 5, diSlot1Y - 1, diSlotX + diSlotWidth, diSlot1Y + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                 <Line points={[diSlotX + diSlotWidth, diSlot1Y - 1, diSlotX + diSlotWidth - 5, diSlot1Y + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
+                                                                 <Circle x={slotX + diSlotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeControllerDiDeviceAtSlot(1)} onTap={() => removeControllerDiDeviceAtSlot(1)} />
+                                                                 <Line points={[slotX + diSlotWidth - 5, slotY - 1, slotX + diSlotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
+                                                                 <Line points={[slotX + diSlotWidth, slotY - 1, slotX + diSlotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
                                                              </>
                                                          )}
                                                      </Group>
@@ -6727,7 +6777,8 @@ const App = () => {
                                     const emptySlotHeight = 2 * indentSize;
                                     const slotWidth = pressureSensor ? occupiedSlotWidth : emptySlotWidth;
                                     const slotHeight = pressureSensor ? occupiedSlotHeight : emptySlotHeight;
-                                    const slotDragOffset = controllerType === 'ecosmart' ? controller420SlotOffset : { x: 0, y: 0 };
+                                    const isController420SlotDraggable = controllerType === 'pro' || controllerType === 'ecosmart';
+                                    const slotDragOffset = isController420SlotDraggable ? controller420SlotOffset : { x: 0, y: 0 };
                                     const baseSlotX = controllerType === 'ecosmart'
                                         ? controllerImage.width + 4 * indentSize
                                         : controllerImage.width - slotWidth;
@@ -6778,13 +6829,13 @@ const App = () => {
 
                                     return (
                                         <Group
-                                            draggable={controllerType === 'ecosmart'}
+                                            draggable={isController420SlotDraggable}
                                             onDragStart={() => {
-                                                if (controllerType !== 'ecosmart') return;
+                                                if (!isController420SlotDraggable) return;
                                                 controller420DragStartOffsetRef.current = controller420SlotOffset;
                                             }}
                                             onDragMove={(event) => {
-                                                if (controllerType !== 'ecosmart') return;
+                                                if (!isController420SlotDraggable) return;
                                                 const delta = event.target.position();
                                                 const startOffset = controller420DragStartOffsetRef.current || { x: 0, y: 0 };
                                                 setController420SlotOffset({
@@ -6794,7 +6845,7 @@ const App = () => {
                                                 event.target.position({ x: 0, y: 0 });
                                             }}
                                             onDragEnd={(event) => {
-                                                if (controllerType !== 'ecosmart') return;
+                                                if (!isController420SlotDraggable) return;
                                                 event.target.position({ x: 0, y: 0 });
                                             }}
                                         >
@@ -8745,17 +8796,23 @@ const App = () => {
                                                  const slotPos = getRelaySSlotPosition(slotIndex);
                                                 let slotX = slotPos.x;
                                                 let slotY = slotPos.y;
-                                                if (isDoubleRelayDevice && !isCoveredRelaySSlot && slotSpan > 1) {
-                                                    const nextPos = getRelaySSlotPosition(slotIndex + 1);
+                                                 if (isDoubleRelayDevice && !isCoveredRelaySSlot && slotSpan > 1) {
+                                                     const nextPos = getRelaySSlotPosition(slotIndex + 1);
                                                     if (nextPos) {
                                                         const centerX = (slotPos.x + nextPos.x + RELAY_SLOT_SIZE) / 2;
                                                         const bottomY = Math.max(slotPos.y, nextPos.y);
                                                         const centerY = bottomY + RELAY_SLOT_SIZE / 2;
                                                         slotX = centerX - relaySVisualSlotWidth / 2;
-                                                        slotY = centerY - relaySVisualSlotHeight / 2;
-                                                    }
-                                                }
-                                                const bPort = ports.find((port) => port.name === relayLine.bPortName);
+                                                         slotY = centerY - relaySVisualSlotHeight / 2;
+                                                     }
+                                                 }
+                                                 const relaySOffsetKey = `relay-s:${slotState?.startSlot ?? slotIndex}`;
+                                                 const relaySOffset = isRelaySOccupied && !isCoveredRelaySSlot
+                                                     ? (relaySlotOffsets[relaySOffsetKey] || { x: 0, y: 0 })
+                                                     : { x: 0, y: 0 };
+                                                 slotX += relaySOffset.x;
+                                                 slotY += relaySOffset.y;
+                                                 const bPort = ports.find((port) => port.name === relayLine.bPortName);
                                                 const aPort = ports.find((port) => port.name === relayLine.aPortName);
                                                 const relaySBStub = bPort
                                                     ? {
@@ -8843,11 +8900,34 @@ const App = () => {
                                                 const isRelaySHovered = hoveredRelaySlotIndex === relaySHoverKey;
 
                                                 return (
-                                                    <Group
-                                                        key={`relay-s-slot-${slotIndex}`}
-                                                        onMouseEnter={() => setHoveredRelaySlotIndex(relaySHoverKey)}
-                                                        onMouseLeave={() => setHoveredRelaySlotIndex((prev) => (prev === relaySHoverKey ? null : prev))}
-                                                    >
+                                                     <Group
+                                                         key={`relay-s-slot-${slotIndex}`}
+                                                         draggable={isRelaySOccupied && !isCoveredRelaySSlot}
+                                                         onMouseEnter={() => setHoveredRelaySlotIndex(relaySHoverKey)}
+                                                         onMouseLeave={() => setHoveredRelaySlotIndex((prev) => (prev === relaySHoverKey ? null : prev))}
+                                                         onDragStart={() => {
+                                                             if (!isRelaySOccupied || isCoveredRelaySSlot) return;
+                                                             relayDragStartOffsetsRef.current[relaySOffsetKey] = relaySlotOffsets[relaySOffsetKey] || { x: 0, y: 0 };
+                                                         }}
+                                                         onDragMove={(event) => {
+                                                             if (!isRelaySOccupied || isCoveredRelaySSlot) return;
+                                                             const delta = event.target.position();
+                                                             const startOffset = relayDragStartOffsetsRef.current[relaySOffsetKey] || { x: 0, y: 0 };
+                                                             setRelaySlotOffsets((prev) => ({
+                                                                 ...prev,
+                                                                 [relaySOffsetKey]: {
+                                                                     x: startOffset.x + delta.x,
+                                                                     y: startOffset.y + delta.y,
+                                                                 },
+                                                             }));
+                                                             event.target.position({ x: 0, y: 0 });
+                                                         }}
+                                                         onDragEnd={(event) => {
+                                                             if (!isRelaySOccupied || isCoveredRelaySSlot) return;
+                                                             delete relayDragStartOffsetsRef.current[relaySOffsetKey];
+                                                             event.target.position({ x: 0, y: 0 });
+                                                         }}
+                                                     >
                                                         {isRelaySOccupied && relaySAStub && !isDoubleRelayDevice && (() => {
                                                             const endY = relaySAStub.fromY - 5 * indentSize;
                                                             return (
@@ -10166,11 +10246,17 @@ const App = () => {
                                                             busOffsetMultiplier = 0.95;
                                                         } else if (occupiedRelayPortsCount >= 3) {
                                                             busOffsetMultiplier = hasUpsInPower ? 1.9 : 0.95;
-                                                        } else if (hasRelayOccupancy) {
-                                                            busOffsetMultiplier = 0.5;
-                                                        }
-                                                        return { x: getAlignedXByBusA(0), y: controllerImage.height + moduleHeightValue * busOffsetMultiplier };
-                                                    }
+                                                         } else if (hasRelayOccupancy) {
+                                                             busOffsetMultiplier = 0.5;
+                                                         }
+                                                         const relaySlot4Index = relayLines.findIndex((relayLine) => relayLine.index === 4);
+                                                         const relaySlot4Occupied = relaySlot4Index >= 0 && Boolean(relayOccupancy[relaySlot4Index]);
+                                                         const relaySlot4Offset = relaySlot4Occupied ? 5 * indentSize : 0;
+                                                         return {
+                                                             x: getAlignedXByBusA(0),
+                                                             y: controllerImage.height + moduleHeightValue * busOffsetMultiplier + relaySlot4Offset,
+                                                         };
+                                                     }
                                                     if (controllerType === 'ecosmart') {
                                                         const p1a = ports.find((p) => p.name === 'BUS-1-A');
                                                         const p1b = ports.find((p) => p.name === 'BUS-1-B');
@@ -14556,11 +14642,14 @@ const App = () => {
                                                                 const previousBasePos = getExtBaseSlotPosition(slotIndex - 1);
                                                                 baseSourceHopBendY = previousBasePos.y + previousSize.height + (link.moduleHopBendIndent * indentSize);
                                                             }
-                                                              const minAllowedBendY = Math.max(baseDefaultBendY, baseHopBendY, baseSourceHopBendY);
-                                                              const isEmptyProExtBLink = isProExtAddSlot && link.moduleTo === 'EXT-IN-B';
-                                                              const clampedBendY = isEmptyProExtBLink
-                                                                  ? sourceDeviceBottomY + 3 * indentSize
-                                                                  : Math.max(bendY, minAllowedBendY);
+                                                               const minAllowedBendY = Math.max(baseDefaultBendY, baseHopBendY, baseSourceHopBendY);
+                                                               const isEmptyProExtBLink = isProExtAddSlot && link.moduleTo === 'EXT-IN-B';
+                                                               const isEmptyProExtSlotFromController = isProExtAddSlot && slotIndex === 0;
+                                                               const clampedBendY = isEmptyProExtSlotFromController
+                                                                   ? sourceDeviceBottomY + link.firstHopBendIndent * indentSize
+                                                                   : (isEmptyProExtBLink
+                                                                       ? sourceDeviceBottomY + 3 * indentSize
+                                                                       : Math.max(bendY, minAllowedBendY));
                                                               const previousExtNormalizedType = slotIndex > 0
                                                                   ? canonicalDeviceType(extModules[slotIndex - 1]?.type)
                                                                   : null;

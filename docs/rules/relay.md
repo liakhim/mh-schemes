@@ -75,6 +75,7 @@
 - В режиме инсталляции общие питающие клеммы `RELAY(-S)-1-2-3-A` и `RELAY(-S)-4-5-6-A` модулей `rl6`/`rl6s` получают одну лычку с фиксированной маркировкой `L`, если занят хотя бы один канал соответствующей тройки.
 - Вертикальный зазор между слотами controller RELAY-S линии `pro`: `4 * indent`.
 - Занятые controller RELAY-S слоты `pro` на hover показывают кнопку удаления; удаление убирает устройство из `controller.relay_s_devices`.
+- Занятые controller RELAY-S слоты `pro` draggable; double-relay устройство перемещается как один общий слот, а `Reset positions` сбрасывает offsets.
 
 ## Other Equipment
 
