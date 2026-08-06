@@ -7,6 +7,12 @@ export const getGroupedRelaySupplyLabel = (portName) => (
     GROUPED_RELAY_SUPPLY_PORT_PATTERN.test(String(portName || '').trim()) ? 'L' : null
 );
 
+export const getRelaySupplyLabel = (portName, ownerType) => {
+    if (getGroupedRelaySupplyLabel(portName)) return 'L';
+    const normalizedPortName = String(portName || '').trim().toUpperCase();
+    return canonicalDeviceType(ownerType) === 'rl2' && /^RELAY-[12]-A$/.test(normalizedPortName) ? 'L' : null;
+};
+
 export const getRelayDeviceAtPhysicalSlot = (devices, targetSlot) => {
     if (!Array.isArray(devices) || !Number.isInteger(targetSlot) || targetSlot < 0) return null;
     const occupied = new Set();

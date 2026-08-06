@@ -21,8 +21,8 @@ import { normalizeSchemeIds } from './scheme/domain/schemeIds';
 import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './scheme/domain/oneWireMutations';
 import {
     buildSmart2InstallationDiConnections,
-    getGroupedRelaySupplyLabel,
     getRelayDeviceAtPhysicalSlot,
+    getRelaySupplyLabel,
     getSmart2InstallationPowerChainHead,
 } from './scheme/domain/installationDi';
 import { shouldIncludeCollisionSlot, translateRect, unionRects } from './scheme/domain/collisionGeometry';
@@ -814,7 +814,7 @@ const getInstallationPortLineColor = (name, item) => {
     const tag = tags.join(' ');
     const itemType = canonicalDeviceType(item?.type || item?.data?.type);
 
-    if (getGroupedRelaySupplyLabel(terminal)) return '#d32f2f';
+    if (getRelaySupplyLabel(terminal, itemType)) return '#d32f2f';
 
     if (itemType === 'io4') {
         if (/^CHANNEL-\d+-\d+-V\+$/.test(terminal)) return '#d32f2f';
@@ -1077,8 +1077,8 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
     const slot = parseInstallationPortSlot(port?.name);
     const data = item?.data;
     const normalizedPortName = String(port?.name || '').toUpperCase();
-    const groupedRelaySupplyLabel = getGroupedRelaySupplyLabel(normalizedPortName);
-    if (groupedRelaySupplyLabel) return groupedRelaySupplyLabel;
+    const relaySupplyLabel = getRelaySupplyLabel(normalizedPortName, item?.type || item?.data?.type);
+    if (relaySupplyLabel) return relaySupplyLabel;
     if (slot?.line === 'di'
         && item?.installationDiPortLabels
         && Object.prototype.hasOwnProperty.call(item.installationDiPortLabels, slot.index)) {

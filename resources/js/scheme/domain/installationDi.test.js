@@ -4,6 +4,7 @@ import {
     buildSmart2InstallationDiConnections,
     getGroupedRelaySupplyLabel,
     getRelayDeviceAtPhysicalSlot,
+    getRelaySupplyLabel,
     getSmart2InstallationPowerChainHead,
 } from './installationDi.js';
 
@@ -23,6 +24,13 @@ test('maps a double relay device to both physical relay ports', () => {
     assert.equal(getRelayDeviceAtPhysicalSlot([servo], 0), servo);
     assert.equal(getRelayDeviceAtPhysicalSlot([servo], 1), servo);
     assert.equal(getRelayDeviceAtPhysicalSlot([servo], 2), null);
+});
+
+test('labels each occupied RL2 A terminal as an L supply', () => {
+    assert.equal(getRelaySupplyLabel('RELAY-1-A', 'rl2'), 'L');
+    assert.equal(getRelaySupplyLabel('RELAY-2-A', 'rl2'), 'L');
+    assert.equal(getRelaySupplyLabel('RELAY-1-B', 'rl2'), null);
+    assert.equal(getRelaySupplyLabel('RELAY-1-A', 'rl2s'), null);
 });
 
 test('excludes RDT2 and other 1-wire devices from the Smart2 12VDC chain', () => {
