@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     buildSmart2InstallationDiConnections,
+    getDi6PhysicalDevices,
     getEcosmartMixingNtcIndex,
     getGroupedRelaySupplyLabel,
     getIo4SharedTerminalDevices,
@@ -58,6 +59,25 @@ test('connects an IO4 shared GND terminal to NTC but not its paired 0-10V servo'
     const data = { channel_devices: [servo, ntc] };
 
     assert.deepEqual(getIo4SharedTerminalDevices(data, [0, 1], 'CHANNEL-1-2-GND'), [ntc]);
+});
+
+test('resolves DI6 physical inputs from canonical and legacy lines', () => {
+    const canonical = { id: 'canonical' };
+    const legacy = { id: 'legacy' };
+    const fallback = { id: 'fallback' };
+    const channelDevices = [];
+    const diDevices = [];
+    channelDevices[0] = canonical;
+    diDevices[2] = legacy;
+
+    assert.deepEqual(getDi6PhysicalDevices({ channel_devices: channelDevices, di_devices: diDevices }, [null, fallback]), [
+        canonical,
+        fallback,
+        legacy,
+        null,
+        null,
+        null,
+    ]);
 });
 
 test('labels each occupied RL2 A terminal as an L supply', () => {

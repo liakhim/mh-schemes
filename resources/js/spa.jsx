@@ -21,6 +21,7 @@ import { normalizeSchemeIds } from './scheme/domain/schemeIds';
 import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './scheme/domain/oneWireMutations';
 import {
     buildSmart2InstallationDiConnections,
+    getDi6PhysicalDevices,
     getEcosmartMixingNtcIndex,
     getIo4SharedTerminalDevices,
     getRelayDeviceAtPhysicalSlot,
@@ -1034,10 +1035,14 @@ const isInstallationPortOccupied = (item, port) => {
     if (slot.line === 'relayS') return Boolean(getRelayDeviceAtPhysicalSlot(data.relay_s_devices, slot.index));
     if (slot.line === 'relaySRange') return slot.indexes.some((index) => getRelayDeviceAtPhysicalSlot(data.relay_s_devices, index));
     if (slot.line === 'bus') return hasAtIndex(data.bus_devices, slot.index);
-    if (slot.line === 'diRange') return slot.indexes.some((index) => hasAtIndex(data.di_devices, index) || hasAtIndex(data.channel_devices, index));
+    if (slot.line === 'diRange') {
+        if (canonicalDeviceType(item?.type) === 'di6') return false;
+        return slot.indexes.some((index) => hasAtIndex(data.di_devices, index) || hasAtIndex(data.channel_devices, index));
+    }
     if (slot.line === 'di') {
         // DI-IN-2 у ecosmart — вход датчика протечки (leak_sensor_devices).
         if (isEcosmartData && slot.index === 1) return hasAtIndex(data.leak_sensor_devices, 0);
+        if (canonicalDeviceType(item?.type) === 'di6') return Boolean(getDi6PhysicalDevices(data)[slot.index]);
         if (hasAtIndex(data.di_devices, slot.index) || hasAtIndex(data.channel_devices, slot.index)) return true;
         // DI-входы контроллера, занятые линиями коммутации ИБП.
         return Array.isArray(item?.upsDiPortIndexes) && item.upsDiPortIndexes.includes(slot.index);
@@ -1151,6 +1156,7 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
     }
     if (slot.line === 'bus') return getLabel(getAtIndex(data.bus_devices, slot.index), 'BUS');
     if (slot.line === 'diRange') {
+        if (canonicalDeviceType(item?.type) === 'di6') return null;
         const device = slot.indexes
             .map((index) => getAtIndex(data.di_devices, index) || getAtIndex(data.channel_devices, index))
             .find(Boolean);
@@ -1158,6 +1164,7 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
     }
     if (slot.line === 'di') {
         if (isEcosmartData && slot.index === 1) return getLabel(getAtIndex(data.leak_sensor_devices, 0), 'Датчик протечки');
+        if (canonicalDeviceType(item?.type) === 'di6') return getLabel(getDi6PhysicalDevices(data)[slot.index], `DI ${slot.index + 1}`);
         return getLabel(getAtIndex(data.di_devices, slot.index), `DI ${slot.index + 1}`)
             || getLabel(getAtIndex(data.channel_devices, slot.index), `DI ${slot.index + 1}`)
             || (Array.isArray(item?.upsDiPortIndexes) && item.upsDiPortIndexes.includes(slot.index) ? 'UPS' : null);
@@ -12353,9 +12360,9 @@ const App = () => {
                                                     .reduce((sum, item) => sum + getExtDiLineCapacityByType(item?.type), 0);
                                                 const moduleExtDiCapacity = getExtDiLineCapacityByType(extNormalizedType);
                                                 const legacyExtDiAssignedDevices = availableExtDiDevices.slice(extDiOffsetBefore, extDiOffsetBefore + moduleExtDiCapacity);
-                                                const extDiAssignedDevices = (extNormalizedType === 'di6'
-                                                    ? getModuleLineDevices(device, 'channel_devices', getModuleLineDevices(device, 'di_devices', legacyExtDiAssignedDevices))
-                                                    : getModuleLineDevices(device, 'di_devices', legacyExtDiAssignedDevices)).slice(0, moduleExtDiCapacity);
+                                                 const extDiAssignedDevices = (extNormalizedType === 'di6'
+                                                     ? getDi6PhysicalDevices(device, legacyExtDiAssignedDevices)
+                                                     : getModuleLineDevices(device, 'di_devices', legacyExtDiAssignedDevices)).slice(0, moduleExtDiCapacity);
                                                 const pressureSensorsForIo4 = getPressureSensorsFromScheme(scheme).slice(1).map((sensor, index) => ({
                                                     ...sensor,
                                                     id: sensor?.id ?? `channel-pressure-${index}`,

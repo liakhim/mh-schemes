@@ -80,6 +80,13 @@ export const getIo4SharedTerminalDevices = (data, indexes, portName) => {
     });
 };
 
+export const getDi6PhysicalDevices = (data, fallbackDevices = []) => Array.from({ length: 6 }, (_, index) => (
+    (Array.isArray(data?.channel_devices) ? data.channel_devices[index] : null)
+    || (Array.isArray(data?.di_devices) ? data.di_devices[index] : null)
+    || (Array.isArray(fallbackDevices) ? fallbackDevices[index] : null)
+    || null
+));
+
 export const getSmart2InstallationPowerChainHead = (items) => (
     (Array.isArray(items) ? items : []).find((item) => (
         SMART2_POWER_CHAIN_MODULE_TYPES.has(canonicalDeviceType(item?.type || item?.data?.type))

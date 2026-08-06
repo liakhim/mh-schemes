@@ -49,7 +49,7 @@ export const wirelessDeviceImagePaths = {
     discrete_fire_alarm: new URL('../../../assets/discreteInputs/fireSignalLeftPorts.svg', import.meta.url).href,
     'discrete_fire_alarm-right-port': new URL('../../../assets/discreteInputs/fireSignalRightPorts.svg', import.meta.url).href,
     discrete_signal: new URL('../../../assets/discreteInputs/signalLeftPorts.svg', import.meta.url).href,
-    'discrete_signal-right-port': new URL('../../../assets/discreteInputs/fireSignalRightPorts.svg', import.meta.url).href,
+    'discrete_signal-right-port': new URL('../../../assets/discreteInputs/signalRightPorts.svg', import.meta.url).href,
     discrete_ventilation: new URL('../../../assets/discreteInputs/ventilationLeftPorts.svg', import.meta.url).href,
     'discrete_ventilation-right-port': new URL('../../../assets/discreteInputs/ventillationRightPorts.svg', import.meta.url).href,
     'leak-sensor': new URL('../../../assets/sensors/leakSensorLeftPort.svg', import.meta.url).href,
