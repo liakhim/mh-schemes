@@ -22,6 +22,7 @@ import { addOneWireDeviceToScheme, removeOneWireDeviceFromScheme } from './schem
 import {
     buildSmart2InstallationDiConnections,
     getGroupedRelaySupplyLabel,
+    getRelayDeviceAtPhysicalSlot,
     getSmart2InstallationPowerChainHead,
 } from './scheme/domain/installationDi';
 import { shouldIncludeCollisionSlot, translateRect, unionRects } from './scheme/domain/collisionGeometry';
@@ -1019,11 +1020,11 @@ const isInstallationPortOccupied = (item, port) => {
         // На ecosmart нетегированные RELAY-6/RELAY-4 — слоты сервоприводов смесителей.
         if (isEcosmartData && slot.index === 5) return hasAtIndex(data['220_servo_devices'], 0);
         if (isEcosmartData && slot.index === 3) return hasAtIndex(data['220_servo_devices'], 1);
-        return hasAtIndex(data.relay_devices, slot.index);
+        return Boolean(getRelayDeviceAtPhysicalSlot(data.relay_devices, slot.index));
     }
-    if (slot.line === 'relayRange') return slot.indexes.some((index) => hasAtIndex(data.relay_devices, index));
-    if (slot.line === 'relayS') return hasAtIndex(data.relay_s_devices, slot.index);
-    if (slot.line === 'relaySRange') return slot.indexes.some((index) => hasAtIndex(data.relay_s_devices, index));
+    if (slot.line === 'relayRange') return slot.indexes.some((index) => getRelayDeviceAtPhysicalSlot(data.relay_devices, index));
+    if (slot.line === 'relayS') return Boolean(getRelayDeviceAtPhysicalSlot(data.relay_s_devices, slot.index));
+    if (slot.line === 'relaySRange') return slot.indexes.some((index) => getRelayDeviceAtPhysicalSlot(data.relay_s_devices, index));
     if (slot.line === 'bus') return hasAtIndex(data.bus_devices, slot.index);
     if (slot.line === 'diRange') return slot.indexes.some((index) => hasAtIndex(data.di_devices, index) || hasAtIndex(data.channel_devices, index));
     if (slot.line === 'di') {
@@ -1122,18 +1123,18 @@ const getInstallationPortConnectionLabel = (item, port, options = {}) => {
     if (slot.line === 'relay') {
         if (isEcosmartData && slot.index === 5) return getLabel(getAtIndex(data['220_servo_devices'], 0), 'Сервопривод смесителя');
         if (isEcosmartData && slot.index === 3) return getLabel(getAtIndex(data['220_servo_devices'], 1), 'Сервопривод смесителя');
-        return getLabel(getAtIndex(data.relay_devices, slot.index), `Реле ${slot.index + 1}`);
+        return getLabel(getRelayDeviceAtPhysicalSlot(data.relay_devices, slot.index), `Реле ${slot.index + 1}`);
     }
     if (slot.line === 'relayRange') {
         const device = slot.indexes
-            .map((index) => getAtIndex(data.relay_devices, index))
+            .map((index) => getRelayDeviceAtPhysicalSlot(data.relay_devices, index))
             .find(Boolean);
         return getLabel(device, 'Реле');
     }
-    if (slot.line === 'relayS') return getLabel(getAtIndex(data.relay_s_devices, slot.index), `Реле S ${slot.index + 1}`);
+    if (slot.line === 'relayS') return getLabel(getRelayDeviceAtPhysicalSlot(data.relay_s_devices, slot.index), `Реле S ${slot.index + 1}`);
     if (slot.line === 'relaySRange') {
         const device = slot.indexes
-            .map((index) => getAtIndex(data.relay_s_devices, index))
+            .map((index) => getRelayDeviceAtPhysicalSlot(data.relay_s_devices, index))
             .find(Boolean);
         return getLabel(device, 'Реле S');
     }

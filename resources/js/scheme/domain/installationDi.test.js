@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
     buildSmart2InstallationDiConnections,
     getGroupedRelaySupplyLabel,
+    getRelayDeviceAtPhysicalSlot,
     getSmart2InstallationPowerChainHead,
 } from './installationDi.js';
 
@@ -11,7 +12,17 @@ test('labels grouped RL6 and RL6S supply terminals as L', () => {
     assert.equal(getGroupedRelaySupplyLabel('RELAY-4-5-6-A'), 'L');
     assert.equal(getGroupedRelaySupplyLabel('RELAY-S-1-2-3-A'), 'L');
     assert.equal(getGroupedRelaySupplyLabel('RELAY-S-4-5-6-A'), 'L');
+    assert.equal(getGroupedRelaySupplyLabel('RELAY-1-2-A'), 'L');
+    assert.equal(getGroupedRelaySupplyLabel('RELAY-S-1-2-A'), 'L');
     assert.equal(getGroupedRelaySupplyLabel('RELAY-1-B'), null);
+});
+
+test('maps a double relay device to both physical relay ports', () => {
+    const servo = { id: 'servo', type: '220servo', connection_type: 'double_relay' };
+
+    assert.equal(getRelayDeviceAtPhysicalSlot([servo], 0), servo);
+    assert.equal(getRelayDeviceAtPhysicalSlot([servo], 1), servo);
+    assert.equal(getRelayDeviceAtPhysicalSlot([servo], 2), null);
 });
 
 test('excludes RDT2 and other 1-wire devices from the Smart2 12VDC chain', () => {

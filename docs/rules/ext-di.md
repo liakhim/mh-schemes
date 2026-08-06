@@ -115,6 +115,7 @@
 - У `rl2s` есть grouped A-порт `RELAY-S-1-2-A` и B-порты `RELAY-S-1-B`/`RELAY-S-2-B`.
 - Если хотя бы один relay-s слот `rl2s` занят, из `RELAY-S-1-2-A` рисуется общий подвод `L`.
 - Занятые relay-s слоты `rl2s` коммутируются в `RELAY-S-1-B` и `RELAY-S-2-B`.
+- В режиме инсталляции grouped A-порты `RELAY-1-2-A` и `RELAY-S-1-2-A` получают красную лычку `L`; `220servo`/`valve` с `double_relay` занимает и подписывает оба физических B-порта.
 - `220servo`/`valve` с `double_relay` на `rl2s` подключаются к устройству через `RELAY-IN-1` и `RELAY-IN-2`, а не через общий `RELAY-IN`.
 - Балансировщик может размещать `valve` в `rl2s.relay_s_devices`; клапан занимает оба RELAY-S слота, получает общий подвод `L` и две линии `RELAY-IN-1/2` к `RELAY-S-1-B` и `RELAY-S-2-B`.
 - Пустые собственные relay-s слоты `rl2s` при `Show empty slots` показывают кнопку `+`; через меню можно добавить `zoneServo` (`relay-s`), `220servo` (`double_relay`), `valve` (`double_relay`).
