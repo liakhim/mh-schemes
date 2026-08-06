@@ -814,6 +814,8 @@ const getInstallationPortLineColor = (name, item) => {
     const tag = tags.join(' ');
     const itemType = canonicalDeviceType(item?.type || item?.data?.type);
 
+    const relayDevice = getInstallationRelayPortDevice(item, terminal);
+    if (isStupidBoilerType(relayDevice?.type)) return '#2e7d32';
     if (getRelaySupplyLabel(terminal, itemType)) return '#d32f2f';
 
     if (itemType === 'io4') {
@@ -944,6 +946,20 @@ const parseInstallationPortSlot = (name) => {
     if (normalized === 'MODBUS-A' || normalized === 'MODBUS-B') return { line: 'modbus', index: 0 };
     if ((match = /^NTC-(\d+)-[AB]$/.exec(normalized))) return { line: 'ntcChannel', index: Number(match[1]) };
     if (normalized.startsWith('1-WIRE-')) return { line: 'oneWire', index: null };
+    return null;
+};
+
+const getInstallationRelayPortDevice = (item, portName) => {
+    const slot = parseInstallationPortSlot(portName);
+    const data = item?.data;
+    if (!slot || !data || typeof data !== 'object') return null;
+    if (slot.line === 'relay') return getRelayDeviceAtPhysicalSlot(data.relay_devices, slot.index);
+    if (slot.line === 'relayRange') {
+        const devices = slot.indexes
+            .map((index) => getRelayDeviceAtPhysicalSlot(data.relay_devices, index))
+            .filter(Boolean);
+        return devices.find((device) => isStupidBoilerType(device?.type)) || devices[0] || null;
+    }
     return null;
 };
 
