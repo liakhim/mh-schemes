@@ -3070,7 +3070,11 @@ const SectionEquipmentCard = ({
                 maxWidth: half ? 300 : 560,
             }}
         >
-            <div className="sel-card-heading">{title}</div>
+            {/* Без заголовка карточка начинается сразу с содержимого: пустой
+                `sel-card-heading` иначе занял бы строку и отступ. */}
+            {title && (
+                <div className="sel-card-heading">{title}</div>
+            )}
 
             {description && (
                 <p className="sel-card-desc">{description}</p>
@@ -5273,15 +5277,11 @@ const SelectionApp = () => {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
             <div style={{ flex: '1 1 500px', minWidth: 0 }}>
             <section>
-                <h2>Датчики температуры</h2>
-                <SectionSubtitle>Укажите тип и количество датчиков температуры</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <SectionEquipmentCard
                         image={THERMOSTAT_ROOM_IMAGE_PATH}
                         backgroundWidth={520}
                         backgroundColor={CARD_PHOTO_TAIL_COLOR.thermostatRoom}
-                        title={temperatureSensorTemplate?.label}
-                        description="Измеряет температуру воздуха в помещении или теплоносителя в колбе и передаёт её контроллеру."
                         addedTitle="Добавленные датчики температуры:"
                         addedRows={temperatureSensorRows}
                         onAddUnit={(row) => addTemperatureSensor(
