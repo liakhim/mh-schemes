@@ -645,24 +645,41 @@ const getRelayStatsForLimits = (scheme, limits) => {
         if (type === 'zoneServo') return hasConnectionType(device, 'relay') && hasConnectionType(device, 'relay-s');
         return (type === 'boiler-pump' || type === 'pump-220v') && hasConnectionType(device, 'relay') && hasConnectionType(device, 'relay-s');
     };
+    // Клапан на `double_relay` сначала занимает свободную пару RELAY-S и только
+    // при её отсутствии переходит на пару RELAY (`docs/rules/relay.md`,
+    // `balanceServos`). Если считать его строго по RELAY, подбор видит дефицит
+    // релейных слотов при свободной линии RELAY-S и добирает модуль, который в
+    // схеме потом остаётся пустым.
+    const isDoubleRelayValve = (device) => canonicalType(device?.type) === 'valve'
+        && hasConnectionType(device, 'double_relay');
+    const doubleRelayValves = wiredDevices.filter(isDoubleRelayValve).length;
     const flexibleRelayDevices = wiredDevices.filter(isFlexibleRelayDevice).length;
     const relayBoilers = boilers.filter((boiler) => hasConnectionType(boiler, 'relay')).length;
     const relayFromWired = wiredDevices.reduce((sum, device) => {
         const type = canonicalType(device?.type);
-        if (isFlexibleRelayDevice(device)) return sum;
+        if (isFlexibleRelayDevice(device) || isDoubleRelayValve(device)) return sum;
         if (type === 'boiler-pump' && hasConnectionType(device, 'relay')) return sum + 1;
         if (hasConnectionType(device, 'double_relay') && type !== '220servo') return sum + 2;
         if (hasConnectionType(device, 'relay') && !hasConnectionType(device, 'relay-s')) return sum + 1;
         return sum;
     }, 0);
-    const strictRelay = relayBoilers + relayFromWired;
-    const strictRelayS = wiredDevices.reduce((sum, device) => {
+    const baseStrictRelay = relayBoilers + relayFromWired;
+    const baseStrictRelayS = wiredDevices.reduce((sum, device) => {
         const type = canonicalType(device?.type);
-        if (isFlexibleRelayDevice(device)) return sum;
+        if (isFlexibleRelayDevice(device) || isDoubleRelayValve(device)) return sum;
         if (type === '220servo' && hasConnectionType(device, 'double_relay')) return sum + 2;
         if (hasConnectionType(device, 'relay-s') && !hasConnectionType(device, 'relay')) return sum + 1;
         return sum;
     }, 0);
+    // Клапаны размещаются раньше гибких устройств (`balanceServos` работает до
+    // `balanceRelayDevices`), поэтому пары им отсчитываются от линий, занятых
+    // только строгими устройствами.
+    const valvesOnRelayS = Math.min(
+        doubleRelayValves,
+        Math.floor(Math.max(0, (limits?.relayS || 0) - baseStrictRelayS) / 2),
+    );
+    const strictRelay = baseStrictRelay + (doubleRelayValves - valvesOnRelayS) * 2;
+    const strictRelayS = baseStrictRelayS + valvesOnRelayS * 2;
     const flexibleRelayOnRelay = Math.min(flexibleRelayDevices, Math.max(0, (limits?.relay || 0) - strictRelay));
 
     return {
