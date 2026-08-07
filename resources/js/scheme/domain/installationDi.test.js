@@ -101,6 +101,13 @@ test('labels individual PRO RELAY A terminals as L supplies', () => {
     }
 });
 
+test('labels GO relay COM terminals as L supplies', () => {
+    for (const ownerType of ['go', 'go+']) {
+        assert.equal(getRelaySupplyLabel('RELAY-1-COM', ownerType), 'L');
+        assert.equal(getRelaySupplyLabel('RELAY-1-NO', ownerType), null);
+    }
+});
+
 test('excludes RDT2 and other 1-wire devices from the Smart2 12VDC chain', () => {
     const rdt = { type: 'rdt2' };
     const rl2 = { type: 'rl2' };
