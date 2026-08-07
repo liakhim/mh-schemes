@@ -412,8 +412,8 @@ const getWirelessSlotY = (controllerType, slotHeight, moduleHeightValue) => (
  * @param {number} slotHeight Высота текущего слота.
  * @returns {number} Координата Y.
  */
-const getWirelessSlotYByIndex = (devices, index, showEmptySlots, controllerType, moduleHeightValue, indentSize, slotHeight) => {
-    if (controllerType !== 'ecosmart') return getWirelessSlotY(controllerType, slotHeight, moduleHeightValue);
+const getWirelessSlotYByIndex = (devices, index, showEmptySlots, controllerType, moduleHeightValue, indentSize, slotHeight, lineLift = 0) => {
+    if (controllerType !== 'ecosmart') return getWirelessSlotY(controllerType, slotHeight, moduleHeightValue) - lineLift;
     const getSlotHeight = (device) => {
         if (!device) return 10 * indentSize;
         const hasFloorSensor = Array.isArray(device?.additions) && device.additions.length > 0;
@@ -422,7 +422,7 @@ const getWirelessSlotYByIndex = (devices, index, showEmptySlots, controllerType,
             : getWirelessSlotHeight(device, indentSize);
     };
     const firstHeight = getSlotHeight(devices[0] || null);
-    let y = getWirelessSlotY(controllerType, firstHeight, moduleHeightValue) + 54 * indentSize;
+    let y = getWirelessSlotY(controllerType, firstHeight, moduleHeightValue) + 54 * indentSize - lineLift;
     for (let i = 0; i < index; i += 1) {
         y += getSlotHeight(devices[i] || null) + 4 * indentSize + WIRELESS_SLOT_GAP;
     }
@@ -437,17 +437,17 @@ const getWirelessSlotYByIndex = (devices, index, showEmptySlots, controllerType,
  * @param {number} indentSize Шаг сетки.
  * @returns {number} Минимальная координата Y линии.
  */
-const getWirelessLineTop = (devices, showEmptySlots, controllerType, moduleHeightValue, indentSize) => {
+const getWirelessLineTop = (devices, showEmptySlots, controllerType, moduleHeightValue, indentSize, lineLift = 0) => {
     const slotTops = (Array.isArray(devices) ? devices : []).map((device, index) => {
         const hasFloorSensor = Array.isArray(device?.additions) && device.additions.length > 0;
         const slotHeight = device?.type === 'thermostat'
             ? THERMOSTAT_SLOT_PADDING * 2 + THERMOSTAT_IMAGE_SIZE + (hasFloorSensor ? 3 * indentSize : 0)
             : getWirelessSlotHeight(device, indentSize);
-        return getWirelessSlotYByIndex(devices, index, showEmptySlots, controllerType, moduleHeightValue, indentSize, slotHeight);
+        return getWirelessSlotYByIndex(devices, index, showEmptySlots, controllerType, moduleHeightValue, indentSize, slotHeight, lineLift);
     });
 
     if (showEmptySlots || slotTops.length === 0) {
-        slotTops.push(getWirelessSlotYByIndex(devices, (devices || []).length, showEmptySlots, controllerType, moduleHeightValue, indentSize, 10 * indentSize));
+        slotTops.push(getWirelessSlotYByIndex(devices, (devices || []).length, showEmptySlots, controllerType, moduleHeightValue, indentSize, 10 * indentSize, lineLift));
     }
 
     return Math.min(...slotTops);
@@ -455,6 +455,12 @@ const getWirelessLineTop = (devices, showEmptySlots, controllerType, moduleHeigh
 const getWirelessInfoBlockY = (wirelessLineTop) => (
     wirelessLineTop - WIRELESS_INFOBLOCK_BOTTOM_GAP - WIRELESS_INFOBLOCK_HEIGHT
 );
+const getSmart2WirelessLineLift = (schemeValue, controllerType, indentSize) => {
+    if (controllerType !== 'smart2') return 0;
+    const hasRelayDiModule = (Array.isArray(schemeValue?.di_modules) ? schemeValue.di_modules : [])
+        .some((moduleItem) => ['rl2', 'rl2s'].includes(canonicalDeviceType(moduleItem?.type || moduleItem)));
+    return hasRelayDiModule ? 10 * indentSize : 0;
+};
 /**
  * Вычисляет X беспроводного слота по ширинам предшествующих устройств.
  * @param {Array<object>} devices Устройства линии.
@@ -4091,15 +4097,17 @@ const App = () => {
         const wirelessDevices = Array.isArray(currentScheme.wireless_devices) ? currentScheme.wireless_devices : [];
         const currentControllerType = getControllerType(currentScheme);
         const currentModuleHeightValue = parseInt(module_height, 10) || 200;
+        const currentIndentSize = parseInt(indent, 10) || 8;
+        const wirelessLineLift = getSmart2WirelessLineLift(currentScheme, currentControllerType, currentIndentSize);
         wirelessDevices.forEach((device, idx) => {
             const key = getWirelessDeviceKey(device, idx);
             const slotWidth = getWirelessSlotWidth(device, showEmpty);
-            const slotX = getWirelessSlotX(wirelessDevices, idx, showEmpty, currentControllerType, parseInt(indent, 10) || 8, slotWidth);
+            const slotX = getWirelessSlotX(wirelessDevices, idx, showEmpty, currentControllerType, currentIndentSize, slotWidth);
             const hasFloorSensor = Array.isArray(device?.additions) && device.additions.length > 0;
             const slotHeight = device?.type === 'thermostat'
-                ? THERMOSTAT_SLOT_PADDING * 2 + THERMOSTAT_IMAGE_SIZE + (hasFloorSensor ? 3 * (parseInt(indent, 10) || 8) : 0)
-                : getWirelessSlotHeight(device, parseInt(indent, 10) || 8);
-            const slotY = getWirelessSlotYByIndex(wirelessDevices, idx, showEmpty, currentControllerType, currentModuleHeightValue, parseInt(indent, 10) || 8, slotHeight);
+                ? THERMOSTAT_SLOT_PADDING * 2 + THERMOSTAT_IMAGE_SIZE + (hasFloorSensor ? 3 * currentIndentSize : 0)
+                : getWirelessSlotHeight(device, currentIndentSize);
+            const slotY = getWirelessSlotYByIndex(wirelessDevices, idx, showEmpty, currentControllerType, currentModuleHeightValue, currentIndentSize, slotHeight, wirelessLineLift);
             const offset = wirelessOffsets[key] || { x: 0, y: 0 };
             rects.push({
                 id: `wireless:${key}`,
@@ -15767,9 +15775,13 @@ const App = () => {
                                     );
                                 })()}
                                 <Group>
-                                {showLineFrames && (() => {
-                                    const wirelessLineTop = getWirelessLineTop(memoWirelessDevices, showEmptySlots, controllerType, moduleHeightValue, indentSize);
-                                    const wirelessInfoBlockY = getWirelessInfoBlockY(wirelessLineTop);
+                                {(() => {
+                                    const wirelessLineLift = getSmart2WirelessLineLift(scheme, controllerType, indentSize);
+                                    return (
+                                        <>
+                                 {showLineFrames && (() => {
+                                     const wirelessLineTop = getWirelessLineTop(memoWirelessDevices, showEmptySlots, controllerType, moduleHeightValue, indentSize, wirelessLineLift);
+                                     const wirelessInfoBlockY = getWirelessInfoBlockY(wirelessLineTop);
                                     const slotRects = memoWirelessDevices.map((device, idx) => {
                                         const slotX = memoWirelessSlotX[idx] ?? getWirelessSlotX(memoWirelessDevices, idx, showEmptySlots);
                                         const hasFloorSensor = Array.isArray(device?.additions) && device.additions.length > 0;
@@ -15777,11 +15789,11 @@ const App = () => {
                                         const slotHeight = device?.type === 'thermostat'
                                             ? THERMOSTAT_SLOT_PADDING * 2 + THERMOSTAT_IMAGE_SIZE + (hasFloorSensor ? 3 * indentSize : 0)
                                             : getWirelessSlotHeight(device, indentSize);
-                                        const slotY = getWirelessSlotYByIndex(memoWirelessDevices, idx, showEmptySlots, controllerType, moduleHeightValue, indentSize, slotHeight);
+                                        const slotY = getWirelessSlotYByIndex(memoWirelessDevices, idx, showEmptySlots, controllerType, moduleHeightValue, indentSize, slotHeight, wirelessLineLift);
                                         return { left: slotX, top: slotY, right: slotX + slotWidth, bottom: slotY + slotHeight };
                                     });
                                     if (showEmptySlots) {
-                                        const plusSlotY = getWirelessSlotYByIndex(memoWirelessDevices, memoWirelessDevices.length, showEmptySlots, controllerType, moduleHeightValue, indentSize, 10 * indentSize);
+                                        const plusSlotY = getWirelessSlotYByIndex(memoWirelessDevices, memoWirelessDevices.length, showEmptySlots, controllerType, moduleHeightValue, indentSize, 10 * indentSize, wirelessLineLift);
                                         slotRects.push({
                                             left: memoWirelessPlusSlotX,
                                             top: plusSlotY,
@@ -15812,9 +15824,9 @@ const App = () => {
                                             listening={false}
                                         />
                                     );
-                                })()}
-                                {(memoWirelessDevices.length > 0 || showEmptySlots || showLineFrames) && (() => {
-                                    const wirelessLineTop = getWirelessLineTop(memoWirelessDevices, showEmptySlots, controllerType, moduleHeightValue, indentSize);
+                                 })()}
+                                 {(memoWirelessDevices.length > 0 || showEmptySlots || showLineFrames) && (() => {
+                                     const wirelessLineTop = getWirelessLineTop(memoWirelessDevices, showEmptySlots, controllerType, moduleHeightValue, indentSize, wirelessLineLift);
                                     const wirelessInfoBlockY = getWirelessInfoBlockY(wirelessLineTop);
                                     const wirelessInfoBlockX = controllerType === 'ecosmart' ? (-25 * indentSize - 67) : 10;
                                     return (
@@ -15852,7 +15864,7 @@ const App = () => {
                                     const slotHeight = device.type === 'thermostat'
                                         ? THERMOSTAT_SLOT_PADDING * 2 + THERMOSTAT_IMAGE_SIZE + (hasFloorSensor ? 3 * indentSize : 0)
                                         : getWirelessSlotHeight(device, indentSize);
-                                    const slotY = getWirelessSlotYByIndex(memoWirelessDevices, idx, showEmptySlots, controllerType, moduleHeightValue, indentSize, slotHeight);
+                                    const slotY = getWirelessSlotYByIndex(memoWirelessDevices, idx, showEmptySlots, controllerType, moduleHeightValue, indentSize, slotHeight, wirelessLineLift);
                                     const deviceImage = wirelessImages[deviceImageKey];
                                     const devicePorts = wirelessPortsByType[deviceImageKey] || [];
                                     const imageSize = device.type === 'thermostat'
@@ -16112,7 +16124,7 @@ const App = () => {
                                         {(() => {
                                             const plusSlotX = memoWirelessPlusSlotX;
                                             const plusSlotHeight = 10 * indentSize;
-                                            const plusSlotY = getWirelessSlotYByIndex(memoWirelessDevices, memoWirelessDevices.length, showEmptySlots, controllerType, moduleHeightValue, indentSize, plusSlotHeight);
+                                            const plusSlotY = getWirelessSlotYByIndex(memoWirelessDevices, memoWirelessDevices.length, showEmptySlots, controllerType, moduleHeightValue, indentSize, plusSlotHeight, wirelessLineLift);
                                             return (
                                                 <>
                                                     <Rect
@@ -16162,6 +16174,9 @@ const App = () => {
                                         })()}
                                     </>
                                 )}
+                                        </>
+                                    );
+                                })()}
                                 </Group>
                             </Group>
                                 );
