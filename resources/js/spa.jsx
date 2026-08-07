@@ -4646,6 +4646,9 @@ const App = () => {
             .includes('ups');
         const lastPoweredModule = poweredModuleChain[poweredModuleChain.length - 1] || null;
         const smart2PowerSourceLabel = hasUpsPowerModule ? 'UPS' : POWER_UNIT_LABEL;
+        const firstExtThermostatLabel = memoExtLineThermostatDevices[0]
+            ? getInstallationDeviceLabel(memoExtLineThermostatDevices[0], 'Термостат')
+            : null;
         const getPowerLabelsForModule = (moduleItem) => {
             const chainIndex = poweredModuleChain.findIndex((candidate) => candidate === moduleItem || (candidate?.id != null && candidate.id === moduleItem?.id));
             if (chainIndex < 0) return {};
@@ -4665,7 +4668,7 @@ const App = () => {
                     : getChainLabelInfo(poweredModuleChain, chainIndex - 1).label,
                 powerNextLabel: poweredModuleChain[chainIndex + 1]
                     ? getChainLabelInfo(poweredModuleChain, chainIndex + 1).label
-                    : null,
+                    : firstExtThermostatLabel,
             };
         };
         const normalizedPowerModuleTypes = rawPowerModules
@@ -4728,7 +4731,7 @@ const App = () => {
                 : getChainLabelInfo(modules, index - 1).label,
             moduleNextLabel: modules[index + 1]
                 ? getChainLabelInfo(modules, index + 1).label
-                : null,
+                : firstExtThermostatLabel,
             ...getPowerLabelsForModule(item),
             });
         });
