@@ -8,7 +8,7 @@
 - Нижняя грань wireless-линии отстоит от верхней грани контроллера на controller-specific gap.
 - `go`, `go+`: `0.6 * module_height`.
 - `smart2`: `0.5 * module_height`.
-- `smart2` с DI-модулями `rl2`/`rl2s`: wireless-линия дополнительно поднимается на `10 * indent`.
+- `smart2` с DI-модулями `rl2`/`rl2s`: wireless-линия дополнительно поднимается на `12 * indent`.
 - `pro`: `1.25 * module_height`.
 - `ecosmart`: `0.5 * module_height`.
 - Инфоблок `Беспроводные устройства` находится над верхней гранью wireless-линии, нижний край на `40px` выше линии.

@@ -459,7 +459,7 @@ const getSmart2WirelessLineLift = (schemeValue, controllerType, indentSize) => {
     if (controllerType !== 'smart2') return 0;
     const hasRelayDiModule = (Array.isArray(schemeValue?.di_modules) ? schemeValue.di_modules : [])
         .some((moduleItem) => ['rl2', 'rl2s'].includes(canonicalDeviceType(moduleItem?.type || moduleItem)));
-    return hasRelayDiModule ? 10 * indentSize : 0;
+    return hasRelayDiModule ? 12 * indentSize : 0;
 };
 /**
  * Вычисляет X беспроводного слота по ширинам предшествующих устройств.
