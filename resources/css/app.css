@@ -1159,6 +1159,25 @@ body {
     place-items: center;
 }
 
+.spa-device-preview-items {
+    display: grid;
+    grid-row: 3;
+    gap: 10px;
+    min-height: 0;
+    overflow: auto;
+    padding-bottom: 10px;
+}
+
+.spa-device-preview-item {
+    display: grid;
+    gap: 8px;
+}
+
+.spa-device-preview-item .spa-device-preview-image {
+    grid-row: auto;
+    padding-bottom: 4px;
+}
+
 .spa-device-preview-image img {
     display: block;
     width: 92%;
@@ -1402,6 +1421,10 @@ body {
     font: 700 14px/1.25 "Segoe UI", Tahoma, sans-serif;
 }
 
+.spa-device-preview-meta-title.is-static {
+    cursor: default;
+}
+
 .spa-device-preview-meta-comment {
     margin-top: 2px;
     overflow: visible;
@@ -1422,6 +1445,10 @@ body {
 .spa-device-preview-meta-title:hover,
 .spa-device-preview-meta-comment:hover {
     color: var(--ui-green);
+}
+
+.spa-device-preview-meta-title.is-static:hover {
+    color: #1f2937;
 }
 
 .spa-device-preview-meta-copy form {

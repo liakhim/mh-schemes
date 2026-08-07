@@ -5,7 +5,7 @@ import { Circle as KonvaCircle, Group, Image, Layer, Rect, Stage, Text } from 'r
 import '../css/app.css';
 import { din, incomingScheme, indent, module_height } from './constants';
 import { canonicalDeviceType } from './scheme/domain/deviceTypes';
-import { getDeviceStoredTitle, getWirelessDeviceTitle, getOneWireDeviceTitle } from './scheme/domain/deviceTitles';
+import { getDeviceBaseTitle, getDeviceStoredTitle, getWirelessDeviceTitle, getOneWireDeviceTitle } from './scheme/domain/deviceTitles';
 import { collectEquipmentTableRows } from './scheme/domain/equipmentTable';
 import {
     CONTROLLER_KIT_SENSOR_LIMITS,
@@ -1618,14 +1618,7 @@ const App = () => {
     const saveSuccessTimerRef = useRef(null);
     const controllerType = getControllerType(scheme);
     const selectedPreviewDevice = selectedDevicePreview?.device || null;
-    const selectedPreviewImagePath = selectedPreviewDevice
-        ? wirelessDeviceImagePaths[getWirelessDeviceImageKey(selectedPreviewDevice)]
-        : null;
-    const selectedPreviewComment = typeof selectedPreviewDevice?.comment === 'string'
-        ? selectedPreviewDevice.comment.trim()
-        : '';
-    const selectedPreviewIsBoiler = selectedPreviewDevice?.device_type === 'boiler'
-        || ['smart', 'stupid'].includes(canonicalDeviceType(selectedPreviewDevice?.type));
+    const selectedPreviewDevices = selectedDevicePreview?.devices || (selectedPreviewDevice ? [{ device: selectedPreviewDevice, title: selectedDevicePreview.title }] : []);
     const canUseInstallationMode = INSTALLATION_CONTROLLERS.has(controllerType);
     const applyInstallationLayout = (sourceScheme) => {
         const layout = readInstallationLayout(sourceScheme);
@@ -2620,9 +2613,9 @@ const App = () => {
         setTitleEditor({ device, currentTitle, value: currentTitle });
     };
 
-    const selectDevicePreview = (device, title = '') => {
+    const selectDevicePreview = (device, title = '', devices = null) => {
         if (!device) return;
-        setSelectedDevicePreview({ device, title });
+        setSelectedDevicePreview({ device, title, devices: Array.isArray(devices) && devices.length > 0 ? devices : [{ device, title }] });
         setPreviewTitleEditor(false);
         setPreviewTitleDraft(title);
     };
@@ -2683,6 +2676,7 @@ const App = () => {
                     !rect.isAncestorOf?.(previewSource)
                     && !previewSource.isAncestorOf?.(rect)
                 )) || [];
+                const namedSlotBody = sourceParent?.findOne?.('.device-preview-slot-body') || null;
                 const targetBox = targetIsSiblingRect
                     ? target.getClientRect({ relativeTo: sourceParent })
                     : null;
@@ -2698,8 +2692,8 @@ const App = () => {
                             const bDistance = sourceBox ? Math.abs((b.box.x + b.box.width / 2) - (sourceBox.x + sourceBox.width / 2)) : 0;
                             return aDistance - bDistance;
                         })[0]?.rect;
-                selectedPreviewSlotNodeRef.current = bodyRect || null;
-                selectDevicePreview(device, previewSource.getAttr('previewTitle') || '');
+                selectedPreviewSlotNodeRef.current = namedSlotBody || bodyRect || null;
+                selectDevicePreview(device, previewSource.getAttr('previewTitle') || '', previewSource.getAttr('previewDevices') || null);
                 return;
             }
             current = current.getParent?.();
@@ -2711,7 +2705,16 @@ const App = () => {
         const title = String(previewTitleDraft || '').trim();
         if (!title) return;
         setScheme((currentScheme) => updateDeviceTitleInValue(currentScheme, selectedDevicePreview.device, title));
-        setSelectedDevicePreview((current) => (current ? { ...current, title, device: { ...current.device, title } } : current));
+        setSelectedDevicePreview((current) => (current ? {
+            ...current,
+            title,
+            device: { ...current.device, title },
+            devices: Array.isArray(current.devices)
+                ? current.devices.map((item, index) => (
+                    index === 0 ? { ...item, title, device: { ...item.device, title } } : item
+                ))
+                : current.devices,
+        } : current));
         setPreviewTitleEditor(false);
     };
 
@@ -2776,7 +2779,16 @@ const App = () => {
             setScheme((currentScheme) => updateDeviceTitleInValue(currentScheme, titleEditor.device, normalizedTitle));
             setSelectedDevicePreview((current) => (
                 current && isSameTitleTargetDevice(current.device, titleEditor.device)
-                    ? { ...current, title: normalizedTitle, device: { ...current.device, title: normalizedTitle } }
+                    ? {
+                        ...current,
+                        title: normalizedTitle,
+                        device: { ...current.device, title: normalizedTitle },
+                        devices: Array.isArray(current.devices)
+                            ? current.devices.map((item, index) => (
+                                index === 0 ? { ...item, title: normalizedTitle, device: { ...item.device, title: normalizedTitle } } : item
+                            ))
+                            : current.devices,
+                    }
                     : current
             ));
         }
@@ -2789,12 +2801,18 @@ const App = () => {
         if (normalizedComment !== commentEditor.currentComment) {
             setScheme((currentScheme) => updateDeviceCommentInValue(currentScheme, commentEditor.device, normalizedComment));
             setSelectedDevicePreview((current) => {
-                if (!current || !isSameTitleTargetDevice(current.device, commentEditor.device)) return current;
-                if (normalizedComment) {
-                    return { ...current, device: { ...current.device, comment: normalizedComment } };
-                }
-                const { comment: removedComment, ...deviceWithoutComment } = current.device;
-                return { ...current, device: deviceWithoutComment };
+                if (!current) return current;
+                const updatePreviewDevice = (previewDevice) => {
+                    if (!isSameTitleTargetDevice(previewDevice, commentEditor.device)) return previewDevice;
+                    if (normalizedComment) return { ...previewDevice, comment: normalizedComment };
+                    const { comment: removedComment, ...deviceWithoutComment } = previewDevice;
+                    return deviceWithoutComment;
+                };
+                const nextDevice = updatePreviewDevice(current.device);
+                const nextDevices = Array.isArray(current.devices)
+                    ? current.devices.map((item) => ({ ...item, device: updatePreviewDevice(item.device) }))
+                    : current.devices;
+                return { ...current, device: nextDevice, devices: nextDevices };
             });
         }
         closeCommentEditor();
@@ -2808,6 +2826,7 @@ const App = () => {
     const renderInfoBlock = ({
         device,
         title,
+        previewDevices = null,
         x,
         y,
         width,
@@ -2835,8 +2854,9 @@ const App = () => {
                 name="device-preview-source"
                 previewDevice={device}
                 previewTitle={title}
-                onClick={() => selectDevicePreview(device, title)}
-                onTap={() => selectDevicePreview(device, title)}
+                previewDevices={previewDevices}
+                onClick={() => selectDevicePreview(device, title, previewDevices)}
+                onTap={() => selectDevicePreview(device, title, previewDevices)}
             >
                 <Rect
                     x={x}
@@ -2904,13 +2924,14 @@ const App = () => {
         );
     };
 
-    const EditableInfoTitle = ({ device, title, text, x, y, width, height, ...textProps }) => {
+    const EditableInfoTitle = ({ device, title, text, previewDevices = null, x, y, width, height, ...textProps }) => {
         if (!device) {
             return <Text x={x} y={y} width={width} height={height} text={text ?? title} {...textProps} />;
         }
         return renderInfoBlock({
             device,
             title: title ?? text,
+            previewDevices,
             x,
             y,
             width,
@@ -5020,82 +5041,103 @@ const App = () => {
                     </div>
                 </div>
                 {selectedPreviewDevice ? (
-                    <>
-                        <div className={`spa-device-preview-image${selectedPreviewIsBoiler ? ' is-boiler' : ''}`}>
-                            {selectedPreviewImagePath ? (
-                                <img src={selectedPreviewImagePath} alt="" />
-                            ) : (
-                                <span>Нет изображения</span>
-                            )}
-                        </div>
-                        <div className="spa-device-preview-meta-card">
-                            <div className="spa-device-preview-meta-icon" aria-hidden="true">
-                                <svg viewBox="0 0 24 24">
-                                    <rect x="5" y="5" width="14" height="14" rx="2" />
-                                    <path d="M8 9h8M8 12h8M8 15h5" />
-                                </svg>
-                            </div>
-                            <div className="spa-device-preview-meta-copy">
-                                <span className="spa-device-preview-meta-kicker">Устройство</span>
-                                {previewTitleEditor ? (
-                                    <form
-                                        onSubmit={(event) => {
-                                            event.preventDefault();
-                                            savePreviewTitle();
-                                        }}
-                                    >
-                                        <input
-                                            value={previewTitleDraft}
-                                            autoFocus
-                                            aria-label="Текст инфоблока"
-                                            onChange={(event) => setPreviewTitleDraft(event.target.value)}
-                                            onKeyDown={(event) => {
-                                                if (event.key === 'Escape') {
-                                                    event.preventDefault();
-                                                    setPreviewTitleEditor(false);
+                    <div className="spa-device-preview-items">
+                        {selectedPreviewDevices.map((item, previewIndex) => {
+                            const previewDevice = item.device;
+                            const previewTitle = item.title || getDeviceStoredTitle(previewDevice) || getDeviceBaseTitle(previewDevice);
+                            const previewImagePath = previewDevice
+                                ? wirelessDeviceImagePaths[getWirelessDeviceImageKey(previewDevice)]
+                                : null;
+                            const previewComment = typeof previewDevice?.comment === 'string'
+                                ? previewDevice.comment.trim()
+                                : '';
+                            const previewIsPrimary = previewIndex === 0;
+                            const previewIsBoiler = previewDevice?.device_type === 'boiler'
+                                || ['smart', 'stupid'].includes(canonicalDeviceType(previewDevice?.type));
+                            return (
+                                <div className="spa-device-preview-item" key={`${previewDevice?.id ?? previewIndex}-${previewDevice?.type ?? 'device'}`}>
+                                    <div className={`spa-device-preview-image${previewIsBoiler ? ' is-boiler' : ''}`}>
+                                        {previewImagePath ? (
+                                            <img src={previewImagePath} alt="" />
+                                        ) : (
+                                            <span>Нет изображения</span>
+                                        )}
+                                    </div>
+                                    <div className="spa-device-preview-meta-card">
+                                        <div className="spa-device-preview-meta-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24">
+                                                <rect x="5" y="5" width="14" height="14" rx="2" />
+                                                <path d="M8 9h8M8 12h8M8 15h5" />
+                                            </svg>
+                                        </div>
+                                        <div className="spa-device-preview-meta-copy">
+                                            <span className="spa-device-preview-meta-kicker">Устройство</span>
+                                            {previewIsPrimary && previewTitleEditor ? (
+                                                <form
+                                                    onSubmit={(event) => {
+                                                        event.preventDefault();
+                                                        savePreviewTitle();
+                                                    }}
+                                                >
+                                                    <input
+                                                        value={previewTitleDraft}
+                                                        autoFocus
+                                                        aria-label="Текст инфоблока"
+                                                        onChange={(event) => setPreviewTitleDraft(event.target.value)}
+                                                        onKeyDown={(event) => {
+                                                            if (event.key === 'Escape') {
+                                                                event.preventDefault();
+                                                                setPreviewTitleEditor(false);
+                                                                setPreviewTitleDraft(selectedDevicePreview.title);
+                                                            }
+                                                        }}
+                                                    />
+                                                    <button type="submit" aria-label="Сохранить текст инфоблока">✓</button>
+                                                </form>
+                                            ) : previewIsPrimary ? (
+                                                <button
+                                                    type="button"
+                                                    className="spa-device-preview-meta-title"
+                                                    title="Изменить текст инфоблока"
+                                                    onClick={() => {
+                                                        setPreviewTitleDraft(selectedDevicePreview.title);
+                                                        setPreviewTitleEditor(true);
+                                                    }}
+                                                >
+                                                    {previewTitle}
+                                                </button>
+                                            ) : (
+                                                <span className="spa-device-preview-meta-title is-static">{previewTitle}</span>
+                                            )}
+                                            <button
+                                                type="button"
+                                                className={`spa-device-preview-meta-comment${previewComment ? '' : ' is-empty'}`}
+                                                title="Изменить комментарий устройства"
+                                                onClick={() => editDeviceComment(previewDevice)}
+                                            >
+                                                {previewComment || 'Добавить комментарий'}
+                                            </button>
+                                        </div>
+                                        {previewIsPrimary && (
+                                            <button
+                                                type="button"
+                                                className="spa-device-preview-meta-edit"
+                                                aria-label="Изменить название устройства"
+                                                onClick={() => {
                                                     setPreviewTitleDraft(selectedDevicePreview.title);
-                                                }
-                                            }}
-                                        />
-                                        <button type="submit" aria-label="Сохранить текст инфоблока">✓</button>
-                                    </form>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        className="spa-device-preview-meta-title"
-                                        title="Изменить текст инфоблока"
-                                        onClick={() => {
-                                            setPreviewTitleDraft(selectedDevicePreview.title);
-                                            setPreviewTitleEditor(true);
-                                        }}
-                                    >
-                                        {selectedDevicePreview.title}
-                                    </button>
-                                )}
-                                <button
-                                    type="button"
-                                    className={`spa-device-preview-meta-comment${selectedPreviewComment ? '' : ' is-empty'}`}
-                                    title="Изменить комментарий устройства"
-                                    onClick={() => editDeviceComment(selectedPreviewDevice)}
-                                >
-                                    {selectedPreviewComment || 'Добавить комментарий'}
-                                </button>
-                            </div>
-                            <button
-                                type="button"
-                                className="spa-device-preview-meta-edit"
-                                aria-label="Изменить название устройства"
-                                onClick={() => {
-                                    setPreviewTitleDraft(selectedDevicePreview.title);
-                                    setPreviewTitleEditor(true);
-                                }}
-                            >
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="m5 16.5-.7 3.2 3.2-.7L18 8.5 15.5 6zM14 7.5l2.5 2.5" />
-                                </svg>
-                            </button>
-                        </div>
-                    </>
+                                                    setPreviewTitleEditor(true);
+                                                }}
+                                            >
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="m5 16.5-.7 3.2 3.2-.7L18 8.5 15.5 6zM14 7.5l2.5 2.5" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 ) : (
                     <div className="spa-device-preview-empty">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -6167,6 +6209,7 @@ const App = () => {
                                                         listening={false}
                                                     />
                                             <Rect
+                                                name="device-preview-slot-body"
                                                 x={slotX}
                                                 y={slotY}
                                                 width={slotWidth}
@@ -12774,17 +12817,16 @@ const App = () => {
                                                                           <Image image={floorSensorImage} x={floorSlotX} y={floorSlotY} width={floorSlotSize} height={floorSlotSize} listening={false} />
                                                                      )}
                                                                      {floorSensor && (() => {
-                                                                         const thermostatGnd = getPortPosition(extPorts, '1-WIRE-GND', slotX, slotY, slotWidth, slotHeight);
-                                                                         const thermostatDat = getPortPosition(extPorts, '1-WIRE-DAT', slotX, slotY, slotWidth, slotHeight);
-                                                                         const thermostatVPlus = getPortPosition(extPorts, '1-WIRE-V+', slotX, slotY, slotWidth, slotHeight);
-                                                                         const floorGnd = getPortPosition(floorSensorPorts, '1-WIRE-GND', floorSlotX, floorSlotY, floorSlotSize, floorSlotSize);
-                                                                         const floorDat = getPortPosition(floorSensorPorts, '1-WIRE-DAT', floorSlotX, floorSlotY, floorSlotSize, floorSlotSize);
-                                                                         const floorVPlus = getPortPosition(floorSensorPorts, '1-WIRE-V+', floorSlotX, floorSlotY, floorSlotSize, floorSlotSize);
-                                                                         const lines = [
-                                                                             { from: thermostatGnd, to: floorGnd, offset: 3 * indentSize, color: '#212121' },
-                                                                             { from: thermostatDat, to: floorDat, offset: 2 * indentSize, color: '#fbc02d' },
-                                                                             { from: thermostatVPlus, to: floorVPlus, offset: 1 * indentSize, color: '#d32f2f' },
-                                                                         ];
+                                                                          const thermostatGnd = getPortPosition(extPorts, '1-WIRE-GND', slotX, slotY, slotWidth, slotHeight);
+                                                                          const thermostatDat = getPortPosition(extPorts, '1-WIRE-DAT', slotX, slotY, slotWidth, slotHeight);
+                                                                          const floorGnd = getPortPosition(floorSensorPorts, '1-WIRE-GND', floorSlotX, floorSlotY, floorSlotSize, floorSlotSize);
+                                                                          const floorDat = getPortPosition(floorSensorPorts, '1-WIRE-DAT', floorSlotX, floorSlotY, floorSlotSize, floorSlotSize);
+                                                                          const floorVPlus = getPortPosition(floorSensorPorts, '1-WIRE-V+', floorSlotX, floorSlotY, floorSlotSize, floorSlotSize);
+                                                                          const lines = [
+                                                                              { from: thermostatGnd, to: floorGnd, offset: 3 * indentSize, color: '#212121' },
+                                                                              { from: thermostatGnd ? { ...thermostatGnd, y: thermostatGnd.y + 0.2 * indentSize } : null, to: floorVPlus, offset: 2 * indentSize, color: '#d32f2f' },
+                                                                              { from: thermostatDat, to: floorDat, offset: 1 * indentSize, color: '#fbc02d' },
+                                                                          ];
                                                                          return lines
                                                                              .filter((item) => item.from && item.to)
                                                                              .map((item, lineIndex) => (
@@ -15860,6 +15902,9 @@ const App = () => {
                                     const deviceImageKey = getWirelessDeviceImageKey(device);
                                     const slotX = memoWirelessSlotX[idx] ?? getWirelessSlotX(memoWirelessDevices, idx, showEmptySlots);
                                     const hasFloorSensor = Array.isArray(device.additions) && device.additions.length > 0;
+                                    const floorSensor = hasFloorSensor
+                                        ? device.additions.find(isThermostatFloorSensorAddition) || device.additions[0]
+                                        : null;
                                     const slotWidth = getWirelessSlotWidth(device, showEmptySlots);
                                     const slotHeight = device.type === 'thermostat'
                                         ? THERMOSTAT_SLOT_PADDING * 2 + THERMOSTAT_IMAGE_SIZE + (hasFloorSensor ? 3 * indentSize : 0)
@@ -15879,6 +15924,12 @@ const App = () => {
                                     const deviceTitle = device.type === 'thermostat' && hasFloorSensor
                                         ? `${baseDeviceTitle} с датчиком пола`
                                         : baseDeviceTitle;
+                                    const previewDevices = floorSensor
+                                        ? [
+                                            { device, title: deviceTitle },
+                                            { device: floorSensor, title: getDeviceStoredTitle(floorSensor) || getDeviceBaseTitle(floorSensor) },
+                                        ]
+                                        : [{ device, title: deviceTitle }];
                                     const imageX = device.type === 'thermostat'
                                         ? slotX + THERMOSTAT_SLOT_PADDING
                                         : slotX + (slotWidth - imageSize.width) / 2;
@@ -15935,6 +15986,7 @@ const App = () => {
                                                 verticalAlign="middle"
                                                 device={device}
                                                 title={deviceTitle}
+                                                previewDevices={previewDevices}
                                             />
                                             <Rect
                                                 x={slotX}
@@ -15946,17 +15998,21 @@ const App = () => {
                                                 stroke="rgba(0,0,0,0)"
                                                 strokeWidth={1.5}
                                             />
-                                             {deviceImage && (
+                                            {deviceImage && (
                                                 <Image
+                                                    name="device-preview-source"
+                                                    previewDevice={device}
+                                                    previewTitle={deviceTitle}
+                                                    previewDevices={previewDevices}
                                                     image={deviceImage}
                                                     x={imageX}
                                                     y={imageY}
                                                     width={imageSize.width}
                                                     height={imageSize.height}
                                                 />
-                                             )}
-                                             {isBundledSensorDevice(memoBundledSensorDevices, device) && <KitBadge x={slotX} y={slotY + 1} />}
-                                             {hasThermostatOneWire && showThermostatOneWire && (
+                                            )}
+                                            {isBundledSensorDevice(memoBundledSensorDevices, device) && <KitBadge x={slotX} y={slotY + 1} />}
+                                            {hasThermostatOneWire && showThermostatOneWire && (
                                                 <>
                                                     {!hasFloorSensor && showEmptySlots && (
                                                         <Rect
@@ -16041,6 +16097,10 @@ const App = () => {
                                                         </>
                                                     )}
                                                     <Rect
+                                                        name={hasFloorSensor ? 'device-preview-source' : undefined}
+                                                        previewDevice={hasFloorSensor ? device : undefined}
+                                                        previewTitle={hasFloorSensor ? deviceTitle : undefined}
+                                                        previewDevices={hasFloorSensor ? previewDevices : undefined}
                                                         x={thermostatOneWireSlotX}
                                                         y={thermostatOneWireSlotY}
                                                         width={thermostatOneWireSlotSize}
@@ -16049,6 +16109,7 @@ const App = () => {
                                                         fill="rgba(0,0,0,0)"
                                                         visible={showEmptySlots || hasFloorSensor}
                                                         onClick={(e) => {
+                                                            if (hasFloorSensor) return;
                                                             const pos = e.target.getAbsolutePosition();
                                                             setThermostatMenuPos({
                                                                 x: pos.x + 10,
@@ -16057,6 +16118,7 @@ const App = () => {
                                                             });
                                                         }}
                                                         onTap={(e) => {
+                                                            if (hasFloorSensor) return;
                                                             const pos = e.target.getAbsolutePosition();
                                                             setThermostatMenuPos({
                                                                 x: pos.x + 10,

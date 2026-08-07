@@ -237,11 +237,10 @@ export const QUESTIONS = [
             pair(0, 'EXT-OUT-B', 1, 'EXT-B'),
             pair(0, '12VDC-OUT-V+', 1, '1-WIRE-V+'),
             pair(0, '12VDC-OUT-GND', 1, '1-WIRE-GND'),
-            // The floor sensor addition taps the thermostat's own 1-wire terminal (V+/GND
-            // shared with the EXT-power link above, DAT used only here).
-            pair(1, '1-WIRE-V+', 2, '1-WIRE-V+'),
-            pair(1, '1-WIRE-DAT', 2, '1-WIRE-DAT'),
+            // EXT thermostat floor sensor wiring is intentionally asymmetric.
             pair(1, '1-WIRE-GND', 2, '1-WIRE-GND'),
+            pair(1, '1-WIRE-GND', 2, '1-WIRE-V+'),
+            pair(1, '1-WIRE-DAT', 2, '1-WIRE-DAT'),
         ],
     },
     {
@@ -322,9 +321,9 @@ export const QUESTIONS = [
             pair(0, 'EXT-OUT-B', 1, 'EXT-B'),
             pair(0, '12VDC-OUT-V+', 1, '1-WIRE-V+'),
             pair(0, '12VDC-OUT-GND', 1, '1-WIRE-GND'),
-            pair(1, '1-WIRE-V+', 2, '1-WIRE-V+'),
-            pair(1, '1-WIRE-DAT', 2, '1-WIRE-DAT'),
             pair(1, '1-WIRE-GND', 2, '1-WIRE-GND'),
+            pair(1, '1-WIRE-GND', 2, '1-WIRE-V+'),
+            pair(1, '1-WIRE-DAT', 2, '1-WIRE-DAT'),
         ],
     },
 ];
