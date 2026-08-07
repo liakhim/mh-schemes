@@ -395,10 +395,8 @@ const getWirelessLineGap = (controllerType, moduleHeightValue) => (
     controllerType === 'go' || controllerType === 'go+'
         ? moduleHeightValue * 0.6
         : controllerType === 'pro'
-            ? moduleHeightValue * 1.85
-            : controllerType === 'ecosmart'
-                ? moduleHeightValue * 1.6
-                : moduleHeightValue * 1
+            ? moduleHeightValue * 1.25
+            : moduleHeightValue * 0.5
 );
 const getWirelessSlotY = (controllerType, slotHeight, moduleHeightValue) => (
     -getWirelessLineGap(controllerType, moduleHeightValue) - slotHeight
@@ -1511,7 +1509,9 @@ const App = () => {
     const [showUnusedBundledSensors, setShowUnusedBundledSensors] = useState(false);
     const [showSaveActions, setShowSaveActions] = useState(false);
     const [showDeveloperToolsPanel, setShowDeveloperToolsPanel] = useState(false);
-    const [wifiLineEnabled, setWifiLineEnabled] = useState(false);
+    const [wifiLineEnabled, setWifiLineEnabled] = useState(() => (
+        Array.isArray(initialIncomingScheme?.wifi_modules) && initialIncomingScheme.wifi_modules.length > 0
+    ));
     const [installationMode, setInstallationMode] = useState(
         initialViewOptions.installationMode ?? !requestedControllerOnlyScheme,
     );
@@ -2248,7 +2248,12 @@ const App = () => {
                 const current = Array.isArray(item?.[lineKey]) ? [...item[lineKey]] : [];
                 if (mark) {
                     if (current[ntcSlotIndex]) return item;
-                    current[ntcSlotIndex] = { id: Date.now(), type: 'ntc-sensor', connection_type: 'ntc' };
+                    current[ntcSlotIndex] = {
+                        id: Date.now(),
+                        device_type: 'sensor',
+                        type: 'ntc-sensor',
+                        connection_type: 'ntc',
+                    };
                 } else {
                     if (!current[ntcSlotIndex]) return item;
                     current[ntcSlotIndex] = null;
@@ -3697,7 +3702,12 @@ const App = () => {
                 const sensors = Array.isArray(s.sensors) ? s.sensors : [];
                 return {
                     ...s,
-                    sensors: [...sensors, { id: Date.now(), type: 'ntc-sensor', connection_type: 'ntc' }],
+                    sensors: [...sensors, {
+                        id: Date.now(),
+                        device_type: 'sensor',
+                        type: 'ntc-sensor',
+                        connection_type: 'ntc',
+                    }],
                 };
             }
             const wired = Array.isArray(s.wired_devices) ? s.wired_devices : [];
@@ -3979,7 +3989,12 @@ const App = () => {
             const oneWireDevices = Array.isArray(targetModule?.one_wire_devices) ? targetModule.one_wire_devices : [];
             const target = oneWireDevices[slotIndex];
             if (!target || canonicalDeviceType(target?.type) !== 'ntc-1-wire') return s;
-            const sensorPayload = { id: Date.now(), type: 'ntc-sensor', connection_type: 'ntc' };
+            const sensorPayload = {
+                id: Date.now(),
+                device_type: 'sensor',
+                type: 'ntc-sensor',
+                connection_type: 'ntc',
+            };
             const nextModules = extModules.map((moduleItem, idx) => {
                 if (idx !== moduleIndex) return moduleItem;
                 const base = typeof moduleItem === 'string'

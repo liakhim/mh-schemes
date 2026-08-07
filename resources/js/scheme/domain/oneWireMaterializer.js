@@ -73,7 +73,9 @@ const hasConnectionType = (device, connectionType) => String(device?.connection_
     .map((item) => item.trim())
     .includes(connectionType);
 
-const isDirectNtcSensor = (sensor) => sensor?.device_type === 'sensor'
+const isDirectNtcSensor = (sensor) => (
+    sensor?.device_type === 'sensor' || canonicalDeviceType(sensor?.type) === 'ntc-sensor'
+)
     && String(sensor?.connection_type || '').toLowerCase() === 'ntc';
 
 const getNtcModuleFreeSlots = (device) => {

@@ -11,13 +11,14 @@ const NTC_LINE_CAPACITY = 3;
 
 const isNtcModule = (device) => canonicalDeviceType(device?.type) === 'ntc-1-wire';
 const isNtcSensor = (sensor) => (
-    sensor?.device_type === 'sensor'
+    (sensor?.device_type === 'sensor' || canonicalDeviceType(sensor?.type) === 'ntc-sensor')
     && String(sensor?.connection_type || '').toLowerCase() === 'ntc'
 );
 
 const normalizeNtcSensor = (sensor, index) => ({
     ...sensor,
     id: sensor?.id ?? `ntc-sensor-${index}`,
+    device_type: 'sensor',
     type: 'ntc-sensor',
     connection_type: 'ntc',
 });

@@ -44,7 +44,9 @@ const isBusBoiler = (device) => getDeviceType(device) === 'smart'
 const isPressureSensor = (device) => getDeviceType(device) === 'pressure-sensor'
     && hasConnectionType(device, '4-20');
 
-const isDirectNtcSensor = (device) => device?.device_type === 'sensor'
+const isDirectNtcSensor = (device) => (
+    device?.device_type === 'sensor' || getDeviceType(device) === 'ntc-sensor'
+)
     && hasConnectionType(device, 'ntc');
 
 const isDiscreteDevice = (device) => new Set([

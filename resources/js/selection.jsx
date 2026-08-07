@@ -1688,39 +1688,85 @@ const reconcileRequiredModules = (scheme) => {
 };
 
 /**
+ * Собирает схему под конкретный контроллер: переносит выбор, приводит модули
+ * к его правилам и пересчитывает обязательные.
+ * @param {object} scheme Исходная схема.
+ * @param {string} controllerType Целевой контроллер.
+ * @param {boolean} upsRequested Пользовательское требование UPS.
+ * @returns {?object} Согласованная схема или null для неизвестного контроллера.
+ */
+const buildSchemeForController = (scheme, controllerType, upsRequested) => {
+    let nextScheme = scheme;
+    if (getControllerType(scheme) !== controllerType) {
+        const controllerValue = getControllerTemplateValue(controllerType);
+        if (!controllerValue) return null;
+        nextScheme = withControllerValue(scheme, controllerValue);
+    }
+    nextScheme = materializeUpsIntentForController(nextScheme, controllerType, upsRequested);
+    nextScheme = normalizeModulesForController(nextScheme);
+    nextScheme = reconcileRequiredModules(nextScheme);
+    return materializeUpsIntentForController(nextScheme, controllerType, upsRequested);
+};
+
+/**
+ * Строит порядок перебора контроллеров для подбора.
+ *
+ * Порядок — от младшего к старшему, как в `CONTROLLER_TEMPLATES`, поэтому
+ * подбор работает симметрично: добавили оборудование — контроллер поднимется,
+ * убрали — вернется младший, который снова вмещает конфигурацию. Ручной выбор
+ * пользователя проверяется первым и держится, пока оборудование в него влезает.
+ * @param {object} scheme Текущая схема.
+ * @param {boolean} upsRequested Пользовательское требование UPS.
+ * @param {boolean} isManualControllerSelection Контроллер выбран вручную.
+ * @returns {string[]} Типы контроллеров в порядке предпочтения.
+ */
+const getControllerCandidateOrder = (scheme, upsRequested, isManualControllerSelection) => {
+    const preferredGoControllerType = getPreferredGoControllerType(scheme, upsRequested);
+    const candidateTypes = [];
+    const addCandidate = (type) => {
+        if (type && !candidateTypes.includes(type)) candidateTypes.push(type);
+    };
+
+    if (isManualControllerSelection) addCandidate(getControllerType(scheme));
+    CONTROLLER_TEMPLATES.forEach((item) => {
+        const type = item.value.type;
+        // GO и GO+ различаются не емкостью линий, а радиомодулем и батареей,
+        // поэтому из пары в подбор идет только уместный для схемы вариант.
+        if ((type === 'go' || type === 'go+') && type !== preferredGoControllerType) return;
+        addCandidate(type);
+    });
+
+    return candidateTypes;
+};
+
+/**
  * Выполняет полный цикл выбора контроллера, нормализации и подбора модулей.
  * @param {object} scheme Входная схема после пользовательского изменения.
  * @param {boolean} upsRequested Пользовательское требование UPS.
+ * @param {boolean} isManualControllerSelection Контроллер выбран вручную.
  * @returns {object} Готовая согласованная схема.
  */
 const resolveControllerAndRequiredModules = (scheme, upsRequested = false, isManualControllerSelection = false) => {
     const initialControllerType = getControllerType(scheme);
-    const preferredGoControllerType = getPreferredGoControllerType(scheme, upsRequested);
-    if (
-        !isManualControllerSelection
-        && (initialControllerType === 'go' || initialControllerType === 'go+')
-        && initialControllerType !== preferredGoControllerType
-    ) {
-        scheme = withControllerValue(scheme, getControllerTemplateValue(preferredGoControllerType));
-    }
-    scheme = materializeUpsIntentForController(scheme, getControllerType(scheme), upsRequested);
-    scheme = normalizeModulesForController(scheme);
-    scheme = reconcileRequiredModules(scheme);
-    const currentControllerIssues = getControllerCompatibilityIssues(scheme, null, upsRequested);
-    if (currentControllerIssues.length > 0) {
-        const compatibleOption = getCompatibleControllerOptions(scheme, upsRequested)[0] || null;
-        const controllerValue = compatibleOption ? getControllerTemplateValue(compatibleOption.type) : null;
-        if (controllerValue) {
-            const candidateScheme = materializeUpsIntentForController(
-                withControllerValue(scheme, controllerValue),
-                compatibleOption.type,
-                upsRequested,
-            );
-            return reconcileRequiredModules(normalizeModulesForController(candidateScheme));
+    const candidateTypes = getControllerCandidateOrder(scheme, upsRequested, isManualControllerSelection);
+    let currentControllerScheme = null;
+
+    // Кандидат проверяется по уже собранной под него схеме: только так учтены
+    // модули расширения, которые подбор для него добавит.
+    for (const candidateType of candidateTypes) {
+        const candidateScheme = buildSchemeForController(scheme, candidateType, upsRequested);
+        if (!candidateScheme) continue;
+        if (getControllerCompatibilityIssues(candidateScheme, null, upsRequested).length === 0) {
+            return candidateScheme;
         }
+        if (candidateType === initialControllerType) currentControllerScheme = candidateScheme;
     }
 
-    return materializeUpsIntentForController(scheme, getControllerType(scheme), upsRequested);
+    // Не подошел никто — остаемся на текущем контроллере, чтобы пользователь
+    // увидел список несовместимостей и убрал лишнее оборудование.
+    return currentControllerScheme
+        || buildSchemeForController(scheme, initialControllerType, upsRequested)
+        || scheme;
 };
 
 const DISCRETE_TEMPLATES = [
@@ -3992,8 +4038,14 @@ const SelectionApp = () => {
         if (!ecosmartAvailableForProScheme) return null;
         const controllerValue = getControllerTemplateValue('ecosmart');
         if (!controllerValue) return null;
-        return resolveSelectionScheme(withControllerValue(incomingScheme, controllerValue));
-    }, [ecosmartAvailableForProScheme, incomingScheme, resolveSelectionScheme]);
+        // Контроллер здесь задан явно, поэтому согласование идет как при ручном
+        // выборе: иначе подбор тут же вернул бы схему на младший контроллер.
+        return resolveControllerAndRequiredModules(
+            withControllerValue(incomingScheme, controllerValue),
+            upsRequested,
+            true,
+        );
+    }, [ecosmartAvailableForProScheme, incomingScheme, upsRequested]);
     const wiredThermostatTemplate = useMemo(() => makeThermostatTemplate({
         target: 'wired',
         color: wiredThermostatColor,

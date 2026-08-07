@@ -20,7 +20,7 @@ class IntegrationController extends Controller
      */
     public function proxy(Request $request): Response
     {
-        $response = $this->client->send($request->all(), $request);
+        $response = $this->client->send($request->all());
 
         return response($response->body(), $response->status())
             ->header('Content-Type', 'application/json');
@@ -35,7 +35,7 @@ class IntegrationController extends Controller
             'query' => ['required', 'string', 'max:255'],
         ]);
 
-        $response = $this->client->searchBoilers($validated['query'], $request);
+        $response = $this->client->searchBoilers($validated['query']);
 
         return response($response->body(), $response->status())
             ->header('Content-Type', 'application/json');

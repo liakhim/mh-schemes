@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use Illuminate\Http\Client\Response;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -35,11 +34,11 @@ class MhTestIntegrationClient
     }
 
     /**
-     * Отправить произвольный payload в сервис интеграции, пробрасывая куки клиента.
+     * Отправить произвольный payload в сервис интеграции.
      */
-    public function send(array $payload, Request $request): Response
+    public function send(array $payload): Response
     {
-        return Http::withHeaders($this->buildHeaders($request))
+        return Http::withHeaders($this->buildHeaders())
             ->asJson()
             ->timeout($this->timeout)
             ->post($this->baseUrl, $payload);
@@ -48,31 +47,25 @@ class MhTestIntegrationClient
     /**
      * Найти котлы по названию через сервис интеграции.
      */
-    public function searchBoilers(string $query, Request $request): Response
+    public function searchBoilers(string $query): Response
     {
         return $this->send([
             'action' => 'getNames',
             'data' => ['name' => $query],
-        ], $request);
+        ]);
     }
 
     /**
-     * Собрать заголовки запроса к внешнему сервису, включая куки клиента.
+     * Собрать заголовки запроса к внешнему сервису.
      *
      * @return array<string, string>
      */
-    private function buildHeaders(Request $request): array
+    private function buildHeaders(): array
     {
-        $headers = [
+        return [
             'Accept' => '*/*',
             'Origin' => $this->origin,
             'Referer' => $this->referer,
         ];
-
-        if ($request->header('Cookie')) {
-            $headers['Cookie'] = $request->header('Cookie');
-        }
-
-        return $headers;
     }
 }

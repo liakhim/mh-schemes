@@ -198,7 +198,9 @@ export const getAllOneWireDevicesForBalancing = (scheme) => {
     const extByModule = getExtOneWireDevicesByModuleIndex(scheme);
     const extDevices = Object.values(extByModule).flat();
     const wifiDevices = Object.values(getWifiOneWireDevicesByModuleIndex(scheme)).flat();
-    const legacyDevices = getLegacyOneWireDevicesFromScheme(scheme);
+    const hasMaterializedControllerLine = Array.isArray(scheme?.controller?.one_wire_devices)
+        || Array.isArray(scheme?.controller_one_wire_devices);
+    const legacyDevices = hasMaterializedControllerLine ? getLegacyOneWireDevicesFromScheme(scheme) : [];
     return [...controllerDevices, ...extDevices, ...wifiDevices, ...legacyDevices];
 };
 

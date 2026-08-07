@@ -360,3 +360,34 @@ test('uses an existing IO4 tail for standalone NTC before creating NTC-1-wire', 
     assert.equal(result.one_wire_modules.some(({ type }) => type === 'ntc-1-wire'), false);
     assert.equal(result.controller.one_wire_devices.some(({ type }) => type === 'ntc-1-wire'), false);
 });
+
+test('materializes public one-wire sources exactly once', () => {
+    const result = materializeBalancedOneWireScheme({
+        controller: 'pro',
+        ext_modules: [],
+        one_wire_modules: [{ id: 'rdt', type: 'rdt2', device_type: 'module', connection_type: '1-wire' }],
+        wired_devices: [{ id: 'thermostat', type: 'thermostat', device_type: 'thermostat', connection_type: '1-wire' }],
+        sensors: [{ id: 'sensor', type: 'wall-digital-sensor', device_type: 'sensor', connection_type: '1-wire' }],
+    });
+
+    assert.deepEqual(result.controller.one_wire_devices.map(({ id }) => id), ['rdt', 'thermostat', 'sensor']);
+});
+
+test('repairs and places an NTC sensor saved without device_type', () => {
+    const result = materializeBalancedOneWireScheme({
+        controller: {
+            type: 'smart2',
+            one_wire_devices: [{ id: 'ntc-module', type: 'ntc-1-wire', connection_type: '1-wire' }],
+        },
+        ext_modules: [],
+        sensors: [{ id: 'ntc', type: 'ntc-sensor', connection_type: 'ntc' }],
+    });
+
+    assert.equal(result.sensors.length, 0);
+    assert.deepEqual(result.controller.one_wire_devices[0].ntc1_devices, [{
+        id: 'ntc',
+        device_type: 'sensor',
+        type: 'ntc-sensor',
+        connection_type: 'ntc',
+    }]);
+});
