@@ -11142,6 +11142,7 @@ const App = () => {
                                                                                         <Line points={[moduleAPortX, moduleAPortY, moduleAPortX, lRouteY]} stroke={relayContactStroke} strokeWidth={1} lineCap="round" listening={false} />
                                                                                         {nextAPort && <Line points={[nextModuleAPortX, nextModuleAPortY, nextModuleAPortX, lRouteY]} stroke={relayContactStroke} strokeWidth={1} lineCap="round" listening={false} />}
                                                                                         <Text x={moduleAPortX - 8} y={lRouteY - 14} width={16} text="L" fontSize={10} align="center" fill="#212121" listening={false} />
+                                                                                        {nextAPort && <Text x={nextModuleAPortX - 8} y={lRouteY - 14} width={16} text="L" fontSize={10} align="center" fill="#212121" listening={false} />}
                                                                                     </>
                                                                                 );
                                                                            })()}
