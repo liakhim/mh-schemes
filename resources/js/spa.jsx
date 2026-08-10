@@ -3400,6 +3400,23 @@ const App = () => {
         });
     };
 
+    const removeController420PressureSensor = () => {
+        setScheme((s) => {
+            const controller = s?.controller && typeof s.controller === 'object'
+                ? { ...s.controller }
+                : { type: getControllerType(s) };
+            const devicesKey = Object.prototype.hasOwnProperty.call(controller, 'devices420') ? 'devices420' : 'devices_420';
+            return {
+                ...s,
+                controller: {
+                    ...controller,
+                    [devicesKey]: [],
+                },
+            };
+        });
+        setHoveredNtcSlotKey((current) => (current === 'controller-420' ? null : current));
+    };
+
     const addWifiOneWireDeviceAtSlot = (moduleIndex, slotIndex, type) => {
         setUseInitialOneWireBalance(false);
         setScheme((s) => patchWifiModuleLine(s, moduleIndex, 'one_wire_devices', (currentLine) => {
@@ -6910,10 +6927,13 @@ const App = () => {
                                         })) + 1
                                         : 0;
                                     const pressureInfoTitle = getDeviceStoredTitle(pressureSensor) || `Датчик давления ${pressureSensorIndex}`;
+                                    const isController420Hovered = hoveredNtcSlotKey === 'controller-420';
 
                                     return (
                                         <Group
                                             draggable={isController420SlotDraggable}
+                                            onMouseEnter={() => setHoveredNtcSlotKey('controller-420')}
+                                            onMouseLeave={() => setHoveredNtcSlotKey((current) => (current === 'controller-420' ? null : current))}
                                             onDragStart={() => {
                                                 if (!isController420SlotDraggable) return;
                                                 controller420DragStartOffsetRef.current = controller420SlotOffset;
@@ -6933,8 +6953,8 @@ const App = () => {
                                                 event.target.position({ x: 0, y: 0 });
                                             }}
                                         >
-                                            {pressureSensor && (
-                                                <>
+                                             {pressureSensor && (
+                                                 <>
                                                     <Line
                                                         points={[outVPlusPort.x, outVPlusPort.y, outVPlusPort.x, inVPlusY, inVPlusX, inVPlusY]}
                                                         stroke="#d32f2f"
@@ -7037,10 +7057,24 @@ const App = () => {
                                                         fontSize={4}
                                                         fill="#4a6a8a"
                                                         align="center"
-                                                        verticalAlign="middle" device={pressureSensor} title={pressureInfoTitle} />
-                                                </>
-                                            )}
-                                                        {showPorts && pressureSensor && pressureSensorPorts.map((port) => (
+                                                         verticalAlign="middle" device={pressureSensor} title={pressureInfoTitle} />
+                                                 </>
+                                             )}
+                                             {pressureSensor && isController420Hovered && (
+                                                 <>
+                                                     <Circle
+                                                         x={slotX + slotWidth - 2.5}
+                                                         y={slotY + 1.5}
+                                                         radius={6}
+                                                         fill="rgba(217, 83, 79, 0.55)"
+                                                         onClick={removeController420PressureSensor}
+                                                         onTap={removeController420PressureSensor}
+                                                     />
+                                                     <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
+                                                     <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
+                                                 </>
+                                             )}
+                                                         {showPorts && pressureSensor && pressureSensorPorts.map((port) => (
                                                             <Circle
                                                                 key={`pressure-sensor-port-${port.name}`}
                                                                 x={sensorX + port.x * sensorSize.width}
