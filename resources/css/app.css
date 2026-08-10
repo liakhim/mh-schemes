@@ -1801,7 +1801,7 @@ body {
 
 .spa-floating-tools {
     position: fixed;
-    top: calc(var(--nav-height) + 80px);
+    top: calc(var(--nav-height) + 140px);
     left: 14px;
     z-index: 90;
     display: flex;
