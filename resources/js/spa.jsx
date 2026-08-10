@@ -45,6 +45,7 @@ import { getOneWirePortByRole, getPortPosition } from './scheme/layout/ports';
 import { Line, RealisticConnectionLines, snapPixel } from './scheme/rendering/SharpLine';
 import EquipmentOfferModal from './components/EquipmentOfferModal';
 import SelectionConfigModal from './components/SelectionConfigModal';
+import logoPath from '../assets/logo/logo.svg';
 import commentIconPath from '../assets/icons/comment-icon.svg';
 import commentAddIconPath from '../assets/icons/comment-add-icon.svg';
 
@@ -4901,6 +4902,17 @@ const App = () => {
             {showSelectionConfig && selectionConfig && (
                 <SelectionConfigModal config={selectionConfig} onClose={() => setShowSelectionConfig(false)} />
             )}
+            <nav className="spa-selection-return" aria-label="Навигация схемы">
+                <a className="spa-selection-return-logo" href="/selection" aria-label="Перейти к подбору">
+                    <img src={logoPath} alt="MYHEAT" />
+                </a>
+                <a className="spa-selection-return-button" href="/selection">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m14.5 5-7 7 7 7M8 12h9" />
+                    </svg>
+                    <span>Назад</span>
+                </a>
+            </nav>
             <div className="spa-floating-tools" ref={unusedBundledSensorsRef}>
                 <div className="spa-unused-sensors-tool">
                     <button
