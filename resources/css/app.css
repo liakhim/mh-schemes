@@ -378,6 +378,17 @@ body {
     stroke-width: 1.5;
 }
 
+.account-navigation img {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    object-fit: contain;
+}
+
+.account-navigation a.is-active img {
+    filter: brightness(0) invert(1);
+}
+
 .account-settings-form {
     display: grid;
     align-content: start;

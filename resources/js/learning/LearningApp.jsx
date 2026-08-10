@@ -2,6 +2,7 @@ import React, {
     useCallback, useEffect, useState,
 } from 'react';
 import logoPath from '../../assets/logo/logo.svg';
+import settingsIconPath from '../../assets/icons/settings.svg';
 import CompleteScreen from './CompleteScreen';
 import DecorativeDevices from './DecorativeDevices';
 import Fireworks from './Fireworks';
@@ -41,7 +42,7 @@ const LearningSidebar = () => (
     <aside className="account-sidebar" aria-label="Навигация аккаунта">
         <nav className="account-navigation">
             <a href="/settings">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.12 2.12-.06-.06A1.7 1.7 0 0 0 15.74 18a1.7 1.7 0 0 0-1.02 1.55V20h-3v-.45A1.7 1.7 0 0 0 10.7 18a1.7 1.7 0 0 0-1.88 1l-.06.06-2.12-2.12.06-.06A1.7 1.7 0 0 0 7.7 15a1.7 1.7 0 0 0-1.55-1H5.7v-3h.45A1.7 1.7 0 0 0 7.7 10a1.7 1.7 0 0 0-1-1.88l-.06-.06 2.12-2.12.06.06A1.7 1.7 0 0 0 10.7 7a1.7 1.7 0 0 0 1.02-1.55V5h3v.45A1.7 1.7 0 0 0 15.74 7a1.7 1.7 0 0 0 1.88-1l.06-.06 2.12 2.12-.06.06a1.7 1.7 0 0 0-1 1.88 1.7 1.7 0 0 0 1.55 1h.45v3h-.45A1.7 1.7 0 0 0 19.4 15Z" /></svg>
+                <img src={settingsIconPath} alt="" aria-hidden="true" />
                 <span>Настройки аккаунта</span>
             </a>
             <a href="/services">
