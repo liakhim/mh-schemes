@@ -38,6 +38,7 @@ const countDevice = (scheme, id) => {
         'channel_devices',
         'devices_420',
         'devices420',
+        'one_wire_devices',
     ];
     const owners = [scheme?.controller, ...(scheme?.ext_modules || []), ...(scheme?.di_modules || [])];
     const placed = owners.reduce((count, owner) => count + lineKeys.reduce((lineCount, line) => (
@@ -85,6 +86,36 @@ test('round trip keeps a standalone NTC sensor on its exact IO4 channel', () => 
     });
 
     assert.equal(reopened.ext_modules[0].channel_devices[2].id, sensor.id);
+    assert.equal(countDevice(reopened, sensor.id), 1);
+});
+
+test('flask GVS boiler sensor ignores a corrupted IO4 assignment and stays on one-wire', () => {
+    const sensor = {
+        id: 'gvs-corrupt-io4',
+        type: 'flask-sensor-gvs-boiler',
+        device_type: 'sensor',
+        connection_type: '1-wire|ntc',
+    };
+    const reopened = materializeBalancedOneWireScheme({
+        controller: { type: 'pro', one_wire_devices: [] },
+        ext_modules: [{ id: 'io4-second', type: 'io4', channel_devices: [] }],
+        one_wire_modules: [{ id: 'ntc-module', type: 'ntc-1-wire', connection_type: '1-wire' }],
+        sensors: [sensor],
+        connection_layout: {
+            version: 1,
+            assignments: [{
+                device_type: sensor.type,
+                device_id: sensor.id,
+                owner_kind: 'ext_module',
+                owner_id: 'io4-second',
+                line: 'channel_devices',
+                slot: 2,
+            }],
+        },
+    });
+
+    assert.equal(reopened.ext_modules[0].channel_devices.length, 0);
+    assert.equal(reopened.controller.one_wire_devices.some((device) => device.id === sensor.id), true);
     assert.equal(countDevice(reopened, sensor.id), 1);
 });
 

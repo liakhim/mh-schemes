@@ -7,9 +7,7 @@ const getControllerType = (scheme) => canonicalDeviceType(
     typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type,
 );
 
-const isDirectNtcSensor = (device) => (
-    device?.device_type === 'sensor' || canonicalDeviceType(device?.type) === 'ntc-sensor'
-)
+const isDirectNtcSensor = (device) => canonicalDeviceType(device?.type) === 'ntc-sensor'
     && String(device?.connection_type || '')
         .toLowerCase()
         .split('|')

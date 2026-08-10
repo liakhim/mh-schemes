@@ -44,9 +44,7 @@ const isBusBoiler = (device) => getDeviceType(device) === 'smart'
 const isPressureSensor = (device) => getDeviceType(device) === 'pressure-sensor'
     && hasConnectionType(device, '4-20');
 
-const isDirectNtcSensor = (device) => (
-    device?.device_type === 'sensor' || getDeviceType(device) === 'ntc-sensor'
-)
+const isDirectNtcSensor = (device) => getDeviceType(device) === 'ntc-sensor'
     && hasConnectionType(device, 'ntc');
 
 const isDiscreteDevice = (device) => new Set([
@@ -65,7 +63,8 @@ const isIo4Device = (device) => {
     return isPressureSensor(device)
         || isDiscreteDevice(device)
         || ((type === '010servo' || type === '010pump') && hasConnectionType(device, 'di'))
-        || isDirectNtcSensor(device);
+        || isDirectNtcSensor(device)
+        || isMixingNtcSensor(device);
 };
 
 const isIo4GroupParent = (device) => {
