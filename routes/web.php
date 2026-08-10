@@ -8,10 +8,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Корень ведет в публичный каталог сервисов.
-Route::redirect('/', '/services')->name('home');
+Route::redirect('/', '/user-schemes')->name('home');
 
 // Рабочий раздел подбора оборудования доступен при наличии внешней PHP-сессии.
-Route::get('/services', [SchemeController::class, 'selectionDashboard'])->middleware('php-session')->name('services');
+Route::get('/user-schemes', [SchemeController::class, 'selectionDashboard'])->middleware('php-session')->name('user-schemes');
 
 // Временный вход монтажника: найденный аккаунт создает PHP-сессию-заглушку.
 Route::view('/auth', 'auth')->name('auth');

@@ -16,9 +16,9 @@ class PhpSessionCookieMiddlewareTest extends TestCase
             ->assertRedirect(route('auth'));
     }
 
-    public function test_services_redirect_to_auth_without_php_session_cookie(): void
+    public function test_user_schemes_redirect_to_auth_without_php_session_cookie(): void
     {
-        $this->get('/services')
+        $this->get('/user-schemes')
             ->assertRedirect(route('auth'));
     }
 

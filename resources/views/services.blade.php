@@ -9,7 +9,7 @@
 <body class="account-page services-page">
     <header class="account-liquid-header">
         <div class="account-liquid-header-shine" aria-hidden="true"></div>
-        <a class="account-header-brand" href="{{ route('services') }}" aria-label="MyHeat, подбор оборудования">
+        <a class="account-header-brand" href="{{ route('user-schemes') }}" aria-label="MyHeat, подбор оборудования">
             <span class="account-logo-lockup"><img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat"><b>PRO</b></span>
             <span>Личный кабинет</span>
         </a>
@@ -25,7 +25,7 @@
                     <img src="{{ Vite::asset('resources/assets/icons/settings.svg') }}" alt="" aria-hidden="true">
                     <span>Настройки аккаунта</span>
                 </a>
-                <a class="is-active" href="{{ route('services') }}" aria-current="page">
+                <a class="is-active" href="{{ route('user-schemes') }}" aria-current="page">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h.01M12 9h.01M16 9h.01M8 15h.01M12 15h.01M16 15h.01" /></svg>
                     <span>Подбор оборудования</span>
                 </a>

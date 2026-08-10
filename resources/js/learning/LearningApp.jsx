@@ -27,7 +27,7 @@ const formatElapsed = (totalSeconds) => {
 const LearningAccountHeader = () => (
     <header className="account-liquid-header">
         <div className="account-liquid-header-shine" aria-hidden="true" />
-        <a className="account-header-brand" href="/services" aria-label="MyHeat, сервисы">
+        <a className="account-header-brand" href="/user-schemes" aria-label="MyHeat, подбор оборудования">
             <span className="account-logo-lockup"><img src={logoPath} alt="MyHeat" /><b>PRO</b></span>
             <span>Личный кабинет</span>
         </a>
@@ -45,7 +45,7 @@ const LearningSidebar = () => (
                 <img src={settingsIconPath} alt="" aria-hidden="true" />
                 <span>Настройки аккаунта</span>
             </a>
-            <a href="/services">
+            <a href="/user-schemes">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h.01M12 9h.01M16 9h.01M8 15h.01M12 15h.01M16 15h.01" /></svg>
                 <span>Подбор оборудования</span>
             </a>
