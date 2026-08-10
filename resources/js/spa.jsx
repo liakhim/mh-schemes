@@ -837,6 +837,12 @@ const getOneWirePortColor = (name) => {
     return '#212121';
 };
 
+const ECOSMART_LEAK_SENSOR_COLORS = {
+    gnd: '#212121',
+    di: '#1976d2',
+    vplus: '#d32f2f',
+};
+
 /**
  * Подбирает цвет монтажного провода по имени терминала и типу владельца порта.
  * @param {string} name Имя SVG-порта с семантическими тегами.
@@ -881,9 +887,9 @@ const getInstallationPortLineColor = (name, item) => {
             if (terminal.endsWith('-B')) return blueOnA ? '#d32f2f' : '#1565c0';
         }
         if (!tag && /^RELAY-1-[AB]$/.test(terminal)) return '#2e7d32';
-        if (terminal === 'DI-IN-2-GND') return '#212121';
-        if (terminal === 'DI-IN-2-DI') return '#d32f2f';
-        if (terminal === 'DI-IN-2-V+') return '#fbc02d';
+        if (terminal === 'DI-IN-2-GND') return ECOSMART_LEAK_SENSOR_COLORS.gnd;
+        if (terminal === 'DI-IN-2-DI') return ECOSMART_LEAK_SENSOR_COLORS.di;
+        if (terminal === 'DI-IN-2-V+') return ECOSMART_LEAK_SENSOR_COLORS.vplus;
     }
 
     if (terminal === '1-WIRE-V+') return '#d32f2f';
@@ -6695,9 +6701,9 @@ const App = () => {
                                         >
                                             {(leakSensor || showEmptySlots) && (
                                                 <>
-                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, leakPorts.gnd.x, targetPorts.gnd.y, leakPorts.gnd.x, leakPorts.gnd.y]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.di.x, targetPorts.di.y, leakPorts.di.x, targetPorts.di.y, leakPorts.di.x, leakPorts.di.y]} stroke="#1976d2" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                    <Line points={[targetPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, leakPorts.vplus.y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.gnd.x, targetPorts.gnd.y, leakPorts.gnd.x, targetPorts.gnd.y, leakPorts.gnd.x, leakPorts.gnd.y]} stroke={ECOSMART_LEAK_SENSOR_COLORS.gnd} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.di.x, targetPorts.di.y, leakPorts.di.x, targetPorts.di.y, leakPorts.di.x, leakPorts.di.y]} stroke={ECOSMART_LEAK_SENSOR_COLORS.di} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                    <Line points={[targetPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, targetPorts.vplus.y, leakPorts.vplus.x, leakPorts.vplus.y]} stroke={ECOSMART_LEAK_SENSOR_COLORS.vplus} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
                                                 </>
                                             )}
                                             <Rect
