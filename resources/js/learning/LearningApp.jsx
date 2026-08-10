@@ -23,18 +23,47 @@ const formatElapsed = (totalSeconds) => {
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
-const LearningNavbar = () => (
-    <nav className="learning-navbar">
-        <div className="learning-navbar-brand">
-            <a href="/" className="learning-navbar-logo-link" aria-label="MyHeat — главная">
-                <img src={logoPath} alt="MyHeat" className="learning-navbar-logo" />
-            </a>
-            <div className="learning-alpha-notice">
-                <span>Приложение находится <u>в стадии альфа-тестирования</u>, все вопросы к разработчику:</span>
-                <a href="https://t.me/mmingareev" target="_blank" rel="noreferrer">Telegram</a>
-            </div>
+const LearningAccountHeader = () => (
+    <header className="account-liquid-header">
+        <div className="account-liquid-header-shine" aria-hidden="true" />
+        <a className="account-header-brand" href="/services" aria-label="MyHeat, сервисы">
+            <span className="account-logo-lockup"><img src={logoPath} alt="MyHeat" /><b>PRO</b></span>
+            <span>Личный кабинет</span>
+        </a>
+        <div className="account-header-caption">
+            <strong>Обучение</strong>
+            <span>Практика подключения оборудования</span>
         </div>
-    </nav>
+    </header>
+);
+
+const LearningSidebar = () => (
+    <aside className="account-sidebar" aria-label="Навигация аккаунта">
+        <nav className="account-navigation">
+            <a href="/settings">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.12 2.12-.06-.06A1.7 1.7 0 0 0 15.74 18a1.7 1.7 0 0 0-1.02 1.55V20h-3v-.45A1.7 1.7 0 0 0 10.7 18a1.7 1.7 0 0 0-1.88 1l-.06.06-2.12-2.12.06-.06A1.7 1.7 0 0 0 7.7 15a1.7 1.7 0 0 0-1.55-1H5.7v-3h.45A1.7 1.7 0 0 0 7.7 10a1.7 1.7 0 0 0-1-1.88l-.06-.06 2.12-2.12.06.06A1.7 1.7 0 0 0 10.7 7a1.7 1.7 0 0 0 1.02-1.55V5h3v.45A1.7 1.7 0 0 0 15.74 7a1.7 1.7 0 0 0 1.88-1l.06-.06 2.12 2.12-.06.06a1.7 1.7 0 0 0-1 1.88 1.7 1.7 0 0 0 1.55 1h.45v3h-.45A1.7 1.7 0 0 0 19.4 15Z" /></svg>
+                <span>Настройки аккаунта</span>
+            </a>
+            <a href="/services">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h.01M12 9h.01M16 9h.01M8 15h.01M12 15h.01M16 15h.01" /></svg>
+                <span>Подбор оборудования</span>
+            </a>
+            <a className="is-active" href="/learning" aria-current="page">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5m0-16v16M8 7h8m-8 4h8" /></svg>
+                <span>Обучение</span>
+            </a>
+        </nav>
+    </aside>
+);
+
+const LearningLayout = ({ children }) => (
+    <div className="learning-page">
+        <LearningAccountHeader />
+        <main className="account-shell learning-account-shell">
+            <LearningSidebar />
+            <section className="learning-content">{children}</section>
+        </main>
+    </div>
 );
 
 const LearningApp = () => {
@@ -111,17 +140,15 @@ const LearningApp = () => {
 
     if (view === 'intro') {
         return (
-            <div className="learning-page">
-                <LearningNavbar />
+            <LearningLayout>
                 <IntroScreen totalQuestions={TOTAL} onStart={startQuiz} />
-            </div>
+            </LearningLayout>
         );
     }
 
     if (view === 'complete') {
         return (
-            <div className="learning-page">
-                <LearningNavbar />
+            <LearningLayout>
                 <CompleteScreen
                     solvedCount={solvedCount}
                     solvableCount={SOLVABLE_TOTAL}
@@ -129,13 +156,12 @@ const LearningApp = () => {
                     onRestart={restart}
                     onReview={reviewQuestions}
                 />
-            </div>
+            </LearningLayout>
         );
     }
 
     return (
-        <div className="learning-page">
-            <LearningNavbar />
+        <LearningLayout>
             <header className="learning-header">
                 <div className="learning-header-top">
                     <div className="learning-title">Обучение — вопрос {currentIndex + 1} из {TOTAL}</div>
@@ -193,7 +219,7 @@ const LearningApp = () => {
                     {currentIndex === TOTAL - 1 ? 'Завершить →' : 'Следующий →'}
                 </button>
             </footer>
-        </div>
+        </LearningLayout>
     );
 };
 

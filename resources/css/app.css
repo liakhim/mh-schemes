@@ -319,6 +319,964 @@ body {
     }
 }
 
+.account-page {
+    min-height: 100vh;
+    background: #f7f7f5;
+}
+
+.account-shell {
+    display: grid;
+    min-height: 100vh;
+    grid-template-columns: 290px minmax(0, 1fr);
+    gap: 20px;
+    padding: 12px 10px 28px;
+}
+
+.account-sidebar {
+    align-self: start;
+    padding: 16px;
+    border-radius: 18px;
+    background: #fff;
+}
+
+.account-navigation {
+    display: grid;
+    gap: 3px;
+}
+
+.account-navigation a {
+    display: flex;
+    min-height: 36px;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 16px;
+    border-radius: 9px;
+    color: #151b26;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.account-navigation a:hover,
+.account-navigation a.is-active {
+    background: #f0f0f2;
+}
+
+.account-navigation a:focus-visible {
+    outline: 2px solid #ff7b26;
+    outline-offset: 2px;
+}
+
+.account-navigation svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.5;
+}
+
+.account-settings-form {
+    display: grid;
+    align-content: start;
+    gap: 20px;
+}
+
+.services-content .home-main {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.selection-dashboard {
+    min-width: 0;
+}
+
+.selection-dashboard-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 22px;
+    padding: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.88);
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 92% 8%, rgba(224, 112, 32, 0.16), transparent 12rem),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.8));
+    box-shadow: 0 16px 38px rgba(32, 39, 56, 0.08), inset 0 1px rgba(255, 255, 255, 0.92);
+}
+
+.selection-dashboard-kicker {
+    display: block;
+    margin-bottom: 7px;
+    color: #c85e18;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.selection-dashboard-heading h1 {
+    margin: 0;
+    color: #101722;
+    font-size: 29px;
+    letter-spacing: -0.04em;
+}
+
+.selection-dashboard-heading p {
+    max-width: 650px;
+    margin: 8px 0 0;
+    color: #64748b;
+    font-size: 15px;
+    line-height: 1.45;
+}
+
+.selection-dashboard-action,
+.selection-dashboard-empty a {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 18px;
+    border: 1px solid rgba(194, 65, 12, 0.82);
+    border-radius: 12px;
+    color: #fff;
+    background: linear-gradient(135deg, #f28a3f, #e07020 52%, #c85e18);
+    box-shadow: 0 10px 24px rgba(200, 94, 24, 0.26), inset 0 1px rgba(255, 255, 255, 0.3);
+    font-size: 14px;
+    font-weight: 800;
+    text-decoration: none;
+    transition: box-shadow 0.2s ease, filter 0.2s ease, transform 0.2s ease;
+}
+
+.selection-dashboard-action:hover,
+.selection-dashboard-empty a:hover {
+    box-shadow: 0 14px 30px rgba(200, 94, 24, 0.34), inset 0 1px rgba(255, 255, 255, 0.38);
+    filter: saturate(1.08);
+    transform: translateY(-2px);
+}
+
+.selection-dashboard-action span {
+    font-size: 19px;
+    line-height: 0.8;
+}
+
+.selection-dashboard-table-wrap {
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 16px 38px rgba(32, 39, 56, 0.08), inset 0 1px rgba(255, 255, 255, 0.92);
+}
+
+.selection-dashboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #334155;
+    font-size: 14px;
+}
+
+.selection-dashboard-table th,
+.selection-dashboard-table td {
+    padding: 16px 20px;
+    border-bottom: 1px solid #edf0f5;
+    text-align: left;
+}
+
+.selection-dashboard-table th {
+    color: #64748b;
+    background: rgba(248, 250, 252, 0.82);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.selection-dashboard-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.selection-dashboard-table tbody tr:hover td {
+    background: #fffaf5;
+}
+
+.selection-dashboard-table td:first-child strong,
+.selection-dashboard-table td:first-child span {
+    display: block;
+}
+
+.selection-dashboard-table td:first-child strong {
+    color: #1e293b;
+    font-size: 15px;
+}
+
+.selection-dashboard-table td:first-child span {
+    max-width: 500px;
+    margin-top: 4px;
+    overflow: hidden;
+    color: #7b8794;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.selection-dashboard-controller {
+    display: inline-flex;
+    padding: 5px 8px;
+    border: 1px solid #dbe3ef;
+    border-radius: 999px;
+    color: #475569;
+    background: #f8fafc;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.selection-dashboard-table td:last-child {
+    text-align: right;
+}
+
+.selection-dashboard-table td:last-child a {
+    color: #c85e18;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.selection-dashboard-table td:last-child a:hover {
+    color: #9a3412;
+    text-decoration: underline;
+}
+
+.selection-dashboard-empty {
+    display: grid;
+    min-height: 250px;
+    align-content: center;
+    justify-items: center;
+    gap: 10px;
+    padding: 32px;
+    text-align: center;
+}
+
+.selection-dashboard-empty strong {
+    color: #1e293b;
+    font-size: 19px;
+}
+
+.selection-dashboard-empty span {
+    color: #64748b;
+    font-size: 14px;
+}
+
+.selection-dashboard-empty a {
+    margin-top: 8px;
+}
+
+.selection-dashboard-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.selection-dashboard-pagination a,
+.selection-dashboard-pagination > span {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    border: 1px solid rgba(203, 213, 225, 0.9);
+    border-radius: 10px;
+    color: #475569;
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.9);
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.selection-dashboard-pagination a:hover {
+    border-color: rgba(224, 112, 32, 0.55);
+    color: #a84a13;
+    background: #fff7ed;
+}
+
+.selection-dashboard-pagination .selection-dashboard-page-status {
+    border-color: transparent;
+    color: #64748b;
+    background: transparent;
+    box-shadow: none;
+    font-weight: 600;
+}
+
+.selection-dashboard-pagination .is-disabled {
+    color: #a1aab7;
+    background: rgba(241, 245, 249, 0.7);
+    cursor: not-allowed;
+}
+
+.account-card {
+    padding: 17px 16px 16px;
+    border-radius: 14px;
+    background: #fff;
+}
+
+.account-card h1,
+.account-card h2 {
+    margin: 0;
+    color: #101722;
+    font-size: 20px;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.account-card p {
+    margin: 7px 0 16px;
+    color: #637083;
+    font-size: 16px;
+    line-height: 1.25;
+}
+
+.account-fields {
+    display: grid;
+    gap: 16px;
+}
+
+.account-personal-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 30px;
+}
+
+.account-fields label,
+.account-textarea {
+    position: relative;
+    display: block;
+}
+
+.account-fields label > span,
+.account-textarea > span {
+    position: absolute;
+    top: -9px;
+    left: 10px;
+    z-index: 1;
+    padding: 0 4px;
+    color: #f07725;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.account-card input,
+.account-card textarea {
+    width: 100%;
+    border: 1px solid #ff7b26;
+    border-radius: 12px;
+    outline: none;
+    color: #1d2939;
+    background: #fff;
+    font: 16px/1.2 "Segoe UI", Tahoma, sans-serif;
+}
+
+.account-card input {
+    height: 41px;
+    padding: 0 15px;
+}
+
+.account-card textarea {
+    display: block;
+    min-height: 161px;
+    padding: 12px 15px;
+    resize: vertical;
+}
+
+.account-card input:focus,
+.account-card textarea:focus {
+    border-color: #d85c0a;
+    box-shadow: 0 0 0 3px rgba(255, 123, 38, 0.15);
+}
+
+.account-contact-card {
+    min-height: 136px;
+}
+
+.account-contact-card p {
+    margin-bottom: 10px;
+}
+
+.account-time-fields {
+    display: grid;
+    width: min(492px, 100%);
+    margin: 0 auto;
+    grid-template-columns: auto 208px auto 208px;
+    align-items: center;
+    gap: 16px;
+    color: #1d2939;
+    font-size: 14px;
+}
+
+.account-time-fields > label {
+    position: relative;
+}
+
+.account-time-fields input {
+    padding-right: 34px;
+}
+
+.account-time-fields button {
+    position: absolute;
+    top: 50%;
+    right: 9px;
+    padding: 0;
+    border: 0;
+    color: #9aa3af;
+    background: transparent;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transform: translateY(-50%);
+}
+
+.account-visibility-card {
+    padding-bottom: 22px;
+}
+
+.account-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: #263242;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.account-toggle input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.account-toggle span {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    border-radius: 999px;
+    background: #cbd2db;
+    transition: background-color 0.15s ease;
+}
+
+.account-toggle span::after {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+    content: "";
+    transition: transform 0.15s ease;
+}
+
+.account-toggle input:checked + span {
+    background: #f07725;
+}
+
+.account-toggle input:checked + span::after {
+    transform: translateX(16px);
+}
+
+.account-toggle input:focus-visible + span {
+    outline: 2px solid #1565c0;
+    outline-offset: 2px;
+}
+
+/* Settings reuse the glass, warm accent, and layered cards language of /selection. */
+.account-settings-page {
+    background:
+        radial-gradient(circle at 91% 9%, rgba(224, 112, 32, 0.16), transparent 27rem),
+        radial-gradient(circle at 3% 42%, rgba(252, 211, 77, 0.1), transparent 24rem),
+        #f4f5f7;
+}
+
+.account-liquid-header {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    z-index: 10;
+    display: flex;
+    width: min(calc(100% - 20px), 1480px);
+    min-height: 82px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 16px;
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(242, 246, 252, 0.62)),
+        rgba(255, 255, 255, 0.52);
+    box-shadow: 0 18px 55px rgba(32, 39, 56, 0.14), 0 3px 12px rgba(32, 39, 56, 0.07), inset 0 1px rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(18px) saturate(145%);
+    -webkit-backdrop-filter: blur(18px) saturate(145%);
+    transform: translateX(-50%);
+}
+
+.account-liquid-header-shine {
+    position: absolute;
+    top: -120%;
+    left: 28%;
+    width: 240px;
+    height: 300%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+    opacity: 0.7;
+    pointer-events: none;
+    transform: rotate(24deg);
+}
+
+.account-header-brand {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: #202738;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+}
+
+.account-header-brand img {
+    display: block;
+    width: 118px;
+    height: auto;
+}
+
+.account-logo-lockup {
+    position: relative;
+    display: block;
+    margin-right: 16px;
+    flex: 0 0 auto;
+    line-height: 0;
+}
+
+.account-logo-lockup b {
+    position: absolute;
+    right: -22px;
+    bottom: -6px;
+    padding: 2px 4px;
+    border: 1px solid #e07020;
+    border-radius: 999px;
+    color: #c85e18;
+    background: linear-gradient(135deg, #fff, #fff7ed 58%, #fed7aa);
+    box-shadow: 0 5px 12px rgba(224, 112, 32, 0.24), 0 0 14px rgba(224, 112, 32, 0.16);
+    font-size: 7px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    line-height: 1;
+}
+
+.account-header-brand > span:last-child {
+    padding-left: 14px;
+    border-left: 1px solid rgba(148, 163, 184, 0.38);
+}
+
+.account-header-caption {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.account-header-caption strong {
+    color: #a84a13;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+}
+
+.account-header-caption span {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.account-settings-page .account-shell {
+    width: min(1500px, 100%);
+    margin: 0 auto;
+    padding-top: 132px;
+}
+
+.account-settings-page .account-settings-form {
+    counter-reset: account-section;
+}
+
+.services-page .account-shell {
+    width: min(1500px, 100%);
+    margin: 0 auto;
+    padding-top: 132px;
+}
+
+.services-page .account-sidebar {
+    position: sticky;
+    top: 132px;
+}
+
+.account-settings-page .account-sidebar {
+    position: sticky;
+    top: 132px;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    border-radius: 16px;
+    background:
+        linear-gradient(155deg, rgba(255, 255, 255, 0.92), rgba(246, 248, 252, 0.78)),
+        rgba(255, 255, 255, 0.72);
+    box-shadow: 0 18px 44px rgba(32, 39, 56, 0.12), inset 0 1px rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(18px) saturate(145%);
+    -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+
+.account-settings-page .account-navigation {
+    gap: 6px;
+}
+
+.account-settings-page .account-navigation a {
+    min-height: 46px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    color: #475569;
+    font-weight: 700;
+    transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.account-settings-page .account-navigation a:hover {
+    border-color: rgba(224, 112, 32, 0.2);
+    color: #a84a13;
+    background: rgba(255, 255, 255, 0.78);
+    transform: translateX(2px);
+}
+
+.account-settings-page .account-navigation a.is-active {
+    border-color: rgba(224, 112, 32, 0.35);
+    color: #fff;
+    background: linear-gradient(135deg, #f28a3f, #d85c0a);
+    box-shadow: 0 9px 18px rgba(216, 92, 10, 0.2), inset 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.account-settings-page .account-card {
+    position: relative;
+    counter-increment: account-section;
+    padding: 26px 28px 28px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 18px;
+    background:
+        linear-gradient(130deg, rgba(255, 255, 255, 0.96), rgba(250, 251, 253, 0.84)),
+        #fff;
+    box-shadow: 0 16px 38px rgba(32, 39, 56, 0.08), inset 0 1px rgba(255, 255, 255, 0.92);
+}
+
+.account-settings-page .account-card h1,
+.account-settings-page .account-card h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 22px;
+}
+
+.account-settings-page .account-card h1::before,
+.account-settings-page .account-card h2::before {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #e07020;
+    color: #fff;
+    content: counter(account-section);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.account-settings-page .account-card p {
+    max-width: 1080px;
+    margin-top: 8px;
+    color: #718096;
+    line-height: 1.45;
+}
+
+.account-settings-page .account-fields label > span,
+.account-settings-page .account-textarea > span {
+    color: #c85e18;
+}
+
+.account-settings-page .account-card input,
+.account-settings-page .account-card textarea {
+    border-color: rgba(224, 112, 32, 0.62);
+    background: rgba(255, 255, 255, 0.86);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.account-settings-page .account-card input:hover,
+.account-settings-page .account-card textarea:hover {
+    border-color: #e07020;
+    background: #fff;
+}
+
+.account-settings-page .account-card input:focus,
+.account-settings-page .account-card textarea:focus {
+    border-color: #d85c0a;
+    box-shadow: 0 0 0 4px rgba(224, 112, 32, 0.14);
+}
+
+@media (max-width: 850px) {
+    .account-settings-page .account-shell {
+        padding-top: 108px;
+    }
+
+    .services-page .account-shell {
+        padding-top: 108px;
+    }
+
+    .account-liquid-header {
+        min-height: 66px;
+        padding: 10px 16px;
+    }
+
+    .account-settings-page .account-sidebar {
+        position: static;
+    }
+
+    .services-page .account-sidebar {
+        position: static;
+    }
+    .account-shell {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .account-sidebar {
+        padding: 8px;
+    }
+
+    .account-navigation {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .account-navigation a {
+        justify-content: center;
+        gap: 7px;
+        padding: 8px;
+        text-align: center;
+    }
+
+    .account-personal-fields {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .selection-dashboard-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .selection-dashboard-table-wrap {
+        overflow-x: auto;
+    }
+
+    .selection-dashboard-table {
+        min-width: 620px;
+    }
+}
+
+@media (max-width: 600px) {
+    .account-liquid-header {
+        width: calc(100% - 16px);
+        min-height: 58px;
+        border-radius: 13px;
+    }
+
+    .account-settings-page .account-shell {
+        padding-top: 88px;
+    }
+
+    .services-page .account-shell {
+        padding-top: 88px;
+    }
+
+    .account-header-brand img {
+        width: 92px;
+    }
+
+    .account-header-brand {
+        gap: 9px;
+        font-size: 14px;
+    }
+
+    .account-header-brand span {
+        padding-left: 9px;
+    }
+
+    .account-header-caption {
+        display: none;
+    }
+
+    .account-shell {
+        padding: 8px;
+    }
+
+    .account-navigation a {
+        font-size: 12px;
+    }
+
+    .account-navigation svg {
+        display: none;
+    }
+
+    .account-card {
+        padding: 16px 14px;
+    }
+
+    .account-settings-page .account-card {
+        padding: 22px 18px;
+        border-radius: 14px;
+    }
+
+    .account-card h1,
+    .account-card h2 {
+        font-size: 18px;
+    }
+
+    .account-card p {
+        font-size: 14px;
+        line-height: 1.35;
+    }
+
+    .account-time-fields {
+        width: 100%;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 12px;
+    }
+
+    .account-time-fields > span:nth-of-type(2) {
+        grid-column: 1;
+    }
+
+    .account-time-fields > label:nth-of-type(2) {
+        grid-column: 2;
+    }
+}
+
+.auth-page {
+    display: grid;
+    min-height: 100vh;
+    padding: 24px;
+    background:
+        radial-gradient(circle at 80% 10%, rgba(255, 123, 38, 0.15), transparent 28rem),
+        #f7f7f5;
+    place-items: center;
+}
+
+.auth-card {
+    width: min(440px, 100%);
+    padding: 36px;
+    border: 1px solid rgba(215, 219, 228, 0.9);
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 20px 48px rgba(32, 39, 56, 0.12);
+}
+
+.auth-kicker {
+    display: block;
+    margin-bottom: 14px;
+    color: #f07725;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+}
+
+.auth-brand {
+    display: inline-flex;
+    margin: 0 0 20px;
+    text-decoration: none;
+}
+
+.auth-brand .account-logo-lockup img {
+    display: block;
+    width: 138px;
+    height: auto;
+}
+
+.auth-card h1 {
+    margin: 0;
+    color: #101722;
+    font-size: 28px;
+    letter-spacing: -0.035em;
+    line-height: 1.08;
+}
+
+.auth-card > p {
+    margin: 12px 0 26px;
+    color: #637083;
+    font-size: 15px;
+    line-height: 1.45;
+}
+
+.auth-card form {
+    display: grid;
+    gap: 9px;
+}
+
+.auth-card label {
+    color: #374151;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.auth-card input {
+    height: 46px;
+    padding: 0 13px;
+    border: 1px solid #ff7b26;
+    border-radius: 10px;
+    color: #1d2939;
+    font: 16px "Segoe UI", Tahoma, sans-serif;
+    outline: none;
+}
+
+.auth-card input:focus {
+    border-color: #d85c0a;
+    box-shadow: 0 0 0 3px rgba(255, 123, 38, 0.15);
+}
+
+.auth-card button {
+    height: 46px;
+    margin-top: 12px;
+    border: 0;
+    border-radius: 10px;
+    color: #fff;
+    background: #f07725;
+    cursor: pointer;
+    font: 700 15px "Segoe UI", Tahoma, sans-serif;
+}
+
+.auth-card button:hover {
+    background: #d85c0a;
+}
+
+.auth-error {
+    color: #c62828;
+    font-size: 13px;
+}
+
 .spa-page {
     height: 100dvh;
     overflow: hidden;

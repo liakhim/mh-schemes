@@ -36,6 +36,19 @@ class SchemeController extends Controller
     }
 
     /**
+     * Показать рабочий список схем в разделе подбора оборудования.
+     */
+    public function selectionDashboard(): View
+    {
+        return view('services', [
+            'schemes' => Scheme::query()
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->paginate(20),
+        ]);
+    }
+
+    /**
      * Показать данные одной схемы в формате JSON.
      */
     public function show(Scheme $scheme): SchemeResource

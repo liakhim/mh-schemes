@@ -28,108 +28,90 @@ body {
 
 .learning-page {
     height: 100dvh;
-    display: flex;
-    flex-direction: column;
+    padding-top: 108px;
     overflow: hidden;
 }
 
-/* Mirrors the .spa-navbar header used on the Schemes page (logo + alpha-test notice), kept as
-   its own copy here since the learning page doesn't load app.css. */
-.learning-navbar {
+.learning-account-shell {
+    width: min(1500px, 100%);
+    height: 100%;
+    min-height: 0;
+    margin: 0 auto;
+    padding-top: 12px;
+}
+
+.learning-page .account-sidebar {
     position: sticky;
-    top: 0;
-    z-index: 100;
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 64px;
-    padding: 0 20px;
-    border-bottom: 1px solid var(--learning-line);
-    background: #ffffffd9;
-    backdrop-filter: blur(4px);
+    top: 12px;
+    align-self: start;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    border-radius: 16px;
+    background:
+        linear-gradient(155deg, rgba(255, 255, 255, 0.92), rgba(246, 248, 252, 0.78)),
+        rgba(255, 255, 255, 0.72);
+    box-shadow: 0 18px 44px rgba(32, 39, 56, 0.12), inset 0 1px rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(18px) saturate(145%);
+    -webkit-backdrop-filter: blur(18px) saturate(145%);
 }
 
-.learning-navbar-brand {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 12px;
+.learning-page .account-navigation {
+    gap: 6px;
 }
 
-.learning-navbar-logo {
-    display: block;
-    width: auto;
-    height: 28px;
-    flex: 0 0 auto;
-}
-
-.learning-navbar-logo-link {
-    display: block;
-    flex: 0 0 auto;
-    line-height: 0;
-}
-
-.learning-alpha-notice {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    max-width: min(620px, 60vw);
-    padding: 8px 10px;
-    border: 1px solid #f2c7c7;
+.learning-page .account-navigation a {
+    min-height: 46px;
+    border: 1px solid transparent;
     border-radius: 12px;
-    background: #fff1f1;
-    color: #8a3a3a;
-    font-size: 12px;
-    line-height: 1.25;
-}
-
-.learning-alpha-notice span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.learning-alpha-notice a {
-    flex: 0 0 auto;
-    padding: 5px 8px;
-    border-radius: 999px;
-    background: var(--learning-orange);
-    color: #fff;
-    font-size: 12px;
+    color: #475569;
     font-weight: 700;
-    text-decoration: none;
+    transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease, transform 0.18s ease;
 }
 
-@media (max-width: 800px) {
-    .learning-navbar {
-        height: auto;
-        flex-wrap: wrap;
-        padding: 6px 12px;
+.learning-page .account-navigation a:hover {
+    border-color: rgba(224, 112, 32, 0.2);
+    color: #a84a13;
+    background: rgba(255, 255, 255, 0.78);
+    transform: translateX(2px);
+}
+
+.learning-page .account-navigation a.is-active {
+    border-color: rgba(224, 112, 32, 0.35);
+    color: #fff;
+    background: linear-gradient(135deg, #f28a3f, #d85c0a);
+    box-shadow: 0 9px 18px rgba(216, 92, 10, 0.2), inset 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.learning-content {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+}
+
+@media (max-width: 850px) {
+    .learning-page {
+        padding-top: 88px;
     }
 
-    .learning-navbar-brand {
-        width: 100%;
-        gap: 10px;
+    .learning-account-shell {
+        grid-template-columns: 1fr;
+        gap: 12px;
     }
 
-    .learning-navbar-logo {
-        height: 22px;
+    .learning-page .account-sidebar {
+        position: static;
+    }
+}
+
+@media (max-width: 600px) {
+    .learning-page {
+        padding-top: 76px;
     }
 
-    .learning-alpha-notice {
-        flex: 1 1 auto;
-        min-width: 0;
-        max-width: none;
-        padding: 4px 8px;
-        font-size: 11px;
-        gap: 8px;
-    }
-
-    .learning-alpha-notice a {
-        padding: 4px 8px;
-        font-size: 11px;
+    .learning-account-shell {
+        padding: 8px;
     }
 }
 
@@ -337,15 +319,29 @@ body {
 }
 
 .learning-cover-button {
+    position: relative;
     margin-top: 24px;
     padding: 12px 28px;
-    font-size: 15px;
-    font-weight: 600;
-    border-radius: 8px;
-    border: none;
-    background: var(--learning-accent);
+    overflow: hidden;
+    border: 1px solid rgba(194, 65, 12, 0.82);
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f28a3f, #e07020 52%, #c85e18);
+    box-shadow: 0 10px 24px rgba(200, 94, 24, 0.26), inset 0 1px rgba(255, 255, 255, 0.3);
     color: #ffffff;
     cursor: pointer;
+    font-size: 15px;
+    font-weight: 800;
+    transition: box-shadow 0.2s ease, filter 0.2s ease, transform 0.2s ease;
+}
+
+.learning-cover-button::after {
+    position: absolute;
+    top: 0;
+    left: 12%;
+    width: 76%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.42);
+    content: "";
 }
 
 .learning-cover-actions .learning-cover-button {
@@ -353,7 +349,9 @@ body {
 }
 
 .learning-cover-button:hover {
-    filter: brightness(1.08);
+    box-shadow: 0 14px 30px rgba(200, 94, 24, 0.34), inset 0 1px rgba(255, 255, 255, 0.38);
+    filter: saturate(1.08);
+    transform: translateY(-2px);
 }
 
 .learning-cover-button--ghost {
