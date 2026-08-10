@@ -3405,12 +3405,14 @@ const App = () => {
             const controller = s?.controller && typeof s.controller === 'object'
                 ? { ...s.controller }
                 : { type: getControllerType(s) };
-            const devicesKey = Object.prototype.hasOwnProperty.call(controller, 'devices420') ? 'devices420' : 'devices_420';
             return {
                 ...s,
                 controller: {
                     ...controller,
-                    [devicesKey]: [],
+                    // Legacy schemes may carry both names. Clear both so the renderer
+                    // cannot find the removed sensor through the fallback line.
+                    devices_420: [],
+                    devices420: [],
                 },
             };
         });
@@ -7093,8 +7095,10 @@ const App = () => {
                                     if (controllerType !== 'ecosmart') return null;
                                     const controller420SlotWidth = 9 * indentSize;
                                     const controller420SlotHeight = 2 * indentSize;
-                                     const controller420SlotX = controllerImage.width + 4 * indentSize + controller420SlotOffset.x;
-                                     const controller420SlotY = 9 * indentSize + controller420SlotOffset.y;
+                                      // The boiler relay has its own drag offset and must not inherit
+                                      // movement from the neighbouring controller 4-20 slot.
+                                      const controller420SlotX = controllerImage.width + 4 * indentSize;
+                                      const controller420SlotY = 9 * indentSize;
                                      const relayDevice = getRelayDevicesForController(scheme)[0] || null;
                                      if (!relayDevice && !showEmptySlots) return null;
                                      const relayType = canonicalDeviceType(relayDevice?.type);
