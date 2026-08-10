@@ -3,7 +3,6 @@
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\SchemeController;
 use App\Models\Scheme;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -13,7 +12,7 @@ Route::redirect('/', '/user-schemes')->name('home');
 // Рабочий раздел подбора оборудования доступен при наличии внешней PHP-сессии.
 Route::get('/user-schemes', [SchemeController::class, 'selectionDashboard'])->middleware('php-session')->name('user-schemes');
 
-// Временный вход монтажника: найденный аккаунт создает PHP-сессию-заглушку.
+// Временный вход монтажника: любая непустая строка создает PHP-сессию-заглушку.
 Route::get('/auth', function (Request $request) {
     if ($request->cookies->has('PHPSESSID')) {
         return redirect()->route('user-schemes');
@@ -22,14 +21,7 @@ Route::get('/auth', function (Request $request) {
     return view('auth');
 })->name('auth');
 Route::post('/auth', function (Request $request) {
-    $validated = $request->validate(['email' => ['required', 'string']]);
-    $email = trim($validated['email']);
-
-    if (!User::query()->where('email', $email)->exists()) {
-        return back()
-            ->withErrors(['email' => 'Аккаунт монтажника с таким email не найден.'])
-            ->onlyInput('email');
-    }
+    $request->validate(['email' => ['required', 'string']]);
 
     return redirect()->route('settings')->withCookie(cookie('PHPSESSID', '1'));
 })->name('auth.store');
