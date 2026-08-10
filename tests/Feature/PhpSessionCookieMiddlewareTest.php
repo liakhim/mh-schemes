@@ -36,6 +36,13 @@ class PhpSessionCookieMiddlewareTest extends TestCase
             ->assertViewIs('settings');
     }
 
+    public function test_auth_redirects_to_user_schemes_with_php_session_cookie(): void
+    {
+        $this->withCookie('PHPSESSID', 'any-value')
+            ->get('/auth')
+            ->assertRedirect(route('user-schemes'));
+    }
+
     public function test_auth_sets_php_session_cookie_for_existing_installer_email(): void
     {
         User::factory()->create(['email' => 'installer@example.test']);

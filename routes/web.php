@@ -14,7 +14,13 @@ Route::redirect('/', '/user-schemes')->name('home');
 Route::get('/user-schemes', [SchemeController::class, 'selectionDashboard'])->middleware('php-session')->name('user-schemes');
 
 // Временный вход монтажника: найденный аккаунт создает PHP-сессию-заглушку.
-Route::view('/auth', 'auth')->name('auth');
+Route::get('/auth', function (Request $request) {
+    if ($request->cookies->has('PHPSESSID')) {
+        return redirect()->route('user-schemes');
+    }
+
+    return view('auth');
+})->name('auth');
 Route::post('/auth', function (Request $request) {
     $validated = $request->validate(['email' => ['required', 'string']]);
     $email = trim($validated['email']);

@@ -75,7 +75,7 @@
                         </td>
                         <td><span class="selection-dashboard-controller">{{ $controllerType ?: 'Не указан' }}</span></td>
                         <td>{{ $scheme->updated_at?->format('d.m.Y H:i') ?? '—' }}</td>
-                        <td><a href="{{ route('scheme.with-id', $scheme) }}">Открыть</a></td>
+                        <td><a href="{{ route('scheme.with-id', $scheme) }}" target="_blank" rel="noopener">Открыть</a></td>
                     </tr>
                     @if ($loop->last)
                             </tbody>
