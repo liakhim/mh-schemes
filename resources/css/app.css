@@ -939,7 +939,8 @@ body {
     top: 132px;
 }
 
-.account-settings-page .account-sidebar {
+.account-settings-page .account-sidebar,
+.services-page .account-sidebar {
     position: sticky;
     top: 132px;
     padding: 12px;
@@ -953,11 +954,13 @@ body {
     -webkit-backdrop-filter: blur(18px) saturate(145%);
 }
 
-.account-settings-page .account-navigation {
+.account-settings-page .account-navigation,
+.services-page .account-navigation {
     gap: 6px;
 }
 
-.account-settings-page .account-navigation a {
+.account-settings-page .account-navigation a,
+.services-page .account-navigation a {
     min-height: 46px;
     border: 1px solid transparent;
     border-radius: 12px;
@@ -966,14 +969,16 @@ body {
     transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease, transform 0.18s ease;
 }
 
-.account-settings-page .account-navigation a:hover {
+.account-settings-page .account-navigation a:hover,
+.services-page .account-navigation a:hover {
     border-color: rgba(224, 112, 32, 0.2);
     color: #a84a13;
     background: rgba(255, 255, 255, 0.78);
     transform: translateX(2px);
 }
 
-.account-settings-page .account-navigation a.is-active {
+.account-settings-page .account-navigation a.is-active,
+.services-page .account-navigation a.is-active {
     border-color: rgba(224, 112, 32, 0.35);
     color: #fff;
     background: linear-gradient(135deg, #f28a3f, #d85c0a);
