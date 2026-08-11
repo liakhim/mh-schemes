@@ -1854,8 +1854,16 @@ const App = () => {
     }, []);
 
     const handleDownloadPdf = async () => {
+        const shouldHideEmptySlots = showEmptySlots;
+        if (shouldHideEmptySlots) {
+            setShowEmptySlots(false);
+            await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+        }
         const stage = stageRef.current;
-        if (!stage) return;
+        if (!stage) {
+            if (shouldHideEmptySlots) setShowEmptySlots(true);
+            return;
+        }
         const gridLayer = gridLayerRef.current;
         const shouldHideGrid = showGrid && gridLayer;
         const commentIconNodes = stage.find(`.${COMMENT_ICON_NODE_NAME}`).filter((node) => node.visible());
@@ -1884,6 +1892,7 @@ const App = () => {
             console.error('PDF export failed', error);
             alert('Download PDF failed. Please try again.');
         } finally {
+            if (shouldHideEmptySlots) setShowEmptySlots(true);
             if (shouldHideGrid) {
                 gridLayer.visible(true);
             }
@@ -11845,7 +11854,7 @@ const App = () => {
                                         || memoExtLineThermostatDevices.length > 0
                                         || (showEmptySlots && (memoExtModules.length + memoExtLineThermostatDevices.length) < 12);
                                     const baseX = controllerType === 'smart2'
-                                        ? getSmart2DiRight() + (getDiModules(scheme).length ? 28 : 12) * indentSize
+                                        ? getSmart2DiRight() + 15 * indentSize
                                         : controllerType === 'pro'
                                             ? getProExtRight() + (hasVisibleProExtSlot ? 6 : 16) * indentSize
                                             : controllerImage.width + (controllerType === 'ecosmart' ? 10 : 12) * indentSize;
@@ -12071,7 +12080,7 @@ const App = () => {
                                                                     || (relayType === 'pump-220v' ? 'Насос 220V'
                                                                         : relayType === 'boiler-pump' ? 'Насос бойлера'
                                                                             : relayType === '220servo' ? `Сервопривод ${relaySystemIndex}`
-                                                                                : relayType === 'valve' ? 'Запорный клапан'
+                                                                                : relayType === 'valve' ? `Запорный клапан ${relaySystemIndex}`
                                                                                     : relayType === 'zoneServo' ? 'Сервопривод зоны'
                                                                                         : isRelayBoilerType(relayType) ? (relayDevice?.name || 'Котел')
                                                                                             : 'Прочее оборудование');
@@ -12147,8 +12156,8 @@ const App = () => {
                                                                             const to2Y = nextModulePort.y * moduleSize.height;
                                                                             return <><Line points={[from1X, from1Y, to1X, from1Y, to1X, to1Y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} /><Line points={[from2X, from2Y, to2X, from2Y, to2X, to2Y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} /></>;
                                                                         })()}
-                                                                        {!relayDevice && <Circle x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} radius={10} fill="#1565c0" onClick={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} />}
-                                                                        {!relayDevice && <Text x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} text="+" fontSize={15} fill="#fff" offsetX={4.5} offsetY={6} listening={false} />}
+                                                                        {!relayDevice && <Circle x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} radius={16} fill="#1565c0" onClick={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} />}
+                                                                        {!relayDevice && <Text x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} text="+" fontSize={22} fill="#fff" offsetX={6.5} offsetY={9} listening={false} />}
                                                                         {relayDevice && <NtcDeleteButton x={slotX + slotSize.width - 5} y={slotY + 5} onRemove={() => removeWifiModuleRelayDeviceAtSlot(moduleIndex, lineKey, relayIndex)} />}
                                                                         {relayDevice && (
                                                                             <>
