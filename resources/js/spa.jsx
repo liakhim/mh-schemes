@@ -860,7 +860,9 @@ const getInstallationPortLineColor = (name, item) => {
     const itemType = canonicalDeviceType(item?.type || item?.data?.type);
 
     const relayDevice = getInstallationRelayPortDevice(item, terminal);
-    if (isStupidBoilerType(relayDevice?.type)) return '#2e7d32';
+    // ECOsmart reuses RELAY-1-A/B names for tagged per-role terminals. A stupid
+    // boiler occupies only the untagged pair; BOILER-GVS has its own wire colors.
+    if (!tag && isStupidBoilerType(relayDevice?.type)) return '#2e7d32';
     if (getRelaySupplyLabel(terminal, itemType)) return '#d32f2f';
 
     if (itemType === 'io4') {
@@ -16472,16 +16474,26 @@ const App = () => {
                                         // DI-входы контроллера, занятые линиями коммутации ИБП (DI-IN-1/2 у pro,
                                         // первая пара DI-OUT у smart2).
                                         upsDiPortIndexes: hasInstallationUps ? [0, 1] : null,
-                                        // EXT-цепочка контроллера: сначала EXT-модули, после них EXT-термостаты.
-                                        moduleNextLabel: firstExtInstallationModule
-                                            ? getInstallationItemLabel(firstExtInstallationModule)
-                                            : (memoExtLineThermostatDevices[0]
-                                                ? getInstallationDeviceLabel(memoExtLineThermostatDevices[0], 'Термостат')
-                                                : null),
+                                         // EXT-цепочка контроллера: сначала EXT-модули, после них EXT-термостаты.
+                                         moduleNextLabel: firstExtInstallationModule
+                                             ? getInstallationItemLabel(firstExtInstallationModule)
+                                             : (memoExtLineThermostatDevices[0]
+                                                 ? getInstallationDeviceLabel(memoExtLineThermostatDevices[0], 'Термостат')
+                                                 : null),
                                         powerPreviousLabel: isSmart2Installation && smart2PowerChainHead
                                             ? getInstallationItemLabel(smart2PowerChainHead)
                                             : (hasInstallationUps ? 'UPS' : POWER_UNIT_LABEL),
-                                        powerNextLabel: !isSmart2Installation && poweredInstallationModules[0] ? getInstallationItemLabel(poweredInstallationModules[0]) : null,
+                                         // У ECOsmart 12VDC-OUT питает первый EXT-элемент. Standalone
+                                         // NTC-1-wire не является частью этой силовой EXT-цепочки.
+                                         powerNextLabel: !isSmart2Installation
+                                             ? (controllerType === 'ecosmart'
+                                                 ? (firstExtInstallationModule
+                                                     ? getInstallationItemLabel(firstExtInstallationModule)
+                                                     : (memoExtLineThermostatDevices[0]
+                                                         ? getInstallationDeviceLabel(memoExtLineThermostatDevices[0], 'Термостат')
+                                                         : (poweredInstallationModules[0] ? getInstallationItemLabel(poweredInstallationModules[0]) : null)))
+                                                 : (poweredInstallationModules[0] ? getInstallationItemLabel(poweredInstallationModules[0]) : null))
+                                             : null,
                                     } : null,
                                     ...poweredInstallationModules,
                                 ].filter((item) => item?.image?.width && item?.image?.height);
