@@ -462,6 +462,11 @@ const getSmart2WirelessLineLift = (schemeValue, controllerType, indentSize) => {
         .some((moduleItem) => ['rl2', 'rl2s'].includes(canonicalDeviceType(moduleItem?.type || moduleItem)));
     return hasRelayDiModule ? 12 * indentSize : 0;
 };
+const getWirelessLineLift = (schemeValue, controllerType, indentSize) => {
+    const smart2Lift = getSmart2WirelessLineLift(schemeValue, controllerType, indentSize);
+    const hasWifiModules = Array.isArray(schemeValue?.wifi_modules) && schemeValue.wifi_modules.length > 0;
+    return smart2Lift + (controllerType === 'pro' && hasWifiModules ? 7 * indentSize : 0);
+};
 /**
  * Вычисляет X беспроводного слота по ширинам предшествующих устройств.
  * @param {Array<object>} devices Устройства линии.
@@ -1522,9 +1527,7 @@ const App = () => {
     const [showUnusedBundledSensors, setShowUnusedBundledSensors] = useState(false);
     const [showSaveActions, setShowSaveActions] = useState(false);
     const [showDeveloperToolsPanel, setShowDeveloperToolsPanel] = useState(false);
-    const [wifiLineEnabled, setWifiLineEnabled] = useState(() => (
-        Array.isArray(initialIncomingScheme?.wifi_modules) && initialIncomingScheme.wifi_modules.length > 0
-    ));
+    const [wifiLineEnabled, setWifiLineEnabled] = useState(true);
     const [installationMode, setInstallationMode] = useState(
         initialViewOptions.installationMode ?? !requestedControllerOnlyScheme,
     );
@@ -1564,6 +1567,8 @@ const App = () => {
     const [controller420SlotOffset, setController420SlotOffset] = useState({ x: 0, y: 0 });
     const [hoveredWirelessDeviceKey, setHoveredWirelessDeviceKey] = useState(null);
     const [hoveredOneWireSlotIndex, setHoveredOneWireSlotIndex] = useState(null);
+    const [hoveredWifiOneWireSlotKey, setHoveredWifiOneWireSlotKey] = useState(null);
+    const [hoveredWifiSlotKey, setHoveredWifiSlotKey] = useState(null);
     const [hoveredExtSlotIndex, setHoveredExtSlotIndex] = useState(null);
     const [hoveredBusLineIndex, setHoveredBusLineIndex] = useState(null);
     const [hoveredRelaySlotIndex, setHoveredRelaySlotIndex] = useState(null);
@@ -3532,8 +3537,18 @@ const App = () => {
                 ...(Array.isArray(moduleItem?.relay_s_devices) ? moduleItem.relay_s_devices : []),
                 ...(Array.isArray(moduleItem?.relay_devices) ? moduleItem.relay_devices : []),
             ]);
+        const diDevices = (Array.isArray(currentScheme?.di_modules) ? currentScheme.di_modules : [])
+            .flatMap((moduleItem) => [
+                ...(Array.isArray(moduleItem?.relay_s_devices) ? moduleItem.relay_s_devices : []),
+                ...(Array.isArray(moduleItem?.relay_devices) ? moduleItem.relay_devices : []),
+            ]);
+        const wifiDevices = (Array.isArray(currentScheme?.wifi_modules) ? currentScheme.wifi_modules : [])
+            .flatMap((moduleItem) => [
+                ...(Array.isArray(moduleItem?.relay_s_devices) ? moduleItem.relay_s_devices : []),
+                ...(Array.isArray(moduleItem?.relay_devices) ? moduleItem.relay_devices : []),
+            ]);
         const wired = Array.isArray(currentScheme?.wired_devices) ? currentScheme.wired_devices : [];
-        return [...controllerDevices, ...extDevices, ...wired].filter((device) => {
+        return [...controllerDevices, ...extDevices, ...diDevices, ...wifiDevices, ...wired].filter((device) => {
             const connectionType = typeof device?.connection_type === 'string'
                 ? device.connection_type.toLowerCase()
                 : '';
@@ -4145,7 +4160,7 @@ const App = () => {
         const currentControllerType = getControllerType(currentScheme);
         const currentModuleHeightValue = parseInt(module_height, 10) || 200;
         const currentIndentSize = parseInt(indent, 10) || 8;
-        const wirelessLineLift = getSmart2WirelessLineLift(currentScheme, currentControllerType, currentIndentSize);
+        const wirelessLineLift = getWirelessLineLift(currentScheme, currentControllerType, currentIndentSize);
         wirelessDevices.forEach((device, idx) => {
             const key = getWirelessDeviceKey(device, idx);
             const slotWidth = getWirelessSlotWidth(device, showEmpty);
@@ -11866,9 +11881,14 @@ const App = () => {
                                         const oneWireSlotCount = oneWireDevices.length
                                             + (showEmptySlots && oneWireDevices.length < WIFI_ONE_WIRE_CAPACITY ? 1 : 0);
                                         if (oneWireSlotCount > 0) {
+                                            const oneWireVPlus = (wirelessPortsByType[getWirelessDeviceImageKey(moduleItem)] || [])
+                                                .find((port) => port.name === '1-WIRE-V+');
+                                            const oneWireFirstX = moduleX
+                                                + (oneWireVPlus ? oneWireVPlus.x * moduleSize.width : 0)
+                                                + 2 * indentSize;
                                             right = Math.max(
                                                 right,
-                                                moduleX + (oneWireSlotCount - 1) * (ONE_WIRE_SLOT_SIZE + 2 * indentSize) + ONE_WIRE_SLOT_SIZE,
+                                                oneWireFirstX + (oneWireSlotCount - 1) * (ONE_WIRE_SLOT_SIZE + 2 * indentSize) + ONE_WIRE_SLOT_SIZE,
                                             );
                                         }
                                         return { left, right };
@@ -11922,14 +11942,31 @@ const App = () => {
                                                 ));
                                                 const oneWireDevices = occupied ? (moduleItem.one_wire_devices || []).slice(0, WIFI_ONE_WIRE_CAPACITY) : [];
                                                 const oneWireSlotCount = oneWireDevices.length + (showEmptySlots && oneWireDevices.length < WIFI_ONE_WIRE_CAPACITY ? 1 : 0);
-                                                const oneWireSlotY = moduleSize.height + 5 * indentSize;
                                                 const findPort = (list, names) => names.map((name) => list.find((port) => port.name === name)).find(Boolean);
+                                                const wifiOneWirePorts = modulePorts.filter((port) => port.name.startsWith('1-WIRE-'));
+                                                const wifiOneWireVPlus = wifiOneWirePorts.find((port) => port.name === '1-WIRE-V+');
+                                                const wifiOneWireBottomY = wifiOneWirePorts.length > 0
+                                                    ? Math.max(...wifiOneWirePorts.map((port) => port.y * moduleSize.height))
+                                                    : moduleSize.height;
+                                                const getWifiOneWireSlotPosition = (sensorIndex) => getOneWireSlotPosition({
+                                                    slotIndex: sensorIndex,
+                                                    devices: oneWireDevices,
+                                                    offsets: {},
+                                                    getDeviceSize: () => ({ width: ONE_WIRE_SLOT_SIZE, height: ONE_WIRE_SLOT_SIZE }),
+                                                    getOffsetKey: () => '',
+                                                    firstSlotX: moduleX + (wifiOneWireVPlus ? wifiOneWireVPlus.x * moduleSize.width : 0) + 2 * indentSize,
+                                                    firstSlotY: wifiOneWireBottomY + moduleHeightValue,
+                                                    indentSize,
+                                                    moduleHeightValue,
+                                                });
                                                 return (
                                                     <Group
                                                         key={`wifi-slot-${offsetKey}`}
                                                         x={position.x}
                                                         y={position.y}
                                                         draggable={occupied}
+                                                        onMouseEnter={() => setHoveredWifiSlotKey(offsetKey)}
+                                                        onMouseLeave={() => setHoveredWifiSlotKey((current) => (current === offsetKey ? null : current))}
                                                         onDragStart={() => { wifiDragStartOffsetsRef.current[offsetKey] = wifiSlotOffsets[offsetKey] || { x: 0, y: 0 }; }}
                                                         onDragMove={(event) => {
                                                             if (!occupied) return;
@@ -11987,16 +12024,16 @@ const App = () => {
                                                             const getSlotSize = (device) => (isRelayBoilerType(device?.type)
                                                                 ? { width: 6 * indentSize, height: 10 * indentSize }
                                                                 : { width: defaultSlotSize, height: defaultSlotSize });
-                                                            const getSlotY = (lineStates, lineSlotIndex, side) => {
-                                                                const states = side === 'left' ? [...lineStates].reverse() : lineStates;
-                                                                const visualIndex = side === 'left' ? 2 - lineSlotIndex : lineSlotIndex;
-                                                                const sizes = states.map((state) => getSlotSize(state?.device));
-                                                                const totalHeight = sizes.reduce((sum, size) => sum + size.height, 0) + slotGap * 2;
-                                                                return sizes.slice(0, visualIndex).reduce(
-                                                                    (y, size) => y + size.height + slotGap,
-                                                                    -totalHeight,
-                                                                );
-                                                            };
+                                                                const getSlotY = (lineStates, lineSlotIndex, side) => {
+                                                                    const states = side === 'left' ? [...lineStates].reverse() : lineStates;
+                                                                    const visualIndex = side === 'left' ? 2 - lineSlotIndex : lineSlotIndex;
+                                                                    const sizes = states.map((state) => getSlotSize(state?.device));
+                                                                    const totalHeight = sizes.reduce((sum, size) => sum + size.height, 0) + slotGap * 2;
+                                                                    return sizes.slice(0, visualIndex).reduce(
+                                                                        (y, size) => y + size.height + slotGap,
+                                                                        -totalHeight - 4 * indentSize,
+                                                                    );
+                                                                };
                                                             const renderLine = (side, states, relayIndexOffset) => states.map((state, lineSlotIndex) => {
                                                                 if (state?.covered) return null;
                                                                 const relayIndex = relayIndexOffset + lineSlotIndex;
@@ -12023,10 +12060,17 @@ const App = () => {
                                                                 const modulePortY = modulePort ? modulePort.y * moduleSize.height : null;
                                                                 const relayPorts = imageKey ? (wirelessPortsByType[imageKey] || []) : [];
                                                                 const relayInPort = relayDevice ? getRelayInputPort(relayPorts, relayType, imageKey) : null;
+                                                                const relaySystemIndex = relayDevice
+                                                                    ? Math.max(0, getDoubleRelayDevices(scheme)
+                                                                        .filter((device) => canonicalDeviceType(device?.type) === relayType)
+                                                                        .findIndex((device) => (relayDevice.id != null && device?.id != null
+                                                                            ? device.id === relayDevice.id
+                                                                            : device === relayDevice))) + 1
+                                                                    : 0;
                                                                 const infoTitle = getDeviceStoredTitle(relayDevice)
                                                                     || (relayType === 'pump-220v' ? 'Насос 220V'
                                                                         : relayType === 'boiler-pump' ? 'Насос бойлера'
-                                                                            : relayType === '220servo' ? 'Сервопривод'
+                                                                            : relayType === '220servo' ? `Сервопривод ${relaySystemIndex}`
                                                                                 : relayType === 'valve' ? 'Запорный клапан'
                                                                                     : relayType === 'zoneServo' ? 'Сервопривод зоны'
                                                                                         : isRelayBoilerType(relayType) ? (relayDevice?.name || 'Котел')
@@ -12082,6 +12126,27 @@ const App = () => {
                                                                                 listening={false}
                                                                             />
                                                                         )}
+                                                                        {relayDevice && image && String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay' && (() => {
+                                                                            const nextModulePort = findPort(modulePorts, [`${relayPortPrefix}-${relayIndex + 2}-B`]);
+                                                                            const firstRelayPort = relayPorts.find((port) => port.name === 'RELAY-1')
+                                                                                || (getPortsByClassToken(relayPorts, 'RELAY-1') || [])[0]
+                                                                                || (getPortsByClassToken(relayPorts, 'RELAY-IN-1') || [])[0]
+                                                                                || null;
+                                                                            const secondRelayPort = relayPorts.find((port) => port.name === 'RELAY-2')
+                                                                                || (getPortsByClassToken(relayPorts, 'RELAY-2') || [])[0]
+                                                                                || (getPortsByClassToken(relayPorts, 'RELAY-IN-2') || [])[0]
+                                                                                || null;
+                                                                            if (!modulePort || !nextModulePort || !firstRelayPort || !secondRelayPort) return null;
+                                                                            const from1X = imageX + firstRelayPort.x * imageSize.width;
+                                                                            const from1Y = imageY + firstRelayPort.y * imageSize.height;
+                                                                            const from2X = imageX + secondRelayPort.x * imageSize.width;
+                                                                            const from2Y = imageY + secondRelayPort.y * imageSize.height;
+                                                                            const to1X = moduleX + modulePort.x * moduleSize.width;
+                                                                            const to1Y = modulePort.y * moduleSize.height;
+                                                                            const to2X = moduleX + nextModulePort.x * moduleSize.width;
+                                                                            const to2Y = nextModulePort.y * moduleSize.height;
+                                                                            return <><Line points={[from1X, from1Y, to1X, from1Y, to1X, to1Y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} /><Line points={[from2X, from2Y, to2X, from2Y, to2X, to2Y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} /></>;
+                                                                        })()}
                                                                         {!relayDevice && <Circle x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} radius={10} fill="#1565c0" onClick={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} />}
                                                                         {!relayDevice && <Text x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} text="+" fontSize={15} fill="#fff" offsetX={4.5} offsetY={6} listening={false} />}
                                                                         {relayDevice && <NtcDeleteButton x={slotX + slotSize.width - 5} y={slotY + 5} onRemove={() => removeWifiModuleRelayDeviceAtSlot(moduleIndex, lineKey, relayIndex)} />}
@@ -12103,36 +12168,67 @@ const App = () => {
                                                         })()}
                                                         {occupied && Array.from({ length: oneWireSlotCount }).map((__, sensorIndex) => {
                                                             const sensor = oneWireDevices[sensorIndex] || null;
-                                                            const x = moduleX + sensorIndex * (ONE_WIRE_SLOT_SIZE + 2 * indentSize);
+                                                            const slotPos = getWifiOneWireSlotPosition(sensorIndex);
                                                             const imageKey = sensor ? getWirelessDeviceImageKey(sensor) : null;
                                                             const image = imageKey ? wirelessImages[imageKey] : null;
                                                             const sensorPorts = imageKey ? (wirelessPortsByType[imageKey] || ONE_WIRE_SLOT_FAKE_PORTS) : ONE_WIRE_SLOT_FAKE_PORTS;
-                                                            const previous = sensorIndex === 0 ? null : oneWireDevices[sensorIndex - 1];
-                                                            const previousPorts = previous ? (wirelessPortsByType[getWirelessDeviceImageKey(previous)] || ONE_WIRE_SLOT_FAKE_PORTS) : modulePorts;
-                                                            const previousX = sensorIndex === 0 ? moduleX : moduleX + (sensorIndex - 1) * (ONE_WIRE_SLOT_SIZE + 2 * indentSize);
+                                                            const currentPorts = {
+                                                                '1-WIRE-V+': getOneWirePortByRole(sensorPorts, '1-WIRE-V+'),
+                                                                '1-WIRE-DAT': getOneWirePortByRole(sensorPorts, '1-WIRE-DAT'),
+                                                                '1-WIRE-GND': getOneWirePortByRole(sensorPorts, '1-WIRE-GND'),
+                                                            };
+                                                            const hoverKey = `${moduleIndex}:${sensorIndex}`;
                                                             return (
-                                                                <Group key={`wifi-onewire-${moduleIndex}-${sensorIndex}`}>
-                                                                    {sensor && ['1-WIRE-V+', '1-WIRE-DAT', '1-WIRE-GND'].map((name) => {
-                                                                        const from = getOneWirePortByRole(previousPorts, name, null);
-                                                                        const to = getOneWirePortByRole(sensorPorts, name, null);
-                                                                        if (!from || !to) return null;
+                                                                <Group
+                                                                    key={`wifi-onewire-${moduleIndex}-${sensorIndex}`}
+                                                                    onMouseEnter={() => setHoveredWifiOneWireSlotKey(hoverKey)}
+                                                                    onMouseLeave={() => setHoveredWifiOneWireSlotKey((current) => (current === hoverKey ? null : current))}
+                                                                >
+                                                                    {['1-WIRE-V+', '1-WIRE-DAT', '1-WIRE-GND'].map((name, linkIndex) => {
+                                                                        const to = currentPorts[name];
+                                                                        if (!to) return null;
+                                                                        const previous = sensorIndex === 0 ? null : oneWireDevices[sensorIndex - 1];
+                                                                        const previousPorts = previous
+                                                                            ? (wirelessPortsByType[getWirelessDeviceImageKey(previous)] || ONE_WIRE_SLOT_FAKE_PORTS)
+                                                                            : modulePorts;
+                                                                        const from = getOneWirePortByRole(previousPorts, name);
+                                                                        if (!from) return null;
+                                                                        const previousPos = sensorIndex === 0
+                                                                            ? { x: moduleX, y: 0 }
+                                                                            : getWifiOneWireSlotPosition(sensorIndex - 1);
                                                                         const fromWidth = sensorIndex === 0 ? moduleSize.width : ONE_WIRE_SLOT_SIZE;
                                                                         const fromHeight = sensorIndex === 0 ? moduleSize.height : ONE_WIRE_SLOT_SIZE;
-                                                                        return <Line key={`${name}-${sensorIndex}`} points={[previousX + from.x * fromWidth, (sensorIndex === 0 ? 0 : oneWireSlotY) + from.y * fromHeight, x + to.x * ONE_WIRE_SLOT_SIZE, oneWireSlotY + to.y * ONE_WIRE_SLOT_SIZE]} stroke={getOneWirePortColor(name)} strokeWidth={1} listening={false} />;
+                                                                        const fromX = previousPos.x + from.x * fromWidth;
+                                                                        const fromY = previousPos.y + from.y * fromHeight;
+                                                                        const toX = sensor
+                                                                            ? slotPos.x + to.x * ONE_WIRE_SLOT_SIZE
+                                                                            : slotPos.x + to.x;
+                                                                        const toY = sensor
+                                                                            ? slotPos.y + to.y * ONE_WIRE_SLOT_SIZE
+                                                                            : slotPos.y + to.y;
+                                                                        const bendY = getOneWireBendY({
+                                                                            slotTop: slotPos.y,
+                                                                            slotHeight: ONE_WIRE_SLOT_SIZE,
+                                                                            offset: (linkIndex + 1) * indentSize,
+                                                                            fromY,
+                                                                            toY,
+                                                                        });
+                                                                        return <Line key={`${name}-${sensorIndex}`} points={getOrthogonalLinkPoints(fromX, fromY, bendY, toX, toY)} stroke={getOneWirePortColor(name)} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />;
                                                                     })}
-                                                                    <Rect x={x} y={oneWireSlotY} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} cornerRadius={5} fill={sensor ? 'rgba(0,0,0,0)' : '#fff'} stroke="#8ab4d6" />
-                                                                    {sensor && image && <Image image={image} x={x} y={oneWireSlotY} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} listening={false} />}
-                                                                    {!sensor && <Circle x={x + ONE_WIRE_SLOT_SIZE / 2} y={oneWireSlotY + ONE_WIRE_SLOT_SIZE / 2} radius={10} fill="#1565c0" onClick={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} />}
-                                                                    {!sensor && <Text x={x + ONE_WIRE_SLOT_SIZE / 2} y={oneWireSlotY + ONE_WIRE_SLOT_SIZE / 2} text="+" fontSize={15} fill="#fff" offsetX={4.5} offsetY={6} listening={false} />}
-                                                                    {sensor && <NtcDeleteButton x={x + ONE_WIRE_SLOT_SIZE - 5} y={oneWireSlotY + 5} onRemove={() => removeWifiOneWireDeviceAtSlot(moduleIndex, sensorIndex)} />}
-                                                                    {showPorts && sensor && sensorPorts.map((port) => <Circle key={`${sensorIndex}-${port.name}`} x={x + port.x * ONE_WIRE_SLOT_SIZE} y={oneWireSlotY + port.y * ONE_WIRE_SLOT_SIZE} radius={2.5} fill="red" />)}
+                                                                    {sensor && <><Rect x={slotPos.x} y={slotPos.y - (INFO_BLOCK_HEIGHT + 14)} width={ONE_WIRE_SLOT_SIZE} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotPos.x + 4} y={slotPos.y - (INFO_BLOCK_HEIGHT + 14)} width={ONE_WIRE_SLOT_SIZE - 8} height={INFO_BLOCK_HEIGHT} text={getDeviceStoredTitle(sensor) || getOneWireDeviceTitle(oneWireDevices, sensor, sensorIndex)} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={sensor} title={getDeviceStoredTitle(sensor) || getOneWireDeviceTitle(oneWireDevices, sensor, sensorIndex)} /></>}
+                                                                    <Rect x={slotPos.x} y={slotPos.y} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} cornerRadius={10} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.5} />
+                                                                    {sensor && image && <Image image={image} x={slotPos.x} y={slotPos.y} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} listening={false} />}
+                                                                    {!sensor && <Circle x={slotPos.x + ONE_WIRE_SLOT_SIZE / 2} y={slotPos.y + ONE_WIRE_SLOT_SIZE / 2} radius={16} fill="#1565c0" onClick={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} />}
+                                                                    {!sensor && <Text x={slotPos.x + ONE_WIRE_SLOT_SIZE / 2} y={slotPos.y + ONE_WIRE_SLOT_SIZE / 2} text="+" fontSize={22} fill="#fff" offsetX={6.5} offsetY={9} listening={false} />}
+                                                                    {sensor && hoveredWifiOneWireSlotKey === hoverKey && <NtcDeleteButton x={slotPos.x + ONE_WIRE_SLOT_SIZE - 5} y={slotPos.y + 5} onRemove={() => removeWifiOneWireDeviceAtSlot(moduleIndex, sensorIndex)} />}
+                                                                    {showPorts && sensorPorts.map((port) => <Circle key={`${sensorIndex}-${port.name}`} x={slotPos.x + port.x * ONE_WIRE_SLOT_SIZE} y={slotPos.y + port.y * ONE_WIRE_SLOT_SIZE} radius={2.5} fill="red" />)}
                                                                 </Group>
                                                             );
                                                         })}
                                                         {showPorts && occupied && modulePorts.filter((port) => !String(port.name).includes('INDICATOR')).map((port) => <Circle key={`wifi-port-${port.name}`} x={moduleX + port.x * moduleSize.width} y={port.y * moduleSize.height} radius={2.5} fill="red" />)}
                                                         {!occupied && <Circle x={pairWidth / 2} y={moduleSize.height / 2} radius={16} fill="#1565c0" onClick={(event) => { const pos = event.target.getAbsolutePosition(); setWifiMenuPos({ x: pos.x, y: pos.y, slotIndex: moduleIndex }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setWifiMenuPos({ x: pos.x, y: pos.y, slotIndex: moduleIndex }); }} />}
                                                         {!occupied && <Text x={pairWidth / 2} y={moduleSize.height / 2} text="+" fontSize={22} fill="#fff" offsetX={6.5} offsetY={9} listening={false} />}
-                                                        {occupied && <NtcDeleteButton x={pairWidth - 5} y={5} onRemove={() => removeWifiModuleAtSlot(moduleIndex)} />}
+                                                        {occupied && hoveredWifiSlotKey === offsetKey && <NtcDeleteButton x={pairWidth - 5} y={5} onRemove={() => removeWifiModuleAtSlot(moduleIndex)} />}
                                                     </Group>
                                                 );
                                             })}
@@ -15874,7 +15970,7 @@ const App = () => {
                                 })()}
                                 <Group>
                                 {(() => {
-                                    const wirelessLineLift = getSmart2WirelessLineLift(scheme, controllerType, indentSize);
+                                    const wirelessLineLift = getWirelessLineLift(scheme, controllerType, indentSize);
                                     return (
                                         <>
                                  {showLineFrames && (() => {
