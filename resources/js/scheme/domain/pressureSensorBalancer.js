@@ -8,10 +8,6 @@ const getControllerType = (scheme) => canonicalDeviceType(
     typeof scheme?.controller === 'string' ? scheme.controller : scheme?.controller?.type,
 );
 
-const getController420Key = (controller) => (
-    controller && Array.isArray(controller.devices420) ? 'devices420' : 'devices_420'
-);
-
 const normalizeExtModule = (moduleItem, index) => {
     const type = canonicalDeviceType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type);
     if (!type) return null;
@@ -57,15 +53,15 @@ export const balancePressureSensors = (scheme) => {
     const controller = scheme?.controller && typeof scheme.controller === 'object'
         ? { ...scheme.controller }
         : { type: controllerType };
-    const controller420Key = getController420Key(controller);
+    delete controller.devices420;
     const extModules = controllerType === 'pro' || controllerType === 'ecosmart'
         ? (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : []).map(normalizeExtModule).filter(Boolean)
         : scheme?.ext_modules;
 
-    controller[controller420Key] = Array.isArray(controller[controller420Key]) ? [...controller[controller420Key]] : [];
+    controller.devices_420 = Array.isArray(controller.devices_420) ? [...controller.devices_420] : [];
 
     const lines = [
-        { devices: controller[controller420Key], capacity: getController420Capacity(controllerType) },
+        { devices: controller.devices_420, capacity: getController420Capacity(controllerType) },
         ...(controllerType === 'pro' || controllerType === 'ecosmart' ? extModules : [])
             .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'io4')
             .map((moduleItem) => ({ devices: moduleItem.channel_devices, capacity: IO4_CHANNEL_CAPACITY })),

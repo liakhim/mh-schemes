@@ -38,20 +38,6 @@ const getPotentialOneWireLines = (scheme, extModules) => {
     return lines;
 };
 
-const getMostFreeLineIndex = (lineBuckets, startIndex = 0) => {
-    let bestIdx = -1;
-    let bestFree = -1;
-    for (let i = 0; i < lineBuckets.length; i += 1) {
-        const idx = (startIndex + i) % lineBuckets.length;
-        const free = LINE_CAPACITY - lineBuckets[idx].length;
-        if (free > bestFree) {
-            bestFree = free;
-            bestIdx = idx;
-        }
-    }
-    return bestIdx;
-};
-
 const tryPushGroupToLine = (lineBuckets, lineIndex, group) => {
     if (!lineBuckets[lineIndex]) return false;
     if (lineBuckets[lineIndex].length + group.length > LINE_CAPACITY) return false;

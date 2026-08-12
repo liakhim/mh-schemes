@@ -738,10 +738,7 @@ const getCompatibilityStats = (scheme, controllerTypeOverride = null) => {
         return type === '010pump' || type === '010servo' || type === 'mixing-ntc-sensor';
     }).length;
     const io4Only = wiredDevices.reduce((sum, device) => sum + countIo4OnlyDeviceSlots(device), placedIo4Only);
-    const controller420Key = Object.prototype.hasOwnProperty.call(controller, 'devices420')
-        ? 'devices420'
-        : 'devices_420';
-    const controller420Devices = Array.isArray(controller[controller420Key]) ? controller[controller420Key] : [];
+    const controller420Devices = Array.isArray(controller.devices_420) ? controller.devices_420 : [];
     const analog420 = sensors.filter((sensor) => hasConnectionType(sensor, '4-20')).length
         + controller420Devices.filter((sensor) => hasConnectionType(sensor, '4-20')).length
         + io4ChannelDevices.filter((sensor) => hasConnectionType(sensor, '4-20')).length;
@@ -753,10 +750,7 @@ const getSelectionMixedIoPlan = (scheme, stats, controllerType) => {
     const baseLimits = CONTROLLER_LIMITS[controllerType] || {};
     const controllerDiCapacity = controllerType === 'pro' && stats.ups > 0 ? 0 : (baseLimits.di || 0);
     const controller = scheme?.controller && typeof scheme.controller === 'object' ? scheme.controller : {};
-    const controller420Key = Object.prototype.hasOwnProperty.call(controller, 'devices420')
-        ? 'devices420'
-        : 'devices_420';
-    const controller420Devices = Array.isArray(controller[controller420Key]) ? controller[controller420Key] : [];
+    const controller420Devices = Array.isArray(controller.devices_420) ? controller.devices_420 : [];
     const extModules = Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : [];
     const io4Modules = extModules.filter((moduleItem) => (
         canonicalType(typeof moduleItem === 'string' ? moduleItem : moduleItem?.type) === 'io4'

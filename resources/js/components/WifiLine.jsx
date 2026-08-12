@@ -8,7 +8,30 @@ import { getOneWireSlotPosition } from '../scheme/layout/oneWireLayout';
 import { getOneWirePortByRole } from '../scheme/layout/ports';
 import { getPortsByClassToken } from '../scheme/layout/portParsing';
 import { getWifiModuleSize, getWifiPairHorizontalBounds } from '../scheme/layout/wifiLineLayout';
+import {
+    DI_SLOT_MIN_GAP_MULTIPLIER,
+    DI_SLOT_SIZE,
+    EXT_SLOT_MIN_GAP_MULTIPLIER,
+    EXT_SLOT_SIZE,
+    ONE_WIRE_SLOT_FAKE_PORTS,
+} from '../scheme/layout/renderConstants';
 import { Line } from '../scheme/rendering/SharpLine';
+import {
+    ADD_ACTION_FILL,
+    ADD_ACTION_TEXT_FILL,
+    EMPTY_SLOT_FILL,
+    EMPTY_SLOT_STROKE,
+    INFO_BLOCK_FILL,
+    INFO_BLOCK_HEIGHT,
+    INFO_BLOCK_STROKE,
+    INFO_BLOCK_STROKE_WIDTH,
+    INFO_BLOCK_TEXT_COLOR,
+    ONE_WIRE_SLOT_SIZE,
+    TRANSPARENT_FILL,
+} from '../constants';
+import DeviceIndicator from './DeviceIndicator';
+import { DeviceInfoBlock as EditableInfoTitle } from './DeviceInfoBlock';
+import NtcDeleteButton from './NtcDeleteButton';
 
 const WifiLine = ({
     wifiLineEnabled,
@@ -24,21 +47,16 @@ const WifiLine = ({
     scheme,
     getDiModules,
     controllerImage,
-    DI_SLOT_MIN_GAP_MULTIPLIER,
-    DI_SLOT_SIZE,
     getSmart2DiModuleExtraSpacing,
     diSlotOffsets,
     getDiOffsetKey,
     renderedProExtRight,
     memoExtModules,
     memoExtLineThermostatDevices,
-    EXT_SLOT_MIN_GAP_MULTIPLIER,
-    EXT_SLOT_SIZE,
     extSlotOffsets,
     getExtOffsetKey,
     buildRelaySlotOccupancyPreserveIndexes,
     isRelayBoilerType,
-    ONE_WIRE_SLOT_SIZE,
     wifiSlotOffsets,
     getWifiOffsetKey,
     snapToGrid,
@@ -50,8 +68,6 @@ const WifiLine = ({
     invalidWifiDragMap,
     setWifiSlotOffsets,
     getMorphImageKey,
-    ACTIVE_INDICATOR_COLOR,
-    ACTIVE_INDICATOR_SHADOW_BLUR,
     getFullWidthSize,
     getContainSize,
     getRelayInputPort,
@@ -59,10 +75,6 @@ const WifiLine = ({
     getRelayLinkPointsFromDevice,
     setRelayMenuPos,
     removeWifiModuleRelayDeviceAtSlot,
-    INFO_BLOCK_HEIGHT,
-    INFO_BLOCK_STROKE_WIDTH,
-    EditableInfoTitle,
-    ONE_WIRE_SLOT_FAKE_PORTS,
     getOneWireBendY,
     getOrthogonalLinkPoints,
     getOneWirePortColor,
@@ -74,7 +86,6 @@ const WifiLine = ({
     setWifiMenuPos,
     hoveredWifiSlotKey,
     removeWifiModuleAtSlot,
-    NtcDeleteButton,
 }) => (
     <>
 {(() => {
@@ -251,7 +262,7 @@ const WifiLine = ({
                                                             delete wifiDragStartOffsetsRef.current[offsetKey];
                                                         }}
                                                     >
-                                                        <Rect width={pairWidth} height={moduleSize.height} cornerRadius={8} fill={invalidWifiDragMap[offsetKey] ? 'rgba(211,47,47,0.08)' : (occupied ? 'rgba(0,0,0,0)' : '#f0f0f5')} stroke={invalidWifiDragMap[offsetKey] ? '#d32f2f' : (occupied ? 'rgba(0,0,0,0)' : '#d7dbe4')} />
+                                                        <Rect width={pairWidth} height={moduleSize.height} cornerRadius={8} fill={invalidWifiDragMap[offsetKey] ? 'rgba(211,47,47,0.08)' : (occupied ? TRANSPARENT_FILL : EMPTY_SLOT_FILL)} stroke={invalidWifiDragMap[offsetKey] ? '#d32f2f' : (occupied ? TRANSPARENT_FILL : EMPTY_SLOT_STROKE)} />
                                                         {occupied && powerImage && <Image image={powerImage} width={powerWidth} height={moduleSize.height} listening={false} />}
                                                         {occupied && moduleImage && <Image name={`morph:${getMorphImageKey(moduleItem)}`} image={moduleImage} x={moduleX} width={moduleSize.width} height={moduleSize.height} listening={false} />}
                                                         {occupied && (() => {
@@ -276,7 +287,7 @@ const WifiLine = ({
                                                         {occupied && modulePorts.filter((port) => String(port.name).includes('INDICATOR')).map((port) => {
                                                             const relayMatch = /RELAY(?:-S)?-INDICATOR-(\d+)/i.exec(port.name);
                                                             const active = !relayMatch || Boolean(relayOccupancy[Number(relayMatch?.[1]) - 1]);
-                                                            return <Rect key={`wifi-indicator-${port.name}`} x={moduleX + port.x * moduleSize.width - 2} y={port.y * moduleSize.height - 2} width={4} height={4} cornerRadius={2} fill={active ? ACTIVE_INDICATOR_COLOR : '#D2D2D2'} shadowColor={active ? ACTIVE_INDICATOR_COLOR : undefined} shadowBlur={active ? ACTIVE_INDICATOR_SHADOW_BLUR : 0} listening={false} />;
+                                                            return <DeviceIndicator key={`wifi-indicator-${port.name}`} port={port} imageWidth={moduleSize.width} imageHeight={moduleSize.height} offsetX={moduleX} active={active} size={4} />;
                                                         })}
                                                         {occupied && (() => {
                                                             const relayPortPrefix = moduleType === 'rl6sw' ? 'RELAY-S' : 'RELAY';
@@ -347,8 +358,8 @@ const WifiLine = ({
                                                                             width={slotSize.width}
                                                                             height={slotSize.height}
                                                                             cornerRadius={10}
-                                                                            fill={relayDevice ? 'rgba(0,0,0,0)' : '#f0f0f5'}
-                                                                            stroke={relayDevice ? 'rgba(0,0,0,0)' : '#d7dbe4'}
+                                                                            fill={relayDevice ? TRANSPARENT_FILL : EMPTY_SLOT_FILL}
+                                                                            stroke={relayDevice ? TRANSPARENT_FILL : EMPTY_SLOT_STROKE}
                                                                             strokeWidth={1.5}
                                                                         />
                                                                         {!relayDevice && modulePort && (
@@ -409,13 +420,13 @@ const WifiLine = ({
                                                                             const to2Y = nextModulePort.y * moduleSize.height;
                                                                             return <><Line points={[from1X, from1Y, to1X, from1Y, to1X, to1Y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} /><Line points={[from2X, from2Y, to2X, from2Y, to2X, to2Y]} stroke="#d32f2f" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} /></>;
                                                                         })()}
-                                                                        {!relayDevice && <Circle x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} radius={16} fill="#1565c0" onClick={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} />}
-                                                                        {!relayDevice && <Text x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} text="+" fontSize={22} fill="#fff" offsetX={6.5} offsetY={9} listening={false} />}
+                                                                        {!relayDevice && <Circle x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} radius={16} fill={ADD_ACTION_FILL} onClick={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} />}
+                                                                        {!relayDevice && <Text x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} text="+" fontSize={22} fill={ADD_ACTION_TEXT_FILL} offsetX={6.5} offsetY={9} listening={false} />}
                                                                         {relayDevice && <NtcDeleteButton x={slotX + slotSize.width - 5} y={slotY + 5} onRemove={() => removeWifiModuleRelayDeviceAtSlot(moduleIndex, lineKey, relayIndex)} />}
                                                                         {relayDevice && (
                                                                             <>
-                                                                                <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 8)} width={slotSize.width} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                                                <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 8)} width={Math.max(34, slotSize.width - 6)} height={INFO_BLOCK_HEIGHT} text={infoTitle} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={relayDevice} title={infoTitle} />
+                                                                                <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 8)} width={slotSize.width} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
+                                                                                <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 8)} width={Math.max(34, slotSize.width - 6)} height={INFO_BLOCK_HEIGHT} text={infoTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={relayDevice} title={infoTitle} />
                                                                             </>
                                                                         )}
                                                                     </Group>
@@ -477,19 +488,19 @@ const WifiLine = ({
                                                                         });
                                                                         return <Line key={`${name}-${sensorIndex}`} points={getOrthogonalLinkPoints(fromX, fromY, bendY, toX, toY)} stroke={getOneWirePortColor(name)} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />;
                                                                     })}
-                                                                    {sensor && <><Rect x={slotPos.x} y={slotPos.y - (INFO_BLOCK_HEIGHT + 14)} width={ONE_WIRE_SLOT_SIZE} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill="#fff" stroke="#2F08AF" strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotPos.x + 4} y={slotPos.y - (INFO_BLOCK_HEIGHT + 14)} width={ONE_WIRE_SLOT_SIZE - 8} height={INFO_BLOCK_HEIGHT} text={getDeviceStoredTitle(sensor) || getOneWireDeviceTitle(oneWireDevices, sensor, sensorIndex)} fontSize={4} fill="#4a6a8a" align="center" verticalAlign="middle" device={sensor} title={getDeviceStoredTitle(sensor) || getOneWireDeviceTitle(oneWireDevices, sensor, sensorIndex)} /></>}
-                                                                    <Rect x={slotPos.x} y={slotPos.y} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} cornerRadius={10} fill={sensor ? 'rgba(0,0,0,0)' : '#f0f0f5'} stroke={sensor ? 'rgba(0,0,0,0)' : '#d7dbe4'} strokeWidth={1.5} />
+                                                                    {sensor && <><Rect x={slotPos.x} y={slotPos.y - (INFO_BLOCK_HEIGHT + 14)} width={ONE_WIRE_SLOT_SIZE} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotPos.x + 4} y={slotPos.y - (INFO_BLOCK_HEIGHT + 14)} width={ONE_WIRE_SLOT_SIZE - 8} height={INFO_BLOCK_HEIGHT} text={getDeviceStoredTitle(sensor) || getOneWireDeviceTitle(oneWireDevices, sensor, sensorIndex)} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={getDeviceStoredTitle(sensor) || getOneWireDeviceTitle(oneWireDevices, sensor, sensorIndex)} /></>}
+                                                                    <Rect x={slotPos.x} y={slotPos.y} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} cornerRadius={10} fill={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_FILL} stroke={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_STROKE} strokeWidth={1.5} />
                                                                     {sensor && image && <Image image={image} x={slotPos.x} y={slotPos.y} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} listening={false} />}
-                                                                    {!sensor && <Circle x={slotPos.x + ONE_WIRE_SLOT_SIZE / 2} y={slotPos.y + ONE_WIRE_SLOT_SIZE / 2} radius={16} fill="#1565c0" onClick={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} />}
-                                                                    {!sensor && <Text x={slotPos.x + ONE_WIRE_SLOT_SIZE / 2} y={slotPos.y + ONE_WIRE_SLOT_SIZE / 2} text="+" fontSize={22} fill="#fff" offsetX={6.5} offsetY={9} listening={false} />}
+                                                                    {!sensor && <Circle x={slotPos.x + ONE_WIRE_SLOT_SIZE / 2} y={slotPos.y + ONE_WIRE_SLOT_SIZE / 2} radius={16} fill={ADD_ACTION_FILL} onClick={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} />}
+                                                                    {!sensor && <Text x={slotPos.x + ONE_WIRE_SLOT_SIZE / 2} y={slotPos.y + ONE_WIRE_SLOT_SIZE / 2} text="+" fontSize={22} fill={ADD_ACTION_TEXT_FILL} offsetX={6.5} offsetY={9} listening={false} />}
                                                                     {sensor && hoveredWifiOneWireSlotKey === hoverKey && <NtcDeleteButton x={slotPos.x + ONE_WIRE_SLOT_SIZE - 5} y={slotPos.y + 5} onRemove={() => removeWifiOneWireDeviceAtSlot(moduleIndex, sensorIndex)} />}
                                                                     {showPorts && sensorPorts.map((port) => <Circle key={`${sensorIndex}-${port.name}`} x={slotPos.x + port.x * ONE_WIRE_SLOT_SIZE} y={slotPos.y + port.y * ONE_WIRE_SLOT_SIZE} radius={2.5} fill="red" />)}
                                                                 </Group>
                                                             );
                                                         })}
                                                         {showPorts && occupied && modulePorts.filter((port) => !String(port.name).includes('INDICATOR')).map((port) => <Circle key={`wifi-port-${port.name}`} x={moduleX + port.x * moduleSize.width} y={port.y * moduleSize.height} radius={2.5} fill="red" />)}
-                                                        {!occupied && <Circle x={pairWidth / 2} y={moduleSize.height / 2} radius={16} fill="#1565c0" onClick={(event) => { const pos = event.target.getAbsolutePosition(); setWifiMenuPos({ x: pos.x, y: pos.y, slotIndex: moduleIndex }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setWifiMenuPos({ x: pos.x, y: pos.y, slotIndex: moduleIndex }); }} />}
-                                                        {!occupied && <Text x={pairWidth / 2} y={moduleSize.height / 2} text="+" fontSize={22} fill="#fff" offsetX={6.5} offsetY={9} listening={false} />}
+                                                        {!occupied && <Circle x={pairWidth / 2} y={moduleSize.height / 2} radius={16} fill={ADD_ACTION_FILL} onClick={(event) => { const pos = event.target.getAbsolutePosition(); setWifiMenuPos({ x: pos.x, y: pos.y, slotIndex: moduleIndex }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setWifiMenuPos({ x: pos.x, y: pos.y, slotIndex: moduleIndex }); }} />}
+                                                        {!occupied && <Text x={pairWidth / 2} y={moduleSize.height / 2} text="+" fontSize={22} fill={ADD_ACTION_TEXT_FILL} offsetX={6.5} offsetY={9} listening={false} />}
                                                         {occupied && hoveredWifiSlotKey === offsetKey && <NtcDeleteButton x={pairWidth - 5} y={5} onRemove={() => removeWifiModuleAtSlot(moduleIndex)} />}
                                                     </Group>
                                                 );

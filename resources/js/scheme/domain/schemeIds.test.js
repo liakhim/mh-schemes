@@ -54,3 +54,19 @@ test('normalization is idempotent', () => {
     const once = normalizeSchemeIds({ wired_devices: [{ id: 10, ownerThermostatId: 11 }] });
     assert.deepEqual(normalizeSchemeIds(once), once);
 });
+
+test('migrates legacy controller 4-20 devices and connection assignments', () => {
+    const current = { id: 1, type: 'pressure-sensor', connection_type: '4-20' };
+    const legacy = { id: 2, type: 'pressure-sensor', connection_type: '4-20' };
+    const result = normalizeSchemeIds({
+        controller: { type: 'pro', devices_420: [current], devices420: [{ ...current }, legacy] },
+        connection_layout: {
+            version: 1,
+            assignments: [{ device_id: 2, line: 'devices420', slot: 0 }],
+        },
+    });
+
+    assert.deepEqual(result.controller.devices_420.map((device) => device.id), ['1', '2']);
+    assert.equal('devices420' in result.controller, false);
+    assert.equal(result.connection_layout.assignments[0].line, 'devices_420');
+});

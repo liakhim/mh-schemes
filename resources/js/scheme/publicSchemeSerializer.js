@@ -25,7 +25,6 @@ const MATERIALIZED_LINE_KEYS = new Set([
     'ai_devices',
     'modbus_devices',
     'devices_420',
-    'devices420',
     'ntc1_devices',
     'ntc2_devices',
     '220_servo_devices',
@@ -102,10 +101,26 @@ const stripInternalMetadata = (value) => {
         .map(([key, item]) => [key, stripInternalMetadata(item)]));
 };
 
+const stripWifiModuleInternalMetadata = (value) => {
+    if (Array.isArray(value)) return value.map(stripWifiModuleInternalMetadata);
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(Object.entries(value)
+        .filter(([key]) => key === 'relay_slot_index' || !INTERNAL_METADATA_KEYS.has(key))
+        .map(([key, item]) => [key, stripWifiModuleInternalMetadata(item)]));
+};
+
 const withoutMaterializedLines = (value) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
     return Object.fromEntries(Object.entries(value).filter(([key]) => (
-        !MATERIALIZED_LINE_KEYS.has(key) && key !== 'ecosmart_bl2'
+        !MATERIALIZED_LINE_KEYS.has(key) && key !== 'ecosmart_bl2' && key !== 'devices420'
+    )));
+};
+
+const withoutGeneratedWifiLines = (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+    const userOwnedWifiLines = new Set(['one_wire_devices', 'relay_devices', 'relay_s_devices']);
+    return Object.fromEntries(Object.entries(value).filter(([key]) => (
+        userOwnedWifiLines.has(key) || !MATERIALIZED_LINE_KEYS.has(key)
     )));
 };
 
@@ -252,7 +267,6 @@ export const serializePublicScheme = (scheme) => {
     collectMaterializedLines(controllerSource, buckets);
     (Array.isArray(scheme.ext_modules) ? scheme.ext_modules : []).forEach((moduleItem) => collectMaterializedLines(moduleItem, buckets));
     (Array.isArray(scheme.di_modules) ? scheme.di_modules : []).forEach((moduleItem) => collectMaterializedLines(moduleItem, buckets));
-    (Array.isArray(scheme.wifi_modules) ? scheme.wifi_modules : []).forEach((moduleItem) => collectMaterializedLines(moduleItem, buckets));
 
     const controller = withoutMaterializedLines(controllerSource);
     const {
@@ -260,7 +274,7 @@ export const serializePublicScheme = (scheme) => {
         connection_layout: removedConnectionLayout,
         ...schemeWithoutLegacyEcosmartBl2
     } = scheme;
-    return stripInternalMetadata({
+    const publicScheme = stripInternalMetadata({
         ...schemeWithoutLegacyEcosmartBl2,
         controller,
         ext_modules: Array.isArray(scheme.ext_modules)
@@ -270,9 +284,15 @@ export const serializePublicScheme = (scheme) => {
             ? scheme.di_modules.map(withoutMaterializedLines)
             : scheme.di_modules,
         wifi_modules: Array.isArray(scheme.wifi_modules)
-            ? scheme.wifi_modules.map(withoutMaterializedLines)
+            ? scheme.wifi_modules.map(withoutGeneratedWifiLines)
             : scheme.wifi_modules,
         ...(connectionLayout ? { connection_layout: connectionLayout } : {}),
         ...finalizeBuckets(buckets),
     });
+    return {
+        ...publicScheme,
+        wifi_modules: Array.isArray(scheme.wifi_modules)
+            ? scheme.wifi_modules.map((moduleItem) => stripWifiModuleInternalMetadata(withoutGeneratedWifiLines(moduleItem)))
+            : scheme.wifi_modules,
+    };
 };

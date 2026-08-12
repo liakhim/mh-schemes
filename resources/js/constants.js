@@ -1,6 +1,27 @@
 export const indent = '8px';
 export const module_height = '200px';
 export const din = '40px';
+export const INFO_BLOCK_STROKE_WIDTH = 0.2;
+export const INFO_BLOCK_FONT_SIZE = 6;
+export const INFO_BLOCK_HEIGHT = 18;
+export const AERIAL_WIDTH = 18;
+export const AERIAL_HEIGHT = 18;
+export const ONE_WIRE_SLOT_SIZE = 80;
+export const CANVAS_GRID_MIN = -4000;
+export const CANVAS_GRID_MAX = 4000;
+export const EMPTY_SLOT_FILL = '#f0f0f5';
+export const EMPTY_SLOT_STROKE = '#d7dbe4';
+export const INFO_BLOCK_FILL = '#fff';
+export const INFO_BLOCK_STROKE = '#2F08AF';
+export const INFO_BLOCK_TEXT_COLOR = '#4a6a8a';
+export const TRANSPARENT_FILL = 'rgba(0,0,0,0)';
+export const ADD_ACTION_FILL = '#1565c0';
+export const ADD_ACTION_TEXT_FILL = '#fff';
+export const ECOSMART_LEAK_SENSOR_COLORS = {
+    gnd: '#212121',
+    di: '#1976d2',
+    vplus: '#d32f2f',
+};
 
 let i = {
     type: 'ecosmart',

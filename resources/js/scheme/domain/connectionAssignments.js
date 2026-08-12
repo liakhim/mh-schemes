@@ -97,7 +97,7 @@ const getControllerLine = (scheme, line) => {
     }
     if (line === 'relay_s_devices') return { capacity: type === 'pro' ? 4 : 0, accepts: supportsRelayS };
     if (line === 'di_devices') return { capacity: getControllerDiCapacity(scheme, type), accepts: isDiscreteDevice };
-    if (line === 'devices_420' || line === 'devices420') {
+    if (line === 'devices_420') {
         return { capacity: type === 'pro' || type === 'ecosmart' ? 1 : 0, accepts: isPressureSensor };
     }
     return null;
@@ -166,7 +166,7 @@ const getPhysicalRelaySlot = (devices, arrayIndex, capacity) => {
 
 const collectOwnerAssignments = (scheme, ownerKind, owner, seen, assignments) => {
     if (!owner || typeof owner !== 'object') return;
-    const lines = ['bus_devices', 'relay_devices', 'relay_s_devices', 'di_devices', 'channel_devices', 'devices_420', 'devices420'];
+    const lines = ['bus_devices', 'relay_devices', 'relay_s_devices', 'di_devices', 'channel_devices', 'devices_420'];
     lines.forEach((line) => {
         const descriptor = getOwnerLine(scheme, ownerKind, owner, line);
         if (!descriptor || descriptor.capacity <= 0 || !Array.isArray(owner[line])) return;
@@ -208,11 +208,6 @@ export const collectConnectionLayout = (scheme) => {
     (Array.isArray(scheme?.di_modules) ? scheme.di_modules : []).forEach((moduleItem) => {
         if (moduleItem?.id != null && !moduleItem.connectionAssignmentGeneratedId) {
             collectOwnerAssignments(scheme, 'di_module', moduleItem, seen, assignments);
-        }
-    });
-    (Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : []).forEach((moduleItem) => {
-        if (moduleItem?.id != null && !moduleItem.connectionAssignmentGeneratedId) {
-            collectOwnerAssignments(scheme, 'wifi_module', moduleItem, seen, assignments);
         }
     });
     return assignments.length > 0 ? { version: CONNECTION_LAYOUT_VERSION, assignments } : null;

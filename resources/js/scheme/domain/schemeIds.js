@@ -83,13 +83,52 @@ const preserveCollidingInstallationKeys = (scheme, idMap) => {
     };
 };
 
+const getDeviceMigrationKey = (device) => {
+    if (device && typeof device === 'object' && device.id != null) return `id:${device.id}`;
+    return JSON.stringify(device);
+};
+
+const migrateLegacyController420 = (scheme) => {
+    const controller = scheme?.controller;
+    const assignments = scheme?.connection_layout?.assignments;
+    const hasLegacyControllerDevices = controller && typeof controller === 'object'
+        && !Array.isArray(controller) && Object.hasOwn(controller, 'devices420');
+    const hasLegacyAssignments = Array.isArray(assignments)
+        && assignments.some((assignment) => assignment?.line === 'devices420');
+    if (!hasLegacyControllerDevices && !hasLegacyAssignments) return scheme;
+
+    const devices420 = Array.isArray(controller?.devices_420) ? controller.devices_420 : [];
+    const seen = new Set(devices420.map(getDeviceMigrationKey));
+    const mergedDevices420 = [...devices420];
+    (Array.isArray(controller?.devices420) ? controller.devices420 : []).forEach((device) => {
+        const key = getDeviceMigrationKey(device);
+        if (seen.has(key)) return;
+        seen.add(key);
+        mergedDevices420.push(device);
+    });
+    const { devices420: removedLegacyDevices420, ...canonicalController } = controller || {};
+
+    return {
+        ...scheme,
+        ...(hasLegacyControllerDevices ? { controller: { ...canonicalController, devices_420: mergedDevices420 } } : {}),
+        ...(Array.isArray(assignments) ? {
+            connection_layout: {
+                ...scheme.connection_layout,
+                assignments: assignments.map((assignment) => (
+                    assignment?.line === 'devices420' ? { ...assignment, line: 'devices_420' } : assignment
+                )),
+            },
+        } : {}),
+    };
+};
+
 /** Converts persisted device and reference IDs to one collision-safe string format. */
 export const normalizeSchemeIds = (sourceScheme) => {
     if (!sourceScheme || typeof sourceScheme !== 'object' || Array.isArray(sourceScheme)) return sourceScheme;
     const idMap = buildIdMap(sourceScheme);
     const normalized = normalizeValue(sourceScheme, idMap);
     return {
-        ...preserveCollidingInstallationKeys(normalized, idMap),
+        ...migrateLegacyController420(preserveCollidingInstallationKeys(normalized, idMap)),
         id_schema_version: SCHEME_ID_VERSION,
     };
 };

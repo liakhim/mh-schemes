@@ -131,7 +131,6 @@ export const assignMaterializedDeviceTitles = (scheme) => {
             'di_devices',
             'leak_sensor_devices',
             'devices_420',
-            'devices420',
             '220_servo_devices',
             'relay_s_valve_devices',
             'relay_boiler_gvs_devices',

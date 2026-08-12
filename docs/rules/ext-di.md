@@ -69,8 +69,8 @@
 ## Pressure / Discrete
 
 - `pressure-sensor` с `connection_type='4-20'` распределяется на controller 4-20 или `io4.channel_devices`.
-- Controller 4-20 capacity есть у `pro` и `ecosmart`: первый 4-20 датчик попадает в `controller.devices_420`/`controller.devices420`, следующие уходят в `io4.channel_devices`.
-- Пустой controller 4-20 слот на `pro` и `ecosmart` отображается при `Show empty slots`, имеет размер `9 * indent` на `2 * indent`, порты находятся на левой грани друг над другом с расстоянием `1 * indent`, коммутируется двумя проводами от `4-20-OUT-V+` и `4-20-OUT-IN`, кликается через `+` и добавляет первый датчик в `controller.devices_420`/`controller.devices420`.
+- Controller 4-20 capacity есть у `pro` и `ecosmart`: первый 4-20 датчик попадает в `controller.devices_420`, следующие уходят в `io4.channel_devices`.
+- Пустой controller 4-20 слот на `pro` и `ecosmart` отображается при `Show empty slots`, имеет размер `9 * indent` на `2 * indent`, порты находятся на левой грани друг над другом с расстоянием `1 * indent`, коммутируется двумя проводами от `4-20-OUT-V+` и `4-20-OUT-IN`, кликается через `+` и добавляет первый датчик в `controller.devices_420`.
 - У `ecosmart` controller 4-20 слот расположен справа от контроллера с зазором `4 * indent`; верхняя грань слота на `9 * indent` ниже верхней грани контроллера.
 - Controller 4-20 слот `pro` и `ecosmart` draggable; offset сохраняется отдельно и сбрасывается через `Reset positions`.
 - Discrete devices с `connection_type='di'` распределяются на controller DI, `io4.channel_devices`, `di6.channel_devices`.

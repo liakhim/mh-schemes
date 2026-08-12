@@ -54,23 +54,6 @@ const expandOneWireDeviceWithFloorAdditions = (device, deviceIndex, ownerPrefix 
     ];
 };
 
-export const getInitialWirelessDevices = (scheme) => {
-    if (Array.isArray(scheme.wireless_devices) && scheme.wireless_devices.length > 0) {
-        return scheme.wireless_devices;
-    }
-
-    if (!Array.isArray(scheme.thermostats)) {
-        return [];
-    }
-
-    return scheme.thermostats.map((device) => ({
-        id: device.id,
-        type: device.type,
-        color: device.color,
-        additions: device.additions || [],
-    }));
-};
-
 const getLegacyOneWireDevicesFromScheme = (scheme) => {
     const fromWiredDevices = Array.isArray(scheme?.wired_devices)
         ? scheme.wired_devices
