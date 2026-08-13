@@ -38,9 +38,13 @@ import {
     VALVE_SLOT_WIDTH,
 } from '../scheme/layout/renderConstants';
 import { WIRELESS_INFOBLOCK_HEIGHT } from '../scheme/layout/wirelessLineLayout';
+import {
+    buildRelaySlotOccupancyPreserveIndexes,
+    removeRelayDeviceAtSlotFromLine,
+} from '../scheme/domain/relaySlots';
 import DeviceIndicator from './DeviceIndicator';
 import KitBadge from './KitBadge';
-import NtcDeleteButton from './NtcDeleteButton';
+import SlotDeleteButton from './SlotDeleteButton';
 import PortDotCircle from './PortDotCircle';
 import WifiLine from './WifiLine';
 import { DeviceInfoBlock as EditableInfoTitle } from './DeviceInfoBlock';
@@ -59,7 +63,6 @@ const SchemeCanvas = ({
     addExtThermostatFloorSensor,
     addOneWireNtcSensorAtSlot,
     aerialImage,
-    buildRelaySlotOccupancyPreserveIndexes,
     busDragStartOffsetsRef,
     busSlotOffsets,
     canonicalDeviceType,
@@ -223,7 +226,6 @@ const SchemeCanvas = ({
     removeIo4ChannelDeviceAtSlot,
     removeOneWireDeviceAtSlot,
     removeOneWireNtcSensorAtSlot,
-    removeRelayDeviceAtSlotFromLine,
     removeWifiModuleAtSlot,
     removeWifiModuleRelayDeviceAtSlot,
     removeWifiOneWireDeviceAtSlot,
@@ -919,11 +921,7 @@ const SchemeCanvas = ({
                                                              />
                                                          ))}
                                                          {isHovered && (
-                                                             <>
-                                                                 <Circle x={slotX + diSlotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeControllerDiDeviceAtSlot(0)} onTap={() => removeControllerDiDeviceAtSlot(0)} />
-                                                                 <Line points={[slotX + diSlotWidth - 5, slotY - 1, slotX + diSlotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                 <Line points={[slotX + diSlotWidth, slotY - 1, slotX + diSlotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                             </>
+                                                             <SlotDeleteButton compact x={slotX + diSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeControllerDiDeviceAtSlot(0)} />
                                                          )}
                                                      </Group>
                                                 );
@@ -1022,11 +1020,7 @@ const SchemeCanvas = ({
                                                              />
                                                          ))}
                                                          {isHovered && (
-                                                             <>
-                                                                 <Circle x={slotX + diSlotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeControllerDiDeviceAtSlot(1)} onTap={() => removeControllerDiDeviceAtSlot(1)} />
-                                                                 <Line points={[slotX + diSlotWidth - 5, slotY - 1, slotX + diSlotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                 <Line points={[slotX + diSlotWidth, slotY - 1, slotX + diSlotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                             </>
+                                                             <SlotDeleteButton compact x={slotX + diSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeControllerDiDeviceAtSlot(1)} />
                                                          )}
                                                      </Group>
                                                 );
@@ -1163,11 +1157,7 @@ const SchemeCanvas = ({
                                                 </>
                                             )}
                                             {leakSensor && isHovered && (
-                                                <>
-                                                    <Circle x={slotX + slotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={removeControllerLeakSensorAtSlot} onTap={removeControllerLeakSensorAtSlot} />
-                                                    <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                    <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                </>
+                                                <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={removeControllerLeakSensorAtSlot} />
                                             )}
                                             {!leakSensor && showEmptySlots && (
                                                 <>
@@ -1286,11 +1276,7 @@ const SchemeCanvas = ({
                                                  </>
                                              )}
                                              {diDevice && isHovered && (
-                                                 <>
-                                                     <Circle x={slotX + slotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeControllerDiDeviceAtSlot(0)} onTap={() => removeControllerDiDeviceAtSlot(0)} />
-                                                     <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                     <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                 </>
+                                                 <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeControllerDiDeviceAtSlot(0)} />
                                              )}
                                          </Group>
                                      );
@@ -1494,18 +1480,7 @@ const SchemeCanvas = ({
                                                  </>
                                              )}
                                              {pressureSensor && isController420Hovered && (
-                                                 <>
-                                                     <Circle
-                                                         x={slotX + slotWidth - 2.5}
-                                                         y={slotY + 1.5}
-                                                         radius={6}
-                                                         fill="rgba(217, 83, 79, 0.55)"
-                                                         onClick={removeController420PressureSensor}
-                                                         onTap={removeController420PressureSensor}
-                                                     />
-                                                     <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                     <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                 </>
+                                                 <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={removeController420PressureSensor} />
                                              )}
                                                          {showPorts && pressureSensor && pressureSensorPorts.map((port) => (
                                                             <Circle
@@ -1686,11 +1661,7 @@ const SchemeCanvas = ({
                                                 </>
                                             )}
                                             {relayDevice && isRelayHovered && (
-                                                <>
-                                                    <Circle x={relaySlotX + relaySlotWidth - 2.5} y={relaySlotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={removeEcosmartRelayDevice} onTap={removeEcosmartRelayDevice} />
-                                                    <Line points={[relaySlotX + relaySlotWidth - 5, relaySlotY - 1, relaySlotX + relaySlotWidth, relaySlotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                    <Line points={[relaySlotX + relaySlotWidth, relaySlotY - 1, relaySlotX + relaySlotWidth - 5, relaySlotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                </>
+                                                <SlotDeleteButton compact x={relaySlotX + relaySlotWidth - 2.5} y={relaySlotY + 1.5} onRemove={removeEcosmartRelayDevice} />
                                             )}
                                              {relayDevice && isRelayBoilerType(relayType) && boilerBusAPort && boilerBusBPort && (
                                                  <>
@@ -1943,18 +1914,7 @@ const SchemeCanvas = ({
                                                      </>
                                                  )}
                                                 {sensor && isHovered && (
-                                                    <>
-                                                        <Circle
-                                                            x={slotX + slotWidth - 2.5}
-                                                            y={y + 1.5}
-                                                            radius={6}
-                                                            fill="rgba(217, 83, 79, 0.55)"
-                                                            onClick={() => removeControllerNtcLineSensorAtSlot(slot.lineKey, slot.lineIndex)}
-                                                            onTap={() => removeControllerNtcLineSensorAtSlot(slot.lineKey, slot.lineIndex)}
-                                                        />
-                                                        <Line points={[slotX + slotWidth - 5, y - 1, slotX + slotWidth, y + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                        <Line points={[slotX + slotWidth, y - 1, slotX + slotWidth - 5, y + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                    </>
+                                                    <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={y + 1.5} onRemove={() => removeControllerNtcLineSensorAtSlot(slot.lineKey, slot.lineIndex)} />
                                                 )}
                                                  {!sensor && showEmptySlots && (
                                                      <>
@@ -2046,11 +2006,7 @@ const SchemeCanvas = ({
                                              )}
                                              {servoDevice && image && <Image image={image} x={renderX} y={renderY} width={renderSize.width} height={renderSize.height} listening={false} />}
                                              {servoDevice && isHovered && (
-                                                 <>
-                                                     <Circle x={slotX + slotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeEcosmartServo(0, hoverKey)} onTap={() => removeEcosmartServo(0, hoverKey)} />
-                                                     <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                     <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                 </>
+                                                 <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeEcosmartServo(0, hoverKey)} />
                                              )}
                                             {servoDevice && (
                                                 <>
@@ -2142,11 +2098,7 @@ const SchemeCanvas = ({
                                              )}
                                              {pumpDevice && image && <Image image={image} x={renderX} y={renderY} width={renderSize.width} height={renderSize.height} listening={false} />}
                                              {pumpDevice && isHovered && (
-                                                 <>
-                                                     <Circle x={slotX + slotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeEcosmartPump('relay_220pump5_devices', hoverKey)} onTap={() => removeEcosmartPump('relay_220pump5_devices', hoverKey)} />
-                                                     <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                     <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                 </>
+                                                 <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeEcosmartPump('relay_220pump5_devices', hoverKey)} />
                                              )}
                                             {pumpDevice && (
                                                 <>
@@ -2243,11 +2195,7 @@ const SchemeCanvas = ({
                                              )}
                                              {servoDevice && image && <Image image={image} x={renderX} y={renderY} width={renderSize.width} height={renderSize.height} listening={false} />}
                                              {servoDevice && isHovered && (
-                                                 <>
-                                                     <Circle x={slotX + slotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeEcosmartServo(1, hoverKey)} onTap={() => removeEcosmartServo(1, hoverKey)} />
-                                                     <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                     <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                 </>
+                                                 <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeEcosmartServo(1, hoverKey)} />
                                              )}
                                             {servoDevice && (
                                                 <>
@@ -2346,11 +2294,7 @@ const SchemeCanvas = ({
                                              )}
                                              {pumpDevice && image && <Image image={image} x={renderX} y={renderY} width={renderSize.width} height={renderSize.height} listening={false} />}
                                              {pumpDevice && isHovered && (
-                                                 <>
-                                                     <Circle x={slotX + slotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeEcosmartPump('relay_220pump3_devices', hoverKey)} onTap={() => removeEcosmartPump('relay_220pump3_devices', hoverKey)} />
-                                                     <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                     <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                 </>
+                                                 <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeEcosmartPump('relay_220pump3_devices', hoverKey)} />
                                              )}
                                             {pumpDevice && (
                                                 <>
@@ -2464,18 +2408,7 @@ const SchemeCanvas = ({
                                              )}
                                               {valveDevice && image && <Image image={image} x={renderX} y={renderY} width={renderSize.width} height={renderSize.height} listening={false} />}
                                              {valveDevice && isHovered && (
-                                                 <>
-                                                     <Circle
-                                                         x={slotX + slotWidth - 2.5}
-                                                         y={slotY + 1.5}
-                                                         radius={6}
-                                                         fill="rgba(217, 83, 79, 0.55)"
-                                                         onClick={removeEcosmartValve}
-                                                         onTap={removeEcosmartValve}
-                                                     />
-                                                      <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                      <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                 </>
+                                                 <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={removeEcosmartValve} />
                                              )}
                                              {valveDevice && (
                                                 <>
@@ -2567,11 +2500,7 @@ const SchemeCanvas = ({
                                              )}
                                              {pumpDevice && image && <Image image={image} x={renderX} y={renderY} width={renderSize.width} height={renderSize.height} listening={false} />}
                                              {pumpDevice && isHovered && (
-                                                 <>
-                                                     <Circle x={slotX + slotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeEcosmartPump('relay_boiler_gvs_devices', hoverKey)} onTap={() => removeEcosmartPump('relay_boiler_gvs_devices', hoverKey)} />
-                                                     <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                     <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                 </>
+                                                 <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeEcosmartPump('relay_boiler_gvs_devices', hoverKey)} />
                                              )}
                                             {pumpDevice && (
                                                 <>
@@ -2667,11 +2596,7 @@ const SchemeCanvas = ({
                                              )}
                                              {pumpDevice && image && <Image image={image} x={renderX} y={renderY} width={renderSize.width} height={renderSize.height} listening={false} />}
                                              {pumpDevice && isHovered && (
-                                                 <>
-                                                     <Circle x={slotX + slotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeEcosmartPump('relay_220pump_devices', hoverKey)} onTap={() => removeEcosmartPump('relay_220pump_devices', hoverKey)} />
-                                                     <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                     <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                 </>
+                                                 <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeEcosmartPump('relay_220pump_devices', hoverKey)} />
                                              )}
                                             {pumpDevice && (
                                                 <>
@@ -3782,18 +3707,7 @@ const SchemeCanvas = ({
                                                                     </>
                                                                 )}
                                                                 {isRelaySOccupied && !isCoveredRelaySSlot && isRelaySHovered && (
-                                                                    <>
-                                                                        <Circle
-                                                                            x={slotX + relaySVisualSlotWidth - 2.5}
-                                                                            y={slotY + 1.5}
-                                                                            radius={6}
-                                                                            fill="rgba(217, 83, 79, 0.55)"
-                                                                            onClick={() => removeControllerRelaySDevice(relaySDevice, slotState?.startSlot ?? slotIndex)}
-                                                                            onTap={() => removeControllerRelaySDevice(relaySDevice, slotState?.startSlot ?? slotIndex)}
-                                                                        />
-                                                                        <Line points={[slotX + relaySVisualSlotWidth - 5, slotY - 1, slotX + relaySVisualSlotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                        <Line points={[slotX + relaySVisualSlotWidth, slotY - 1, slotX + relaySVisualSlotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                    </>
+                                                                    <SlotDeleteButton compact x={slotX + relaySVisualSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeControllerRelaySDevice(relaySDevice, slotState?.startSlot ?? slotIndex)} />
                                                                 )}
                                                             </>
                                                         )}
@@ -4452,46 +4366,26 @@ const SchemeCanvas = ({
                                                              );
                                                         })()}
                                                         {isRelayOccupied && isRelaySlotHovered && !isCoveredRelaySlot && (
-                                                            <>
-                                                                <Circle
-                                                                    x={relaySlotX + relayVisualSlotWidth - 2.5}
-                                                                    y={relaySlotRenderYOffset + 1.5}
-                                                                    radius={6}
-                                                                    fill="rgba(217, 83, 79, 0.55)"
-                                                                    onClick={() => {
-                                                                        setScheme((s) => {
-                                                                            const targetId = relayDevice?.id;
-                                                                            if (targetId == null) return s;
-                                                                            const controllerPatched = patchControllerLine(s, 'relay_devices', (currentLine) => removeRelayDeviceAtSlotFromLine(currentLine, slotIndex, relaySlotsCount, relayDevice));
-                                                                            if (controllerPatched) return controllerPatched;
-                                                                            if (isRelayBoilerType(relayType)) {
-                                                                                const currentBoilers = Array.isArray(s.boilers) ? s.boilers : [];
-                                                                                return { ...s, boilers: currentBoilers.filter((item) => item?.id !== targetId) };
-                                                                            }
-                                                                            const currentWired = Array.isArray(s.wired_devices) ? s.wired_devices : [];
-                                                                            return { ...s, wired_devices: currentWired.filter((item) => item?.id !== targetId) };
-                                                                        });
-                                                                        setHoveredRelaySlotIndex((prev) => (prev === slotIndex ? null : prev));
-                                                                    }}
-                                                                    onTap={() => {
-                                                                        setScheme((s) => {
-                                                                            const targetId = relayDevice?.id;
-                                                                            if (targetId == null) return s;
-                                                                            const controllerPatched = patchControllerLine(s, 'relay_devices', (currentLine) => removeRelayDeviceAtSlotFromLine(currentLine, slotIndex, relaySlotsCount, relayDevice));
-                                                                            if (controllerPatched) return controllerPatched;
-                                                                            if (isRelayBoilerType(relayType)) {
-                                                                                const currentBoilers = Array.isArray(s.boilers) ? s.boilers : [];
-                                                                                return { ...s, boilers: currentBoilers.filter((item) => item?.id !== targetId) };
-                                                                            }
-                                                                            const currentWired = Array.isArray(s.wired_devices) ? s.wired_devices : [];
-                                                                            return { ...s, wired_devices: currentWired.filter((item) => item?.id !== targetId) };
-                                                                        });
-                                                                        setHoveredRelaySlotIndex((prev) => (prev === slotIndex ? null : prev));
-                                                                    }}
-                                                                />
-                                                                <Line points={[relaySlotX + relayVisualSlotWidth - 5, relaySlotRenderYOffset - 1, relaySlotX + relayVisualSlotWidth, relaySlotRenderYOffset + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                <Line points={[relaySlotX + relayVisualSlotWidth, relaySlotRenderYOffset - 1, relaySlotX + relayVisualSlotWidth - 5, relaySlotRenderYOffset + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                            </>
+                                                            <SlotDeleteButton
+                                                                compact
+                                                                x={relaySlotX + relayVisualSlotWidth - 2.5}
+                                                                y={relaySlotRenderYOffset + 1.5}
+                                                                onRemove={() => {
+                                                                    setScheme((s) => {
+                                                                        const targetId = relayDevice?.id;
+                                                                        if (targetId == null) return s;
+                                                                        const controllerPatched = patchControllerLine(s, 'relay_devices', (currentLine) => removeRelayDeviceAtSlotFromLine(currentLine, slotIndex, relaySlotsCount, relayDevice));
+                                                                        if (controllerPatched) return controllerPatched;
+                                                                        if (isRelayBoilerType(relayType)) {
+                                                                            const currentBoilers = Array.isArray(s.boilers) ? s.boilers : [];
+                                                                            return { ...s, boilers: currentBoilers.filter((item) => item?.id !== targetId) };
+                                                                        }
+                                                                        const currentWired = Array.isArray(s.wired_devices) ? s.wired_devices : [];
+                                                                        return { ...s, wired_devices: currentWired.filter((item) => item?.id !== targetId) };
+                                                                    });
+                                                                    setHoveredRelaySlotIndex((prev) => (prev === slotIndex ? null : prev));
+                                                                }}
+                                                            />
                                                         )}
                                                          {!isRelayOccupied && showEmptySlots && !isCoveredRelaySlot && (
                                                             <>
@@ -4748,11 +4642,7 @@ const SchemeCanvas = ({
                                                              />
                                                          ))}
                                                          {device && isHovered && (
-                                                             <>
-                                                                 <Circle x={slotX + diSlotWidth - 2.5} y={slotY + 1.5} radius={6} fill="rgba(217, 83, 79, 0.55)" onClick={() => removeControllerDiDeviceAtSlot(slotIndex)} onTap={() => removeControllerDiDeviceAtSlot(slotIndex)} />
-                                                                 <Line points={[slotX + diSlotWidth - 5, slotY - 1, slotX + diSlotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                 <Line points={[slotX + diSlotWidth, slotY - 1, slotX + diSlotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                             </>
+                                                             <SlotDeleteButton compact x={slotX + diSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeControllerDiDeviceAtSlot(slotIndex)} />
                                                          )}
                                                      </Group>
                                                 );
@@ -5116,18 +5006,7 @@ const SchemeCanvas = ({
                                                             </>
                                                         )}
                                                         {isOccupied && isHovered && (
-                                                            <>
-                                                                <Circle
-                                                                    x={slotX + slotWidth - 2.5}
-                                                                    y={slotY + 1.5}
-                                                                    radius={6}
-                                                                    fill="rgba(217, 83, 79, 0.55)"
-                                                                    onClick={() => removeBusDeviceAtLine(lineIndex)}
-                                                                    onTap={() => removeBusDeviceAtLine(lineIndex)}
-                                                                />
-                                                                <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                            </>
+                                                            <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeBusDeviceAtLine(lineIndex)} />
                                                         )}
                                                     </Group>
                                                 );
@@ -5813,24 +5692,10 @@ const SchemeCanvas = ({
                                                                               </>
                                                                           )}
                                                                            {shouldRenderRelayDevice && isRelayHovered && (
-                                                                              <>
-                                                                                  <Circle
-                                                                                      x={relaySlotX + relaySlotSize - 2.5}
-                                                                                      y={sourceRelaySlotY + 1.5}
-                                                                                      radius={6}
-                                                                                      fill="rgba(217, 83, 79, 0.55)"
-                                                                                      onClick={(event) => {
-                                                                                          event.cancelBubble = true;
-                                                                                          removeDiModuleRelayDeviceAtSlot(slotIndex, 'relay_devices', sourceRelaySlotIndex);
-                                                                                      }}
-                                                                                      onTap={(event) => {
-                                                                                          event.cancelBubble = true;
-                                                                                          removeDiModuleRelayDeviceAtSlot(slotIndex, 'relay_devices', sourceRelaySlotIndex);
-                                                                                      }}
-                                                                                  />
-                                                                                  <Line points={[relaySlotX + relaySlotSize - 5, sourceRelaySlotY - 1, relaySlotX + relaySlotSize, sourceRelaySlotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                                  <Line points={[relaySlotX + relaySlotSize, sourceRelaySlotY - 1, relaySlotX + relaySlotSize - 5, sourceRelaySlotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                              </>
+                                                                              <SlotDeleteButton compact x={relaySlotX + relaySlotSize - 2.5} y={sourceRelaySlotY + 1.5} onRemove={(event) => {
+                                                                                  event.cancelBubble = true;
+                                                                                  removeDiModuleRelayDeviceAtSlot(slotIndex, 'relay_devices', sourceRelaySlotIndex);
+                                                                              }} />
                                                                           )}
                                                                       </Group>
                                                                   );
@@ -6093,24 +5958,10 @@ const SchemeCanvas = ({
                                                                                </>
                                                                            )}
                                                                            {shouldRenderRelayDevice && isRelayHovered && (
-                                                                               <>
-                                                                                    <Circle
-                                                                                        x={relaySlotX + relayVisualSlotWidth - 2.5}
-                                                                                        y={sourceRelaySlotY + 1.5}
-                                                                                        radius={6}
-                                                                                        fill="rgba(217, 83, 79, 0.55)"
-                                                                                        onClick={(event) => {
-                                                                                            event.cancelBubble = true;
-                                                                                            removeDiModuleRelayDeviceAtSlot(slotIndex, 'relay_s_devices', sourceRelaySlotIndex);
-                                                                                        }}
-                                                                                        onTap={(event) => {
-                                                                                            event.cancelBubble = true;
-                                                                                            removeDiModuleRelayDeviceAtSlot(slotIndex, 'relay_s_devices', sourceRelaySlotIndex);
-                                                                                        }}
-                                                                                    />
-                                                                                    <Line points={[relaySlotX + relayVisualSlotWidth - 5, sourceRelaySlotY - 1, relaySlotX + relayVisualSlotWidth, sourceRelaySlotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                                    <Line points={[relaySlotX + relayVisualSlotWidth, sourceRelaySlotY - 1, relaySlotX + relayVisualSlotWidth - 5, sourceRelaySlotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                               </>
+                                                                               <SlotDeleteButton compact x={relaySlotX + relayVisualSlotWidth - 2.5} y={sourceRelaySlotY + 1.5} onRemove={(event) => {
+                                                                                   event.cancelBubble = true;
+                                                                                   removeDiModuleRelayDeviceAtSlot(slotIndex, 'relay_s_devices', sourceRelaySlotIndex);
+                                                                               }} />
                                                                            )}
                                                                        </Group>
                                                                    );
@@ -6157,33 +6008,7 @@ const SchemeCanvas = ({
                                                             </>
                                                         )}
                                                         {isOccupied && hoveredExtSlotIndex === `di:${slotIndex}` && (
-                                                            <>
-                                                                <Circle
-                                                                    name="scheme-delete-control"
-                                                                    x={slotX + size.width - 2.5}
-                                                                    y={slotY + 1.5}
-                                                                    radius={6}
-                                                                    fill="rgba(217, 83, 79, 0.55)"
-                                                                    onClick={() => removeDiModuleAtSlot(slotIndex)}
-                                                                    onTap={() => removeDiModuleAtSlot(slotIndex)}
-                                                                />
-                                                                <Line
-                                                                    name="scheme-delete-control"
-                                                                    points={[slotX + size.width - 5, slotY - 1, slotX + size.width, slotY + 4]}
-                                                                    stroke="white"
-                                                                    strokeWidth={1}
-                                                                    lineCap="round"
-                                                                    listening={false}
-                                                                />
-                                                                <Line
-                                                                    name="scheme-delete-control"
-                                                                    points={[slotX + size.width, slotY - 1, slotX + size.width - 5, slotY + 4]}
-                                                                    stroke="white"
-                                                                    strokeWidth={1}
-                                                                    lineCap="round"
-                                                                    listening={false}
-                                                                />
-                                                            </>
+                                                            <SlotDeleteButton compact name="scheme-delete-control" x={slotX + size.width - 2.5} y={slotY + 1.5} onRemove={() => removeDiModuleAtSlot(slotIndex)} />
                                                         )}
                                                     </Group>
                                                 );
@@ -6213,7 +6038,6 @@ const SchemeCanvas = ({
                                     memoExtLineThermostatDevices={memoExtLineThermostatDevices}
                                     extSlotOffsets={extSlotOffsets}
                                     getExtOffsetKey={getExtOffsetKey}
-                                    buildRelaySlotOccupancyPreserveIndexes={buildRelaySlotOccupancyPreserveIndexes}
                                     isRelayBoilerType={isRelayBoilerType}
                                     wifiSlotOffsets={wifiSlotOffsets}
                                     getWifiOffsetKey={getWifiOffsetKey}
@@ -6965,18 +6789,7 @@ const SchemeCanvas = ({
                                                              );
                                                           })()}
                                                           {isOccupied && isExtThermostat && isHovered && (
-                                                              <>
-                                                                  <Circle
-                                                                      x={slotX + slotWidth - 2.5}
-                                                                      y={slotY + 1.5}
-                                                                      radius={6}
-                                                                      fill="rgba(217, 83, 79, 0.55)"
-                                                                      onClick={() => removeExtThermostatAtSlot(slotIndex, memoExtModules.length)}
-                                                                      onTap={() => removeExtThermostatAtSlot(slotIndex, memoExtModules.length)}
-                                                                  />
-                                                                   <Line points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                   <Line points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                              </>
+                                                              <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeExtThermostatAtSlot(slotIndex, memoExtModules.length)} />
                                                           )}
                                                           {isOccupied && isExtThermostat && (
                                                               <>
@@ -7223,18 +7036,7 @@ const SchemeCanvas = ({
                                                                             <Image image={imageRelay} x={imageRelayX} y={imageRelayY} width={imageSizeRelay.width} height={imageSizeRelay.height} listening={false} />
                                                                         )}
                                                                         {relayDevice && isHoveredRelay && !isCoveredRelaySlot && (
-                                                                            <>
-                                                                                <Circle
-                                                                                    x={slotRelayX + slotSize.width - 2.5}
-                                                                                    y={slotRelayY + 1.5}
-                                                                                    radius={6}
-                                                                                    fill="rgba(217, 83, 79, 0.55)"
-                                                                                    onClick={() => removeExtModuleRelayDeviceAtSlot(slotIndex, isRelaySModule ? 'relay_s_devices' : 'relay_devices', relayIndex - 1)}
-                                                                                    onTap={() => removeExtModuleRelayDeviceAtSlot(slotIndex, isRelaySModule ? 'relay_s_devices' : 'relay_devices', relayIndex - 1)}
-                                                                                />
-                                                                                <Line points={[slotRelayX + slotSize.width - 5, slotRelayY - 1, slotRelayX + slotSize.width, slotRelayY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                                <Line points={[slotRelayX + slotSize.width, slotRelayY - 1, slotRelayX + slotSize.width - 5, slotRelayY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                            </>
+                                                                            <SlotDeleteButton compact x={slotRelayX + slotSize.width - 2.5} y={slotRelayY + 1.5} onRemove={() => removeExtModuleRelayDeviceAtSlot(slotIndex, isRelaySModule ? 'relay_s_devices' : 'relay_devices', relayIndex - 1)} />
                                                                         )}
                                                                         {!relayDevice && bPort && moduleBPortX !== null && moduleBPortY !== null && (() => {
                                                                             const fromX = side === 'left' ? slotRelayX + slotSize.width : slotRelayX;
@@ -7773,24 +7575,10 @@ const SchemeCanvas = ({
                                                                         />
                                                                     ))}
                                                                     {hasDevice && isChannelHovered && (
-                                                                        <>
-                                                                            <Circle
-                                                                                x={slotRenderX + visualSlotWidth - 2.5}
-                                                                                y={slotRenderY + 1.5}
-                                                                                radius={6}
-                                                                                fill="rgba(217, 83, 79, 0.55)"
-                                                                                onClick={(event) => {
-                                                                                    event.cancelBubble = true;
-                                                                                    removeIo4ChannelDeviceAtSlot(slotIndex, channelIndex);
-                                                                                }}
-                                                                                onTap={(event) => {
-                                                                                    event.cancelBubble = true;
-                                                                                    removeIo4ChannelDeviceAtSlot(slotIndex, channelIndex);
-                                                                                }}
-                                                                            />
-                                                                            <Line points={[slotRenderX + visualSlotWidth - 5, slotRenderY - 1, slotRenderX + visualSlotWidth, slotRenderY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                            <Line points={[slotRenderX + visualSlotWidth, slotRenderY - 1, slotRenderX + visualSlotWidth - 5, slotRenderY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                        </>
+                                                                        <SlotDeleteButton compact x={slotRenderX + visualSlotWidth - 2.5} y={slotRenderY + 1.5} onRemove={(event) => {
+                                                                            event.cancelBubble = true;
+                                                                            removeIo4ChannelDeviceAtSlot(slotIndex, channelIndex);
+                                                                        }} />
                                                                     )}
                                                                 </Group>
                                                             );
@@ -7927,24 +7715,10 @@ const SchemeCanvas = ({
                                                                              </>
                                                                          )}
                                                                         {hasDevice && isHovered && (
-                                                                            <>
-                                                                                <Circle
-                                                                                    x={lineX + di6SlotWidth - 2.5}
-                                                                                    y={slotYLine + 1.5}
-                                                                                    radius={6}
-                                                                                    fill="rgba(217, 83, 79, 0.55)"
-                                                                                    onClick={(event) => {
-                                                                                        event.cancelBubble = true;
-                                                                                        removeDi6ChannelDeviceAtSlot(slotIndex, channelIndex);
-                                                                                    }}
-                                                                                    onTap={(event) => {
-                                                                                        event.cancelBubble = true;
-                                                                                        removeDi6ChannelDeviceAtSlot(slotIndex, channelIndex);
-                                                                                    }}
-                                                                                />
-                                                                                <Line points={[lineX + di6SlotWidth - 5, slotYLine - 1, lineX + di6SlotWidth, slotYLine + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                                <Line points={[lineX + di6SlotWidth, slotYLine - 1, lineX + di6SlotWidth - 5, slotYLine + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                            </>
+                                                                            <SlotDeleteButton compact x={lineX + di6SlotWidth - 2.5} y={slotYLine + 1.5} onRemove={(event) => {
+                                                                                event.cancelBubble = true;
+                                                                                removeDi6ChannelDeviceAtSlot(slotIndex, channelIndex);
+                                                                            }} />
                                                                         )}
                                                                     </Group>
                                                                 );
@@ -8102,18 +7876,7 @@ const SchemeCanvas = ({
                                                                       <Image image={bl2RinnaiAdapterImage} x={bl2RinnaiAdapterX} y={bl2RinnaiAdapterY} width={bl2RinnaiAdapterWidth} height={bl2RinnaiAdapterHeight} listening={false} />
                                                                   )}
                                                                   {bl2Boiler && isHovered && (
-                                                                     <>
-                                                                         <Circle
-                                                                             x={bl2BusSlotX + bl2BoilerWidth - 2.5}
-                                                                             y={bl2BusSlotY + 1.5}
-                                                                             radius={6}
-                                                                             fill="rgba(217, 83, 79, 0.55)"
-                                                                             onClick={() => removeBusDeviceAtLine({ moduleIndex: slotIndex })}
-                                                                             onTap={() => removeBusDeviceAtLine({ moduleIndex: slotIndex })}
-                                                                         />
-                                                                         <Line points={[bl2BusSlotX + bl2BoilerWidth - 5, bl2BusSlotY - 1, bl2BusSlotX + bl2BoilerWidth, bl2BusSlotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                         <Line points={[bl2BusSlotX + bl2BoilerWidth, bl2BusSlotY - 1, bl2BusSlotX + bl2BoilerWidth - 5, bl2BusSlotY + 4]} stroke="white" strokeWidth={1} lineCap="round" listening={false} />
-                                                                     </>
+                                                                     <SlotDeleteButton compact x={bl2BusSlotX + bl2BoilerWidth - 2.5} y={bl2BusSlotY + 1.5} onRemove={() => removeBusDeviceAtLine({ moduleIndex: slotIndex })} />
                                                                  )}
                                                              {showPorts && bl2Boiler && bl2BoilerPorts.map((port, portIndex) => (
                                                                 <Circle
@@ -8459,7 +8222,7 @@ const SchemeCanvas = ({
                                                                                         </>
                                                                                     )}
                                                                                     {sensor && isNtcHovered && (
-                                                                                        <NtcDeleteButton
+                                                                                        <SlotDeleteButton
                                                                                             x={slotX + ntcSlotWidth - 2.5}
                                                                                             y={slotY + 1.5}
                                                                                             onRemove={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex)}
@@ -8542,7 +8305,7 @@ const SchemeCanvas = ({
                                                                                     {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
                                                                                     {showPorts && sensor && ntcSensorPorts.map((port) => <Circle key={`ext-ntc2-port-${slotIndex}-${extOneWireIndex}-${ntcIndex}-${port.name}`} x={sensorRenderX + port.x * sensorRenderSize.width} y={sensorRenderY + port.y * sensorRenderSize.height} radius={2.5} fill="red" listening={false} />)}
                                                                                     {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}
-                                                                                    {sensor && isNtcHovered && <NtcDeleteButton x={slotX + ntcSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} />}
+                                                                                    {sensor && isNtcHovered && <SlotDeleteButton x={slotX + ntcSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} />}
                                                                                     {!sensor && showEmptySlots && <><EditableInfoTitle x={slotX + ntcSlotWidth - 13} y={slotY + 2} width={10} height={10} text={String(ntcChannel)} fontSize={7} fill="#7b8494" align="right" listening={false} /><Circle x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} radius={10} fill={ADD_ACTION_FILL} onClick={() => addExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} onTap={() => addExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} /><Text x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} text="+" fontSize={15} fill={ADD_ACTION_TEXT_FILL} offsetX={4.5} offsetY={6} listening={false} /></>}
                                                                                 </Group>
                                                                             );
@@ -8618,30 +8381,7 @@ const SchemeCanvas = ({
                                                                         </>
                                                                     )}
                                                                     {owDevice && isOwHovered && (
-                                                                        <>
-                                                                            <Circle
-                                                                                x={owX + owWidth - 2.5}
-                                                                                y={owY + 1.5}
-                                                                                radius={6}
-                                                                                fill="rgba(217, 83, 79, 0.55)"
-                                                                                onClick={() => removeExtOneWireDeviceAtSlot(slotIndex, extOneWireIndex)}
-                                                                                onTap={() => removeExtOneWireDeviceAtSlot(slotIndex, extOneWireIndex)}
-                                                                            />
-                                                                            <Line
-                                                                                points={[owX + owWidth - 5, owY - 1, owX + owWidth, owY + 4]}
-                                                                                stroke="white"
-                                                                                strokeWidth={1}
-                                                                                lineCap="round"
-                                                                                listening={false}
-                                                                            />
-                                                                            <Line
-                                                                                points={[owX + owWidth, owY - 1, owX + owWidth - 5, owY + 4]}
-                                                                                stroke="white"
-                                                                                strokeWidth={1}
-                                                                                lineCap="round"
-                                                                                listening={false}
-                                                                            />
-                                                                        </>
+                                                                        <SlotDeleteButton compact x={owX + owWidth - 2.5} y={owY + 1.5} onRemove={() => removeExtOneWireDeviceAtSlot(slotIndex, extOneWireIndex)} />
                                                                     )}
                                                                     {showPorts && owPorts.map((port) => (
                                                                         <Circle
@@ -8960,30 +8700,7 @@ const SchemeCanvas = ({
                                                             );
                                                         })}
                                                         {isOccupied && isHovered && !isExtThermostat && (
-                                                            <Group name="scheme-delete-control">
-                                                                <Circle
-                                                                    x={slotX + slotWidth - 2.5}
-                                                                    y={slotY + 1.5}
-                                                                    radius={6}
-                                                                    fill="rgba(217, 83, 79, 0.55)"
-                                                                    onClick={() => { removeExtModuleAtSlot(slotIndex); }}
-                                                                    onTap={() => { removeExtModuleAtSlot(slotIndex); }}
-                                                                />
-                                                                <Line
-                                                                    points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]}
-                                                                    stroke="white"
-                                                                    strokeWidth={1}
-                                                                    lineCap="round"
-                                                                    listening={false}
-                                                                />
-                                                                <Line
-                                                                    points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]}
-                                                                    stroke="white"
-                                                                    strokeWidth={1}
-                                                                    lineCap="round"
-                                                                    listening={false}
-                                                                />
-                                                            </Group>
+                                                            <SlotDeleteButton compact name="scheme-delete-control" x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeExtModuleAtSlot(slotIndex)} />
                                                         )}
                                                     </Group>
                                                 );
@@ -9564,7 +9281,7 @@ const SchemeCanvas = ({
                                                                                     </>
                                                                                 )}
                                                                                 {sensor && isNtcHovered && (
-                                                                                    <NtcDeleteButton
+                                                                                    <SlotDeleteButton
                                                                                         x={slotX + ntcSlotWidth - 2.5}
                                                                                         y={slotY + 1.5}
                                                                                         onRemove={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex)}
@@ -9648,37 +9365,14 @@ const SchemeCanvas = ({
                                                                                 {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
                                                                                 {showPorts && sensor && ntcSensorPorts.map((port) => <Circle key={`onewire-ntc2-port-${slotIndex}-${ntcIndex}-${port.name}`} x={sensorRenderX + port.x * sensorRenderSize.width} y={sensorRenderY + port.y * sensorRenderSize.height} radius={2.5} fill="red" listening={false} />)}
                                                                                 {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}
-                                                                                {sensor && isNtcHovered && <NtcDeleteButton x={slotX + ntcSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} />}
+                                                                                {sensor && isNtcHovered && <SlotDeleteButton x={slotX + ntcSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} />}
                                                                                 {!sensor && showEmptySlots && <><EditableInfoTitle x={slotX + ntcSlotWidth - 13} y={slotY + 2} width={10} height={10} text={String(ntcChannel)} fontSize={7} fill="#7b8494" align="right" listening={false} /><Circle x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} radius={10} fill={ADD_ACTION_FILL} onClick={() => addOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} onTap={() => addOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} /><Text x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} text="+" fontSize={15} fill={ADD_ACTION_TEXT_FILL} offsetX={4.5} offsetY={6} listening={false} /></>}
                                                                             </Group>
                                                                         );
                                                                     });
                                                                 })()}
                                                                 {isOccupied && isHovered && (
-                                                                    <>
-                                                                        <Circle
-                                                                            x={slotPos.x + slotWidth - 2.5}
-                                                                            y={slotPos.y + 1.5}
-                                                                            radius={6}
-                                                                            fill="rgba(217, 83, 79, 0.55)"
-                                                                            onClick={() => { removeOneWireDeviceAtSlot(slotIndex); }}
-                                                                            onTap={() => { removeOneWireDeviceAtSlot(slotIndex); }}
-                                                                        />
-                                                                        <Line
-                                                                            points={[slotPos.x + slotWidth - 5, slotPos.y - 1, slotPos.x + slotWidth, slotPos.y + 4]}
-                                                                            stroke="white"
-                                                                            strokeWidth={1}
-                                                                            lineCap="round"
-                                                                            listening={false}
-                                                                        />
-                                                                        <Line
-                                                                            points={[slotPos.x + slotWidth, slotPos.y - 1, slotPos.x + slotWidth - 5, slotPos.y + 4]}
-                                                                            stroke="white"
-                                                                            strokeWidth={1}
-                                                                            lineCap="round"
-                                                                            listening={false}
-                                                                        />
-                                                                    </>
+                                                                    <SlotDeleteButton compact x={slotPos.x + slotWidth - 2.5} y={slotPos.y + 1.5} onRemove={() => removeOneWireDeviceAtSlot(slotIndex)} />
                                                                 )}
                                                                 {!isOccupied && (
                                                                     <>
@@ -10249,42 +9943,13 @@ const SchemeCanvas = ({
                                                 />
                                             ))}
                                             {isHovered && (
-                                                <>
-                                                    <Circle
-                                                        x={slotX + slotWidth - 2.5}
-                                                        y={slotY + 1.5}
-                                                        radius={6}
-                                                        fill="rgba(217, 83, 79, 0.55)"
-                                                        onClick={() => {
-                                                            setScheme((s) => ({
-                                                                ...s,
-                                                                wireless_devices: s.wireless_devices.filter((_, deviceIndex) => deviceIndex !== idx),
-                                                            }));
-                                                            setHoveredWirelessDeviceKey(null);
-                                                        }}
-                                                        onTap={() => {
-                                                            setScheme((s) => ({
-                                                                ...s,
-                                                                wireless_devices: s.wireless_devices.filter((_, deviceIndex) => deviceIndex !== idx),
-                                                            }));
-                                                            setHoveredWirelessDeviceKey(null);
-                                                        }}
-                                                    />
-                                                    <Line
-                                                        points={[slotX + slotWidth - 5, slotY - 1, slotX + slotWidth, slotY + 4]}
-                                                        stroke="white"
-                                                        strokeWidth={1}
-                                                        lineCap="round"
-                                                        listening={false}
-                                                    />
-                                                    <Line
-                                                        points={[slotX + slotWidth, slotY - 1, slotX + slotWidth - 5, slotY + 4]}
-                                                        stroke="white"
-                                                        strokeWidth={1}
-                                                        lineCap="round"
-                                                        listening={false}
-                                                    />
-                                                </>
+                                                <SlotDeleteButton compact x={slotX + slotWidth - 2.5} y={slotY + 1.5} onRemove={() => {
+                                                    setScheme((s) => ({
+                                                        ...s,
+                                                        wireless_devices: s.wireless_devices.filter((_, deviceIndex) => deviceIndex !== idx),
+                                                    }));
+                                                    setHoveredWirelessDeviceKey(null);
+                                                }} />
                                             )}
                                         </Group>
                                     );

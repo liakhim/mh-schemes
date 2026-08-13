@@ -1,4 +1,5 @@
 import React from 'react';
+import { buildRelaySlotOccupancyPreserveIndexes } from '../scheme/domain/relaySlots';
 import SlotContextMenu from './SlotContextMenu';
 
 const SlotContextMenus = ({
@@ -40,7 +41,6 @@ const SlotContextMenus = ({
     canAddDoubleRelayToDiModule,
     getControllerLineDevices,
     getRelaySPreferredDevices,
-    buildRelaySlotOccupancyPreserveIndexes,
     addRl2sRelayDeviceFromMenu,
     wifiLineMenus,
     isExtModuleAllowedForController,

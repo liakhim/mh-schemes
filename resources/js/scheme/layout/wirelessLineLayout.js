@@ -68,8 +68,13 @@ export const getWirelessLineLift = (schemeValue, controllerType, indentSize) => 
     const hasRelayDiModule = controllerType === 'smart2' && (Array.isArray(schemeValue?.di_modules) ? schemeValue.di_modules : [])
         .some((moduleItem) => ['rl2', 'rl2s'].includes(canonicalDeviceType(moduleItem?.type || moduleItem)));
     const smart2Lift = hasRelayDiModule ? 12 * indentSize : 0;
-    const hasWifiModules = Array.isArray(schemeValue?.wifi_modules) && schemeValue.wifi_modules.length > 0;
-    return smart2Lift + (controllerType === 'pro' && hasWifiModules ? 7 * indentSize : 0);
+    const hasWifiModules = (Array.isArray(schemeValue?.wifi_modules) ? schemeValue.wifi_modules : [])
+        .some((moduleItem) => ['rl6w', 'rl6sw'].includes(canonicalDeviceType(moduleItem?.type || moduleItem)));
+    const goWifiLift = (controllerType === 'go' || controllerType === 'go+') && hasWifiModules
+        ? 24 * indentSize
+        : 0;
+    const proWifiLift = controllerType === 'pro' && hasWifiModules ? 7 * indentSize : 0;
+    return smart2Lift + goWifiLift + proWifiLift;
 };
 
 export const getWirelessSlotX = (devices, index, showEmptySlots, controllerType = null, indentSize = 8, slotWidth = null) => {

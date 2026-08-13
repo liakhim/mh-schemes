@@ -7,6 +7,7 @@
 - Источник данных: `incomingScheme.wireless_devices`.
 - Нижняя грань wireless-линии отстоит от верхней грани контроллера на controller-specific gap.
 - `go`, `go+`: `0.6 * module_height`.
+- `go`, `go+` с модулем `rl6w` или `rl6sw` на Wi-Fi-линии: дополнительно поднимается на `24 * indent`.
 - `smart2`: `0.5 * module_height`.
 - `smart2` с DI-модулями `rl2`/`rl2s`: wireless-линия дополнительно поднимается на `12 * indent`.
 - `pro`: `1.25 * module_height`.

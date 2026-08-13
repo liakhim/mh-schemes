@@ -3,6 +3,7 @@ import { Circle, Group, Image, Rect, Text } from 'react-konva';
 import { canonicalDeviceType } from '../scheme/domain/deviceTypes';
 import { getDeviceStoredTitle, getOneWireDeviceTitle } from '../scheme/domain/deviceTitles';
 import { WIFI_ONE_WIRE_CAPACITY, WIFI_RELAY_CAPACITY } from '../scheme/domain/wifiModules';
+import { buildRelaySlotOccupancyPreserveIndexes } from '../scheme/domain/relaySlots';
 import { getWirelessDeviceImageKey } from '../scheme/assets/imageRegistry';
 import { getOneWireSlotPosition } from '../scheme/layout/oneWireLayout';
 import { getOneWirePortByRole } from '../scheme/layout/ports';
@@ -31,7 +32,7 @@ import {
 } from '../constants';
 import DeviceIndicator from './DeviceIndicator';
 import { DeviceInfoBlock as EditableInfoTitle } from './DeviceInfoBlock';
-import NtcDeleteButton from './NtcDeleteButton';
+import SlotDeleteButton from './SlotDeleteButton';
 
 const WifiLine = ({
     wifiLineEnabled,
@@ -55,7 +56,6 @@ const WifiLine = ({
     memoExtLineThermostatDevices,
     extSlotOffsets,
     getExtOffsetKey,
-    buildRelaySlotOccupancyPreserveIndexes,
     isRelayBoilerType,
     wifiSlotOffsets,
     getWifiOffsetKey,
@@ -422,7 +422,7 @@ const WifiLine = ({
                                                                         })()}
                                                                         {!relayDevice && <Circle x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} radius={16} fill={ADD_ACTION_FILL} onClick={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} />}
                                                                         {!relayDevice && <Text x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} text="+" fontSize={22} fill={ADD_ACTION_TEXT_FILL} offsetX={6.5} offsetY={9} listening={false} />}
-                                                                        {relayDevice && <NtcDeleteButton x={slotX + slotSize.width - 5} y={slotY + 5} onRemove={() => removeWifiModuleRelayDeviceAtSlot(moduleIndex, lineKey, relayIndex)} />}
+                                                                         {relayDevice && <SlotDeleteButton x={slotX + slotSize.width - 5} y={slotY + 5} onRemove={() => removeWifiModuleRelayDeviceAtSlot(moduleIndex, lineKey, relayIndex)} />}
                                                                         {relayDevice && (
                                                                             <>
                                                                                 <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 8)} width={slotSize.width} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
@@ -493,7 +493,7 @@ const WifiLine = ({
                                                                     {sensor && image && <Image image={image} x={slotPos.x} y={slotPos.y} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} listening={false} />}
                                                                     {!sensor && <Circle x={slotPos.x + ONE_WIRE_SLOT_SIZE / 2} y={slotPos.y + ONE_WIRE_SLOT_SIZE / 2} radius={16} fill={ADD_ACTION_FILL} onClick={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} />}
                                                                     {!sensor && <Text x={slotPos.x + ONE_WIRE_SLOT_SIZE / 2} y={slotPos.y + ONE_WIRE_SLOT_SIZE / 2} text="+" fontSize={22} fill={ADD_ACTION_TEXT_FILL} offsetX={6.5} offsetY={9} listening={false} />}
-                                                                    {sensor && hoveredWifiOneWireSlotKey === hoverKey && <NtcDeleteButton x={slotPos.x + ONE_WIRE_SLOT_SIZE - 5} y={slotPos.y + 5} onRemove={() => removeWifiOneWireDeviceAtSlot(moduleIndex, sensorIndex)} />}
+                                                                    {sensor && hoveredWifiOneWireSlotKey === hoverKey && <SlotDeleteButton x={slotPos.x + ONE_WIRE_SLOT_SIZE - 5} y={slotPos.y + 5} onRemove={() => removeWifiOneWireDeviceAtSlot(moduleIndex, sensorIndex)} />}
                                                                     {showPorts && sensorPorts.map((port) => <Circle key={`${sensorIndex}-${port.name}`} x={slotPos.x + port.x * ONE_WIRE_SLOT_SIZE} y={slotPos.y + port.y * ONE_WIRE_SLOT_SIZE} radius={2.5} fill="red" />)}
                                                                 </Group>
                                                             );
@@ -501,7 +501,7 @@ const WifiLine = ({
                                                         {showPorts && occupied && modulePorts.filter((port) => !String(port.name).includes('INDICATOR')).map((port) => <Circle key={`wifi-port-${port.name}`} x={moduleX + port.x * moduleSize.width} y={port.y * moduleSize.height} radius={2.5} fill="red" />)}
                                                         {!occupied && <Circle x={pairWidth / 2} y={moduleSize.height / 2} radius={16} fill={ADD_ACTION_FILL} onClick={(event) => { const pos = event.target.getAbsolutePosition(); setWifiMenuPos({ x: pos.x, y: pos.y, slotIndex: moduleIndex }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setWifiMenuPos({ x: pos.x, y: pos.y, slotIndex: moduleIndex }); }} />}
                                                         {!occupied && <Text x={pairWidth / 2} y={moduleSize.height / 2} text="+" fontSize={22} fill={ADD_ACTION_TEXT_FILL} offsetX={6.5} offsetY={9} listening={false} />}
-                                                        {occupied && hoveredWifiSlotKey === offsetKey && <NtcDeleteButton x={pairWidth - 5} y={5} onRemove={() => removeWifiModuleAtSlot(moduleIndex)} />}
+                                                        {occupied && hoveredWifiSlotKey === offsetKey && <SlotDeleteButton x={pairWidth - 5} y={5} onRemove={() => removeWifiModuleAtSlot(moduleIndex)} />}
                                                     </Group>
                                                 );
                                             })}

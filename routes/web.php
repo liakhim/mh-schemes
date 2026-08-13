@@ -82,3 +82,12 @@ Route::get('/scheme/{scheme}', function (Scheme $scheme) {
     ->whereNumber('scheme')
     ->middleware('php-session')
     ->name('scheme.with-id');
+
+// Experimental replacement editor. The established /scheme routes remain unchanged.
+Route::view('/project', 'project', ['scheme' => null])->middleware('php-session')->name('project');
+Route::get('/project/{scheme}', function (Scheme $scheme) {
+    return view('project', ['scheme' => $scheme]);
+})
+    ->whereNumber('scheme')
+    ->middleware('php-session')
+    ->name('project.with-id');
