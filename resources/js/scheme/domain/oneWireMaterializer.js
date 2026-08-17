@@ -14,6 +14,7 @@ import { restoreConnectionAssignments } from './connectionAssignments.js';
 import {
     CONTROLLER_MIXING_OWNER,
     getExtMixingOwner,
+    getNtcModuleOwnerRequirement,
     isMixingUnitSensor,
     MIXING_OWNER_FIELD,
 } from './mixingUnitOwnership.js';
@@ -180,11 +181,12 @@ const ensureNtcOneWireModules = (scheme) => {
 };
 
 const ensureOwnedNtcOneWireModules = (scheme) => {
+    const controllerType = getControllerType(scheme);
     const requiredByOwner = new Map();
     (Array.isArray(scheme?.sensors) ? scheme.sensors : [])
         .filter(isDirectNtcSensor)
         .forEach((sensor) => {
-            const ownerKey = sensor?.[MIXING_OWNER_FIELD];
+            const ownerKey = getNtcModuleOwnerRequirement(controllerType, sensor?.[MIXING_OWNER_FIELD]);
             if (ownerKey) requiredByOwner.set(ownerKey, (requiredByOwner.get(ownerKey) || 0) + 1);
         });
     if (requiredByOwner.size === 0) return scheme;
@@ -196,7 +198,7 @@ const ensureOwnedNtcOneWireModules = (scheme) => {
         .map((device) => (canonicalDeviceType(device?.type) === 'ntc-1-wire'
             ? { ...device, [MIXING_OWNER_FIELD]: device?.[MIXING_OWNER_FIELD] || CONTROLLER_MIXING_OWNER }
             : device));
-    const supportsExt = ['pro', 'ecosmart'].includes(getControllerType(scheme));
+    const supportsExt = ['pro', 'ecosmart'].includes(controllerType);
     const extModules = supportsExt ? (Array.isArray(scheme?.ext_modules) ? scheme.ext_modules : []).map((moduleItem, moduleIndex) => {
         const ownerKey = getExtMixingOwner(moduleItem, moduleIndex);
         return {

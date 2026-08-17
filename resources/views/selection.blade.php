@@ -14,7 +14,7 @@
     window.__vite_plugin_react_preamble_installed__ = true;
     </script>
     @endif
-    @vite(['resources/css/app.css', 'resources/js/selection.jsx'])
+    @vite('resources/js/selection.jsx')
 </head>
 <body>
     <div id="selection-app"></div>

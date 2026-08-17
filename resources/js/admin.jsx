@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import '../css/app.css';
 
 const controllerImagePaths = {
     pro: new URL('../assets/controllers/pro/pro.svg', import.meta.url).href,

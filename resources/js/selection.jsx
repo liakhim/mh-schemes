@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import '../css/app.css';
 import EquipmentOfferModal from './components/EquipmentOfferModal';
 import { getAllOneWireDevicesForBalancing } from './scheme/domain/initialState';
 import { materializePowerModules } from './scheme/domain/powerModules';
@@ -3840,6 +3841,7 @@ const SelectionApp = () => {
     // результаты последнего поиска заново, без запроса.
     const [boilerDropdownOpen, setBoilerDropdownOpen] = useState(false);
     const boilerSearchRef = useRef(null);
+    const boilerSearchInputRef = useRef(null);
     const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
     const [upsRequested, setUpsRequested] = useState(false);
     const [requestedControllerType, setRequestedControllerType] = useState('go');
@@ -4988,6 +4990,23 @@ const SelectionApp = () => {
                                         />
                                     );
                                 })}
+                                <div className="sel-added-boiler-search-row">
+                                    <button
+                                        className="sel-added-boiler-search-button"
+                                        type="button"
+                                        data-test-id="boiler-search-restart"
+                                        onClick={() => {
+                                            setBoilerQuery('');
+                                            setBoilerResults([]);
+                                            setBoilerSearchedQuery('');
+                                            setBoilerDropdownOpen(true);
+                                            requestAnimationFrame(() => boilerSearchInputRef.current?.focus());
+                                        }}
+                                    >
+                                        <span aria-hidden="true">+</span>
+                                        Добавить котёл
+                                    </button>
+                                </div>
                             </AddedDevicesBlock>
                         )}
 
@@ -5029,6 +5048,8 @@ const SelectionApp = () => {
                                     с onFocus: если поле уже в фокусе, событие focus не повторяется. */}
                                 <div style={{ position: 'relative' }}>
                                     <input
+                                        ref={boilerSearchInputRef}
+                                        className="sel-boiler-search-input"
                                         type="text"
                                         placeholder="Введите название котла..."
                                         value={boilerQuery}

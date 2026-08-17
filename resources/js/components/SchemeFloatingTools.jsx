@@ -25,6 +25,7 @@ const SchemeFloatingTools = ({
                     <circle cx="16" cy="23" r="2.5" />
                     <path d="M22.5 8.5h4m-4 4h3m-3 4h4" />
                 </svg>
+                <span className="spa-tool-label">Датчики</span>
                 <span className="spa-floating-tool-badge" aria-label={`${unusedBundledSensorCount} датчиков`}>
                     {unusedBundledSensorCount}
                 </span>
@@ -68,6 +69,7 @@ const SchemeFloatingTools = ({
                 <path d="M19 3.5v5h5M12 13h8m-8 4h5" />
                 <path d="M12.5 24.5h5.25a2.25 2.25 0 0 0 0-4.5H14v7m0-3h6" />
             </svg>
+            <span className="spa-tool-label">Предложение</span>
         </button>
         {selectionConfig && (
             <button
@@ -84,6 +86,7 @@ const SchemeFloatingTools = ({
                     <path d="M9 5.5h14v23H9zM13 3.5h6v4h-6z" />
                     <path d="m12 13 1.5 1.5L16 12m2 1h2m-8 6 1.5 1.5L16 18m2 1h2m-8 6 1.5 1.5L16 24m2 1h2" />
                 </svg>
+                <span className="spa-tool-label">Подбор</span>
             </button>
         )}
     </div>

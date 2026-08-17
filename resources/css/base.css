@@ -1,0 +1,30 @@
+:root {
+    --bg: #f3f4f7;
+    --card: #ffffff;
+    --line: #d7dbe4;
+    --text: #202738;
+    --text-muted: #667089;
+    --accent: #1565c0;
+    --ui-green: #2e7d32;
+    --ui-green-soft: #edf7e9;
+    --nav-height: 0px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    color: var(--text);
+    background: radial-gradient(circle at 20% 0%, #ffffff 0%, var(--bg) 52%);
+}
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
+}

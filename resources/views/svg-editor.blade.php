@@ -13,7 +13,7 @@
     window.__vite_plugin_react_preamble_installed__ = true;
     </script>
     @endif
-    @vite(['resources/css/svg-editor.css', 'resources/js/svg-editor.jsx'])
+    @vite('resources/js/svg-editor.jsx')
 </head>
 <body>
     <div id="svg-editor-app"></div>

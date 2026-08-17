@@ -1,5 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import '../css/app.css';
+import '../css/learning.css';
 import LearningApp from './learning/LearningApp';
 
 const container = document.getElementById('learning-app');

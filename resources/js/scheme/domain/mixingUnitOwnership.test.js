@@ -50,7 +50,7 @@ const collectNtcSensorOwners = (scheme) => {
     return result;
 };
 
-test('keeps PRO servos, NTC modules and mixing sensors on the same owner', () => {
+test('uses one EXT NTC module for PRO mixing sensors while keeping servo owners', () => {
     const result = materializeBalancedOneWireScheme(makeProScheme([
         makeSensor(1),
         makeSensor(2),
@@ -60,10 +60,12 @@ test('keeps PRO servos, NTC modules and mixing sensors on the same owner', () =>
     assert.deepEqual(result.controller.relay_s_devices.map((device) => device.mixing_unit_id), ['mix-1', 'mix-2']);
     assert.deepEqual(result.ext_modules[0].relay_s_devices.map((device) => device.mixing_unit_id), ['mix-3']);
     assert.deepEqual(Object.fromEntries(collectNtcSensorOwners(result)), {
-        'mix-1': 'controller',
-        'mix-2': 'controller',
+        'mix-1': 'ext:rl6s-1',
+        'mix-2': 'ext:rl6s-1',
         'mix-3': 'ext:rl6s-1',
     });
+    assert.equal(result.controller.one_wire_devices.some(({ type }) => type === 'ntc-1-wire'), false);
+    assert.equal(result.ext_modules[0].one_wire_devices.filter(({ type }) => type === 'ntc-1-wire').length, 1);
     assert.equal(result.sensors.length, 0);
     assert.deepEqual(
         Object.fromEntries(collectNtcSensorOwners(materializeBalancedOneWireScheme(result))),

@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import '../css/base.css';
+import '../css/svg-editor.css';
 
 const SAMPLE_SVG = `<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
   <style>

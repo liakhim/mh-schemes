@@ -2,6 +2,7 @@ import { canonicalDeviceType } from './deviceTypes.js';
 import {
     CONTROLLER_MIXING_OWNER,
     getExtMixingOwner,
+    getNtcModuleOwnerRequirement,
     isMixingUnitSensor,
     MIXING_OWNER_FIELD,
 } from './mixingUnitOwnership.js';
@@ -132,7 +133,8 @@ export const balanceNtcSensors = (scheme) => {
         Number(Boolean(b.sensor?.[MIXING_OWNER_FIELD])) - Number(Boolean(a.sensor?.[MIXING_OWNER_FIELD]))
     ));
     orderedNtcSensors.forEach(({ sensor, index }) => {
-        const best = findBestModuleRef(controllerDevices, extModules, refs, cursor, sensor?.[MIXING_OWNER_FIELD] || null);
+        const ownerKey = getNtcModuleOwnerRequirement(controllerType, sensor?.[MIXING_OWNER_FIELD]);
+        const best = findBestModuleRef(controllerDevices, extModules, refs, cursor, ownerKey);
         if (!best) return;
 
         const device = getDeviceByRef(controllerDevices, extModules, best.ref);

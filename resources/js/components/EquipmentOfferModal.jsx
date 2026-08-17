@@ -1,6 +1,8 @@
 import React from 'react';
 import logoPath from '../../assets/logo/logo.svg';
-import { downloadOfferPdf, getBillableCount } from '../scheme/export/offerPdfExport';
+import Modal from './Modal';
+
+const getBillableCount = (row) => row.paidCount ?? (row.count || 1);
 
 const EquipmentOfferModal = ({ sections, onClose }) => {
     const [isDownloading, setIsDownloading] = React.useState(false);
@@ -13,6 +15,7 @@ const EquipmentOfferModal = ({ sections, onClose }) => {
         if (isDownloading) return;
         setIsDownloading(true);
         try {
+            const { downloadOfferPdf } = await import('../scheme/export/offerPdfExport');
             await downloadOfferPdf(sections);
         } finally {
             setIsDownloading(false);
@@ -20,14 +23,7 @@ const EquipmentOfferModal = ({ sections, onClose }) => {
     };
 
     return (
-        <div className="equipment-offer-backdrop" onMouseDown={onClose}>
-            <div
-                className="equipment-offer-modal"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="equipment-offer-title"
-                onMouseDown={(event) => event.stopPropagation()}
-            >
+        <Modal className="equipment-offer-modal" labelledBy="equipment-offer-title" onClose={onClose}>
                 <header className="equipment-offer-header">
                     <h2 id="equipment-offer-title">Коммерческое предложение</h2>
                     <div className="equipment-offer-header-actions">
@@ -82,8 +78,7 @@ const EquipmentOfferModal = ({ sections, onClose }) => {
                         <span>{total.toLocaleString('ru-RU')} ₽</span>
                     </footer>
                 )}
-            </div>
-        </div>
+        </Modal>
     );
 };
 

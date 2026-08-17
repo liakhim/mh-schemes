@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf';
 import logoPath from '../../../assets/logo/logo.svg';
 
 const PAGE_WIDTH = 595.28;
@@ -73,6 +72,7 @@ const drawLeader = (ctx, fromX, toX, y) => {
 };
 
 export const downloadOfferPdf = async (sections) => {
+    const { jsPDF } = await import('jspdf');
     const logoImage = await loadImage(logoPath);
     const pages = [];
     let page = createPage();

@@ -91,6 +91,7 @@ const SchemeRightTools = ({
                     <circle cx="22.5" cy="21.5" r="4.5" />
                     <path d="m26 25 3 3" />
                 </svg>
+                <span className="spa-tool-label">Детали</span>
             </button>
         )}
         {displayedToolsInstallationMode && (
@@ -116,6 +117,7 @@ const SchemeRightTools = ({
                 <svg viewBox="0 0 32 32" aria-hidden="true">
                     <path d="M4.5 4.5h23v23h-23zM12.2 4.5v23m7.6-23v23M4.5 12.2h23m-23 7.6h23" />
                 </svg>
+                <span className="spa-tool-label">Сетка</span>
             </button>
         )}
         {!displayedToolsInstallationMode && (
@@ -133,6 +135,7 @@ const SchemeRightTools = ({
                     <rect x="4.5" y="19.5" width="9" height="7" rx="1.5" />
                     <path d="M23 19.5v7m-3.5-3.5h7" />
                 </svg>
+                <span className="spa-tool-label">Слоты</span>
             </button>
         )}
         <div className="spa-save-tool" ref={saveActionsRef}>
@@ -149,6 +152,7 @@ const SchemeRightTools = ({
                 <path d="M5 4.5h19l3 3v20H5zM10 4.5v8h12v-8M10 27.5v-10h12v10" />
                 <path d="M18.5 7.5h2" />
             </svg>
+            <span className="spa-tool-label">Сохранить</span>
         </button>
         <section
             id="spa-save-actions-panel"
@@ -203,6 +207,7 @@ const SchemeRightTools = ({
                 <svg viewBox="0 0 32 32" aria-hidden="true">
                     <path d="m12 8-7 8 7 8m8-16 7 8-7 8M18 5l-4 22" />
                 </svg>
+                <span className="spa-tool-label">Код</span>
             </button>
             <section
                 id="spa-developer-tools-panel"
@@ -255,6 +260,7 @@ const SchemeRightTools = ({
                 <path d="M8 3.5h11l5 5v20H8z" />
                 <path d="M19 3.5v5h5M16 11.5v10m-4-4 4 4 4-4M11.5 25h9" />
             </svg>
+            <span className="spa-tool-label">Экспорт</span>
         </button>
     </div>
     );

@@ -68,9 +68,8 @@ Route::view('/svg-editor', 'svg-editor')->name('svg-editor');
 // Страница обучения.
 Route::view('/learning', 'learning')->name('learning');
 
-// Страницы подбора оборудования (текущая и старая версии).
+// Страница подбора оборудования.
 Route::view('/selection', 'selection')->middleware('php-session')->name('selection');
-Route::view('/selection-old', 'selection-old')->middleware('php-session')->name('selection-old');
 
 // SPA-страница для создания новой схемы.
 Route::view('/scheme', 'spa', ['scheme' => null])->middleware('php-session')->name('scheme');
@@ -82,12 +81,3 @@ Route::get('/scheme/{scheme}', function (Scheme $scheme) {
     ->whereNumber('scheme')
     ->middleware('php-session')
     ->name('scheme.with-id');
-
-// Experimental replacement editor. The established /scheme routes remain unchanged.
-Route::view('/project', 'project', ['scheme' => null])->middleware('php-session')->name('project');
-Route::get('/project/{scheme}', function (Scheme $scheme) {
-    return view('project', ['scheme' => $scheme]);
-})
-    ->whereNumber('scheme')
-    ->middleware('php-session')
-    ->name('project.with-id');

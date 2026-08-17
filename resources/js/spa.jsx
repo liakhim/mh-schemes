@@ -4214,6 +4214,7 @@ const App = () => {
                         <path d="M7.5 11.5A10 10 0 1 1 6 20" />
                         <path d="M7.5 5.5v6h6M16 10.5v6l4 2.5" />
                     </svg>
+                    <span className="spa-tool-label">Сброс</span>
                 </button>
             )}
             <button
@@ -4223,7 +4224,12 @@ const App = () => {
                 data-tooltip="Помощь"
                 onClick={() => setShowHelpModal(true)}
             >
-                ?
+                <svg viewBox="0 0 32 32" aria-hidden="true">
+                    <circle cx="16" cy="16" r="11.5" />
+                    <path d="M12.8 12.5a3.4 3.4 0 1 1 5.2 2.9c-1.3.8-2 1.5-2 3.1" />
+                    <path d="M16 23h.01" />
+                </svg>
+                <span className="spa-tool-label">Помощь</span>
             </button>
             <div className={`spa-scheme-meta${schemeMetadataEditor ? ' is-open' : ''}${schemeMetaCollapsed ? ' is-collapsed' : ''}`}>
                 {schemeMetaCollapsed ? (
@@ -4238,6 +4244,7 @@ const App = () => {
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M6 3.5h9l3 3v14H6zM15 3.5v3h3M9 11h6m-6 3h6m-6 3h4" />
                         </svg>
+                        <span className="spa-tool-label">Текущая</span>
                     </button>
                 ) : (
                     <>

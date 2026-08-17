@@ -14,3 +14,9 @@ export const isMixingUnitSensor = (device) => {
     return device?.mixing_unit_id != null
         || String(device?.type || '').toLowerCase().includes('mixing');
 };
+
+// NTC modules are shared across PRO 1-wire lines. Only digital mixing sensors
+// require the same owner as their 220 V servo for the PID polling constraint.
+export const getNtcModuleOwnerRequirement = (controllerType, ownerKey) => (
+    controllerType === 'pro' && ownerKey === CONTROLLER_MIXING_OWNER ? null : ownerKey
+);
