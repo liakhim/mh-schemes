@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createRoot } from 'react-dom/client';
 import '../css/app.css';
 import EquipmentOfferModal from './components/EquipmentOfferModal';
+import TutorialPopover from './components/TutorialPopover';
 import { getAllOneWireDevicesForBalancing } from './scheme/domain/initialState';
 import { materializePowerModules } from './scheme/domain/powerModules';
 import {
@@ -123,7 +124,6 @@ const PRESSURE_SENSOR_BACKGROUND_PATH = new URL('../images/thermostats/standard_
 const PRESSURE_SENSOR_IMAGE_PATH = new URL('../images/thermostats/420sensor.png', import.meta.url).href;
 
 /** Быстрые подсказки над строкой поиска: подставляют бренд в запрос. */
-const BOILER_BRAND_TAGS = ['Baxi', 'Ariston', 'Arderia', 'Rinnai', 'Zota'];
 
 const MYHEAT_LOGO_PATH = new URL('../assets/logo/logo.svg', import.meta.url).href;
 
@@ -2323,10 +2323,11 @@ const SectionSubtitle = ({ children }) => (
     <p className="sel-subtitle">{children}</p>
 );
 
-const BoilerConnectionSwitch = ({ connectionType, onChange }) => {
+const BoilerConnectionSwitch = ({ connectionType, onChange, tutorialRef, onTutorialComplete }) => {
     const isRelay = String(connectionType || '').toUpperCase() === 'RELAY';
     return (
         <label
+            ref={tutorialRef}
             title={`Подключение: ${isRelay ? 'RELAY' : 'BUS'}`}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#64748b', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer' }}
         >
@@ -2334,7 +2335,10 @@ const BoilerConnectionSwitch = ({ connectionType, onChange }) => {
             <input
                 type="checkbox"
                 checked={isRelay}
-                onChange={(event) => onChange(event.target.checked ? 'RELAY' : 'BUS')}
+                onChange={(event) => {
+                    onChange(event.target.checked ? 'RELAY' : 'BUS');
+                    onTutorialComplete?.();
+                }}
                 style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
             />
             <span
@@ -2348,7 +2352,7 @@ const BoilerConnectionSwitch = ({ connectionType, onChange }) => {
     );
 };
 
-const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, price = null, disabled = false, control = null, hideCount = false, removeFirst = false, align = 'flex-end' }) => {
+const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, price = null, disabled = false, control = null, hideCount = false, removeFirst = false, align = 'flex-end', trailing = null }) => {
     const removeButton = onRemove ? (
         <button
             onClick={onRemove}
@@ -2413,6 +2417,7 @@ const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove 
         {/* Подъём нужен только прижатой к низу строке: по центру пунктир и так
             попадает на середину. */}
         <span className="sel-added-leader" style={{ flex: 1, borderBottom: '1px dotted #6b7f95', transform: badgeAbove || align === 'center' ? 'none' : 'translateY(-3px)' }} />
+        {trailing}
         {removeFirst && removeButton}
         {control}
         {!hideCount && <span style={{ whiteSpace: 'nowrap' }}>{count} шт</span>}
@@ -2621,27 +2626,46 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
         {addedRows.length > 0 && (
             <AddedDevicesBlock marginTop={0} compact>
                 <AddedDevicesTitle>Добавленные термостаты:</AddedDevicesTitle>
-                {addedRows.map((row) => (
-                    <AddedDeviceLine
-                        key={row.label}
-                        label={row.label}
-                        count={row.count}
-                        hideCount
-                        removeFirst
-                        align="center"
-                        // Крестик убирает позицию целиком, минус у счётчика — по одному.
-                        onRemove={() => onRemoveRowCompletely(row)}
-                        control={(
-                            <QtyStepper
-                                count={row.count}
-                                onDecrement={() => onRemoveRow(row)}
-                                onIncrement={() => onAddRow(row)}
-                                decTestId={`thermostat-${String(row.templateKey || '').replace(/\|/g, '-')}-qty-dec`}
-                                incTestId={`thermostat-${String(row.templateKey || '').replace(/\|/g, '-')}-qty-inc`}
-                            />
-                        )}
-                    />
-                ))}
+                {addedRows.map((row) => {
+                    const [, thermostatColor = 'black', floorSensor] = String(row.templateKey || '').split('|');
+                    return (
+                        <AddedDeviceLine
+                            key={row.label}
+                            label={row.label}
+                            count={row.count}
+                            hideCount
+                            removeFirst
+                            align="center"
+                            trailing={(
+                                <span className="sel-added-thermostat-meta">
+                                    {floorSensor === 'floor' && (
+                                        <span className="sel-added-floor-sensor-marker" role="img" aria-label="С датчиком пола" title="С датчиком пола">
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <circle cx="12" cy="7" r="3" />
+                                                <path d="M12 10v5M4 17h16M6 21h12" />
+                                            </svg>
+                                            <span>Датчик пола</span>
+                                        </span>
+                                    )}
+                                    <span className="sel-added-thermostat-swatch" aria-hidden="true">
+                                        <span style={{ background: THERMOSTAT_SWATCH_FILL[thermostatColor] || THERMOSTAT_SWATCH_FILL.black }} />
+                                    </span>
+                                </span>
+                            )}
+                            // Крестик убирает позицию целиком, минус у счётчика — по одному.
+                            onRemove={() => onRemoveRowCompletely(row)}
+                            control={(
+                                <QtyStepper
+                                    count={row.count}
+                                    onDecrement={() => onRemoveRow(row)}
+                                    onIncrement={() => onAddRow(row)}
+                                    decTestId={`thermostat-${String(row.templateKey || '').replace(/\|/g, '-')}-qty-dec`}
+                                    incTestId={`thermostat-${String(row.templateKey || '').replace(/\|/g, '-')}-qty-inc`}
+                                />
+                            )}
+                        />
+                    );
+                })}
             </AddedDevicesBlock>
         )}
 
@@ -3842,6 +3866,11 @@ const SelectionApp = () => {
     const [boilerDropdownOpen, setBoilerDropdownOpen] = useState(false);
     const boilerSearchRef = useRef(null);
     const boilerSearchInputRef = useRef(null);
+    const boilerTutorialScopeRef = useRef(null);
+    const boilerDropdownTutorialRef = useRef(null);
+    const boilerConnectionTutorialRef = useRef(null);
+    const boilerAddMoreTutorialRef = useRef(null);
+    const [boilerTutorialStep, setBoilerTutorialStep] = useState(null);
     const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
     const [upsRequested, setUpsRequested] = useState(false);
     const [requestedControllerType, setRequestedControllerType] = useState('go');
@@ -4248,6 +4277,12 @@ const SelectionApp = () => {
         && boilerSearchedQuery === boilerSearchQuery;
     const boilerDropdownVisible = boilerResultsVisible || boilerNotFoundVisible;
 
+    useEffect(() => {
+        if (boilerTutorialStep === 'input' && boilerSearchQuery && boilerResultsVisible) {
+            setBoilerTutorialStep('select');
+        }
+    }, [boilerResultsVisible, boilerSearchQuery, boilerTutorialStep]);
+
     // Клик мимо блока поиска и Escape убирают выпадашку. Слушатели висят только
     // пока она раскрыта; клик по самой строке результата попадает внутрь
     // контейнера, поэтому выбор котла обрабатывается обычным onClick и не
@@ -4256,10 +4291,16 @@ const SelectionApp = () => {
     useEffect(() => {
         if (!boilerDropdownOpen) return undefined;
         const onDocumentMouseDown = (event) => {
-            if (!boilerSearchRef.current?.contains(event.target)) setBoilerDropdownOpen(false);
+            if (!boilerSearchRef.current?.contains(event.target)) {
+                setBoilerDropdownOpen(false);
+                setBoilerTutorialStep((current) => current === 'select' ? null : current);
+            }
         };
         const onDocumentKeyDown = (event) => {
-            if (event.key === 'Escape') setBoilerDropdownOpen(false);
+            if (event.key === 'Escape') {
+                setBoilerDropdownOpen(false);
+                setBoilerTutorialStep((current) => current === 'select' ? null : current);
+            }
         };
         document.addEventListener('mousedown', onDocumentMouseDown);
         document.addEventListener('keydown', onDocumentKeyDown);
@@ -4275,6 +4316,7 @@ const SelectionApp = () => {
         // новый запрос инициирует только изменение текста.
         setBoilerDropdownOpen(false);
         const isStupid = result.bus_type === 127;
+        setBoilerTutorialStep(isStupid ? 'add-more' : 'connection');
         setIncomingScheme((prev) => {
             const boilers = Array.isArray(prev.boilers) ? [...prev.boilers] : [];
             const boiler = withRinnaiAdapter({
@@ -4950,8 +4992,19 @@ const SelectionApp = () => {
                         position="right -70px"
                         fallbackColor={CARD_PHOTO_TAIL_COLOR.boilerRoom}
                     />
+                    <button
+                        className="selection-tutorial-trigger"
+                        type="button"
+                        data-active={Boolean(boilerTutorialStep)}
+                        aria-label={boilerTutorialStep ? 'Закрыть обучение по выбору котла' : 'Показать подсказку по выбору котла'}
+                        title={boilerTutorialStep ? 'Закрыть обучение' : 'Как добавить котёл'}
+                        onClick={() => setBoilerTutorialStep((current) => current ? null : 'input')}
+                    >
+                        ?
+                    </button>
 
                     <div
+                        ref={boilerTutorialScopeRef}
                         style={{
                             position: 'relative',
                             display: 'flex',
@@ -4983,6 +5036,8 @@ const SelectionApp = () => {
                                                 <BoilerConnectionSwitch
                                                     connectionType={boiler.connection_type}
                                                     onChange={(connectionType) => setSmartBoilerConnectionType(index, connectionType)}
+                                                    tutorialRef={boilerTutorialStep === 'connection' && index === incomingScheme.boilers.length - 1 ? boilerConnectionTutorialRef : null}
+                                                    onTutorialComplete={() => setBoilerTutorialStep('add-more')}
                                                 />
                                             ) : null}
                                             hideCount
@@ -4992,10 +5047,12 @@ const SelectionApp = () => {
                                 })}
                                 <div className="sel-added-boiler-search-row">
                                     <button
+                                        ref={boilerAddMoreTutorialRef}
                                         className="sel-added-boiler-search-button"
                                         type="button"
                                         data-test-id="boiler-search-restart"
                                         onClick={() => {
+                                            if (boilerTutorialStep === 'add-more') setBoilerTutorialStep(null);
                                             setBoilerQuery('');
                                             setBoilerResults([]);
                                             setBoilerSearchedQuery('');
@@ -5011,37 +5068,6 @@ const SelectionApp = () => {
                         )}
 
                         <div>
-                            {/* Быстрые теги брендов: подставляют бренд в строку поиска,
-                                повторный клик по активному тегу очищает запрос. */}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-                                {BOILER_BRAND_TAGS.map((brand) => {
-                                    const isActive = boilerQuery.trim().toLowerCase() === brand.toLowerCase();
-                                    return (
-                                        <button
-                                            className="selection-option-button"
-                                            key={brand}
-                                            type="button"
-                                            data-test-id={`boiler-brand-${brand.toLowerCase()}`}
-                                            data-active={isActive}
-                                            onClick={() => setBoilerQuery(isActive ? '' : brand)}
-                                            style={{
-                                                padding: '6px 14px',
-                                                border: `1px solid ${isActive ? '#e07020' : '#e3e7ef'}`,
-                                                borderRadius: 999,
-                                                background: isActive ? '#fff8f2' : '#fff',
-                                                color: isActive ? '#c85e18' : '#667089',
-                                                cursor: 'pointer',
-                                                fontSize: 13,
-                                                fontWeight: isActive ? 700 : 500,
-                                                transition: 'background 0.18s, border-color 0.18s, color 0.18s',
-                                            }}
-                                        >
-                                            {brand}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
                             <div style={{ position: 'relative' }} ref={boilerSearchRef}>
                                 {/* Возврат в поле ввода снова раскрывает результаты последнего
                                     поиска, нового запроса при этом не уходит. onClick стоит рядом
@@ -5070,8 +5096,9 @@ const SelectionApp = () => {
                                         }}
                                     />
                                     {boilerSearchLoading && (
-                                        <span style={{ position: 'absolute', right: boilerQuery ? 44 : 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }}>
-                                            Поиск...
+                                        <span className={`sel-boiler-search-loading${boilerQuery ? ' has-clear' : ''}`} role="status" aria-live="polite">
+                                            <span className="sel-boiler-search-spinner" aria-hidden="true" />
+                                            Ищем котлы…
                                         </span>
                                     )}
                                     {boilerQuery && (
@@ -5109,10 +5136,11 @@ const SelectionApp = () => {
                                         </button>
                                     )}
                                 </div>
+                                {boilerSearchLoading && <span className="sel-boiler-search-progress" aria-hidden="true" />}
                                 {/* Выпадашка висит поверх контента и не входит
                                     в поток, чтобы высота карточки от нее не зависела. */}
                                 {boilerResultsVisible && (
-                                    <div data-test-id="boiler-search-results" style={{
+                                    <div ref={boilerDropdownTutorialRef} data-test-id="boiler-search-results" style={{
                                         position: 'absolute',
                                         top: '100%',
                                         left: 0,
@@ -5186,6 +5214,40 @@ const SelectionApp = () => {
                                 )}
                             </div>
                         </div>
+                        <TutorialPopover
+                            anchorRef={boilerSearchInputRef}
+                            scopeRef={boilerTutorialScopeRef}
+                            open={boilerTutorialStep === 'input'}
+                            onClose={() => setBoilerTutorialStep(null)}
+                        >
+                            Введите название котла или производителя в это поле
+                        </TutorialPopover>
+                        <TutorialPopover
+                            anchorRef={boilerDropdownTutorialRef}
+                            scopeRef={boilerTutorialScopeRef}
+                            open={boilerTutorialStep === 'select'}
+                            onClose={() => setBoilerTutorialStep(null)}
+                        >
+                            Выберите нужный котел
+                        </TutorialPopover>
+                        <TutorialPopover
+                            anchorRef={boilerConnectionTutorialRef}
+                            scopeRef={boilerTutorialScopeRef}
+                            open={boilerTutorialStep === 'connection'}
+                            onClose={() => setBoilerTutorialStep(null)}
+                            tipHeight={132}
+                        >
+                            <span>Выберите тип подключения котла или оставьте без изменений</span>
+                            <button className="tutorial-popover-action" type="button" onClick={() => setBoilerTutorialStep('add-more')}>Ок</button>
+                        </TutorialPopover>
+                        <TutorialPopover
+                            anchorRef={boilerAddMoreTutorialRef}
+                            scopeRef={boilerTutorialScopeRef}
+                            open={boilerTutorialStep === 'add-more'}
+                            onClose={() => setBoilerTutorialStep(null)}
+                        >
+                            Добавьте другие котлы, если это требуется
+                        </TutorialPopover>
                     </div>
                 </div>
             </section>
@@ -5366,6 +5428,8 @@ const SelectionApp = () => {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
             <div style={{ flex: '1 1 500px', minWidth: 0 }}>
             <section>
+                <h2>Датчики температуры</h2>
+                <SectionSubtitle>Выберите тип подключения, расположение и количество датчиков температуры</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <SectionEquipmentCard
                         image={THERMOSTAT_ROOM_IMAGE_PATH}
@@ -5439,7 +5503,7 @@ const SelectionApp = () => {
             </section>
 
             <section>
-                <h2>Токовый датчик давления</h2>
+                <h2>Датчик давления</h2>
                 <SectionSubtitle>Укажите количество токовых датчиков давления в системе</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <SectionEquipmentCard
