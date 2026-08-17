@@ -3894,8 +3894,15 @@
 }
 
 .ctx-menu-item {
+    display: block;
+    width: 100%;
     padding: 6px 20px;
+    border: 0;
+    color: inherit;
+    background: transparent;
     cursor: pointer;
+    font: inherit;
+    text-align: left;
 }
 
 .ctx-menu-item:hover {
