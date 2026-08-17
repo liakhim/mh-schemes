@@ -99,7 +99,7 @@ const ZONES_BACKGROUND_PATH = new URL('../images/thermostats/zones_room.jpg', im
 const OTHER_EQUIP_BACKGROUND_PATH = new URL('../images/thermostats/other_room.png', import.meta.url).href;
 
 /** Фон карточки зон контроля протечки: отдельного снимка нет, берём общий интерьер. */
-const LEAK_ZONE_BACKGROUND_PATH = new URL('../images/thermostats/standard_room.png', import.meta.url).href;
+const LEAK_ZONE_BACKGROUND_PATH = new URL('../images/thermostats/leak_room.png', import.meta.url).href;
 
 /** Пример структуры зоны для режима «показать JSON». */
 const LEAK_ZONE_JSON_EXAMPLE = {
@@ -2460,7 +2460,7 @@ const AddedDevicesTitle = ({ children }) => (
  * хватает высоты кадра, снизу продолжается этот цвет, а не белый край.
  * `position` перебивает привязку фона (по умолчанию — правый верхний угол).
  */
-const CardPhotoBackdrop = ({ image, aspectRatio = null, width = null, blur = 5, position = null, fallbackColor = null }) => (
+const CardPhotoBackdrop = ({ image, aspectRatio = null, width = null, blur = 5, position = null, fallbackColor = null, cover = false }) => (
     <>
         <div
             aria-hidden
@@ -2483,7 +2483,7 @@ const CardPhotoBackdrop = ({ image, aspectRatio = null, width = null, blur = 5, 
                 backgroundImage: `url(${image})`,
                 backgroundRepeat: 'no-repeat',
                 backgroundPosition: position || (aspectRatio ? 'center right' : 'right top'),
-                backgroundSize: aspectRatio ? 'cover' : '100% auto',
+                backgroundSize: aspectRatio || cover ? 'cover' : '100% auto',
                 maskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 100%)',
                 WebkitMaskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 100%)',
                 pointerEvents: 'none',
@@ -3040,6 +3040,7 @@ const SectionEquipmentCard = ({
     image = null,
     backgroundColor = null,
     backgroundPosition = null,
+    backgroundCover = false,
     aspectRatio = null,
     blur = 3,
     // Снимок устройства в правой части: рисуется поверх размытого фона и сам не размывается.
@@ -3145,6 +3146,7 @@ const SectionEquipmentCard = ({
                 width={backgroundWidth}
                 position={backgroundPosition}
                 fallbackColor={backgroundColor}
+                cover={backgroundCover}
             />
         )}
 
@@ -5643,6 +5645,8 @@ const SelectionApp = () => {
                         image={LEAK_ZONE_BACKGROUND_PATH}
                         backgroundWidth={520}
                         backgroundColor={CARD_PHOTO_TAIL_COLOR.standardRoom}
+                        backgroundPosition="right bottom"
+                        backgroundCover
                         title="Контроль протечки воды"
                         description="Датчики каждой зоны собираются в один шлейф и занимают один дискретный вход. Запорные клапаны задаются общим количеством, каждый занимает два соседних релейных порта."
                         addLabel="Добавить группу датчиков протечки"
