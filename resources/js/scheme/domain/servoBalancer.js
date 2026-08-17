@@ -106,16 +106,17 @@ export const balanceServos = (scheme) => {
         .map(getMixingUnitKey)
         .filter((key) => key != null));
     const acceptsWifiServo = (device) => canonicalDeviceType(device?.type) !== '220servo'
-        || !linkedMixingUnitKeys.has(getMixingUnitKey(device));
+        || !linkedMixingUnitKeys.has(getMixingUnitKey(device))
+        || device?.connection_mode === 'wifi';
     const forbiddenWifiServos = [];
     if (Array.isArray(wifiModules)) {
         wifiModules = wifiModules.map((moduleItem) => {
             if (canonicalDeviceType(moduleItem?.type) === 'rl6w') {
                 const devices = Array.isArray(moduleItem.relay_devices) ? moduleItem.relay_devices : [];
-                forbiddenWifiServos.push(...devices.filter((device) => canonicalDeviceType(device?.type) === '220servo'));
+                forbiddenWifiServos.push(...devices.filter((device) => canonicalDeviceType(device?.type) === '220servo' && device?.connection_mode !== 'wifi'));
                 return {
                     ...moduleItem,
-                    relay_devices: devices.filter((device) => canonicalDeviceType(device?.type) !== '220servo'),
+                    relay_devices: devices.filter((device) => canonicalDeviceType(device?.type) !== '220servo' || device?.connection_mode === 'wifi'),
                 };
             }
             if (canonicalDeviceType(moduleItem?.type) !== 'rl6sw') return moduleItem;

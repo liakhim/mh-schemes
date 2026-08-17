@@ -2240,6 +2240,11 @@ const MIXING_SENSOR_OPTIONS = [
     { value: 'ntc', label: 'NTC' },
 ];
 
+const MIXING_CONNECTION_OPTIONS = [
+    { value: 'wired', label: 'По проводу' },
+    { value: 'wifi', label: 'По WI-FI' },
+];
+
 const findMixingTemplate = (servo, sensor) => MIXING_TEMPLATES
     .find((template) => template.servo === servo && template.sensor === sensor) || null;
 
@@ -3154,7 +3159,7 @@ const SectionEquipmentCard = ({
                 minWidth: half ? 200 : 260,
                 // В половинной карточке текст короче: иначе строки уезжают на
                 // непрозрачную часть снимка.
-                maxWidth: half ? 300 : 560,
+                maxWidth: half ? 300 : 620,
             }}
         >
             {/* Без заголовка карточка начинается сразу с содержимого: пустой
@@ -3263,7 +3268,9 @@ const SegmentedField = ({
         >
             {options.map((item) => {
                 const isActive = value === item.value;
-                const available = isAvailable(item.value);
+                // Текущий выбор должен оставаться активной кнопкой: режим может
+                // запрещать смену параметра, но не делает уже выбранное значение disabled.
+                const available = isActive || isAvailable(item.value);
                 return (
                     <button
                         className="selection-option-button"
@@ -3300,7 +3307,7 @@ const SegmentedField = ({
  * из пары получается шаблон MIXING_TEMPLATES. Комбинации «0-10V + цифровой
  * датчик» не существует, поэтому такой вариант датчика гасится.
  */
-const MixingUnitCard = ({ template, servo, onServoChange, sensor, onSensorChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, showJsonDetails = false }) => (
+const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, servo, onServoChange, sensor, onSensorChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, showJsonDetails = false }) => (
     <SectionEquipmentCard
         image={MIXING_UNIT_BACKGROUND_PATH}
         backgroundColor="#474847"
@@ -3321,11 +3328,20 @@ const MixingUnitCard = ({ template, servo, onServoChange, sensor, onSensorChange
         {/* Оба переключателя в одном ряду; на узкой карточке переносятся. */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
             <SegmentedField
+                label="Тип подключения"
+                options={MIXING_CONNECTION_OPTIONS}
+                value={connectionMode}
+                onChange={onConnectionModeChange}
+                testIdPrefix="mixing-connection"
+            />
+            <SegmentedField
                 label="Сервопривод"
                 options={MIXING_SERVO_OPTIONS}
                 value={servo}
                 onChange={onServoChange}
                 testIdPrefix="mixing-servo"
+                isAvailable={(value) => connectionMode !== 'wifi' || value === '220'}
+                unavailableTitle="Для Wi-Fi используется сервопривод 220V"
             />
             <SegmentedField
                 label="Датчик"
@@ -3333,8 +3349,12 @@ const MixingUnitCard = ({ template, servo, onServoChange, sensor, onSensorChange
                 value={sensor}
                 onChange={onSensorChange}
                 testIdPrefix="mixing-sensor"
-                isAvailable={(option) => isMixingCombinationAvailable(servo, option)}
-                unavailableTitle="Цифровой датчик не подключается к сервоприводу 0-10V"
+                isAvailable={(value) => connectionMode === 'wifi'
+                    ? value === 'digital'
+                    : isMixingCombinationAvailable(servo, value)}
+                unavailableTitle={connectionMode === 'wifi'
+                    ? 'Для Wi-Fi используется цифровой датчик'
+                    : 'Цифровой датчик не подключается к сервоприводу 0-10V'}
             />
         </div>
     </SectionEquipmentCard>
@@ -3534,9 +3554,14 @@ const getGroupedUnitLabel = (uidVal, devices, sensors, templates) => {
  */
 const getGroupedDeviceRows = (scheme, group, templates) => {
     const wiredDevices = Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [];
-    const sensors = Array.isArray(scheme?.sensors) ? scheme.sensors : [];
+    const wifiModules = Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : [];
+    const wifiDevices = wifiModules.flatMap((moduleItem) => moduleItem?.relay_devices || []);
+    const sensors = [
+        ...(Array.isArray(scheme?.sensors) ? scheme.sensors : []),
+        ...wifiModules.flatMap((moduleItem) => moduleItem?.one_wire_devices || []),
+    ];
     const groups = {};
-    wiredDevices.forEach((device) => {
+    [...wiredDevices, ...wifiDevices].forEach((device) => {
         if (isGroupedDevice(device, group, templates)) {
             if (!groups[device._uid]) groups[device._uid] = [];
             groups[device._uid].push(device);
@@ -3847,6 +3872,7 @@ const SelectionApp = () => {
     const [wirelessThermostatHasFloorSensor, setWirelessThermostatHasFloorSensor] = useState(false);
     const [mixingServo, setMixingServo] = useState('220');
     const [mixingSensor, setMixingSensor] = useState('digital');
+    const [mixingConnectionMode, setMixingConnectionMode] = useState('wired');
     const [pumpType, setPumpType] = useState('220');
     const [wiredTemperatureSensorKey, setWiredTemperatureSensorKey] = useState('wired-wall-digital');
     const [wirelessTemperatureSensorKey, setWirelessTemperatureSensorKey] = useState('wireless-wall');
@@ -3870,7 +3896,9 @@ const SelectionApp = () => {
     const boilerDropdownTutorialRef = useRef(null);
     const boilerConnectionTutorialRef = useRef(null);
     const boilerAddMoreTutorialRef = useRef(null);
+    const boilerAddedListTutorialRef = useRef(null);
     const [boilerTutorialStep, setBoilerTutorialStep] = useState(null);
+    const [boilerTutorialNextStep, setBoilerTutorialNextStep] = useState(null);
     const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
     const [upsRequested, setUpsRequested] = useState(false);
     const [requestedControllerType, setRequestedControllerType] = useState('go');
@@ -4114,10 +4142,12 @@ const SelectionApp = () => {
     // Датчик и сервопривод выбираются независимо, но комбинации
     // «0-10V + цифровой» не существует: при переходе на 0-10V откатываем
     // датчик на NTC, иначе шаблон не нашелся бы.
-    const mixingTemplate = useMemo(
-        () => findMixingTemplate(mixingServo, mixingSensor) || findMixingTemplate(mixingServo, 'ntc'),
-        [mixingServo, mixingSensor],
-    );
+    const mixingTemplate = useMemo(() => {
+        const template = findMixingTemplate(mixingServo, mixingSensor) || findMixingTemplate(mixingServo, 'ntc');
+        return mixingConnectionMode === 'wifi'
+            ? { ...template, label: 'Сервопривод 220V с цифровым датчиком с подключением по WI-FI', connectionMode: 'wifi' }
+            : template;
+    }, [mixingConnectionMode, mixingServo, mixingSensor]);
     const pumpTemplate = useMemo(
         () => PUMP_TEMPLATES.find((item) => item.pump === pumpType) || PUMP_TEMPLATES[0],
         [pumpType],
@@ -4276,6 +4306,9 @@ const SelectionApp = () => {
         && Boolean(boilerSearchQuery)
         && boilerSearchedQuery === boilerSearchQuery;
     const boilerDropdownVisible = boilerResultsVisible || boilerNotFoundVisible;
+    const boilerSearchResultsAvailable = !boilerSearchLoading
+        && boilerResults.length > 0
+        && !boilerDropdownVisible;
 
     useEffect(() => {
         if (boilerTutorialStep === 'input' && boilerSearchQuery && boilerResultsVisible) {
@@ -4316,7 +4349,8 @@ const SelectionApp = () => {
         // новый запрос инициирует только изменение текста.
         setBoilerDropdownOpen(false);
         const isStupid = result.bus_type === 127;
-        setBoilerTutorialStep(isStupid ? 'add-more' : 'connection');
+        setBoilerTutorialNextStep(isStupid ? 'add-more' : 'connection');
+        setBoilerTutorialStep('added-list');
         setIncomingScheme((prev) => {
             const boilers = Array.isArray(prev.boilers) ? [...prev.boilers] : [];
             const boiler = withRinnaiAdapter({
@@ -4371,8 +4405,7 @@ const SelectionApp = () => {
     const addMixingUnit = useCallback((template, group = 'mixing') => {
         setIncomingScheme((prev) => {
             const unitUid = uid();
-            const wiredDevices = Array.isArray(prev.wired_devices) ? [...prev.wired_devices] : [];
-            wiredDevices.push({
+            const servo = {
                 ...template.wiredDevice,
                 id: generateId(),
                 _uid: unitUid,
@@ -4385,12 +4418,40 @@ const SelectionApp = () => {
                     _uid: unitUid,
                     mixing_unit_id: unitUid,
                 })),
-            });
+            };
+            const unitSensors = template.sensors.map((sensor) => ({
+                ...sensor,
+                id: generateId(),
+                _uid: unitUid,
+                mixing_unit_id: unitUid,
+                _group: group,
+                _label: template.label,
+            }));
+            if (template.connectionMode === 'wifi') {
+                const moduleId = `wifi-mixing-${generateId()}`;
+                const wifiServo = { ...servo, connection_mode: 'wifi', ownerWifiModuleId: moduleId };
+                const wifiSensors = unitSensors.map((sensor) => ({ ...sensor, connection_mode: 'wifi', ownerWifiModuleId: moduleId }));
+                return resolveSelectionScheme({
+                    ...prev,
+                    wifi_modules: [
+                        ...(Array.isArray(prev.wifi_modules) ? prev.wifi_modules : []),
+                        {
+                            id: moduleId,
+                            type: 'rl6w',
+                            device_type: 'module',
+                            connection_type: 'WIFI',
+                            _auto_source: 'selection-wifi-mixing',
+                            relay_devices: [wifiServo],
+                            one_wire_devices: wifiSensors,
+                        },
+                    ],
+                });
+            }
+            const wiredDevices = Array.isArray(prev.wired_devices) ? [...prev.wired_devices] : [];
+            wiredDevices.push(servo);
 
             const sensors = Array.isArray(prev.sensors) ? [...prev.sensors] : [];
-            template.sensors.forEach((s) => {
-                sensors.push({ ...s, id: generateId(), _uid: unitUid, mixing_unit_id: unitUid, _group: group, _label: template.label });
-            });
+            sensors.push(...unitSensors);
 
             return resolveSelectionScheme({ ...prev, wired_devices: wiredDevices, sensors });
         });
@@ -4404,7 +4465,10 @@ const SelectionApp = () => {
             const sensors = Array.isArray(prev.sensors)
                 ? prev.sensors.filter((s) => s._uid !== unitUid)
                 : [];
-            return resolveSelectionScheme({ ...prev, wired_devices: wiredDevices, sensors });
+            const wifiModules = (Array.isArray(prev.wifi_modules) ? prev.wifi_modules : []).filter((moduleItem) => (
+                !moduleItem?.relay_devices?.some((device) => String(device?._uid) === String(unitUid))
+            ));
+            return resolveSelectionScheme({ ...prev, wired_devices: wiredDevices, sensors, wifi_modules: wifiModules });
         });
     }, []);
 
@@ -5024,38 +5088,36 @@ const SelectionApp = () => {
                         </p>
 
                         {Array.isArray(incomingScheme.boilers) && incomingScheme.boilers.length > 0 && (
-                            <AddedDevicesBlock marginTop={0}>
-                                <AddedDevicesTitle>Добавленные котлы</AddedDevicesTitle>
-                                {incomingScheme.boilers.map((boiler, index) => {
-                                    const isSmart = canonicalType(boiler?.type) === 'smart';
-                                    return (
-                                        <AddedDeviceLine
-                                            key={boiler.id ?? `${boiler.name}-${index}`}
-                                            label={boiler.name}
-                                            control={isSmart ? (
-                                                <BoilerConnectionSwitch
-                                                    connectionType={boiler.connection_type}
-                                                    onChange={(connectionType) => setSmartBoilerConnectionType(index, connectionType)}
-                                                    tutorialRef={boilerTutorialStep === 'connection' && index === incomingScheme.boilers.length - 1 ? boilerConnectionTutorialRef : null}
-                                                    onTutorialComplete={() => setBoilerTutorialStep('add-more')}
-                                                />
-                                            ) : null}
-                                            hideCount
-                                            onRemove={() => removeBoiler(index)}
-                                        />
-                                    );
-                                })}
-                                <div className="sel-added-boiler-search-row">
+                            <div ref={boilerAddedListTutorialRef}>
+                                <AddedDevicesBlock marginTop={0}>
+                                    <AddedDevicesTitle>Добавленные котлы</AddedDevicesTitle>
+                                    {incomingScheme.boilers.map((boiler, index) => {
+                                        const isSmart = canonicalType(boiler?.type) === 'smart';
+                                        return (
+                                            <AddedDeviceLine
+                                                key={boiler.id ?? `${boiler.name}-${index}`}
+                                                label={boiler.name}
+                                                control={isSmart ? (
+                                                    <BoilerConnectionSwitch
+                                                        connectionType={boiler.connection_type}
+                                                        onChange={(connectionType) => setSmartBoilerConnectionType(index, connectionType)}
+                                                        tutorialRef={boilerTutorialStep === 'connection' && index === incomingScheme.boilers.length - 1 ? boilerConnectionTutorialRef : null}
+                                                        onTutorialComplete={() => setBoilerTutorialStep('add-more')}
+                                                    />
+                                                ) : null}
+                                                hideCount
+                                                onRemove={() => removeBoiler(index)}
+                                            />
+                                        );
+                                    })}
+                                    <div className="sel-added-boiler-search-row">
                                     <button
                                         ref={boilerAddMoreTutorialRef}
                                         className="sel-added-boiler-search-button"
                                         type="button"
                                         data-test-id="boiler-search-restart"
                                         onClick={() => {
-                                            if (boilerTutorialStep === 'add-more') setBoilerTutorialStep(null);
-                                            setBoilerQuery('');
-                                            setBoilerResults([]);
-                                            setBoilerSearchedQuery('');
+                                            if (boilerTutorialStep === 'add-more') setBoilerTutorialStep('search-more');
                                             setBoilerDropdownOpen(true);
                                             requestAnimationFrame(() => boilerSearchInputRef.current?.focus());
                                         }}
@@ -5063,8 +5125,9 @@ const SelectionApp = () => {
                                         <span aria-hidden="true">+</span>
                                         Добавить котёл
                                     </button>
-                                </div>
-                            </AddedDevicesBlock>
+                                    </div>
+                                </AddedDevicesBlock>
+                            </div>
                         )}
 
                         <div>
@@ -5084,7 +5147,7 @@ const SelectionApp = () => {
                                         onClick={() => setBoilerDropdownOpen(true)}
                                         style={{
                                             width: '100%',
-                                            padding: '10px 44px 10px 14px',
+                                            padding: boilerSearchResultsAvailable ? '10px 164px 10px 14px' : '10px 44px 10px 14px',
                                             border: '1px solid #d7dbe4',
                                             borderRadius: boilerDropdownVisible ? '10px 10px 0 0' : 10,
                                             fontSize: 14,
@@ -5133,6 +5196,16 @@ const SelectionApp = () => {
                                             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                                         >
                                             ×
+                                        </button>
+                                    )}
+                                    {boilerSearchResultsAvailable && (
+                                        <button
+                                            className="selection-option-button sel-boiler-search-results-button"
+                                            type="button"
+                                            data-test-id="boiler-search-results-reopen"
+                                            onClick={() => setBoilerDropdownOpen(true)}
+                                        >
+                                            Результаты поиска
                                         </button>
                                     )}
                                 </div>
@@ -5223,6 +5296,16 @@ const SelectionApp = () => {
                             Введите название котла или производителя в это поле
                         </TutorialPopover>
                         <TutorialPopover
+                            anchorRef={boilerAddedListTutorialRef}
+                            scopeRef={boilerTutorialScopeRef}
+                            open={boilerTutorialStep === 'added-list'}
+                            onClose={() => setBoilerTutorialStep(null)}
+                            tipHeight={132}
+                        >
+                            <span>В данном блоке отображается список добавленных в Вашу систему котлов</span>
+                            <button className="tutorial-popover-action" type="button" onClick={() => setBoilerTutorialStep(boilerTutorialNextStep || 'connection')}>Далее</button>
+                        </TutorialPopover>
+                        <TutorialPopover
                             anchorRef={boilerDropdownTutorialRef}
                             scopeRef={boilerTutorialScopeRef}
                             open={boilerTutorialStep === 'select'}
@@ -5235,10 +5318,10 @@ const SelectionApp = () => {
                             scopeRef={boilerTutorialScopeRef}
                             open={boilerTutorialStep === 'connection'}
                             onClose={() => setBoilerTutorialStep(null)}
-                            tipHeight={132}
+                            tipHeight={176}
                         >
-                            <span>Выберите тип подключения котла или оставьте без изменений</span>
-                            <button className="tutorial-popover-action" type="button" onClick={() => setBoilerTutorialStep('add-more')}>Ок</button>
+                            <span>Выберите тип подключения котла (например, если вы хотите сделать этот котёл резервным и подключить его к релейному выходу контроллера или модуля расширения) или оставьте без изменений</span>
+                            <button className="tutorial-popover-action" type="button" onClick={() => setBoilerTutorialStep('add-more')}>Оставить без изменений</button>
                         </TutorialPopover>
                         <TutorialPopover
                             anchorRef={boilerAddMoreTutorialRef}
@@ -5247,6 +5330,14 @@ const SelectionApp = () => {
                             onClose={() => setBoilerTutorialStep(null)}
                         >
                             Добавьте другие котлы, если это требуется
+                        </TutorialPopover>
+                        <TutorialPopover
+                            anchorRef={boilerSearchInputRef}
+                            scopeRef={boilerTutorialScopeRef}
+                            open={boilerTutorialStep === 'search-more'}
+                            onClose={() => setBoilerTutorialStep(null)}
+                        >
+                            Добавьте дополнительный котел из списка или запустите поиск по новому ключевому слову
                         </TutorialPopover>
                     </div>
                 </div>
@@ -5261,6 +5352,14 @@ const SelectionApp = () => {
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <MixingUnitCard
                         template={mixingTemplate}
+                        connectionMode={mixingConnectionMode}
+                        onConnectionModeChange={(mode) => {
+                            setMixingConnectionMode(mode);
+                            if (mode === 'wifi') {
+                                setMixingServo('220');
+                                setMixingSensor('digital');
+                            }
+                        }}
                         servo={mixingServo}
                         onServoChange={selectMixingServo}
                         sensor={mixingSensor}

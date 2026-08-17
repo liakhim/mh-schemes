@@ -49,6 +49,7 @@
 - `rl6w` и `rl6sw` имеют собственную 1-wire линию, но она не является общей дополнительной ёмкостью для любых 1-wire устройств.
 - Capacity 1-wire линии каждого Wi-Fi-модуля: `6` датчиков.
 - Whitelist: `wall-temperature-sensor`, `wall-digital-sensor`, `flask-sensor-temperature`. Устройство также обязано иметь `device_type: 'sensor'` и `connection_type: '1-wire'`.
+- Исключение для Wi-Fi смесительного узла из `/selection`: `flask-sensor-mixing-unit` с `connection_mode: 'wifi'` находится на 1-wire линии того же автоматически добавленного `rl6w`, что и связанный `220servo` с `connection_mode: 'wifi'` на RELAY-линии.
 - Любой тип вне whitelist остаётся в публичном исходном bucket и не переносится в `wifi_modules[n].one_wire_devices`.
 - Одинаковая проверка whitelist обязательна для первичной материализации, повторной балансировки и ручного добавления.
 - Отрисовка использует общую геометрию и правила обычной 1-wire линии: позиции слотов, ортогональные провода, цвета, инфоблоки и hover-удаление. Отличается только whitelist устройств.

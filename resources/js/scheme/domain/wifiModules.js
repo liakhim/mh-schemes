@@ -8,6 +8,7 @@ const WIFI_ONE_WIRE_SENSOR_TYPES = new Set([
     'wall-temperature-sensor',
     'wall-digital-sensor',
     'flask-sensor-temperature',
+    'flask-sensor-mixing-unit',
 ]);
 
 export const normalizeWifiModule = (moduleItem, index) => {
@@ -35,6 +36,7 @@ export const isWifiOneWireSensor = (device) => (
     device?.device_type === 'sensor'
     && String(device?.connection_type || '').toLowerCase() === '1-wire'
     && WIFI_ONE_WIRE_SENSOR_TYPES.has(canonicalDeviceType(device?.type))
+    && (canonicalDeviceType(device?.type) !== 'flask-sensor-mixing-unit' || device?.connection_mode === 'wifi')
 );
 
 export const getWifiOneWireOwner = (moduleItem, moduleIndex) => `wifi:${moduleItem?.id ?? moduleIndex}`;

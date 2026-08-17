@@ -5369,6 +5369,30 @@
     right: 44px;
 }
 
+.selection-page .sel-boiler-search-results-button {
+    position: absolute;
+    top: 50%;
+    right: 40px;
+    padding: 3px 6px;
+    border: 1px solid #d7dbe4;
+    border-radius: 5px;
+    color: #667089;
+    background: #f8fafc;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2;
+    transform: translateY(-50%);
+}
+
+.selection-page .sel-boiler-search-results-button:hover,
+.selection-page .sel-boiler-search-results-button:focus-visible {
+    border-color: #e07020;
+    color: #b84f0f;
+    background: #fff8f2;
+    outline: none;
+}
+
 .sel-boiler-search-spinner {
     width: 12px;
     height: 12px;

@@ -76,6 +76,42 @@ test('supports double relay WIFI lines but keeps a 220servo with its mixing sens
     assert.equal(result.wired_devices.some(({ id }) => id === 'servo-linked'), true);
 });
 
+test('keeps an explicitly selected WIFI mixing unit on one RL6W module', () => {
+    const servo = {
+        id: 'wifi-servo',
+        type: '220servo',
+        device_type: 'equipment',
+        connection_type: 'double_relay',
+        connection_mode: 'wifi',
+        mixing_unit_id: 'wifi-mix',
+    };
+    const mixingSensor = {
+        id: 'wifi-mixing-sensor',
+        type: 'flask-sensor-mixing-unit',
+        device_type: 'sensor',
+        connection_type: '1-wire',
+        connection_mode: 'wifi',
+        mixing_unit_id: 'wifi-mix',
+    };
+    const result = materializeBalancedOneWireScheme({
+        controller: { type: 'pro', relay_s_devices: [], one_wire_devices: [] },
+        ext_modules: [],
+        wired_devices: [],
+        sensors: [],
+        wifi_modules: [{
+            id: 'wifi-mixing',
+            type: 'rl6w',
+            relay_devices: [servo],
+            one_wire_devices: [mixingSensor],
+        }],
+    });
+
+    assert.deepEqual(result.wifi_modules[0].relay_devices.map(({ id }) => id), ['wifi-servo']);
+    assert.deepEqual(result.wifi_modules[0].one_wire_devices.map(({ id }) => id), ['wifi-mixing-sensor']);
+    assert.equal(result.wired_devices.some(({ id }) => id === 'wifi-servo'), false);
+    assert.equal(result.sensors.some(({ id }) => id === 'wifi-mixing-sensor'), false);
+});
+
 test('uses WIFI one-wire only for the three supported sensor types and returns overflow to sensors', () => {
     const ordinary = Array.from({ length: 6 }, (_, index) => sensor(`ordinary-${index}`, 'flask-sensor-strategy'));
     const supported = [
