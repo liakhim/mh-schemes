@@ -4443,8 +4443,10 @@ const SelectionApp = () => {
         // новый запрос инициирует только изменение текста.
         setBoilerDropdownOpen(false);
         const isStupid = result.bus_type === 127;
-        setBoilerTutorialNextStep(isStupid ? 'add-more' : 'connection');
-        setBoilerTutorialStep('added-list');
+        if (boilerTutorialStep) {
+            setBoilerTutorialNextStep(isStupid ? 'add-more' : 'connection');
+            setBoilerTutorialStep('added-list');
+        }
         setIncomingScheme((prev) => {
             const boilers = Array.isArray(prev.boilers) ? [...prev.boilers] : [];
             const boiler = withRinnaiAdapter({
@@ -4464,7 +4466,7 @@ const SelectionApp = () => {
             const nextScheme = withStupidBoilerSensor({ ...prev, boilers }, boiler);
             return resolveSelectionScheme(syncStrategySensorForSmartBoilers(nextScheme));
         });
-    }, []);
+    }, [boilerTutorialStep]);
 
     const addBoiler = useCallback((template) => {
         setIncomingScheme((prev) => {
@@ -5175,14 +5177,22 @@ const SelectionApp = () => {
                         fallbackColor={CARD_PHOTO_TAIL_COLOR.boilerRoom}
                     />
                     <button
-                        className="selection-tutorial-trigger"
+                        className="selection-option-button selection-tutorial-trigger"
                         type="button"
                         data-active={Boolean(boilerTutorialStep)}
+                        aria-pressed={Boolean(boilerTutorialStep)}
                         aria-label={boilerTutorialStep ? 'Закрыть обучение по выбору котла' : 'Показать подсказку по выбору котла'}
                         title={boilerTutorialStep ? 'Закрыть обучение' : 'Как добавить котёл'}
                         onClick={() => setBoilerTutorialStep((current) => current ? null : 'input')}
                     >
-                        ?
+                        <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
+                        <span className="selection-tutorial-trigger-copy">
+                            <strong>Подсказки</strong>
+                            <small>
+                                <i className="selection-tutorial-trigger-status" aria-hidden="true" />
+                                {boilerTutorialStep ? 'Включены' : 'Выключены'}
+                            </small>
+                        </span>
                     </button>
 
                     <div
@@ -5220,7 +5230,7 @@ const SelectionApp = () => {
                                                         connectionType={boiler.connection_type}
                                                         onChange={(connectionType) => setSmartBoilerConnectionType(index, connectionType)}
                                                         tutorialRef={boilerTutorialStep === 'connection' && index === incomingScheme.boilers.length - 1 ? boilerConnectionTutorialRef : null}
-                                                        onTutorialComplete={() => setBoilerTutorialStep('add-more')}
+                                                        onTutorialComplete={boilerTutorialStep === 'connection' ? () => setBoilerTutorialStep('add-more') : undefined}
                                                     />
                                                 ) : null}
                                                 hideCount
@@ -6019,7 +6029,6 @@ const SelectionApp = () => {
                 <div className="sel-controller-panel-glow" aria-hidden="true" />
                 <div className="sel-controller-panel-header">
                     <div>
-                        <span>Результат подбора</span>
                         <strong>Подобранный контроллер</strong>
                         {proAndEcosmartOptions && (
                             <small>Для этой конфигурации подходят два контроллера - выберите подходящий</small>

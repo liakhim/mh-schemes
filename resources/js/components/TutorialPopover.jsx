@@ -1,7 +1,25 @@
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 
 const TutorialPopover = ({ anchorRef, scopeRef, open, onClose, children, maxWidth = 440, tipHeight = 92 }) => {
     const [position, setPosition] = useState(null);
+    const [isRendered, setIsRendered] = useState(open);
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect(() => {
+        let frameId;
+        let timeoutId;
+        if (open) {
+            setIsRendered(true);
+            frameId = requestAnimationFrame(() => setIsVisible(true));
+        } else {
+            setIsVisible(false);
+            timeoutId = window.setTimeout(() => setIsRendered(false), 180);
+        }
+        return () => {
+            cancelAnimationFrame(frameId);
+            window.clearTimeout(timeoutId);
+        };
+    }, [open]);
 
     useLayoutEffect(() => {
         if (!open) return undefined;
@@ -38,15 +56,15 @@ const TutorialPopover = ({ anchorRef, scopeRef, open, onClose, children, maxWidt
         };
     }, [anchorRef, maxWidth, open, scopeRef, tipHeight]);
 
-    if (!open || !position) return null;
+    if (!isRendered || !position) return null;
 
     return (
         <>
-            <svg className="tutorial-popover-line" aria-hidden="true">
+            <svg className={`tutorial-popover-line${isVisible ? ' is-visible' : ''}`} aria-hidden="true">
                 <path d={`M ${position.lineStartX} ${position.lineStartY} V ${position.lineEndY + 7} H ${position.lineEndX} V ${position.lineEndY}`} />
                 <circle cx={position.lineStartX} cy={position.lineStartY} r="4" />
             </svg>
-            <aside className="tutorial-popover" style={{ left: position.left, top: position.top, width: position.width, height: tipHeight }} role="status">
+            <aside className={`tutorial-popover${isVisible ? ' is-visible' : ''}`} style={{ left: position.left, top: position.top, width: position.width, height: tipHeight }} role="status" aria-hidden={!isVisible}>
                 <button type="button" className="tutorial-popover-close" onClick={onClose} aria-label="Закрыть подсказку">×</button>
                 {children}
             </aside>
