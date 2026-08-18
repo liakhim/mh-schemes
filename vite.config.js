@@ -13,6 +13,7 @@ export default defineConfig({
                 'resources/js/selection.jsx',
                 'resources/js/svg-editor.jsx',
                 'resources/js/learning.jsx',
+                'resources/js/graphs.jsx',
             ],
             refresh: true,
         }),

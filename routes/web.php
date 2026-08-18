@@ -68,6 +68,9 @@ Route::view('/svg-editor', 'svg-editor')->name('svg-editor');
 // Страница обучения.
 Route::view('/learning', 'learning')->name('learning');
 
+// Демонстрация графа ограничений подбора.
+Route::view('/graphs', 'graphs')->name('graphs');
+
 // Страница подбора оборудования.
 Route::view('/selection', 'selection')->middleware('php-session')->name('selection');
 

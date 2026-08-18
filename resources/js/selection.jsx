@@ -480,7 +480,11 @@ const getRequiredRdt2ModuleCount = (scheme, controllerTypeOverride = null) => {
  * @returns {number} Число занятых позиций 1-wire.
  */
 const getOneWireCapacityUsage = (scheme, controllerType) => {
-    const devices = getAllOneWireDevicesForBalancing(scheme);
+    // У Wi-Fi модулей собственная 1-wire ёмкость, она не расходует слоты
+    // контроллера или EXT-линии при подборе.
+    const devices = getAllOneWireDevicesForBalancing(scheme).filter((device) => (
+        device?.ownerWifiModuleId == null && device?.ownerWifiModuleIndex == null
+    ));
     if (controllerType !== 'pro') return devices.length;
 
     const extDevices = Array.isArray(scheme?.controller?.ext_devices) ? scheme.controller.ext_devices : [];
@@ -592,6 +596,22 @@ const hasWifiMixingUnit = (scheme) => getSelectedMixingUnits(scheme)
 const getWifiModuleCapacity = (controllerType) => (
     ['pro', 'ecosmart'].includes(controllerType) ? 6 : 1
 );
+const WIFI_MIXING_UNITS_PER_MODULE = 3;
+
+const getRelaySUsedSlots = (moduleItem) => (Array.isArray(moduleItem?.relay_s_devices) ? moduleItem.relay_s_devices : [])
+    .filter(Boolean)
+    .reduce((usedSlots, device) => usedSlots + (hasConnectionType(device, 'double_relay') ? 2 : 1), 0);
+
+const getAvailableWifiMixingUnits = (scheme) => {
+    const wifiModules = Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : [];
+    const freePairsOnExistingModules = wifiModules
+        .filter((moduleItem) => canonicalType(moduleItem?.type) === 'rl6sw')
+        .reduce((freePairs, moduleItem) => (
+            freePairs + Math.floor(Math.max(0, 6 - getRelaySUsedSlots(moduleItem)) / 2)
+        ), 0);
+    const freeWifiModuleSlots = Math.max(0, getWifiModuleCapacity('pro') - wifiModules.length);
+    return freePairsOnExistingModules + freeWifiModuleSlots * WIFI_MIXING_UNITS_PER_MODULE;
+};
 
 /**
  * Рассчитывает доступные порты контроллера после учета расширений и UPS.
@@ -3108,6 +3128,9 @@ const SectionEquipmentCard = ({
     onAdd,
     showAdd = true,
     addTestId = null,
+    addDisabled = false,
+    addDisabledTitle = null,
+    incrementDisabled = false,
     // Строка или функция от строки списка: у карточки с несколькими вариантами
     // оборудования счетчики должны различаться (насос 220V и насос 0-10V).
     qtyTestId = null,
@@ -3120,6 +3143,9 @@ const SectionEquipmentCard = ({
             <AddedDevicesTitle>{addedTitle}</AddedDevicesTitle>
             {addedRows.map((row) => {
                 const rowQtyTestId = typeof qtyTestId === 'function' ? qtyTestId(row) : qtyTestId;
+                const rowIncrementDisabled = typeof incrementDisabled === 'function'
+                    ? incrementDisabled(row)
+                    : incrementDisabled;
                 return (
                     <AddedDeviceLine
                         key={row.label}
@@ -3131,6 +3157,7 @@ const SectionEquipmentCard = ({
                                 dense={addedDense}
                                 onDecrement={() => onRemoveUnit(row)}
                                 onIncrement={() => onAddUnit(row)}
+                                incrementDisabled={rowIncrementDisabled}
                                 decTestId={rowQtyTestId ? `${rowQtyTestId}-dec` : null}
                                 incTestId={rowQtyTestId ? `${rowQtyTestId}-inc` : null}
                             />
@@ -3146,6 +3173,8 @@ const SectionEquipmentCard = ({
             className="selection-add-button"
             onClick={onAdd}
             data-test-id={addTestId || undefined}
+            disabled={addDisabled}
+            title={addDisabled ? addDisabledTitle || undefined : undefined}
         >
             {addLabel}
         </button>
@@ -3347,7 +3376,7 @@ const SegmentedField = ({
  * из пары получается шаблон MIXING_TEMPLATES. Комбинации «0-10V + цифровой
  * датчик» не существует, поэтому такой вариант датчика гасится.
  */
-const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, servo, onServoChange, sensor, onSensorChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, showJsonDetails = false }) => (
+const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, servo, onServoChange, sensor, onSensorChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, wifiMixingLimitReached = false, showJsonDetails = false }) => (
     <SectionEquipmentCard
         image={MIXING_UNIT_BACKGROUND_PATH}
         backgroundColor="#474847"
@@ -3363,6 +3392,9 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         // счетчик в строке — большая кнопка становится лишней и прячется.
         showAdd={!addedRows.some((row) => row.label === template.label)}
         addTestId="add-mixing-unit"
+        addDisabled={connectionMode === 'wifi' && wifiMixingLimitReached}
+        addDisabledTitle="Нет свободных RELAY-S пар или Wi-Fi слотов для смесительного узла."
+        incrementDisabled={(row) => wifiMixingLimitReached && row.label === 'Сервопривод 220V с цифровым датчиком с подключением по WI-FI'}
         jsonData={{ wired_device: template.wiredDevice, sensors: template.sensors }}
         showJsonDetails={showJsonDetails}
     >
@@ -3473,10 +3505,11 @@ const QTY_STEPPER_DENSE_STYLE = {
     fontSize: 12,
 };
 
-const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false, allowZero = false, dense = false, decTestId = null, incTestId = null }) => {
+const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false, incrementDisabled = false, allowZero = false, dense = false, decTestId = null, incTestId = null }) => {
     if (!count && !allowZero) return null;
     const blockStyle = dense ? QTY_STEPPER_DENSE_STYLE : QTY_STEPPER_BLOCK_STYLE;
     const decrementDisabled = disabled || (allowZero && count <= 0);
+    const addDisabled = disabled || incrementDisabled;
     return (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: dense ? 3 : 4, flexShrink: 0 }}>
             <button
@@ -3495,8 +3528,8 @@ const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false, allowZe
                 title="Добавить ещё"
                 data-test-id={incTestId || undefined}
                 onClick={onIncrement}
-                disabled={disabled}
-                style={{ ...blockStyle, cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#94a3b8' : '#2e7d32', opacity: disabled ? 0.6 : 1 }}
+                disabled={addDisabled}
+                style={{ ...blockStyle, cursor: addDisabled ? 'not-allowed' : 'pointer', color: addDisabled ? '#94a3b8' : '#2e7d32', opacity: addDisabled ? 0.6 : 1 }}
             >
                 +
             </button>
@@ -3596,7 +3629,10 @@ const getGroupedUnitLabel = (uidVal, devices, sensors, templates) => {
 const getGroupedDeviceRows = (scheme, group, templates) => {
     const wiredDevices = Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [];
     const wifiModules = Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : [];
-    const wifiDevices = wifiModules.flatMap((moduleItem) => moduleItem?.relay_devices || []);
+    const wifiDevices = wifiModules.flatMap((moduleItem) => [
+        ...(Array.isArray(moduleItem?.relay_devices) ? moduleItem.relay_devices : []),
+        ...(Array.isArray(moduleItem?.relay_s_devices) ? moduleItem.relay_s_devices : []),
+    ]);
     const sensors = [
         ...(Array.isArray(scheme?.sensors) ? scheme.sensors : []),
         ...wifiModules.flatMap((moduleItem) => moduleItem?.one_wire_devices || []),
@@ -3634,7 +3670,7 @@ const getTemperatureSensorRows = (scheme, controllerType) => {
         .filter(isKitTemperatureSensor)
         .map((device) => ({ device, target: null }));
     // Датчик Wi-Fi смесительного узла хранится в собственной 1-wire линии
-    // RL6W, а не в публичном sensors, поэтому учитываем его отдельно.
+    // RL6SW, а не в публичном sensors, поэтому учитываем его отдельно.
     const wifiOneWireTemperatureSensors = (Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : [])
         .flatMap((moduleItem) => (Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : []))
         .filter(isKitTemperatureSensor)
@@ -4034,6 +4070,7 @@ const SelectionApp = () => {
         [compatibleControllerOptions],
     );
     const controllerType = getControllerType(incomingScheme);
+    const wifiMixingLimitReached = getAvailableWifiMixingUnits(incomingScheme) <= 0;
     // При уходе с автоматически выбранного GO+ снимает связанное с ним намерение UPS
     // и повторно согласует контроллер и обязательные модули.
     useEffect(() => {
@@ -4486,23 +4523,33 @@ const SelectionApp = () => {
                 _label: template.label,
             }));
             if (template.connectionMode === 'wifi') {
-                const moduleId = `wifi-mixing-${generateId()}`;
+                if (getAvailableWifiMixingUnits(prev) <= 0) return prev;
+                const wifiModules = Array.isArray(prev.wifi_modules) ? prev.wifi_modules : [];
+                const reusableModuleIndex = wifiModules.findIndex((moduleItem) => (
+                    canonicalType(moduleItem?.type) === 'rl6sw'
+                    && getRelaySUsedSlots(moduleItem) <= 4
+                ));
+                const reusableModule = wifiModules[reusableModuleIndex];
+                const moduleId = reusableModule?.id ?? `wifi-mixing-${generateId()}`;
                 const wifiServo = { ...servo, connection_mode: 'wifi', ownerWifiModuleId: moduleId };
                 const wifiSensors = unitSensors.map((sensor) => ({ ...sensor, connection_mode: 'wifi', ownerWifiModuleId: moduleId }));
                 return resolveSelectionScheme({
                     ...prev,
-                    wifi_modules: [
-                        ...(Array.isArray(prev.wifi_modules) ? prev.wifi_modules : []),
-                        {
+                    wifi_modules: reusableModule
+                        ? wifiModules.map((moduleItem, moduleIndex) => (moduleIndex === reusableModuleIndex ? {
+                            ...moduleItem,
+                            relay_s_devices: [...(Array.isArray(moduleItem.relay_s_devices) ? moduleItem.relay_s_devices : []), wifiServo],
+                            one_wire_devices: [...(Array.isArray(moduleItem.one_wire_devices) ? moduleItem.one_wire_devices : []), ...wifiSensors],
+                        } : moduleItem))
+                        : [...wifiModules, {
                             id: moduleId,
-                            type: 'rl6w',
+                            type: 'rl6sw',
                             device_type: 'module',
                             connection_type: 'WIFI',
                             _auto_source: 'selection-wifi-mixing',
-                            relay_devices: [wifiServo],
+                            relay_s_devices: [wifiServo],
                             one_wire_devices: wifiSensors,
-                        },
-                    ],
+                        }],
                 });
             }
             const wiredDevices = Array.isArray(prev.wired_devices) ? [...prev.wired_devices] : [];
@@ -4523,9 +4570,22 @@ const SelectionApp = () => {
             const sensors = Array.isArray(prev.sensors)
                 ? prev.sensors.filter((s) => s._uid !== unitUid)
                 : [];
-            const wifiModules = (Array.isArray(prev.wifi_modules) ? prev.wifi_modules : []).filter((moduleItem) => (
-                !moduleItem?.relay_devices?.some((device) => String(device?._uid) === String(unitUid))
-            ));
+            const wifiModules = (Array.isArray(prev.wifi_modules) ? prev.wifi_modules : [])
+                .map((moduleItem) => ({
+                    ...moduleItem,
+                    relay_devices: (Array.isArray(moduleItem?.relay_devices) ? moduleItem.relay_devices : [])
+                        .filter((device) => String(device?._uid) !== String(unitUid)),
+                    relay_s_devices: (Array.isArray(moduleItem?.relay_s_devices) ? moduleItem.relay_s_devices : [])
+                        .filter((device) => String(device?._uid) !== String(unitUid)),
+                    one_wire_devices: (Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : [])
+                        .filter((device) => String(device?._uid) !== String(unitUid)),
+                }))
+                .filter((moduleItem) => (
+                    moduleItem?._auto_source !== 'selection-wifi-mixing'
+                    || moduleItem.relay_devices.length > 0
+                    || moduleItem.relay_s_devices.length > 0
+                    || moduleItem.one_wire_devices.length > 0
+                ));
             return resolveSelectionScheme({ ...prev, wired_devices: wiredDevices, sensors, wifi_modules: wifiModules });
         });
     }, []);
@@ -5436,6 +5496,7 @@ const SelectionApp = () => {
                             'mixing',
                         )}
                         onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                        wifiMixingLimitReached={wifiMixingLimitReached}
                         showJsonDetails={showJsonDetails}
                     />
                 </div>

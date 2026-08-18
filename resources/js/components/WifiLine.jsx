@@ -159,7 +159,7 @@ const WifiLine = ({
                                         ? getSmart2DiRight() + 15 * indentSize
                                         : controllerType === 'pro'
                                             ? getProExtRight() + (hasVisibleProExtSlot ? 6 : 16) * indentSize
-                                            : controllerImage.width + (controllerType === 'ecosmart' ? 10 : 12) * indentSize;
+                                            : controllerImage.width + (controllerType === 'ecosmart' ? 20 : 12) * indentSize;
                                     const getPairHorizontalBounds = (moduleItem) => getWifiPairHorizontalBounds({
                                         moduleItem,
                                         wirelessImages,
@@ -263,11 +263,32 @@ const WifiLine = ({
                                                         onDragEnd={(event) => {
                                                             const node = event.target;
                                                             const base = getBasePosition(moduleIndex);
-                                                            const invalid = invalidWifiDragMap[offsetKey];
-                                                            const nextOffset = invalid
-                                                                ? (wifiDragStartOffsetsRef.current[offsetKey] || { x: 0, y: 0 })
-                                                                : { x: snapToGrid(node.x(), indentSize) - base.x, y: snapToGrid(node.y(), indentSize) - base.y };
-                                                            setWifiSlotOffsets((current) => ({ ...current, [offsetKey]: nextOffset }));
+                                                            const startOffset = wifiDragStartOffsetsRef.current[offsetKey] || { x: 0, y: 0 };
+                                                            const nextOffset = {
+                                                                x: snapToGrid(node.x(), indentSize) - base.x,
+                                                                y: snapToGrid(node.y(), indentSize) - base.y,
+                                                            };
+                                                            const bounds = getPairHorizontalBounds(moduleItem);
+                                                            const candidate = {
+                                                                left: base.x + nextOffset.x + bounds.left,
+                                                                top: base.y + nextOffset.y,
+                                                                right: base.x + nextOffset.x + bounds.right,
+                                                                bottom: base.y + nextOffset.y + moduleSize.height,
+                                                            };
+                                                            const controllerRect = { left: 0, top: 0, right: controllerImage.width, bottom: controllerImage.height };
+                                                            const collides = rectsOverlap(candidate, controllerRect)
+                                                                || allRects.some((rect, index) => index !== moduleIndex && rectsOverlap(candidate, rect));
+                                                            setWifiSlotOffsets((current) => ({
+                                                                ...current,
+                                                                [offsetKey]: collides ? startOffset : nextOffset,
+                                                            }));
+                                                            if (collides) {
+                                                                node.position({
+                                                                    x: base.x + startOffset.x,
+                                                                    y: base.y + startOffset.y,
+                                                                });
+                                                                node.getLayer()?.batchDraw();
+                                                            }
                                                             setInvalidWifiDragMap((current) => ({ ...current, [offsetKey]: false }));
                                                             delete wifiDragStartOffsetsRef.current[offsetKey];
                                                         }}

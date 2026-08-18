@@ -4138,12 +4138,12 @@ const SchemeCanvas = ({
                                                                 <EditableInfoTitle x={relaySlotX + 4} y={relaySlotRenderYOffset - (INFO_BLOCK_HEIGHT + 8)} text={relayInfoTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} width={Math.max(40, relayVisualSlotWidth - 8)} height={INFO_BLOCK_HEIGHT} align="center" verticalAlign="middle" device={relayDevice} title={relayInfoTitle} />
                                                             </>
                                                         )}
-                                                        {isRelayOccupied && relayVisualImageKey && relayLine?.bPortName && !isCoveredRelaySlot && (() => {
-                                                            const relayPorts = wirelessPortsByType[relayVisualImageKey] || [];
-                                                            const controllerRelayBPort = ports.find((port) => port.name === relayLine.bPortName);
-                                                            if (!controllerRelayBPort) return null;
+                                                         {isRelayOccupied && relayVisualImageKey && relayLine?.bPortName && !isCoveredRelaySlot && (() => {
+                                                             const relayPorts = wirelessPortsByType[relayVisualImageKey] || [];
+                                                             const controllerRelayBPort = ports.find((port) => port.name === relayLine.bPortName);
+                                                             if (!controllerRelayBPort) return null;
 
-                                                            if (isDoubleRelayRelayDevice) {
+                                                             if (isDoubleRelayRelayDevice) {
                                                                 const nextRelayLine = relayLines[slotIndex + 1] || null;
                                                                 const controllerRelayBPort1 = relayLine?.bPortName
                                                                     ? ports.find((port) => port.name === relayLine.bPortName)
@@ -4241,17 +4241,23 @@ const SchemeCanvas = ({
                                                                 const bToX = relayImageX + boilerBusBPort.x * relayImageSize.width;
                                                                 const bToY = relayImageY + boilerBusBPort.y * relayImageSize.height;
 
-                                                                const slotBasedOffset = controllerType === 'pro'
-                                                                    ? (slotIndex + 1) * indentSize
-                                                                    : indentSize;
-                                                                const bendY = Math.max(controllerImage.height + 2 * indentSize, relaySlotRenderYOffset + relayVisualSlotHeight + slotBasedOffset);
+                                                                 const stupidBoilerBusARouteY = relayImageY + relayImageSize.height + (slotIndex + 2.5) * indentSize;
+                                                                 const stupidBoilerBusBRouteY = relayImageY + relayImageSize.height + (slotIndex + 2) * indentSize;
+                                                                 const slotBasedOffset = controllerType === 'pro'
+                                                                     ? (slotIndex + 1) * indentSize
+                                                                     : indentSize;
+                                                                 const bendY = Math.max(controllerImage.height + 2 * indentSize, relaySlotRenderYOffset + relayVisualSlotHeight + slotBasedOffset);
 
-                                                                return (
-                                                                    <>
-                                                                        <Line points={getOrthogonalLinkPoints(aFromX, aFromY, bendY, aToX, aToY)} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                                        <Line points={getOrthogonalLinkPoints(bFromX, bFromY, bendY + indentSize, bToX, bToY)} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
-                                                                    </>
-                                                                );
+                                                                 return (
+                                                                     <>
+                                                                         <Line points={controllerType === 'pro' && isStupidBoilerType(relayType)
+                                                                             ? [aToX, aToY, aToX, stupidBoilerBusARouteY, bFromX, stupidBoilerBusARouteY, bFromX, bFromY]
+                                                                             : getOrthogonalLinkPoints(aFromX, aFromY, bendY, aToX, aToY)} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                         <Line points={controllerType === 'pro' && isStupidBoilerType(relayType)
+                                                                             ? [bToX, bToY, bToX, stupidBoilerBusBRouteY, aFromX, stupidBoilerBusBRouteY, aFromX, aFromY]
+                                                                             : getOrthogonalLinkPoints(bFromX, bFromY, bendY + indentSize, bToX, bToY)} stroke="#2e7d32" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />
+                                                                     </>
+                                                                 );
                                                             }
 
                                                             const relayInPort = getRelayInputPort(relayPorts, relayType, relayVisualImageKey);

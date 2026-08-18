@@ -11,6 +11,7 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByTestId('mixing-connection-wifi').click();
         await page.getByTestId('add-mixing-unit').click();
         await expect(page.getByTestId('controller-card-smart2')).toHaveAttribute('data-active', 'true');
+        await expect(page.getByText('Сервопривод 220V с цифровым датчиком с подключением по WI-FI')).toBeVisible();
 
         await page.getByTestId('mixing-connection-wired').click();
         await page.getByTestId('add-mixing-unit').click();

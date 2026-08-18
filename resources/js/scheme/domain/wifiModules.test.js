@@ -76,7 +76,7 @@ test('supports double relay WIFI lines but keeps a 220servo with its mixing sens
     assert.equal(result.wired_devices.some(({ id }) => id === 'servo-linked'), true);
 });
 
-test('keeps an explicitly selected WIFI mixing unit on one RL6W module', () => {
+test('keeps an explicitly selected WIFI mixing unit on one RL6SW module', () => {
     const servo = {
         id: 'wifi-servo',
         type: '220servo',
@@ -100,13 +100,13 @@ test('keeps an explicitly selected WIFI mixing unit on one RL6W module', () => {
         sensors: [],
         wifi_modules: [{
             id: 'wifi-mixing',
-            type: 'rl6w',
-            relay_devices: [servo],
+            type: 'rl6sw',
+            relay_s_devices: [servo],
             one_wire_devices: [mixingSensor],
         }],
     });
 
-    assert.deepEqual(result.wifi_modules[0].relay_devices.map(({ id }) => id), ['wifi-servo']);
+    assert.deepEqual(result.wifi_modules[0].relay_s_devices.map(({ id }) => id), ['wifi-servo']);
     assert.deepEqual(result.wifi_modules[0].one_wire_devices.map(({ id }) => id), ['wifi-mixing-sensor']);
     assert.equal(result.wired_devices.some(({ id }) => id === 'wifi-servo'), false);
     assert.equal(result.sensors.some(({ id }) => id === 'wifi-mixing-sensor'), false);
