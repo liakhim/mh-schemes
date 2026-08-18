@@ -6021,6 +6021,9 @@ const SelectionApp = () => {
                     <div>
                         <span>Результат подбора</span>
                         <strong>Подобранный контроллер</strong>
+                        {proAndEcosmartOptions && (
+                            <small>Для этой конфигурации подходят два контроллера - выберите подходящий</small>
+                        )}
                     </div>
                 </div>
                 {jsonToggleEnabled && (
@@ -6064,27 +6067,6 @@ const SelectionApp = () => {
                         );
                     })}
                 </div>
-                {proAndEcosmartOptions && (
-                    <div className="sel-stuck-controllers-note">
-                        <span>Для этой конфигурации подходят два контроллера: <strong>PRO</strong> и <strong>ECOsmart</strong>.</span>
-                        <button
-                            className="selection-option-button sel-controller-choice-button"
-                            type="button"
-                            data-active={controllerType === 'pro'}
-                            onClick={() => setController(getControllerTemplateValue('pro'))}
-                        >
-                            Использовать PRO
-                        </button>
-                        <button
-                            className="selection-option-button sel-controller-choice-button"
-                            type="button"
-                            data-active={controllerType === 'ecosmart'}
-                            onClick={() => setController(getControllerTemplateValue('ecosmart'))}
-                        >
-                            Использовать ECOsmart
-                        </button>
-                    </div>
-                )}
                 {/* Модули расширения, которые подбор добавил к контроллеру:
                     только снимок в плитке, название — в подсказке, количество
                     одинаковых — кружком в углу. */}
