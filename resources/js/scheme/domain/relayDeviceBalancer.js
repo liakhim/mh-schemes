@@ -152,19 +152,21 @@ export const balanceRelayDevices = (scheme) => {
     controller.relay_220pump5_devices = Array.isArray(controller.relay_220pump5_devices) ? [...controller.relay_220pump5_devices] : [];
     controller.relay_220pump3_devices = Array.isArray(controller.relay_220pump3_devices) ? [...controller.relay_220pump3_devices] : [];
 
-    // Тупой котёл не может садиться на RELAY-S порты: вычищаем застрявшие котлы
-    // из relay-s линий модулей и переносим их в обычные relay-линии.
+    // Тупой котёл не может находиться на Wi-Fi relay-модулях или RELAY-S портах.
     const strayStupidBoilers = [];
-    const stripStupidBoilersFromRelayS = (moduleItem) => {
-        if (!Array.isArray(moduleItem.relay_s_devices) || moduleItem.relay_s_devices.length === 0) return;
-        const strays = moduleItem.relay_s_devices.filter(isStupidBoilerDevice);
+    const stripStupidBoilersFromLine = (moduleItem, lineKey) => {
+        if (!Array.isArray(moduleItem[lineKey]) || moduleItem[lineKey].length === 0) return;
+        const strays = moduleItem[lineKey].filter(isStupidBoilerDevice);
         if (strays.length === 0) return;
         strayStupidBoilers.push(...strays);
-        moduleItem.relay_s_devices = moduleItem.relay_s_devices.filter((device) => !isStupidBoilerDevice(device));
+        moduleItem[lineKey] = moduleItem[lineKey].filter((device) => !isStupidBoilerDevice(device));
     };
-    if (controllerType === 'pro' || controllerType === 'ecosmart') extModules.forEach(stripStupidBoilersFromRelayS);
-    if (controllerType === 'smart2') diModules.forEach(stripStupidBoilersFromRelayS);
-    if (Array.isArray(wifiModules)) wifiModules.forEach(stripStupidBoilersFromRelayS);
+    if (controllerType === 'pro' || controllerType === 'ecosmart') extModules.forEach((moduleItem) => stripStupidBoilersFromLine(moduleItem, 'relay_s_devices'));
+    if (controllerType === 'smart2') diModules.forEach((moduleItem) => stripStupidBoilersFromLine(moduleItem, 'relay_s_devices'));
+    if (Array.isArray(wifiModules)) wifiModules.forEach((moduleItem) => {
+        stripStupidBoilersFromLine(moduleItem, 'relay_devices');
+        stripStupidBoilersFromLine(moduleItem, 'relay_s_devices');
+    });
 
     const unplacedStupidBoilers = [];
     if (strayStupidBoilers.length > 0) {
@@ -173,9 +175,6 @@ export const balanceRelayDevices = (scheme) => {
             ...(controllerType === 'pro' || controllerType === 'ecosmart' ? extModules : [])
                 .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6')
                 .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: RELAY_LINE_CAPACITY })),
-            ...(Array.isArray(wifiModules) ? wifiModules : [])
-                .filter((moduleItem) => canonicalDeviceType(moduleItem?.type) === 'rl6w')
-                .map((moduleItem) => ({ devices: moduleItem.relay_devices, capacity: WIFI_RELAY_CAPACITY })),
         ].filter((line) => line.capacity > 0);
         strayStupidBoilers.forEach((boiler) => {
             const device = { ...boiler, connection_type: 'relay' };

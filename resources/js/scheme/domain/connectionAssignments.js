@@ -34,6 +34,8 @@ const supportsRelay = (device) => isStupidBoiler(device)
     || hasConnectionType(device, 'relay')
     || hasConnectionType(device, 'double_relay');
 
+const supportsWifiRelay = (device) => !isStupidBoiler(device) && supportsRelay(device);
+
 const supportsRelayS = (device) => !isStupidBoiler(device)
     && (hasConnectionType(device, 'relay-s') || hasConnectionType(device, 'double_relay'));
 
@@ -124,7 +126,7 @@ const getDiModuleLine = (moduleItem, line) => {
 
 const getWifiModuleLine = (moduleItem, line) => {
     const type = getDeviceType(moduleItem);
-    if (type === 'rl6w' && line === 'relay_devices') return { capacity: 6, accepts: supportsRelay };
+    if (type === 'rl6w' && line === 'relay_devices') return { capacity: 6, accepts: supportsWifiRelay };
     if (type === 'rl6sw' && line === 'relay_s_devices') return { capacity: 6, accepts: supportsRelayS };
     return null;
 };

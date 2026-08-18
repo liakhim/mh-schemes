@@ -258,7 +258,7 @@ const SlotContextMenus = ({
                     </>
                 );
             })()}
-            {relayMenuPos.lineKey !== 'relay_s_devices' && (
+            {relayMenuPos.lineKey !== 'relay_s_devices' && relayMenuPos.moduleGroup !== 'wifi' && (
                 <div
                     className="ctx-menu-item"
                     onClick={() => addRelayDeviceFromMenu('stupid')}

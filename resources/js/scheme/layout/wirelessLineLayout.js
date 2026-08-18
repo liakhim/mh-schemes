@@ -73,8 +73,9 @@ export const getWirelessLineLift = (schemeValue, controllerType, indentSize) => 
     const goWifiLift = (controllerType === 'go' || controllerType === 'go+') && hasWifiModules
         ? 24 * indentSize
         : 0;
+    const proWirelessLift = controllerType === 'pro' ? 13 * indentSize : 0;
     const proWifiLift = controllerType === 'pro' && hasWifiModules ? 7 * indentSize : 0;
-    return smart2Lift + goWifiLift + proWifiLift;
+    return smart2Lift + goWifiLift + proWirelessLift + proWifiLift;
 };
 
 export const getWirelessSlotX = (devices, index, showEmptySlots, controllerType = null, indentSize = 8, slotWidth = null) => {

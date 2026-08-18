@@ -7,7 +7,11 @@ test('lifts Smart2 wireless line for RL2-family DI modules', () => {
 });
 
 test('lifts Pro wireless line when Wi-Fi modules exist', () => {
-    assert.equal(getWirelessLineLift({ wifi_modules: [{ type: 'rl6w' }] }, 'pro', 8), 56);
+    assert.equal(getWirelessLineLift({ wifi_modules: [{ type: 'rl6w' }] }, 'pro', 8), 160);
+});
+
+test('lifts Pro wireless line by 13 indents without Wi-Fi modules', () => {
+    assert.equal(getWirelessLineLift({ wifi_modules: [] }, 'pro', 8), 104);
 });
 
 test('lifts GO and GO+ wireless lines by 24 indents for Wi-Fi modules', () => {

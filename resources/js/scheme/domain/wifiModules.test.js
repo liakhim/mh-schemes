@@ -22,7 +22,7 @@ test('normalizes top-level WIFI modules without depending on controller type', (
     }]);
 });
 
-test('uses WIFI relay lines after controller lines and allows boilers only on RL6W', () => {
+test('does not place stupid boilers on WIFI relay lines', () => {
     const result = materializeBalancedOneWireScheme({
         controller: { type: 'go', relay_devices: [] },
         wifi_modules: [{ id: 'wifi-s', type: 'rl6sw' }, { id: 'wifi-r', type: 'rl6w' }],
@@ -35,7 +35,24 @@ test('uses WIFI relay lines after controller lines and allows boilers only on RL
 
     assert.deepEqual(result.controller.relay_devices.map(({ id }) => id), ['boiler-1']);
     assert.deepEqual(result.wifi_modules[0].relay_s_devices, []);
-    assert.deepEqual(result.wifi_modules[1].relay_devices.map(({ id }) => id), ['boiler-2', 'pump-1']);
+    assert.deepEqual(result.wifi_modules[1].relay_devices.map(({ id }) => id), ['pump-1']);
+    assert.deepEqual(result.boilers.map(({ id }) => id), ['boiler-2']);
+});
+
+test('moves persisted stupid boilers from WIFI relay modules to a wired RELAY line', () => {
+    const result = materializeBalancedOneWireScheme({
+        controller: { type: 'go', relay_devices: [] },
+        wifi_modules: [
+            { id: 'wifi-r', type: 'rl6w', relay_devices: [{ id: 'wifi-boiler', type: 'stupid', connection_type: 'relay' }] },
+            { id: 'wifi-s', type: 'rl6sw', relay_s_devices: [{ id: 'wifi-boiler-s', type: 'stupid', connection_type: 'relay-s' }] },
+        ],
+        boilers: [],
+    });
+
+    assert.deepEqual(result.wifi_modules[0].relay_devices, []);
+    assert.deepEqual(result.wifi_modules[1].relay_s_devices, []);
+    assert.deepEqual(result.controller.relay_devices.map(({ id }) => id), ['wifi-boiler']);
+    assert.deepEqual(result.boilers.map(({ id }) => id), ['wifi-boiler-s']);
 });
 
 test('supports double relay WIFI lines but keeps a 220servo with its mixing sensor off WIFI', () => {
