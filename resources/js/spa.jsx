@@ -4038,6 +4038,14 @@ const App = () => {
                     <div className="spa-device-preview-header-actions">
                         <button
                             type="button"
+                            aria-label="Закрыть просмотр устройства"
+                            disabled={!selectedPreviewDevice}
+                            onClick={() => setSelectedDevicePreview(null)}
+                        >
+                            ×
+                        </button>
+                        <button
+                            type="button"
                             aria-label="Свернуть детали устройства"
                             title="Свернуть"
                             onClick={() => setDevicePreviewCollapsed(true)}
@@ -4046,15 +4054,6 @@ const App = () => {
                                 <path d="m7 4 6 6-6 6" />
                             </svg>
                         </button>
-                        {selectedPreviewDevice && (
-                            <button
-                                type="button"
-                                aria-label="Закрыть просмотр устройства"
-                                onClick={() => setSelectedDevicePreview(null)}
-                            >
-                                ×
-                            </button>
-                        )}
                     </div>
                 </div>
                 {selectedPreviewDevice ? (

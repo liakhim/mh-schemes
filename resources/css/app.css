@@ -1282,6 +1282,8 @@
 }
 
 .spa-page {
+    --scheme-accent: #e07020;
+    --accent: var(--scheme-accent);
     height: 100dvh;
     overflow: hidden;
 }
@@ -1386,7 +1388,7 @@
     min-height: 34px;
     padding: 7px 10px;
     border-radius: 11px;
-    color: #13885c;
+    color: var(--scheme-accent);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.02em;
@@ -1395,8 +1397,8 @@
 }
 
 .spa-selection-return-button:hover {
-    color: #087e52;
-    background: linear-gradient(145deg, #f4fffa, #e5f8ef);
+    color: color-mix(in srgb, var(--scheme-accent) 78%, #065f46);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--scheme-accent) 6%, white), color-mix(in srgb, var(--scheme-accent) 14%, white));
 }
 
 .spa-selection-return-button:focus-visible,
@@ -1429,7 +1431,7 @@
     gap: 5px;
     padding: 7px 5px 6px;
     border-color: #d9e3ed;
-    border-radius: 17px;
+    border-radius: 10px;
     color: #58708f;
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 10px 28px rgba(50, 76, 105, 0.15);
@@ -1461,7 +1463,7 @@
     height: 68px;
     padding: 0;
     border: 1px solid #d9e3ed;
-    border-radius: 17px;
+    border-radius: 10px;
     color: #58708f;
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 10px 28px rgba(50, 76, 105, 0.15);
@@ -1470,9 +1472,9 @@
 }
 
 .spa-scheme-meta-collapse-button:hover {
-    border-color: #b9e3d1;
-    color: #13885c;
-    background: linear-gradient(145deg, #f4fffa, #e5f8ef);
+    border-color: color-mix(in srgb, var(--scheme-accent) 26%, white);
+    color: var(--scheme-accent);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--scheme-accent) 6%, white), color-mix(in srgb, var(--scheme-accent) 14%, white));
     box-shadow: 0 12px 28px rgba(19, 136, 92, 0.16);
 }
 
@@ -1516,12 +1518,12 @@
     position: absolute;
     inset: 0 auto 0 0;
     width: 4px;
-    background: linear-gradient(180deg, #2eaa73, #087e52);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--scheme-accent) 78%, white), color-mix(in srgb, var(--scheme-accent) 78%, #065f46));
 }
 
 .spa-scheme-meta-card:hover:not(:disabled),
 .spa-scheme-meta.is-open .spa-scheme-meta-card {
-    border-color: #b9e3d1;
+    border-color: color-mix(in srgb, var(--scheme-accent) 26%, white);
     box-shadow: 0 13px 32px rgba(19, 136, 92, 0.18);
     transform: translateY(-1px);
 }
@@ -1541,8 +1543,8 @@
     height: 44px;
     flex: 0 0 auto;
     border-radius: 13px;
-    color: #13885c;
-    background: linear-gradient(145deg, #f4fffa, #e5f8ef);
+    color: var(--scheme-accent);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--scheme-accent) 6%, white), color-mix(in srgb, var(--scheme-accent) 14%, white));
     place-items: center;
 }
 
@@ -1567,7 +1569,7 @@
 
 .spa-scheme-meta-kicker {
     margin-bottom: 1px;
-    color: #13885c;
+    color: var(--scheme-accent);
     font-size: 8px;
     font-weight: 800;
     letter-spacing: 0.1em;
@@ -1613,7 +1615,7 @@
 
 .spa-scheme-meta-card:hover .spa-scheme-meta-edit,
 .spa-scheme-meta.is-open .spa-scheme-meta-edit {
-    color: #13885c;
+    color: var(--scheme-accent);
     background: #eaf8f1;
 }
 
@@ -1659,7 +1661,7 @@
 }
 
 .spa-scheme-meta-editor-header span {
-    color: #13885c;
+    color: var(--scheme-accent);
     font-size: 9px;
     font-weight: 800;
     letter-spacing: 0.1em;
@@ -1687,7 +1689,7 @@
 }
 
 .spa-scheme-meta-editor-header button:hover {
-    color: #13885c;
+    color: var(--scheme-accent);
     background: #eaf8f1;
 }
 
@@ -1760,9 +1762,9 @@
 }
 
 .spa-scheme-meta-actions button.is-primary {
-    border-color: #13885c;
+    border-color: var(--scheme-accent);
     color: #fff;
-    background: linear-gradient(145deg, #2eaa73, #087e52);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--scheme-accent) 78%, white), color-mix(in srgb, var(--scheme-accent) 78%, #065f46));
     box-shadow: 0 8px 18px rgba(8, 126, 82, 0.22);
 }
 
@@ -1880,7 +1882,7 @@
     height: 56px;
     padding: 0;
     border: 1px solid #cbd5e1;
-    border-radius: 9px;
+    border-radius: 10px;
     color: #475569;
     background: rgba(255, 255, 255, 0.94);
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
@@ -2026,12 +2028,12 @@
     z-index: 90;
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    width: 220px;
-    height: 74px;
+    width: 246px;
+    height: 52px;
     padding: 0;
     overflow: hidden;
     border: 1px solid #dce5ee;
-    border-radius: 18px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 12px 32px rgba(50, 76, 105, 0.14);
     backdrop-filter: blur(12px);
@@ -2043,14 +2045,14 @@
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    gap: 5px;
-    padding: 8px 10px 7px;
+    gap: 2px;
+    padding: 4px 8px;
     border: 0;
-    border-radius: 17px;
+    border-radius: 10px;
     color: #617895;
     background: transparent;
     cursor: pointer;
-    font-size: 10px;
+    font-size: 8px;
     font-weight: 800;
     letter-spacing: 0.035em;
     line-height: 1;
@@ -2059,8 +2061,8 @@
 }
 
 .spa-mode-toggle button svg {
-    width: 31px;
-    height: 31px;
+    width: 22px;
+    height: 22px;
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
@@ -2070,7 +2072,7 @@
 
 .spa-mode-toggle button.is-active {
     color: #fff;
-    background: linear-gradient(145deg, #29a96f, #078454);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--scheme-accent) 78%, white), color-mix(in srgb, var(--scheme-accent) 78%, #065f46));
     box-shadow: 0 8px 20px rgba(8, 132, 84, 0.28);
 }
 
@@ -2087,7 +2089,7 @@
 
 .spa-right-tools {
     position: fixed;
-    top: calc(var(--nav-height) + 100px);
+    top: calc(var(--nav-height) + 74px);
     right: 14px;
     z-index: 90;
     display: flex;
@@ -2103,7 +2105,7 @@
     gap: 5px;
     padding: 7px 5px 6px;
     border-color: #d9e3ed;
-    border-radius: 17px;
+    border-radius: 10px;
     color: #58708f;
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 10px 28px rgba(50, 76, 105, 0.15);
@@ -2122,17 +2124,17 @@
 }
 
 .spa-right-tools .spa-floating-tool-button.is-active {
-    border-color: #159466;
+    border-color: var(--scheme-accent);
     color: #fff;
-    background: linear-gradient(145deg, #2eaa73, #087e52);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--scheme-accent) 78%, white), color-mix(in srgb, var(--scheme-accent) 78%, #065f46));
     box-shadow: 0 12px 28px rgba(8, 126, 82, 0.3);
 }
 
 .spa-right-tools .spa-floating-tool-button.is-active:hover:not(:disabled),
 .spa-floating-tools .spa-floating-tool-button.is-active:hover:not(:disabled) {
-    border-color: #159466;
+    border-color: var(--scheme-accent);
     color: #fff;
-    background: linear-gradient(145deg, #2eaa73, #087e52);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--scheme-accent) 78%, white), color-mix(in srgb, var(--scheme-accent) 78%, #065f46));
     box-shadow: 0 14px 30px rgba(8, 126, 82, 0.34);
 }
 
@@ -2209,7 +2211,11 @@
 
 .spa-device-preview-header {
     display: flex;
+    height: 52px;
     min-height: 52px;
+    max-height: 52px;
+    box-sizing: border-box;
+    flex: 0 0 52px;
     align-items: center;
     justify-content: space-between;
     padding: 0 14px 0 18px;
@@ -2236,7 +2242,7 @@
     place-items: center;
 }
 
-.spa-device-preview-header button:hover {
+.spa-device-preview-header button:hover:not(:disabled) {
     color: #1e293b;
     background: #f1f5f9;
 }
@@ -2245,6 +2251,11 @@
     display: flex;
     align-items: center;
     gap: 2px;
+}
+
+.spa-device-preview-header button:disabled {
+    color: #cbd5e1;
+    cursor: default;
 }
 
 .spa-device-preview-header-actions button svg {
@@ -2258,15 +2269,15 @@
 }
 
 .spa-device-details-button.has-device {
-    border-color: #b9e3d1;
-    color: #13885c;
-    background: linear-gradient(145deg, #f4fffa, #e5f8ef);
+    border-color: color-mix(in srgb, var(--scheme-accent) 26%, white);
+    color: var(--scheme-accent);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--scheme-accent) 6%, white), color-mix(in srgb, var(--scheme-accent) 14%, white));
 }
 
 .spa-device-details-button.is-active {
-    border-color: #159466;
+    border-color: var(--scheme-accent);
     color: #fff;
-    background: linear-gradient(145deg, #2eaa73, #087e52);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--scheme-accent) 78%, white), color-mix(in srgb, var(--scheme-accent) 78%, #065f46));
     box-shadow: 0 12px 28px rgba(8, 126, 82, 0.3);
 }
 
@@ -2875,9 +2886,9 @@
 }
 
 .spa-floating-tool-button.spa-floating-help-button:hover:not(:disabled) {
-    border-color: #b9e3d1;
-    color: #13885c;
-    background: linear-gradient(145deg, #f4fffa, #e5f8ef);
+    border-color: color-mix(in srgb, var(--scheme-accent) 26%, white);
+    color: var(--scheme-accent);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--scheme-accent) 6%, white), color-mix(in srgb, var(--scheme-accent) 14%, white));
     box-shadow: 0 12px 28px rgba(19, 136, 92, 0.16);
 }
 
@@ -2899,7 +2910,7 @@
     gap: 5px;
     padding: 7px 4px 6px;
     border-color: #d9e3ed;
-    border-radius: 17px;
+    border-radius: 10px;
     color: #58708f;
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 10px 28px rgba(50, 76, 105, 0.15);
@@ -2918,9 +2929,9 @@
 }
 
 .spa-floating-tools .spa-floating-tool-button.is-active {
-    border-color: #159466;
+    border-color: var(--scheme-accent);
     color: #fff;
-    background: linear-gradient(145deg, #2eaa73, #087e52);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--scheme-accent) 78%, white), color-mix(in srgb, var(--scheme-accent) 78%, #065f46));
     box-shadow: 0 12px 28px rgba(8, 126, 82, 0.3);
 }
 
@@ -6363,7 +6374,7 @@
     .spa-scheme-meta-collapse-button {
         width: 58px;
         height: 58px;
-        border-radius: 14px;
+        border-radius: 10px;
     }
 
     .spa-scheme-meta-icon {
@@ -6377,7 +6388,7 @@
         height: 58px;
         grid-template-rows: 29px auto;
         gap: 3px;
-        border-radius: 14px;
+        border-radius: 10px;
     }
 
     .spa-floating-tool-button.spa-scheme-meta-expand-button svg {
@@ -6396,24 +6407,24 @@
     .spa-mode-toggle {
         top: 10px;
         right: 10px;
-        width: 180px;
-        height: 64px;
-        border-radius: 15px;
+        width: 246px;
+        height: 52px;
+        border-radius: 10px;
     }
 
     .spa-mode-toggle button {
-        gap: 3px;
-        border-radius: 14px;
+        gap: 2px;
+        border-radius: 10px;
         font-size: 8px;
     }
 
     .spa-mode-toggle button svg {
-        width: 27px;
-        height: 27px;
+        width: 22px;
+        height: 22px;
     }
 
     .spa-right-tools {
-        top: 84px;
+        top: 70px;
         right: 10px;
         gap: 7px;
     }
@@ -6423,7 +6434,7 @@
         height: 58px;
         grid-template-rows: 29px auto;
         gap: 3px;
-        border-radius: 14px;
+        border-radius: 10px;
     }
 
     .spa-right-tools .spa-floating-tool-button svg {
@@ -6441,7 +6452,7 @@
         height: 58px;
         grid-template-rows: 29px auto;
         gap: 3px;
-        border-radius: 14px;
+        border-radius: 10px;
     }
 
     .spa-floating-tools .spa-floating-tool-button svg {
@@ -6455,7 +6466,7 @@
         height: 58px;
         grid-template-rows: 29px auto;
         gap: 3px;
-        border-radius: 14px;
+        border-radius: 10px;
     }
 
     .spa-floating-tool-button.spa-reset-positions-button svg,
