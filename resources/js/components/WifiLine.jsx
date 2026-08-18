@@ -58,6 +58,7 @@ const WifiLine = ({
     getExtOffsetKey,
     isRelayBoilerType,
     wifiSlotOffsets,
+    wifiOneWireSlotOffsets,
     getWifiOffsetKey,
     snapToGrid,
     showLineFrames,
@@ -81,12 +82,18 @@ const WifiLine = ({
     setHoveredWifiOneWireSlotKey,
     hoveredWifiOneWireSlotKey,
     setWifiOneWireMenuPos,
+    setWifiOneWireSlotOffsets,
     removeWifiOneWireDeviceAtSlot,
     showPorts,
     setWifiMenuPos,
     hoveredWifiSlotKey,
     removeWifiModuleAtSlot,
-}) => (
+}) => {
+    const [hoveredRelaySlotKey, setHoveredRelaySlotKey] = React.useState(null);
+    const wifiOneWireDragStartRef = React.useRef({});
+    const wifiOneWireDragStartPointerRef = React.useRef({});
+
+    return (
     <>
 {(() => {
                                     if (!wifiLineEnabled) return null;
@@ -221,12 +228,15 @@ const WifiLine = ({
                                                 const wifiOneWireBottomY = wifiOneWirePorts.length > 0
                                                     ? Math.max(...wifiOneWirePorts.map((port) => port.y * moduleSize.height))
                                                     : moduleSize.height;
+                                                const getWifiOneWireOffsetKey = (sensor, sensorIndex) => (
+                                                    `wifi-onewire:${moduleItem.id ?? moduleIndex}:${sensor?.id ?? sensorIndex}`
+                                                );
                                                 const getWifiOneWireSlotPosition = (sensorIndex) => getOneWireSlotPosition({
                                                     slotIndex: sensorIndex,
                                                     devices: oneWireDevices,
-                                                    offsets: {},
+                                                    offsets: wifiOneWireSlotOffsets,
                                                     getDeviceSize: () => ({ width: ONE_WIRE_SLOT_SIZE, height: ONE_WIRE_SLOT_SIZE }),
-                                                    getOffsetKey: () => '',
+                                                    getOffsetKey: getWifiOneWireOffsetKey,
                                                     firstSlotX: moduleX + (wifiOneWireVPlus ? wifiOneWireVPlus.x * moduleSize.width : 0) + 2 * indentSize,
                                                     firstSlotY: wifiOneWireBottomY + moduleHeightValue,
                                                     indentSize,
@@ -348,8 +358,13 @@ const WifiLine = ({
                                                                                     : relayType === 'zoneServo' ? 'Сервопривод зоны'
                                                                                         : isRelayBoilerType(relayType) ? (relayDevice?.name || 'Котел')
                                                                                             : 'Прочее оборудование');
+                                                                const hoverKey = `${moduleIndex}:${lineKey}:${relayIndex}`;
                                                                 return (
-                                                                    <Group key={`wifi-relay-${moduleIndex}-${relayIndex}`}>
+                                                                    <Group
+                                                                        key={`wifi-relay-${moduleIndex}-${relayIndex}`}
+                                                                        onMouseEnter={() => setHoveredRelaySlotKey(hoverKey)}
+                                                                        onMouseLeave={() => setHoveredRelaySlotKey((current) => (current === hoverKey ? null : current))}
+                                                                    >
                                                                         <Rect
                                                                             name="module-device-slot"
                                                                             collisionOccupied={Boolean(relayDevice)}
@@ -422,7 +437,7 @@ const WifiLine = ({
                                                                         })()}
                                                                         {!relayDevice && <Circle x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} radius={16} fill={ADD_ACTION_FILL} onClick={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setRelayMenuPos({ x: pos.x, y: pos.y, moduleGroup: 'wifi', moduleIndex, relaySlotIndex: relayIndex, lineKey }); }} />}
                                                                         {!relayDevice && <Text x={slotX + slotSize.width / 2} y={slotY + slotSize.height / 2} text="+" fontSize={22} fill={ADD_ACTION_TEXT_FILL} offsetX={6.5} offsetY={9} listening={false} />}
-                                                                         {relayDevice && <SlotDeleteButton x={slotX + slotSize.width - 5} y={slotY + 5} onRemove={() => removeWifiModuleRelayDeviceAtSlot(moduleIndex, lineKey, relayIndex)} />}
+                                                                          {relayDevice && hoveredRelaySlotKey === hoverKey && <SlotDeleteButton x={slotX + slotSize.width - 5} y={slotY + 5} onRemove={() => removeWifiModuleRelayDeviceAtSlot(moduleIndex, lineKey, relayIndex)} />}
                                                                         {relayDevice && (
                                                                             <>
                                                                                 <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 8)} width={slotSize.width} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
@@ -432,8 +447,39 @@ const WifiLine = ({
                                                                     </Group>
                                                                 );
                                                             });
+                                                            const renderRelayGroupPowerFeed = (groupPortName, lineOccupancy) => {
+                                                                if (!lineOccupancy.some(Boolean)) return null;
+                                                                const groupAPort = modulePorts.find((port) => port.name === groupPortName);
+                                                                if (!groupAPort) return null;
+                                                                const fromX = moduleX + groupAPort.x * moduleSize.width;
+                                                                const fromY = groupAPort.y * moduleSize.height;
+                                                                const endY = fromY - 3 * indentSize;
+                                                                return (
+                                                                    <Group key={`wifi-relay-power-feed-${moduleIndex}-${groupPortName}`}>
+                                                                        <Line
+                                                                            points={[fromX, fromY, fromX, endY]}
+                                                                            stroke="#d32f2f"
+                                                                            strokeWidth={1}
+                                                                            lineCap="round"
+                                                                            listening={false}
+                                                                        />
+                                                                        <Text
+                                                                            x={fromX - 8}
+                                                                            y={endY - 14}
+                                                                            width={16}
+                                                                            text="L"
+                                                                            fontSize={10}
+                                                                            align="center"
+                                                                            fill="#212121"
+                                                                            listening={false}
+                                                                        />
+                                                                    </Group>
+                                                                );
+                                                            };
                                                             return (
                                                                 <>
+                                                                    {renderRelayGroupPowerFeed(`${relayPortPrefix}-1-2-3-A`, relayOccupancy.slice(0, 3))}
+                                                                    {renderRelayGroupPowerFeed(`${relayPortPrefix}-4-5-6-A`, relayOccupancy.slice(3, 6))}
                                                                     {renderLine('left', relayOccupancy.slice(0, 3), 0)}
                                                                     {renderLine('right', relayOccupancy.slice(3, 6), 3)}
                                                                 </>
@@ -445,6 +491,7 @@ const WifiLine = ({
                                                             const imageKey = sensor ? getWirelessDeviceImageKey(sensor) : null;
                                                             const image = imageKey ? wirelessImages[imageKey] : null;
                                                             const sensorPorts = imageKey ? (wirelessPortsByType[imageKey] || ONE_WIRE_SLOT_FAKE_PORTS) : ONE_WIRE_SLOT_FAKE_PORTS;
+                                                            const offsetKey = getWifiOneWireOffsetKey(sensor, sensorIndex);
                                                             const currentPorts = {
                                                                 '1-WIRE-V+': getOneWirePortByRole(sensorPorts, '1-WIRE-V+'),
                                                                 '1-WIRE-DAT': getOneWirePortByRole(sensorPorts, '1-WIRE-DAT'),
@@ -454,6 +501,35 @@ const WifiLine = ({
                                                             return (
                                                                 <Group
                                                                     key={`wifi-onewire-${moduleIndex}-${sensorIndex}`}
+                                                                    draggable={Boolean(sensor)}
+                                                                    onDragStart={(event) => {
+                                                                        event.cancelBubble = true;
+                                                                        wifiOneWireDragStartRef.current[offsetKey] = wifiOneWireSlotOffsets[offsetKey] || { x: 0, y: 0 };
+                                                                        wifiOneWireDragStartPointerRef.current[offsetKey] = event.target.getStage()?.getPointerPosition() || { x: 0, y: 0 };
+                                                                    }}
+                                                                    onDragMove={(event) => {
+                                                                        event.cancelBubble = true;
+                                                                        const stage = event.target.getStage();
+                                                                        const pointer = stage?.getPointerPosition();
+                                                                        if (!pointer) return;
+                                                                        const startPointer = wifiOneWireDragStartPointerRef.current[offsetKey] || pointer;
+                                                                        const startOffset = wifiOneWireDragStartRef.current[offsetKey] || { x: 0, y: 0 };
+                                                                        const scale = stage?.scaleX() || 1;
+                                                                        setWifiOneWireSlotOffsets((current) => ({
+                                                                            ...current,
+                                                                            [offsetKey]: {
+                                                                                x: startOffset.x + (pointer.x - startPointer.x) / scale,
+                                                                                y: startOffset.y + (pointer.y - startPointer.y) / scale,
+                                                                            },
+                                                                        }));
+                                                                        event.target.position({ x: 0, y: 0 });
+                                                                    }}
+                                                                    onDragEnd={(event) => {
+                                                                        event.cancelBubble = true;
+                                                                        delete wifiOneWireDragStartRef.current[offsetKey];
+                                                                        delete wifiOneWireDragStartPointerRef.current[offsetKey];
+                                                                        event.target.position({ x: 0, y: 0 });
+                                                                    }}
                                                                     onMouseEnter={() => setHoveredWifiOneWireSlotKey(hoverKey)}
                                                                     onMouseLeave={() => setHoveredWifiOneWireSlotKey((current) => (current === hoverKey ? null : current))}
                                                                 >
@@ -509,7 +585,8 @@ const WifiLine = ({
                                     );
                                 })()}
     </>
-);
+    );
+};
 
 export default WifiLine;
 

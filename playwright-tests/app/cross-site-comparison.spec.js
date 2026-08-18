@@ -536,7 +536,7 @@ test.describe('/selection vs mhtest.ru — сравнение итоговой �
         // тумблером — он допустим ровно в одном экземпляре.
         await page.getByTestId('outdoor-sensor-toggle').locator('input').check();
         const local = await readLocalOffer(page);
-        expect(local.text).toContain('Беспроводной Уличный датчик температуры');
+        expect(local.text).toContain('Беспроводной уличный датчик температуры');
         expect(local.text).toContain('GO+');
         // GO+ (22 490, включает комплектный wireless-wall датчик) + уличный датчик (5 890, wireless-outdoor).
         expect(local.total).toBe(28380);

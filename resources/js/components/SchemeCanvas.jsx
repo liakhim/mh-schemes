@@ -268,6 +268,7 @@ const SchemeCanvas = ({
     setThermostatMenuPos,
     setWifiMenuPos,
     setWifiOneWireMenuPos,
+    setWifiOneWireSlotOffsets,
     setWifiSlotOffsets,
     shouldShowDiDeviceInfoBlock,
     showEmptySlots,
@@ -278,6 +279,7 @@ const SchemeCanvas = ({
     usesRinnaiAdapter,
     wifiDragStartOffsetsRef,
     wifiLineEnabled,
+    wifiOneWireSlotOffsets,
     wifiSlotOffsets,
     wirelessImages,
     wirelessPortsByType,
@@ -6040,6 +6042,7 @@ const SchemeCanvas = ({
                                     getExtOffsetKey={getExtOffsetKey}
                                     isRelayBoilerType={isRelayBoilerType}
                                     wifiSlotOffsets={wifiSlotOffsets}
+                                    wifiOneWireSlotOffsets={wifiOneWireSlotOffsets}
                                     getWifiOffsetKey={getWifiOffsetKey}
                                     snapToGrid={snapToGrid}
                                     showLineFrames={showLineFrames}
@@ -6049,6 +6052,7 @@ const SchemeCanvas = ({
                                     setInvalidWifiDragMap={setInvalidWifiDragMap}
                                     invalidWifiDragMap={invalidWifiDragMap}
                                     setWifiSlotOffsets={setWifiSlotOffsets}
+                                    setWifiOneWireSlotOffsets={setWifiOneWireSlotOffsets}
                                     getMorphImageKey={getMorphImageKey}
                                     getFullWidthSize={getFullWidthSize}
                                     getContainSize={getContainSize}

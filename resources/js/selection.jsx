@@ -576,6 +576,23 @@ const isGroupedDevice = (device, group, templates) => {
     return templates.some((template) => canonicalType(template.wiredDevice?.type) === canonicalType(device?.type));
 };
 
+const getSelectedMixingUnits = (scheme) => {
+    const wiredDevices = Array.isArray(scheme?.wired_devices) ? scheme.wired_devices : [];
+    const wifiRelayDevices = (Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : [])
+        .flatMap((moduleItem) => [
+            ...(Array.isArray(moduleItem?.relay_devices) ? moduleItem.relay_devices : []),
+            ...(Array.isArray(moduleItem?.relay_s_devices) ? moduleItem.relay_s_devices : []),
+        ]);
+    return [...wiredDevices, ...wifiRelayDevices].filter((device) => device?._group === 'mixing');
+};
+
+const hasWifiMixingUnit = (scheme) => getSelectedMixingUnits(scheme)
+    .some((device) => device?.connection_mode === 'wifi');
+
+const getWifiModuleCapacity = (controllerType) => (
+    ['pro', 'ecosmart'].includes(controllerType) ? 6 : 1
+);
+
 /**
  * Рассчитывает доступные порты контроллера после учета расширений и UPS.
  * @param {object} scheme Схема с установленными модулями.
@@ -901,6 +918,17 @@ const getSmart2UsedDiPorts = (scheme, preparedStats = null) => {
  */
 const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null, upsRequested = false) => {
     const controllerType = controllerTypeOverride || getControllerType(scheme);
+    const mixingUnits = getSelectedMixingUnits(scheme);
+    if ((controllerType === 'go' || controllerType === 'go+') && hasWifiMixingUnit(scheme)) {
+        return ['Wi-Fi смесительный узел требует контроллер Smart2 или старше.'];
+    }
+    if (controllerType === 'smart2' && mixingUnits.length > 2) {
+        return ['Smart2 поддерживает не более двух смесительных узлов, независимо от типа подключения.'];
+    }
+    const wifiModules = Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : [];
+    if (wifiModules.length > getWifiModuleCapacity(controllerType)) {
+        return [`Wi-Fi-модули: требуется ${wifiModules.length}, доступно ${getWifiModuleCapacity(controllerType)}.`];
+    }
     if (controllerType !== 'pro' && requiresProForBoilerCombination(scheme)) {
         return ['Комбинация из двух умных и одного тупого котла, где умный котёл подключён по RELAY, требует контроллер PRO.'];
     }
@@ -989,6 +1017,16 @@ const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null,
 const getControllerRecommendation = (scheme, controllerType, upsRequested = false) => {
     const baseLimits = CONTROLLER_LIMITS[controllerType];
     if (!baseLimits) return { compatible: false, modules: [] };
+    if ((controllerType === 'go' || controllerType === 'go+') && hasWifiMixingUnit(scheme)) {
+        return { compatible: false, modules: [] };
+    }
+    if (controllerType === 'smart2' && getSelectedMixingUnits(scheme).length > 2) {
+        return { compatible: false, modules: [] };
+    }
+    const wifiModules = Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : [];
+    if (wifiModules.length > getWifiModuleCapacity(controllerType)) {
+        return { compatible: false, modules: [] };
+    }
     if (controllerType !== 'pro' && requiresProForBoilerCombination(scheme)) {
         return { compatible: false, modules: [] };
     }
@@ -1812,7 +1850,7 @@ const DISCRETE_CARD_HEIGHT = 158;
 
 const PRESSURE_TEMPLATES = [
     {
-        label: 'Токовый датчик давления',
+        label: 'Датчик давления',
         data: { id: 4, device_type: 'sensor', type: 'pressure-sensor', connection_type: '4-20' },
     },
 ];
@@ -1961,7 +1999,7 @@ const makeSchemeName = () => {
 const TEMPERATURE_SENSOR_TEMPLATES = [
     {
         key: 'wireless-outdoor',
-        label: 'Беспроводной Уличный датчик температуры',
+        label: 'Беспроводной уличный датчик температуры',
         addLabel: 'Добавить беспроводной уличный датчик температуры',
         target: 'wireless_devices',
         data: {
@@ -3324,6 +3362,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         // Как только этот вариант узла попал в список, количеством управляет
         // счетчик в строке — большая кнопка становится лишней и прячется.
         showAdd={!addedRows.some((row) => row.label === template.label)}
+        addTestId="add-mixing-unit"
         jsonData={{ wired_device: template.wiredDevice, sensors: template.sensors }}
         showJsonDetails={showJsonDetails}
     >
@@ -3470,7 +3509,7 @@ const SEL_CHAPTERS = [
     { id: 'chapter-hydraulics', label: 'Гидравлика' },
     { id: 'chapter-climate', label: 'Климат' },
     { id: 'chapter-other-equipment', label: 'Прочее оборудование' },
-    { id: 'chapter-sensors', label: 'Датчики и защита' },
+    { id: 'chapter-sensors', label: 'Датчики и защита от протечки' },
     { id: 'chapter-misc', label: 'Прочее' },
     { id: 'chapter-power', label: 'Питание' },
 ];
@@ -3594,7 +3633,18 @@ const getTemperatureSensorRows = (scheme, controllerType) => {
         .flatMap((device) => (Array.isArray(device?.additions) ? device.additions : []))
         .filter(isKitTemperatureSensor)
         .map((device) => ({ device, target: null }));
-    const temperatureSensors = [...wirelessTemperatureSensors, ...wiredTemperatureSensors, ...embeddedTemperatureSensors];
+    // Датчик Wi-Fi смесительного узла хранится в собственной 1-wire линии
+    // RL6W, а не в публичном sensors, поэтому учитываем его отдельно.
+    const wifiOneWireTemperatureSensors = (Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : [])
+        .flatMap((moduleItem) => (Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : []))
+        .filter(isKitTemperatureSensor)
+        .map((device) => ({ device, target: null }));
+    const temperatureSensors = [
+        ...wirelessTemperatureSensors,
+        ...wiredTemperatureSensors,
+        ...embeddedTemperatureSensors,
+        ...wifiOneWireTemperatureSensors,
+    ];
     const kitTemperatureDevices = CONTROLLER_KIT_TEMPERATURE_DEVICES[controllerType] || [];
 
     const kitRemainingByTemplateKey = new Map(kitTemperatureDevices.map((device) => [device.templateKey, device.count]));
@@ -3676,6 +3726,8 @@ const MODULE_TYPE_LABELS = {
     ecosmartbl2: 'Модуль ECOsmart BL2',
     rl6: 'Модуль реле RL6',
     rl6s: 'Модуль реле RL6S',
+    rl6w: 'Wi-Fi модуль реле RL6W',
+    rl6sw: 'Wi-Fi модуль реле RL6SW',
     io4: 'Модуль IO4',
     di6: 'Модуль DI6',
     rl2: 'Модуль реле RL2',
@@ -3689,6 +3741,7 @@ const getExpansionModuleRows = (incomingSchemeValue) => {
         ...(Array.isArray(incomingSchemeValue?.ext_modules) ? incomingSchemeValue.ext_modules : []),
         ...(Array.isArray(incomingSchemeValue?.di_modules) ? incomingSchemeValue.di_modules : []),
         ...(Array.isArray(incomingSchemeValue?.one_wire_modules) ? incomingSchemeValue.one_wire_modules : []),
+        ...(Array.isArray(incomingSchemeValue?.wifi_modules) ? incomingSchemeValue.wifi_modules : []),
         ...(Array.isArray(incomingSchemeValue?.controller?.ecosmart_bl2) ? incomingSchemeValue.controller.ecosmart_bl2 : []),
     ];
     return aggregateAddedItems(items.map((item) => {
@@ -3836,6 +3889,8 @@ const MYHEAT_PRICES = {
         rl2s: 3890, // MyHeat RL2S
         rl6: 8990, // MyHeat RL6
         rl6s: 9990, // MyHeat RL6S
+        rl6w: 14990, // MyHeat RL6W
+        rl6sw: 15990, // MyHeat RL6SW
         rdt2: 4990, // MyHeat RDT2
         di6: 7990, // MyHeat DI6
         io4: 7990, // MyHeat IO4
@@ -4405,6 +4460,7 @@ const SelectionApp = () => {
 
     /** Добавляет составное устройство и связанные датчики; group задает логическую группу. */
     const addMixingUnit = useCallback((template, group = 'mixing') => {
+        if (!template?.wiredDevice) return;
         setIncomingScheme((prev) => {
             const unitUid = uid();
             const servo = {
@@ -5369,7 +5425,14 @@ const SelectionApp = () => {
                         onAdd={() => addMixingUnit(mixingTemplate, 'mixing')}
                         addedRows={getGroupedDeviceRows(incomingScheme, 'mixing', MIXING_TEMPLATES)}
                         onAddUnit={(row) => addMixingUnit(
-                            MIXING_TEMPLATES.find((item) => item.label === row.label),
+                            MIXING_TEMPLATES.find((item) => item.label === row.label)
+                            || (row.label === 'Сервопривод 220V с цифровым датчиком с подключением по WI-FI'
+                                ? {
+                                    ...MIXING_TEMPLATES[0],
+                                    label: row.label,
+                                    connectionMode: 'wifi',
+                                }
+                                : null),
                             'mixing',
                         )}
                         onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
@@ -5525,7 +5588,7 @@ const SelectionApp = () => {
             </section>
             </div>{/* /Прочее оборудование */}
 
-            <div className="sel-group-label" id="chapter-sensors">Датчики и защита</div>
+            <div className="sel-group-label" id="chapter-sensors">Датчики и защита от протечки</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
             <div style={{ flex: '1 1 500px', minWidth: 0 }}>
             <section>

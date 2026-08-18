@@ -657,7 +657,7 @@ const getRelayInputPort = (portsList, deviceType, imageKey) => {
 
 const OFFER_PRICES = {
     controllers: { go: 16990, 'go+': 22490, smart2: 18990, pro: 44990, ecosmart: 46990 },
-    modules: { rl2: 3890, rl2s: 3890, rl6: 8990, rl6s: 9990, rdt2: 4990, di6: 7990, io4: 7990, 'ntc-1-wire': 4190, bl2: 6990, ecosmartbl2: 6990 },
+    modules: { rl2: 3890, rl2s: 3890, rl6: 8990, rl6s: 9990, rl6w: 14990, rl6sw: 15990, rdt2: 4990, di6: 7990, io4: 7990, 'ntc-1-wire': 4190, bl2: 6990, ecosmartbl2: 6990 },
     thermostat: 9490,
     pressure: 5990,
     leak: null,
@@ -683,7 +683,7 @@ const OFFER_CONTROLLER_KIT_ROWS = {
 };
 
 const OFFER_MODULE_LABELS = {
-    rl2: 'Модуль реле RL2', rl2s: 'Модуль реле RL2S', rl6: 'Модуль реле RL6', rl6s: 'Модуль реле RL6S',
+    rl2: 'Модуль реле RL2', rl2s: 'Модуль реле RL2S', rl6: 'Модуль реле RL6', rl6s: 'Модуль реле RL6S', rl6w: 'Wi-Fi модуль реле RL6W', rl6sw: 'Wi-Fi модуль реле RL6SW',
     rdt2: 'Радиомодуль RDT2', di6: 'Модуль DI6', io4: 'Модуль IO4', 'ntc-1-wire': 'Модуль NTC 1-Wire',
     bl2: 'Модуль BUS BL2', ecosmartbl2: 'Модуль ECOsmart BL2',
 };
@@ -867,6 +867,7 @@ const App = () => {
     const [extSlotOffsets, setExtSlotOffsets] = useState({});
     const [diSlotOffsets, setDiSlotOffsets] = useState({});
     const [wifiSlotOffsets, setWifiSlotOffsets] = useState({});
+    const [wifiOneWireSlotOffsets, setWifiOneWireSlotOffsets] = useState({});
     const [renderedProExtRight, setRenderedProExtRight] = useState(null);
     const [busSlotOffsets, setBusSlotOffsets] = useState({});
     const [relaySlotOffsets, setRelaySlotOffsets] = useState({});
@@ -1074,6 +1075,7 @@ const App = () => {
                 setExtSlotOffsets({});
                 setDiSlotOffsets({});
                 setWifiSlotOffsets({});
+                setWifiOneWireSlotOffsets({});
                 setBusSlotOffsets({});
                 setRelaySlotOffsets({});
                 setController420SlotOffset({ x: 0, y: 0 });
@@ -1186,6 +1188,7 @@ const App = () => {
         setExtSlotOffsets({});
         setDiSlotOffsets({});
         setWifiSlotOffsets({});
+        setWifiOneWireSlotOffsets({});
         setBusSlotOffsets({});
         setRelaySlotOffsets({});
         setController420SlotOffset({ x: 0, y: 0 });
@@ -1336,6 +1339,7 @@ const App = () => {
             setExtSlotOffsets({});
             setDiSlotOffsets({});
             setWifiSlotOffsets({});
+            setWifiOneWireSlotOffsets({});
             setBusSlotOffsets({});
             setRelaySlotOffsets({});
             setController420SlotOffset({ x: 0, y: 0 });
@@ -4776,6 +4780,7 @@ const App = () => {
                             setWifiMenuPos={setWifiMenuPos}
                             setWifiOneWireMenuPos={setWifiOneWireMenuPos}
                             setWifiSlotOffsets={setWifiSlotOffsets}
+                            setWifiOneWireSlotOffsets={setWifiOneWireSlotOffsets}
                             shouldShowDiDeviceInfoBlock={shouldShowDiDeviceInfoBlock}
                             showEmptySlots={showEmptySlots}
                             showLineFrames={showLineFrames}
@@ -4786,6 +4791,7 @@ const App = () => {
                             wifiDragStartOffsetsRef={wifiDragStartOffsetsRef}
                             wifiLineEnabled={wifiLineEnabled}
                             wifiSlotOffsets={wifiSlotOffsets}
+                            wifiOneWireSlotOffsets={wifiOneWireSlotOffsets}
                             wirelessImages={wirelessImages}
                             wirelessPortsByType={wirelessPortsByType}
                     />
