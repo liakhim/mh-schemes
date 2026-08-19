@@ -6662,9 +6662,7 @@
     .selection-page {
         /* Шапка прибита к верху, поэтому её высота и есть занятая полоса. */
         --sel-header-height: 50px;
-        padding: 0 12px 184px !important;
-        /* Место под закреплённую снизу ленту выбора контроллера вместе с
-           плитками модулей и кнопкой сброса под ней. */
+        padding: 0 12px 32px !important;
     }
 
     /* Распорка под фиксированной шапкой считается от её реальной высоты:
@@ -7025,28 +7023,8 @@
         display: block;
     }
 
-    /* Колонки справа на узком экране нет: панель превращается
-       в закреплённую снизу ленту со свайпом. */
     .sel-stuck-controllers-panel {
-        --sel-mobile-equipment-card-height: 70px;
-        position: fixed;
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 8px;
-        top: auto;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        flex: none;
-        width: auto;
-        max-height: none;
-        overflow: visible;
-        padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
-        border-radius: 14px 14px 0 0;
-        border-bottom: 0;
-        box-shadow: 0 -8px 24px rgba(32, 39, 56, 0.14);
-        z-index: 300;
+        display: none;
     }
 
     .sel-stuck-controllers {
