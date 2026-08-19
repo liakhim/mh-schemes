@@ -4805,13 +4805,9 @@
 
 .sel-card-desc {
     margin: 0;
-    color: var(--text-muted);
+    color: #25324A;
     font-size: 13.5px;
     line-height: 1.5;
-}
-
-.sel-card-desc.sel-boilers-lead {
-    color: #25324A;
 }
 
 /* Надпись над группой переключателей внутри карточки. */
