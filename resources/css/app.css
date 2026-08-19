@@ -5397,16 +5397,16 @@
 .selection-page .sel-boiler-search-results-button {
     position: absolute;
     top: 50%;
-    right: 40px;
-    padding: 3px 6px;
-    border: 1px solid #d7dbe4;
-    border-radius: 5px;
-    color: #667089;
-    background: #f8fafc;
+    right: 44px;
+    padding: 4px 7px;
+    border: 0;
+    border-radius: 999px;
+    color: #a64e15;
+    background: rgb(255 248 242 / 0.94);
     cursor: pointer;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.45;
     transform: translateY(-50%);
 }
 
