@@ -5176,25 +5176,6 @@ const SelectionApp = () => {
                         position="right -70px"
                         fallbackColor={CARD_PHOTO_TAIL_COLOR.boilerRoom}
                     />
-                    <button
-                        className="selection-option-button selection-tutorial-trigger"
-                        type="button"
-                        data-active={Boolean(boilerTutorialStep)}
-                        aria-pressed={Boolean(boilerTutorialStep)}
-                        aria-label={boilerTutorialStep ? 'Закрыть обучение по выбору котла' : 'Показать подсказку по выбору котла'}
-                        title={boilerTutorialStep ? 'Закрыть обучение' : 'Как добавить котёл'}
-                        onClick={() => setBoilerTutorialStep((current) => current ? null : 'input')}
-                    >
-                        <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
-                        <span className="selection-tutorial-trigger-copy">
-                            <strong>Подсказки</strong>
-                            <small>
-                                <i className="selection-tutorial-trigger-status" aria-hidden="true" />
-                                {boilerTutorialStep ? 'Включены' : 'Выключены'}
-                            </small>
-                        </span>
-                    </button>
-
                     <div
                         ref={boilerTutorialScopeRef}
                         style={{
@@ -5207,7 +5188,27 @@ const SelectionApp = () => {
                             maxWidth: 560,
                         }}
                     >
-                        <div style={{ fontWeight: 700, fontSize: 18, lineHeight: 1.3 }}>Котлы</div>
+                        <div className="sel-boilers-header">
+                            <div className="sel-boilers-title">Котлы</div>
+                            <button
+                                className="selection-option-button selection-tutorial-trigger"
+                                type="button"
+                                data-active={Boolean(boilerTutorialStep)}
+                                aria-pressed={Boolean(boilerTutorialStep)}
+                                aria-label={boilerTutorialStep ? 'Закрыть обучение по выбору котла' : 'Показать подсказку по выбору котла'}
+                                title={boilerTutorialStep ? 'Закрыть обучение' : 'Как добавить котёл'}
+                                onClick={() => setBoilerTutorialStep((current) => current ? null : 'input')}
+                            >
+                                <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
+                                <span className="selection-tutorial-trigger-copy">
+                                    <strong>Подсказки</strong>
+                                    <small>
+                                        <i className="selection-tutorial-trigger-status" aria-hidden="true" />
+                                        {boilerTutorialStep ? 'Включены' : 'Выключены'}
+                                    </small>
+                                </span>
+                            </button>
+                        </div>
 
                         <p className="sel-card-desc sel-boilers-lead">
                             Найдите котел по названию. Тип подключения определяется автоматически:

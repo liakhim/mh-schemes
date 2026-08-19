@@ -5459,11 +5459,24 @@
     to { left: 100%; }
 }
 
+.sel-boilers-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+}
+
+.sel-boilers-title {
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
 .selection-tutorial-trigger {
-    position: absolute;
+    position: relative;
     z-index: 2;
-    top: 16px;
-    right: 16px;
     display: inline-flex;
     align-items: center;
     justify-content: flex-start;
@@ -7159,8 +7172,6 @@
     }
 
     .selection-page .selection-tutorial-trigger {
-        top: 12px;
-        right: 12px;
         min-width: 0;
         height: 30px;
         padding: 3px 6px;
