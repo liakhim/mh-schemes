@@ -5634,9 +5634,16 @@
 .tutorial-popover-mask {
     position: fixed;
     z-index: 2000;
-    top: 0;
-    left: 0;
+    border-radius: 10px;
+    box-shadow: 0 0 0 100vmax rgb(15 23 42 / 0.68);
     pointer-events: none;
+}
+
+.tutorial-popover-mask.is-solid {
+    inset: 0;
+    border-radius: 0;
+    background: rgb(15 23 42 / 0.68);
+    box-shadow: none;
 }
 
 .tutorial-popover-line.is-visible {
@@ -5700,7 +5707,7 @@
 
 .tutorial-popover-close {
     position: absolute;
-    top: 10px;
+    top: 50%;
     right: 12px;
     display: inline-flex;
     align-items: center;
@@ -5715,6 +5722,7 @@
     cursor: pointer;
     font-size: 24px;
     line-height: 1;
+    transform: translateY(-50%);
 }
 
 .tutorial-popover-close:hover,
@@ -7303,7 +7311,7 @@
     }
 
     .tutorial-popover-close {
-        top: 8px;
+        top: 50%;
         right: 8px;
         width: 24px;
         height: 24px;

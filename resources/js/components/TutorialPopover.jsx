@@ -1,11 +1,10 @@
-import React, { useId, useLayoutEffect, useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = true, scopeRef, open, onClose, title, description = 'Подробное описание подсказки', children, maxWidth = 440, tipHeight = 100, showMask = false }) => {
     const [position, setPosition] = useState(null);
     const [isRendered, setIsRendered] = useState(open);
     const [isVisible, setIsVisible] = useState(false);
-    const maskId = useId();
 
     useLayoutEffect(() => {
         setIsRendered(open);
@@ -60,25 +59,30 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                     top: Math.max(0, maskRect.top - 8),
                     right: Math.min(viewportWidth, maskRect.right + 8),
                     bottom: Math.min(viewportHeight, maskRect.bottom + 8),
-                    width: viewportWidth,
-                    height: viewportHeight,
                 },
             });
         };
 
+        let frameId;
+        const schedulePositionUpdate = () => {
+            cancelAnimationFrame(frameId);
+            frameId = requestAnimationFrame(updatePosition);
+        };
+
         updatePosition();
-        window.addEventListener('resize', updatePosition);
-        window.addEventListener('scroll', updatePosition, true);
-        window.visualViewport?.addEventListener('resize', updatePosition);
-        window.visualViewport?.addEventListener('scroll', updatePosition);
-        const observer = new ResizeObserver(updatePosition);
+        window.addEventListener('resize', schedulePositionUpdate);
+        window.addEventListener('scroll', schedulePositionUpdate, true);
+        window.visualViewport?.addEventListener('resize', schedulePositionUpdate);
+        window.visualViewport?.addEventListener('scroll', schedulePositionUpdate);
+        const observer = new ResizeObserver(schedulePositionUpdate);
         if (anchorRef.current) observer.observe(anchorRef.current);
         if (scopeRef.current) observer.observe(scopeRef.current);
         return () => {
-            window.removeEventListener('resize', updatePosition);
-            window.removeEventListener('scroll', updatePosition, true);
-            window.visualViewport?.removeEventListener('resize', updatePosition);
-            window.visualViewport?.removeEventListener('scroll', updatePosition);
+            cancelAnimationFrame(frameId);
+            window.removeEventListener('resize', schedulePositionUpdate);
+            window.removeEventListener('scroll', schedulePositionUpdate, true);
+            window.visualViewport?.removeEventListener('resize', schedulePositionUpdate);
+            window.visualViewport?.removeEventListener('scroll', schedulePositionUpdate);
             observer.disconnect();
         };
     }, [anchorRef, highlightActive, maxWidth, open, scopeRef, tipHeight]);
@@ -89,23 +93,16 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
     return createPortal((
         <>
             {showMask && (
-                <svg
-                    className="tutorial-popover-mask"
+                <div
+                    className={`tutorial-popover-mask${isVisible ? '' : ' is-solid'}`}
                     aria-hidden="true"
-                    viewBox={`0 0 ${mask.width} ${mask.height}`}
-                    preserveAspectRatio="none"
-                    style={{ width: mask.width, height: mask.height }}
-                >
-                    {isVisible ? <>
-                        <defs>
-                            <mask id={maskId} maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse">
-                                <rect width={mask.width} height={mask.height} fill="#fff" />
-                                <rect x={mask.left} y={mask.top} width={mask.right - mask.left} height={mask.bottom - mask.top} rx="10" fill="#000" />
-                            </mask>
-                        </defs>
-                        <rect width={mask.width} height={mask.height} fill="rgba(15, 23, 42, 0.68)" mask={`url(#${maskId})`} />
-                    </> : <rect width={mask.width} height={mask.height} fill="rgba(15, 23, 42, 0.68)" />}
-                </svg>
+                    style={isVisible ? {
+                        left: mask.left,
+                        top: mask.top,
+                        width: mask.right - mask.left,
+                        height: mask.bottom - mask.top,
+                    } : undefined}
+                />
             )}
             <svg className={`tutorial-popover-line${isVisible ? ' is-visible' : ''}`} aria-hidden="true">
                 <path d={`M ${position.lineStartX} ${position.lineStartY} V ${position.lineBendY} H ${position.lineEndX} V ${position.lineEndY}`} />
@@ -113,7 +110,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                 <circle cx={position.lineEndX} cy={position.lineEndY} r="4" />
             </svg>
             <aside className={`tutorial-popover${isVisible ? ' is-visible' : ''}`} style={{ left: position.viewportLeft, top: position.viewportTop, width: position.width, height: tipHeight }} role="status" aria-hidden={!isVisible}>
-                <button type="button" className="tutorial-popover-close" onClick={onClose} aria-label="Закрыть подсказку">×</button>
+                <button type="button" className="tutorial-popover-close" onClick={onClose} aria-label="Закрыть подсказку"><span aria-hidden="true">×</span></button>
                 <div className="tutorial-popover-title">{title}</div>
                 <p className="tutorial-popover-description">{description}</p>
                 {children}
