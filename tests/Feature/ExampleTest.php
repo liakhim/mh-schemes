@@ -7,19 +7,8 @@ use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
-    /**
-     * A basic test example.
-     */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_home_redirects_to_the_scheme_dashboard(): void
     {
-        $response = $this->get('/');
-
-        $response
-            ->assertOk()
-            ->assertViewIs('home')
-            ->assertSee('Подбор')
-            ->assertSee(route('schemes.index'), false)
-            ->assertSee(route('learning'), false)
-            ->assertSee(route('admin'), false);
+        $this->get('/')->assertRedirect(route('user-schemes'));
     }
 }

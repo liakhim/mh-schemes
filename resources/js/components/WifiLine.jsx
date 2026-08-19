@@ -6,8 +6,7 @@ import { WIFI_ONE_WIRE_CAPACITY, WIFI_RELAY_CAPACITY } from '../scheme/domain/wi
 import { buildRelaySlotOccupancyPreserveIndexes } from '../scheme/domain/relaySlots';
 import { getWirelessDeviceImageKey } from '../scheme/assets/imageRegistry';
 import { getOneWireSlotPosition } from '../scheme/layout/oneWireLayout';
-import { getOneWirePortByRole } from '../scheme/layout/ports';
-import { getPortsByClassToken } from '../scheme/layout/portParsing';
+import { getOneWirePortByRole, getPortByNames, getRelayInputPort, getRelayTerminalPort } from '../scheme/layout/ports';
 import { getWifiModuleSize, getWifiPairHorizontalBounds } from '../scheme/layout/wifiLineLayout';
 import {
     DI_SLOT_MIN_GAP_MULTIPLIER,
@@ -17,6 +16,7 @@ import {
     ONE_WIRE_SLOT_FAKE_PORTS,
 } from '../scheme/layout/renderConstants';
 import { Line } from '../scheme/rendering/SharpLine';
+import OneWireLine from './OneWireLine';
 import {
     ADD_ACTION_FILL,
     ADD_ACTION_TEXT_FILL,
@@ -71,14 +71,12 @@ const WifiLine = ({
     getMorphImageKey,
     getFullWidthSize,
     getContainSize,
-    getRelayInputPort,
     getDoubleRelayDevices,
     getRelayLinkPointsFromDevice,
     setRelayMenuPos,
     removeWifiModuleRelayDeviceAtSlot,
     getOneWireBendY,
     getOrthogonalLinkPoints,
-    getOneWirePortColor,
     setHoveredWifiOneWireSlotKey,
     hoveredWifiOneWireSlotKey,
     setWifiOneWireMenuPos,
@@ -222,7 +220,6 @@ const WifiLine = ({
                                                 ));
                                                 const oneWireDevices = occupied ? (moduleItem.one_wire_devices || []).slice(0, WIFI_ONE_WIRE_CAPACITY) : [];
                                                 const oneWireSlotCount = oneWireDevices.length + (showEmptySlots && oneWireDevices.length < WIFI_ONE_WIRE_CAPACITY ? 1 : 0);
-                                                const findPort = (list, names) => names.map((name) => list.find((port) => port.name === name)).find(Boolean);
                                                 const wifiOneWirePorts = modulePorts.filter((port) => port.name.startsWith('1-WIRE-'));
                                                 const wifiOneWireVPlus = wifiOneWirePorts.find((port) => port.name === '1-WIRE-V+');
                                                 const wifiOneWireBottomY = wifiOneWirePorts.length > 0
@@ -302,8 +299,8 @@ const WifiLine = ({
                                                                 { name: 'GND', color: '#212121', upOffset: 1 * indentSize, sideOffset: 1 * indentSize, underOffset: 2 * indentSize },
                                                             ];
                                                             return links.map((link) => {
-                                                                const from = findPort(powerPorts, [`12VDC-OUT-${link.name}`, `VDC-OUT-${link.name}`]);
-                                                                const to = findPort(modulePorts, [`12VDC-IN-${link.name}`, `12VDC-${link.name}`]);
+                                                                const from = getPortByNames(powerPorts, [`12VDC-OUT-${link.name}`, `VDC-OUT-${link.name}`]);
+                                                                const to = getPortByNames(modulePorts, [`12VDC-IN-${link.name}`, `12VDC-${link.name}`]);
                                                                 if (!from || !to) return null;
                                                                 const fromX = from.x * powerWidth;
                                                                 const fromY = from.y * moduleSize.height;
@@ -359,7 +356,7 @@ const WifiLine = ({
                                                                     : slotSize;
                                                                 const imageX = slotX + (slotSize.width - imageSize.width) / 2;
                                                                 const imageY = slotY + (slotSize.height - imageSize.height) / 2;
-                                                                const modulePort = findPort(modulePorts, [`${relayPortPrefix}-${relayIndex + 1}-B`]);
+                                                                const modulePort = getPortByNames(modulePorts, [`${relayPortPrefix}-${relayIndex + 1}-B`]);
                                                                 const modulePortX = modulePort ? moduleX + modulePort.x * moduleSize.width : null;
                                                                 const modulePortY = modulePort ? modulePort.y * moduleSize.height : null;
                                                                 const relayPorts = imageKey ? (wirelessPortsByType[imageKey] || []) : [];
@@ -436,15 +433,9 @@ const WifiLine = ({
                                                                             />
                                                                         )}
                                                                         {relayDevice && image && String(relayDevice?.connection_type || '').toLowerCase() === 'double_relay' && (() => {
-                                                                            const nextModulePort = findPort(modulePorts, [`${relayPortPrefix}-${relayIndex + 2}-B`]);
-                                                                            const firstRelayPort = relayPorts.find((port) => port.name === 'RELAY-1')
-                                                                                || (getPortsByClassToken(relayPorts, 'RELAY-1') || [])[0]
-                                                                                || (getPortsByClassToken(relayPorts, 'RELAY-IN-1') || [])[0]
-                                                                                || null;
-                                                                            const secondRelayPort = relayPorts.find((port) => port.name === 'RELAY-2')
-                                                                                || (getPortsByClassToken(relayPorts, 'RELAY-2') || [])[0]
-                                                                                || (getPortsByClassToken(relayPorts, 'RELAY-IN-2') || [])[0]
-                                                                                || null;
+                                                                            const nextModulePort = getPortByNames(modulePorts, [`${relayPortPrefix}-${relayIndex + 2}-B`]);
+                                                                            const firstRelayPort = getRelayTerminalPort(relayPorts, 1);
+                                                                            const secondRelayPort = getRelayTerminalPort(relayPorts, 2);
                                                                             if (!modulePort || !nextModulePort || !firstRelayPort || !secondRelayPort) return null;
                                                                             const from1X = imageX + firstRelayPort.x * imageSize.width;
                                                                             const from1Y = imageY + firstRelayPort.y * imageSize.height;
@@ -519,6 +510,42 @@ const WifiLine = ({
                                                                 '1-WIRE-GND': getOneWirePortByRole(sensorPorts, '1-WIRE-GND'),
                                                             };
                                                             const hoverKey = `${moduleIndex}:${sensorIndex}`;
+                                                            const lineSegments = ['1-WIRE-V+', '1-WIRE-DAT', '1-WIRE-GND'].flatMap((name, linkIndex) => {
+                                                                const to = currentPorts[name];
+                                                                if (!to) return [];
+                                                                const previous = sensorIndex === 0 ? null : oneWireDevices[sensorIndex - 1];
+                                                                const previousPorts = previous
+                                                                    ? (wirelessPortsByType[getWirelessDeviceImageKey(previous)] || ONE_WIRE_SLOT_FAKE_PORTS)
+                                                                    : modulePorts;
+                                                                const from = getOneWirePortByRole(previousPorts, name);
+                                                                if (!from) return [];
+                                                                const previousPos = sensorIndex === 0
+                                                                    ? { x: moduleX, y: 0 }
+                                                                    : getWifiOneWireSlotPosition(sensorIndex - 1);
+                                                                const fromWidth = sensorIndex === 0 ? moduleSize.width : ONE_WIRE_SLOT_SIZE;
+                                                                const fromHeight = sensorIndex === 0 ? moduleSize.height : ONE_WIRE_SLOT_SIZE;
+                                                                const fromX = previousPos.x + from.x * fromWidth;
+                                                                const fromY = previousPos.y + from.y * fromHeight;
+                                                                const toX = sensor
+                                                                    ? slotPos.x + to.x * ONE_WIRE_SLOT_SIZE
+                                                                    : slotPos.x + to.x;
+                                                                const toY = sensor
+                                                                    ? slotPos.y + to.y * ONE_WIRE_SLOT_SIZE
+                                                                    : slotPos.y + to.y;
+                                                                const bendY = getOneWireBendY({
+                                                                    slotTop: slotPos.y,
+                                                                    slotHeight: ONE_WIRE_SLOT_SIZE,
+                                                                    offset: (linkIndex + 1) * indentSize,
+                                                                    fromY,
+                                                                    toY,
+                                                                });
+
+                                                                return [{
+                                                                    key: `${name}-${sensorIndex}`,
+                                                                    role: name,
+                                                                    points: getOrthogonalLinkPoints(fromX, fromY, bendY, toX, toY),
+                                                                }];
+                                                            });
                                                             return (
                                                                 <Group
                                                                     key={`wifi-onewire-${moduleIndex}-${sensorIndex}`}
@@ -554,37 +581,7 @@ const WifiLine = ({
                                                                     onMouseEnter={() => setHoveredWifiOneWireSlotKey(hoverKey)}
                                                                     onMouseLeave={() => setHoveredWifiOneWireSlotKey((current) => (current === hoverKey ? null : current))}
                                                                 >
-                                                                    {['1-WIRE-V+', '1-WIRE-DAT', '1-WIRE-GND'].map((name, linkIndex) => {
-                                                                        const to = currentPorts[name];
-                                                                        if (!to) return null;
-                                                                        const previous = sensorIndex === 0 ? null : oneWireDevices[sensorIndex - 1];
-                                                                        const previousPorts = previous
-                                                                            ? (wirelessPortsByType[getWirelessDeviceImageKey(previous)] || ONE_WIRE_SLOT_FAKE_PORTS)
-                                                                            : modulePorts;
-                                                                        const from = getOneWirePortByRole(previousPorts, name);
-                                                                        if (!from) return null;
-                                                                        const previousPos = sensorIndex === 0
-                                                                            ? { x: moduleX, y: 0 }
-                                                                            : getWifiOneWireSlotPosition(sensorIndex - 1);
-                                                                        const fromWidth = sensorIndex === 0 ? moduleSize.width : ONE_WIRE_SLOT_SIZE;
-                                                                        const fromHeight = sensorIndex === 0 ? moduleSize.height : ONE_WIRE_SLOT_SIZE;
-                                                                        const fromX = previousPos.x + from.x * fromWidth;
-                                                                        const fromY = previousPos.y + from.y * fromHeight;
-                                                                        const toX = sensor
-                                                                            ? slotPos.x + to.x * ONE_WIRE_SLOT_SIZE
-                                                                            : slotPos.x + to.x;
-                                                                        const toY = sensor
-                                                                            ? slotPos.y + to.y * ONE_WIRE_SLOT_SIZE
-                                                                            : slotPos.y + to.y;
-                                                                        const bendY = getOneWireBendY({
-                                                                            slotTop: slotPos.y,
-                                                                            slotHeight: ONE_WIRE_SLOT_SIZE,
-                                                                            offset: (linkIndex + 1) * indentSize,
-                                                                            fromY,
-                                                                            toY,
-                                                                        });
-                                                                        return <Line key={`${name}-${sensorIndex}`} points={getOrthogonalLinkPoints(fromX, fromY, bendY, toX, toY)} stroke={getOneWirePortColor(name)} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />;
-                                                                    })}
+                                                                    <OneWireLine segments={lineSegments} />
                                                                     {sensor && <><Rect x={slotPos.x} y={slotPos.y - (INFO_BLOCK_HEIGHT + 14)} width={ONE_WIRE_SLOT_SIZE} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotPos.x + 4} y={slotPos.y - (INFO_BLOCK_HEIGHT + 14)} width={ONE_WIRE_SLOT_SIZE - 8} height={INFO_BLOCK_HEIGHT} text={getDeviceStoredTitle(sensor) || getOneWireDeviceTitle(oneWireDevices, sensor, sensorIndex)} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={getDeviceStoredTitle(sensor) || getOneWireDeviceTitle(oneWireDevices, sensor, sensorIndex)} /></>}
                                                                     <Rect x={slotPos.x} y={slotPos.y} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} cornerRadius={10} fill={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_FILL} stroke={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_STROKE} strokeWidth={1.5} />
                                                                     {sensor && image && <Image image={image} x={slotPos.x} y={slotPos.y} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} listening={false} />}

@@ -49,6 +49,22 @@ class SchemeController extends Controller
     }
 
     /**
+     * Показать редактор новой схемы.
+     */
+    public function create(): View
+    {
+        return view('spa', ['scheme' => null]);
+    }
+
+    /**
+     * Показать редактор существующей схемы.
+     */
+    public function edit(Scheme $scheme): View
+    {
+        return view('spa', ['scheme' => $scheme]);
+    }
+
+    /**
      * Показать данные одной схемы в формате JSON.
      */
     public function show(Scheme $scheme): SchemeResource

@@ -61,6 +61,7 @@ import {
 import { restorePublicDevicesFromModules, serializePublicScheme } from './scheme/publicSchemeSerializer';
 import { controllerImagePaths, wirelessDeviceImagePaths, getWirelessDeviceImageKey, aerialImagePath, goAerialImagePath } from './scheme/assets/imageRegistry';
 import { getOneWireDirectionForDevice, getOneWireLineGeometry, getOneWireSlotPosition } from './scheme/layout/oneWireLayout';
+import { getPinchStageTransform } from './scheme/layout/stageZoom';
 import {
     getWirelessInfoBlockY,
     getWirelessLineLift,
@@ -528,12 +529,6 @@ const withStupidBoilerSensor = (schemeValue, type) => {
     };
 };
 
-const getOneWirePortColor = (name) => {
-    if (name === '1-WIRE-V+') return '#d32f2f';
-    if (name === '1-WIRE-DAT') return '#fbc02d';
-    return '#212121';
-};
-
 // Контроллеры, для которых доступен режим инсталляции.
 const INSTALLATION_CONTROLLERS = new Set(['go', 'go+', 'smart2', 'pro', 'ecosmart']);
 // Контроллеры, которые физически НЕ ставятся на DIN-рейку щитка (не модульного
@@ -646,13 +641,6 @@ const isDoubleRelaySignalPort = (port) => {
         || name === 'RELAY-IN-2'
         || name === 'RELAY-1'
         || name === 'RELAY-2';
-};
-
-const getRelayInputPort = (portsList, deviceType, imageKey) => {
-    if (deviceType === 'pump-220v' && imageKey === 'pump-220v-right-port') {
-        return portsList.find((port) => port.name === 'RELAY-IN B') || null;
-    }
-    return (getPortsByClassToken(portsList, 'RELAY-IN') || [])[0] || null;
 };
 
 const OFFER_PRICES = {
@@ -974,7 +962,7 @@ const App = () => {
     const zoomFrameRef = useRef(null);
     const zoomPendingRef = useRef(null);
     const zoomLastDrawAtRef = useRef(0);
-    const gestureZoomRef = useRef(null);
+    const pinchZoomRef = useRef(null);
 
     // Один раз подписывается на resize окна и не чаще кадра синхронизирует размер Stage;
     // cleanup снимает обработчик и отменяет незавершенный animation frame.
@@ -999,45 +987,68 @@ const App = () => {
         };
     }, []);
 
-    // Один раз подключает нативные Safari gesture-события к контейнеру Konva;
-    // cleanup удаляет все три обработчика масштабирования.
+    // Обрабатывает pinch нативно, чтобы midpoint двух пальцев оставался anchor масштабирования.
     useEffect(() => {
         const stage = stageRef.current;
         const container = stage?.container();
         if (!stage || !container) return undefined;
 
-        const getGesturePoint = (event) => {
+        const getPinchInput = (touches) => {
+            if (touches.length < 2) return null;
             const rect = container.getBoundingClientRect();
-            const clientX = Number.isFinite(event.clientX) ? event.clientX : rect.left + rect.width / 2;
-            const clientY = Number.isFinite(event.clientY) ? event.clientY : rect.top + rect.height / 2;
-            return { x: clientX - rect.left, y: clientY - rect.top };
-        };
-        const handleGestureStart = (event) => {
-            event.preventDefault();
-            gestureZoomRef.current = {
-                startScale: stage.scaleX(),
-                point: getGesturePoint(event),
+            const firstTouch = touches[0];
+            const secondTouch = touches[1];
+            const firstX = firstTouch.clientX - rect.left;
+            const firstY = firstTouch.clientY - rect.top;
+            const secondX = secondTouch.clientX - rect.left;
+            const secondY = secondTouch.clientY - rect.top;
+            return {
+                point: { x: (firstX + secondX) / 2, y: (firstY + secondY) / 2 },
+                distance: Math.hypot(secondX - firstX, secondY - firstY),
             };
         };
-        const handleGestureChange = (event) => {
+
+        const handleTouchStart = (event) => {
+            const input = getPinchInput(event.touches);
+            if (!input || input.distance === 0) return;
             event.preventDefault();
-            const gesture = gestureZoomRef.current;
-            if (!gesture) return;
-            const scale = Number.isFinite(event.scale) ? event.scale : 1;
-            scaleStageAtPoint(stage, gesture.point, gesture.startScale * scale);
-        };
-        const handleGestureEnd = (event) => {
-            event.preventDefault();
-            gestureZoomRef.current = null;
+            isPanningRef.current = false;
+            pinchZoomRef.current = {
+                startScale: stage.scaleX(),
+                startPoint: input.point,
+                startDistance: input.distance,
+                startStagePosition: { x: stage.x(), y: stage.y() },
+            };
         };
 
-        container.addEventListener('gesturestart', handleGestureStart, { passive: false });
-        container.addEventListener('gesturechange', handleGestureChange, { passive: false });
-        container.addEventListener('gestureend', handleGestureEnd, { passive: false });
+        const handleTouchMove = (event) => {
+            const gesture = pinchZoomRef.current;
+            const input = getPinchInput(event.touches);
+            if (!gesture || !input || input.distance === 0) return;
+            event.preventDefault();
+            const { scale, position } = getPinchStageTransform({
+                ...gesture,
+                currentPoint: input.point,
+                currentDistance: input.distance,
+            });
+            stage.position({ x: snapPixel(position.x), y: snapPixel(position.y) });
+            stage.scale({ x: scale, y: scale });
+            stage.batchDraw();
+        };
+
+        const handleTouchEnd = (event) => {
+            if (event.touches.length < 2) pinchZoomRef.current = null;
+        };
+
+        container.addEventListener('touchstart', handleTouchStart, { passive: false });
+        container.addEventListener('touchmove', handleTouchMove, { passive: false });
+        container.addEventListener('touchend', handleTouchEnd);
+        container.addEventListener('touchcancel', handleTouchEnd);
         return () => {
-            container.removeEventListener('gesturestart', handleGestureStart);
-            container.removeEventListener('gesturechange', handleGestureChange);
-            container.removeEventListener('gestureend', handleGestureEnd);
+            container.removeEventListener('touchstart', handleTouchStart);
+            container.removeEventListener('touchmove', handleTouchMove);
+            container.removeEventListener('touchend', handleTouchEnd);
+            container.removeEventListener('touchcancel', handleTouchEnd);
         };
     }, []);
 
@@ -3595,6 +3606,7 @@ const App = () => {
      */
     const startStagePan = (event) => {
         if (event?.evt?.type?.startsWith('mouse') && event.evt.button !== 0) return;
+        if (event?.evt?.touches?.length >= 2) return;
         const stage = stageRef.current;
         const isLockedDinItem = installationMode
             && installationItemsLocked
@@ -3615,7 +3627,7 @@ const App = () => {
      * @param {object} event Текущее событие указателя Konva.
      */
     const moveStagePan = (event) => {
-        if (!isPanningRef.current) return;
+        if (!isPanningRef.current || pinchZoomRef.current) return;
         const stage = stageRef.current;
         const pointer = stage?.getPointerPosition();
         if (!stage || !pointer) return;
@@ -4487,7 +4499,7 @@ const App = () => {
                     ref={stageRef}
                     width={canvasSize.width}
                     height={canvasSize.height}
-                    style={{ cursor: 'grab' }}
+                    style={{ cursor: 'grab', touchAction: 'none' }}
                     onMouseDown={startStagePan}
                     onMouseMove={moveStagePan}
                     onMouseUp={() => { isPanningRef.current = false; }}
@@ -4629,7 +4641,6 @@ const App = () => {
                             getOneWireLineGeometry={getOneWireLineGeometry}
                             getOneWireOffsetKey={getOneWireOffsetKey}
                             getOneWirePortByRole={getOneWirePortByRole}
-                            getOneWirePortColor={getOneWirePortColor}
                             getOneWireSlotPosition={getOneWireSlotPosition}
                             getOrthogonalLinkPoints={getOrthogonalLinkPoints}
                             getPortPosition={getPortPosition}
@@ -4638,7 +4649,6 @@ const App = () => {
                             getPressureSensorsFromScheme={getPressureSensorsFromScheme}
                             getProAuxLineOccupancy={getProAuxLineOccupancy}
                             getRelayDevicesForController={getRelayDevicesForController}
-                            getRelayInputPort={getRelayInputPort}
                             getRelayLineConfig={getRelayLineConfig}
                             getRelayLinkPointsFromDevice={getRelayLinkPointsFromDevice}
                             getRelayLinkPointsToDevice={getRelayLinkPointsToDevice}

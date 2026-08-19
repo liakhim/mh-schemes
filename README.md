@@ -2,7 +2,7 @@
 Quick-start stack for MH scheme rendering:
 - Laravel backend and MySQL (`schemes_db`)
 - React + `react-konva` canvas scheme page
-- Admin and selection pages
+- Selection page
 - PDF export from canvas
 
 ## Run locally (Docker)
@@ -12,11 +12,9 @@ docker compose up --build
 ```
 
 After startup:
-- Scheme: `http://localhost:8080/scheme`
-- Schemes list: `http://localhost:8080/schemes`
-- Selection: `http://localhost:8080/selection`
-- Admin: `http://localhost:8080/admin`
-- Vite dev server (HMR): `http://localhost:5173`
+- Scheme: `http://localhost:8099/scheme`
+- Selection: `http://localhost:8099/selection`
+- Vite dev server (HMR): `http://localhost:5175`
 - MySQL: `localhost:3308`
 
 ## Project Map

@@ -39,6 +39,13 @@ import {
 } from '../scheme/layout/renderConstants';
 import { WIRELESS_INFOBLOCK_HEIGHT } from '../scheme/layout/wirelessLineLayout';
 import {
+    getDiInputPort,
+    getPortByNameOrClassToken,
+    getPressureSensorPorts,
+    getRelayInputPort,
+    getRelayTerminalPort,
+} from '../scheme/layout/ports';
+import {
     buildRelaySlotOccupancyPreserveIndexes,
     removeRelayDeviceAtSlotFromLine,
 } from '../scheme/domain/relaySlots';
@@ -47,6 +54,7 @@ import KitBadge from './KitBadge';
 import SlotDeleteButton from './SlotDeleteButton';
 import PortDotCircle from './PortDotCircle';
 import WifiLine from './WifiLine';
+import OneWireLine from './OneWireLine';
 import { DeviceInfoBlock as EditableInfoTitle } from './DeviceInfoBlock';
 
 const Circle = PortDotCircle;
@@ -119,7 +127,6 @@ const SchemeCanvas = ({
     getOneWireLineGeometry,
     getOneWireOffsetKey,
     getOneWirePortByRole,
-    getOneWirePortColor,
     getOneWireSlotPosition,
     getOrthogonalLinkPoints,
     getPortPosition,
@@ -128,7 +135,6 @@ const SchemeCanvas = ({
     getPressureSensorsFromScheme,
     getProAuxLineOccupancy,
     getRelayDevicesForController,
-    getRelayInputPort,
     getRelayLineConfig,
     getRelayLinkPointsFromDevice,
     getRelayLinkPointsToDevice,
@@ -846,7 +852,7 @@ const SchemeCanvas = ({
                                                 const image = imageKey ? wirelessImages[imageKey] : null;
                                                 if (!image) return null;
                                                 const portsForDevice = wirelessPortsByType[imageKey] || [];
-                                                const diInputPort = (getPortsByClassToken(portsForDevice, 'DI-IN') || [])[0] || null;
+                                                const diInputPort = getDiInputPort(portsForDevice);
                                                  const imageBoxWidth = isLeakDevice
                                                      ? diSlotWidth * LEAK_DI_DEVICE_IMAGE_SCALE
                                                      : diSlotWidth;
@@ -945,7 +951,7 @@ const SchemeCanvas = ({
                                                 const image = imageKey ? wirelessImages[imageKey] : null;
                                                 if (!image) return null;
                                                 const portsForDevice = wirelessPortsByType[imageKey] || [];
-                                                const diInputPort = (getPortsByClassToken(portsForDevice, 'DI-IN') || [])[0] || null;
+                                                const diInputPort = getDiInputPort(portsForDevice);
                                                  const imageBoxWidth = isLeakDevice
                                                      ? diSlotWidth * LEAK_DI_DEVICE_IMAGE_SCALE
                                                      : diSlotWidth;
@@ -1199,7 +1205,7 @@ const SchemeCanvas = ({
                                     const renderSize = image ? getContainSize(image, slotWidth, slotHeight) : { width: slotWidth, height: slotHeight };
                                     const renderX = slotX + (slotWidth - renderSize.width) / 2;
                                     const renderY = slotY + (slotHeight - renderSize.height) / 2;
-                                    const deviceDiPort = (getPortsByClassToken(devicePorts, 'DI-IN') || [])[0] || null;
+                                    const deviceDiPort = getDiInputPort(devicePorts);
                                     const targetX = deviceDiPort ? renderX + deviceDiPort.x * renderSize.width : slotX + slotWidth;
                                      const targetY = deviceDiPort ? renderY + deviceDiPort.y * renderSize.height : slotY + slotHeight / 2;
                                      const hoverKey = 'ecosmart-discrete-di';
@@ -1324,8 +1330,7 @@ const SchemeCanvas = ({
                                     const pressureSensorImageKey = 'pressure-sensor';
                                     const pressureSensorImage = wirelessImages[pressureSensorImageKey] || null;
                                     const pressureSensorPorts = wirelessPortsByType[pressureSensorImageKey] || [];
-                                    const pressureInVPlus = (getPortsByClassToken(pressureSensorPorts, '4-20-IN-V+') || [])[0] || null;
-                                    const pressureInIn = (getPortsByClassToken(pressureSensorPorts, '4-20-IN-IN') || [])[0] || null;
+                                    const { vPlus: pressureInVPlus, input: pressureInIn } = getPressureSensorPorts(pressureSensorPorts);
 
                                     const sensorSize = pressureSensorImage
                                         ? getContainSize(pressureSensorImage, slotWidth, slotHeight)
@@ -3421,26 +3426,8 @@ const SchemeCanvas = ({
                                                                       const controllerAFeedPort = lineA?.aPortName ? ports.find((port) => port.name === lineA.aPortName) : null;
                                                                       const controllerBFeedPort = lineB?.aPortName ? ports.find((port) => port.name === lineB.aPortName) : null;
                                                                       const relaySTypeForPorts = canonicalDeviceType(relaySDevice?.type);
-                                                                      const servoRelay1 = relaySTypeForPorts === 'valve'
-                                                                          ? (relaySPorts.find((port) => port.name === 'RELAY-IN-1')
-                                                                              || (getPortsByClassToken(relaySPorts, 'RELAY-IN-1') || [])[0]
-                                                                              || relaySPorts.find((port) => port.name === 'RELAY-1')
-                                                                              || (getPortsByClassToken(relaySPorts, 'RELAY-1') || [])[0]
-                                                                              || null)
-                                                                          : (relaySPorts.find((port) => port.name === 'RELAY-1')
-                                                                              || (getPortsByClassToken(relaySPorts, 'RELAY-1') || [])[0]
-                                                                              || (getPortsByClassToken(relaySPorts, 'RELAY-IN-1') || [])[0]
-                                                                              || null);
-                                                                      const servoRelay2 = relaySTypeForPorts === 'valve'
-                                                                          ? (relaySPorts.find((port) => port.name === 'RELAY-IN-2')
-                                                                              || (getPortsByClassToken(relaySPorts, 'RELAY-IN-2') || [])[0]
-                                                                              || relaySPorts.find((port) => port.name === 'RELAY-2')
-                                                                              || (getPortsByClassToken(relaySPorts, 'RELAY-2') || [])[0]
-                                                                              || null)
-                                                                          : (relaySPorts.find((port) => port.name === 'RELAY-2')
-                                                                              || (getPortsByClassToken(relaySPorts, 'RELAY-2') || [])[0]
-                                                                              || (getPortsByClassToken(relaySPorts, 'RELAY-IN-2') || [])[0]
-                                                                              || null);
+                                                                      const servoRelay1 = getRelayTerminalPort(relaySPorts, 1, relaySTypeForPorts === 'valve');
+                                                                      const servoRelay2 = getRelayTerminalPort(relaySPorts, 2, relaySTypeForPorts === 'valve');
                                                                      if (!controllerAPort || !controllerBPort || !servoRelay1 || !servoRelay2) return null;
 
                                                                      const from1X = relaySImageX + servoRelay1.x * relaySImageSize.width;
@@ -4151,26 +4138,8 @@ const SchemeCanvas = ({
                                                                 const controllerRelayBPort2 = nextRelayLine?.bPortName
                                                                     ? ports.find((port) => port.name === nextRelayLine.bPortName)
                                                                     : null;
-                                                                const servoRelay1 = relayType === 'valve'
-                                                                    ? (relayPorts.find((port) => port.name === 'RELAY-IN-1')
-                                                                        || (getPortsByClassToken(relayPorts, 'RELAY-IN-1') || [])[0]
-                                                                        || relayPorts.find((port) => port.name === 'RELAY-1')
-                                                                        || (getPortsByClassToken(relayPorts, 'RELAY-1') || [])[0]
-                                                                        || null)
-                                                                    : (relayPorts.find((port) => port.name === 'RELAY-1')
-                                                                        || (getPortsByClassToken(relayPorts, 'RELAY-1') || [])[0]
-                                                                        || (getPortsByClassToken(relayPorts, 'RELAY-IN-1') || [])[0]
-                                                                        || null);
-                                                                const servoRelay2 = relayType === 'valve'
-                                                                    ? (relayPorts.find((port) => port.name === 'RELAY-IN-2')
-                                                                        || (getPortsByClassToken(relayPorts, 'RELAY-IN-2') || [])[0]
-                                                                        || relayPorts.find((port) => port.name === 'RELAY-2')
-                                                                        || (getPortsByClassToken(relayPorts, 'RELAY-2') || [])[0]
-                                                                        || null)
-                                                                    : (relayPorts.find((port) => port.name === 'RELAY-2')
-                                                                        || (getPortsByClassToken(relayPorts, 'RELAY-2') || [])[0]
-                                                                        || (getPortsByClassToken(relayPorts, 'RELAY-IN-2') || [])[0]
-                                                                        || null);
+                                                                const servoRelay1 = getRelayTerminalPort(relayPorts, 1, relayType === 'valve');
+                                                                const servoRelay2 = getRelayTerminalPort(relayPorts, 2, relayType === 'valve');
                                                                 if (!controllerRelayBPort1 || !controllerRelayBPort2 || !servoRelay1 || !servoRelay2) return null;
 
                                                                 const from1X = relayImageX + servoRelay1.x * relayImageSize.width;
@@ -4546,7 +4515,7 @@ const SchemeCanvas = ({
                                                 const imageKey = visualDevice ? getWirelessDeviceImageKey(visualDevice) : null;
                                                 const image = imageKey ? wirelessImages[imageKey] : null;
                                                 const devicePorts = imageKey ? (wirelessPortsByType[imageKey] || []) : [];
-                                                const diInputPort = (getPortsByClassToken(devicePorts, 'DI-IN') || [])[0] || null;
+                                                const diInputPort = getDiInputPort(devicePorts);
                                                 const imageSize = image ? getContainSize(image, diSlotWidth, diSlotHeight) : { width: diSlotWidth, height: diSlotHeight };
                                                 const imageX = slotX + (diSlotWidth - imageSize.width) / 2;
                                                 const imageY = slotY + (diSlotHeight - imageSize.height) / 2;
@@ -6062,14 +6031,12 @@ const SchemeCanvas = ({
                                     getMorphImageKey={getMorphImageKey}
                                     getFullWidthSize={getFullWidthSize}
                                     getContainSize={getContainSize}
-                                    getRelayInputPort={getRelayInputPort}
                                     getDoubleRelayDevices={getDoubleRelayDevices}
                                     getRelayLinkPointsFromDevice={getRelayLinkPointsFromDevice}
                                     setRelayMenuPos={setRelayMenuPos}
                                     removeWifiModuleRelayDeviceAtSlot={removeWifiModuleRelayDeviceAtSlot}
                                     getOneWireBendY={getOneWireBendY}
                                     getOrthogonalLinkPoints={getOrthogonalLinkPoints}
-                                    getOneWirePortColor={getOneWirePortColor}
                                     setHoveredWifiOneWireSlotKey={setHoveredWifiOneWireSlotKey}
                                     hoveredWifiOneWireSlotKey={hoveredWifiOneWireSlotKey}
                                     setWifiOneWireMenuPos={setWifiOneWireMenuPos}
@@ -7064,26 +7031,8 @@ const SchemeCanvas = ({
                                                                         })()}
                                                                         {relayDevice && imageRelay && isDoubleRelayModuleDevice && (() => {
                                                                             const nextBPort = extPorts.find((port) => port.name === `${relayPortPrefix}-${relayIndex + 1}-B`);
-                                                                            const relay1Port = relayType === 'valve'
-                                                                                ? (relayPorts.find((port) => port.name === 'RELAY-IN-1')
-                                                                                    || (getPortsByClassToken(relayPorts, 'RELAY-IN-1') || [])[0]
-                                                                                    || relayPorts.find((port) => port.name === 'RELAY-1')
-                                                                                    || (getPortsByClassToken(relayPorts, 'RELAY-1') || [])[0]
-                                                                                    || null)
-                                                                                : (relayPorts.find((port) => port.name === 'RELAY-1')
-                                                                                    || (getPortsByClassToken(relayPorts, 'RELAY-1') || [])[0]
-                                                                                    || (getPortsByClassToken(relayPorts, 'RELAY-IN-1') || [])[0]
-                                                                                    || null);
-                                                                            const relay2Port = relayType === 'valve'
-                                                                                ? (relayPorts.find((port) => port.name === 'RELAY-IN-2')
-                                                                                    || (getPortsByClassToken(relayPorts, 'RELAY-IN-2') || [])[0]
-                                                                                    || relayPorts.find((port) => port.name === 'RELAY-2')
-                                                                                    || (getPortsByClassToken(relayPorts, 'RELAY-2') || [])[0]
-                                                                                    || null)
-                                                                                : (relayPorts.find((port) => port.name === 'RELAY-2')
-                                                                                    || (getPortsByClassToken(relayPorts, 'RELAY-2') || [])[0]
-                                                                                    || (getPortsByClassToken(relayPorts, 'RELAY-IN-2') || [])[0]
-                                                                                    || null);
+                                                                            const relay1Port = getRelayTerminalPort(relayPorts, 1, relayType === 'valve');
+                                                                            const relay2Port = getRelayTerminalPort(relayPorts, 2, relayType === 'valve');
                                                                             if (!bPort || !nextBPort || !relay1Port || !relay2Port) return null;
 
                                                                             const from1X = imageRelayX + relay1Port.x * imageSizeRelay.width;
@@ -7288,8 +7237,8 @@ const SchemeCanvas = ({
                                                                          || slotDevicePorts.find((port) => String(port?.name || '').startsWith('NTC-'))
                                                                          || null)
                                                                 : slotDeviceType === '010servo'
-                                                                    ? (slotDevicePorts.find((port) => port.name === 'CHANNEL-IN') || (getPortsByClassToken(slotDevicePorts, 'CHANNEL-IN') || [])[0] || null)
-                                                                    : ((getPortsByClassToken(slotDevicePorts, 'DI-IN') || [])[0] || null);
+                                                                     ? getPortByNameOrClassToken(slotDevicePorts, 'CHANNEL-IN')
+                                                                     : getDiInputPort(slotDevicePorts);
                                                             const moduleChannelVPlusPortName = channelIndex < 2 ? 'CHANNEL-1-2-V+' : 'CHANNEL-3-4-V+';
                                                             const moduleChannelVPlusPort = extPorts.find((port) => port.name === moduleChannelVPlusPortName);
                                                             const slotDeviceVPlusPort = slotDeviceType === 'pressure-sensor'
@@ -7625,8 +7574,8 @@ const SchemeCanvas = ({
                                                                         || slotDevicePorts.find((port) => port.name === '4-20-IN-V+')
                                                                         || null)
                                                                     : slotDeviceType === '010servo'
-                                                                        ? (slotDevicePorts.find((port) => port.name === 'CHANNEL-IN') || (getPortsByClassToken(slotDevicePorts, 'CHANNEL-IN') || [])[0] || null)
-                                                                        : ((getPortsByClassToken(slotDevicePorts, 'DI-IN') || [])[0] || null);
+                                                                         ? getPortByNameOrClassToken(slotDevicePorts, 'CHANNEL-IN')
+                                                                         : getDiInputPort(slotDevicePorts);
                                                                 const modulePortName = `DI-IN-${channelPortStart + localIndex}`;
                                                                 const channelIndex = channelPortStart + localIndex - 1;
                                                                 const fromPort = extPorts.find((port) => port.name === modulePortName);
@@ -8404,7 +8353,8 @@ const SchemeCanvas = ({
 
                                                                         />
                                                                     ))}
-                                                                    {extOwLinks.map((link) => {
+                                                                    {(() => {
+                                                                        const lineSegments = extOwLinks.map((link) => {
                                                                         const toPort = owPortMap[link.name];
                                                                         if (!toPort) return null;
                                                                         let fromX;
@@ -8436,7 +8386,11 @@ const SchemeCanvas = ({
                                                                         const toY = owDevice ? (owY + toPort.y * owHeight) : (owY + toPort.y);
                                                                         const targetType = canonicalDeviceType(owDevice?.type);
                                                                         if (targetType === 'wall-digital-sensor') {
-                                                                            return <Line key={`ext-ow-link-${slotIndex}-${extOneWireIndex}-${link.name}`} points={[toX, toY, fromX, toY, fromX, fromY]} stroke={getOneWirePortColor(link.name)} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />;
+                                                                            return {
+                                                                                key: `ext-ow-link-${slotIndex}-${extOneWireIndex}-${link.name}`,
+                                                                                role: link.name,
+                                                                                points: [toX, toY, fromX, toY, fromX, fromY],
+                                                                            };
                                                                         }
                                                                         const isTargetThermostat = targetType === 'thermostat' || isFlaskSensorType(targetType);
                                                                         let sourceMinBendY = null;
@@ -8460,8 +8414,15 @@ const SchemeCanvas = ({
                                                                             isTargetThermostat,
                                                                             sourceMinBendY,
                                                                         });
-                                                                        return <Line key={`ext-ow-link-${slotIndex}-${extOneWireIndex}-${link.name}`} points={getOrthogonalLinkPoints(fromX, fromY, bendY, toX, toY)} stroke={getOneWirePortColor(link.name)} strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />;
-                                                                    })}
+                                                                        return {
+                                                                            key: `ext-ow-link-${slotIndex}-${extOneWireIndex}-${link.name}`,
+                                                                            role: link.name,
+                                                                            points: getOrthogonalLinkPoints(fromX, fromY, bendY, toX, toY),
+                                                                        };
+                                                                        }).filter(Boolean);
+
+                                                                        return <OneWireLine segments={lineSegments} />;
+                                                                    })()}
                                                                 </Group>
                                                             );
                                                         })}
@@ -9434,7 +9395,8 @@ const SchemeCanvas = ({
 
                                                                     />
                                                                 ))}
-                                                                {links.map((link) => {
+                                                                {(() => {
+                                                                    const lineSegments = links.map((link) => {
                                                                     const toPort = currentPorts[link.name];
                                                                     if (!toPort) return null;
                                                                     let fromX;
@@ -9499,58 +9461,34 @@ const SchemeCanvas = ({
                                                                          if (!isOccupied && emptySlotDetourIndent > 0) {
                                                                              const slotBottomY = slotPos.y + slotHeight;
                                                                              const detourY = slotBottomY + emptySlotDetourIndent * indentSize;
-                                                                             return (
-                                                                                 <Line
-                                                                                     key={`one-wire-link-${slotIndex}-${link.name}`}
-                                                                                     points={[fromX, fromY, fromX, upY, leftX, upY, leftX, detourY, toX, detourY, toX, slotBottomY]}
-                                                                                     stroke={getOneWirePortColor(link.name)}
-                                                                                     strokeWidth={1}
-                                                                                     lineCap="round"
-                                                                                     lineJoin="round"
-                                                                                     listening={false}
-                                                                                 />
-                                                                             );
+                                                                              return {
+                                                                                  key: `one-wire-link-${slotIndex}-${link.name}`,
+                                                                                  role: link.name,
+                                                                                  points: [fromX, fromY, fromX, upY, leftX, upY, leftX, detourY, toX, detourY, toX, slotBottomY],
+                                                                              };
                                                                          }
                                                                          if (isFirstDeviceModule) {
                                                                             const moduleBottomY = slotPos.y + slotHeight;
                                                                             const downY = moduleBottomY + offsetMultiplier * indentSize;
-                                                                            return (
-                                                                                <Line
-                                                                                    key={`one-wire-link-${slotIndex}-${link.name}`}
-                                                                                    points={[fromX, fromY, fromX, upY, leftX, upY, leftX, downY, toX, downY, toX, toY]}
-                                                                                    stroke={getOneWirePortColor(link.name)}
-                                                                                    strokeWidth={1}
-                                                                                    lineCap="round"
-                                                                                    lineJoin="round"
-                                                                                    listening={false}
-                                                                                />
-                                                                            );
+                                                                             return {
+                                                                                 key: `one-wire-link-${slotIndex}-${link.name}`,
+                                                                                 role: link.name,
+                                                                                 points: [fromX, fromY, fromX, upY, leftX, upY, leftX, downY, toX, downY, toX, toY],
+                                                                             };
                                                                         }
-                                                                        return (
-                                                                            <Line
-                                                                                key={`one-wire-link-${slotIndex}-${link.name}`}
-                                                                                points={[fromX, fromY, fromX, upY, leftX, upY, leftX, toY, toX, toY]}
-                                                                                stroke={getOneWirePortColor(link.name)}
-                                                                                strokeWidth={1}
-                                                                                lineCap="round"
-                                                                                lineJoin="round"
-                                                                                listening={false}
-                                                                            />
-                                                                        );
+                                                                         return {
+                                                                             key: `one-wire-link-${slotIndex}-${link.name}`,
+                                                                             role: link.name,
+                                                                             points: [fromX, fromY, fromX, upY, leftX, upY, leftX, toY, toX, toY],
+                                                                         };
                                                                     }
                                                                     const targetType = canonicalDeviceType(device?.type);
                                                                     if (targetType === 'wall-digital-sensor' && !(slotIndex === 0 && (controllerType === 'go' || controllerType === 'go+'))) {
-                                                                        return (
-                                                                            <Line
-                                                                                key={`one-wire-link-${slotIndex}-${link.name}`}
-                                                                                points={[toX, toY, fromX, toY, fromX, fromY]}
-                                                                                stroke={getOneWirePortColor(link.name)}
-                                                                                strokeWidth={1}
-                                                                                lineCap="round"
-                                                                                lineJoin="round"
-                                                                                listening={false}
-                                                                            />
-                                                                        );
+                                                                        return {
+                                                                            key: `one-wire-link-${slotIndex}-${link.name}`,
+                                                                            role: link.name,
+                                                                            points: [toX, toY, fromX, toY, fromX, fromY],
+                                                                        };
                                                                     }
                                                                     const isTargetThermostat = targetType === 'thermostat' || isFlaskSensorType(targetType);
                                                                     let sourceMinBendY = null;
@@ -9608,18 +9546,15 @@ const SchemeCanvas = ({
                                                                         ? Math.max(bendY, controllerMinBendY)
                                                                         : bendY;
                                                                     const points = getOrthogonalLinkPoints(fromX, fromY, finalBendY, toX, toY);
-                                                                    return (
-                                                                    <Line
-                                                                        key={`one-wire-link-${slotIndex}-${link.name}`}
-                                                                        points={points}
-                                                                        stroke={getOneWirePortColor(link.name)}
-                                                                        strokeWidth={1}
-                                                                        lineCap="round"
-                                                                            lineJoin="round"
-                                                                            listening={false}
-                                                                        />
-                                                                    );
-                                                                })}
+                                                                    return {
+                                                                        key: `one-wire-link-${slotIndex}-${link.name}`,
+                                                                        role: link.name,
+                                                                        points,
+                                                                    };
+                                                                    }).filter(Boolean);
+
+                                                                    return <OneWireLine segments={lineSegments} />;
+                                                                })()}
                                                             </Group>
                                                         );
                                                     })}
