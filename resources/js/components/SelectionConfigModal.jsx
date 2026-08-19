@@ -1,4 +1,5 @@
 import React from 'react';
+import { getSelectionConfigItemLabel } from '../scheme/domain/selectionConfigLabels.js';
 
 const CONTROLLER_LABELS = {
     go: 'GO',
@@ -26,15 +27,10 @@ const SECTIONS = [
     ['wifi_modules', 'Модули Wi-Fi'],
 ];
 
-const getItemLabel = (item) => {
-    if (typeof item === 'string') return item;
-    return item?.title || item?.name || item?._label || item?.type || 'Без названия';
-};
-
-const groupItems = (items) => {
+const groupItems = (items, section) => {
     const counts = new Map();
     (Array.isArray(items) ? items : []).filter(Boolean).forEach((item) => {
-        const label = getItemLabel(item);
+        const label = getSelectionConfigItemLabel(item, section);
         counts.set(label, (counts.get(label) || 0) + 1);
     });
     return [...counts].map(([label, count]) => ({ label, count }));
@@ -52,7 +48,7 @@ const SelectionConfigModal = ({ config, onClose }) => {
     const sections = SECTIONS.map(([key, title]) => ({
         key,
         title,
-        rows: groupItems(selectionState[key]),
+        rows: groupItems(selectionState[key], key),
     })).filter((section) => section.rows.length > 0);
 
     return (
