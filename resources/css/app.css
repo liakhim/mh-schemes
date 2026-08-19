@@ -5620,7 +5620,7 @@
 }
 
 .tutorial-popover-line {
-    position: fixed;
+    position: absolute;
     z-index: 2003;
     inset: 0;
     width: 100%;
