@@ -49,8 +49,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                 left,
                 top,
                 width,
-                viewportLeft: scopeRect.left + left,
-                viewportTop: scopeRect.top + top,
+                popoverLeft: viewportPageLeft + scopeRect.left + left,
+                popoverTop: viewportPageTop + scopeRect.top + top,
                 lineStartX: anchorRect.left + anchorRect.width / 2,
                 lineStartY: placement === 'above' ? anchorRect.top : anchorRect.bottom,
                 lineEndX: scopeRect.left + left + 24,
@@ -113,7 +113,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                 <circle cx={position.lineStartX} cy={position.lineStartY} r="4" />
                 <circle cx={position.lineEndX} cy={position.lineEndY} r="4" />
             </svg>
-            <aside className={`tutorial-popover${isVisible ? ' is-visible' : ''}`} style={{ left: position.viewportLeft, top: position.viewportTop, width: position.width, height: tipHeight }} role="status" aria-hidden={!isVisible}>
+            <aside className={`tutorial-popover${isVisible ? ' is-visible' : ''}`} style={{ left: position.popoverLeft, top: position.popoverTop, width: position.width, height: tipHeight }} role="status" aria-hidden={!isVisible}>
                 <button type="button" className="tutorial-popover-close" onClick={onClose} aria-label="Закрыть подсказку"><span aria-hidden="true">×</span></button>
                 <div className="tutorial-popover-title">{title}</div>
                 <p className="tutorial-popover-description">{description}</p>

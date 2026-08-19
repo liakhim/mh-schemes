@@ -5666,7 +5666,7 @@
 }
 
 .tutorial-popover {
-    position: fixed;
+    position: absolute;
     z-index: 2002;
     max-width: 600px;
     padding: 10px 38px 10px 16px;
