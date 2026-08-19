@@ -7152,10 +7152,46 @@
        Кружок выбора цвета исключён: он не текстовый, а квадратный 36x36 с
        `border-box`, и вертикальные 7px паддинга этого правила (оно перебивало
        `padding: 0` кружка по специфичности) сплющивали образец в овал. */
-    .selection-page .selection-option-button:not(.sel-mode-option):not(.sel-thermostat-color-button) {
+    .selection-page .selection-option-button:not(.sel-mode-option):not(.sel-thermostat-color-button):not(.selection-tutorial-trigger) {
         flex-direction: column !important;
         padding: 7px 9px !important;
         font-size: 12.5px !important;
+    }
+
+    .selection-page .selection-tutorial-trigger {
+        top: 12px;
+        right: 12px;
+        min-width: 0;
+        height: 30px;
+        padding: 3px 6px;
+        border-radius: 8px;
+        gap: 4px;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+    }
+
+    .selection-tutorial-trigger-icon {
+        width: 16px;
+        height: 16px;
+        flex-basis: 16px;
+        font-size: 10px;
+    }
+
+    .selection-tutorial-trigger-copy {
+        flex-direction: row;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+    }
+
+    .selection-tutorial-trigger-copy strong {
+        font-size: 9px;
+    }
+
+    .selection-tutorial-trigger-copy small {
+        gap: 3px;
+        font-size: 8px;
     }
 
     .sel-thermostat-color-options {
