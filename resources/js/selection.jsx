@@ -5177,15 +5177,16 @@ const SelectionApp = () => {
                         fallbackColor={CARD_PHOTO_TAIL_COLOR.boilerRoom}
                     />
                     <div
+                        className="sel-boilers-content"
                         ref={boilerTutorialScopeRef}
                         style={{
                             position: 'relative',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: 20,
-                            flex: '1 1 420px',
+                            flex: '1 1 100%',
                             minWidth: 260,
-                            maxWidth: 560,
+                            width: '100%',
                         }}
                     >
                         <div className="sel-boilers-header">
@@ -5259,7 +5260,7 @@ const SelectionApp = () => {
                             </div>
                         )}
 
-                        <div>
+                        <div className="sel-boiler-search">
                             <div style={{ position: 'relative' }} ref={boilerSearchRef}>
                                 {/* Возврат в поле ввода снова раскрывает результаты последнего
                                     поиска, нового запроса при этом не уходит. onClick стоит рядом

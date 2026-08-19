@@ -5474,6 +5474,13 @@
     line-height: 1.3;
 }
 
+@media (min-width: 761px) {
+    .sel-boilers-lead,
+    .sel-boiler-search {
+        max-width: 560px;
+    }
+}
+
 .selection-tutorial-trigger {
     position: relative;
     z-index: 2;
