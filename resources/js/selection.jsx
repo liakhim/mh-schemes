@@ -2500,7 +2500,7 @@ const AddedDevicesTitle = ({ children }) => (
 
 /**
  * Фоновый слой карточки: фото прижато к правому краю, альфа-маска проявляет
- * его слева направо от 0 до 100%, сверху матовый blur. Контент карточки должен
+ * его слева направо, сохраняя текстовую часть карточки контрастной. Контент карточки должен
  * быть позиционированным, чтобы рисоваться поверх.
  *
  * Два режима размера:
@@ -2542,8 +2542,8 @@ const CardPhotoBackdrop = ({ image, aspectRatio = null, width = null, blur = 5, 
                 backgroundRepeat: 'no-repeat',
                 backgroundPosition: position || (aspectRatio ? 'center right' : 'right top'),
                 backgroundSize: aspectRatio || cover ? 'cover' : '100% auto',
-                maskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 100%)',
-                WebkitMaskImage: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 100%)',
+                maskImage: 'linear-gradient(to right, transparent 0%, transparent 25%, rgba(0, 0, 0, 0.15) 40%, rgba(0, 0, 0, 0.55) 55%, #000 72%, #000 100%)',
+                WebkitMaskImage: 'linear-gradient(to right, transparent 0%, transparent 25%, rgba(0, 0, 0, 0.15) 40%, rgba(0, 0, 0, 0.55) 55%, #000 72%, #000 100%)',
                 pointerEvents: 'none',
             }}
         />
@@ -5148,7 +5148,7 @@ const SelectionApp = () => {
                         width: '100%',
                         minWidth: 260,
                         border: '1px solid #d7dbe4',
-                        borderRadius: 16,
+                        borderRadius: 10,
                         // padding задаёт .sel-card-section: на десктопе те же 24px,
                         // но на телефоне он ужимается до 12px по медиазапросам.
                         background: '#fff',
