@@ -1,9 +1,10 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const TutorialPopover = ({ anchorRef, scopeRef, open, onClose, children, maxWidth = 440, tipHeight = 92 }) => {
     const [position, setPosition] = useState(null);
     const [isRendered, setIsRendered] = useState(open);
     const [isVisible, setIsVisible] = useState(false);
+    const popoverRef = useRef(null);
 
     useEffect(() => {
         let frameId;
@@ -56,6 +57,29 @@ const TutorialPopover = ({ anchorRef, scopeRef, open, onClose, children, maxWidt
         };
     }, [anchorRef, maxWidth, open, scopeRef, tipHeight]);
 
+    useLayoutEffect(() => {
+        if (!open || !position) return undefined;
+
+        const frameId = requestAnimationFrame(() => {
+            const popoverRect = popoverRef.current?.getBoundingClientRect();
+            if (!popoverRect) return;
+
+            const viewportHeight = window.visualViewport?.height || window.innerHeight;
+            const viewportPadding = 16;
+            const scrollOffset = popoverRect.top < viewportPadding
+                ? popoverRect.top - viewportPadding
+                : popoverRect.bottom > viewportHeight - viewportPadding
+                    ? popoverRect.bottom - viewportHeight + viewportPadding
+                    : 0;
+
+            if (scrollOffset !== 0) {
+                window.scrollBy({ top: scrollOffset, behavior: 'smooth' });
+            }
+        });
+
+        return () => cancelAnimationFrame(frameId);
+    }, [open, position]);
+
     if (!isRendered || !position) return null;
 
     return (
@@ -64,7 +88,7 @@ const TutorialPopover = ({ anchorRef, scopeRef, open, onClose, children, maxWidt
                 <path d={`M ${position.lineStartX} ${position.lineStartY} V ${position.lineEndY + 7} H ${position.lineEndX} V ${position.lineEndY}`} />
                 <circle cx={position.lineStartX} cy={position.lineStartY} r="4" />
             </svg>
-            <aside className={`tutorial-popover${isVisible ? ' is-visible' : ''}`} style={{ left: position.left, top: position.top, width: position.width, height: tipHeight }} role="status" aria-hidden={!isVisible}>
+            <aside ref={popoverRef} className={`tutorial-popover${isVisible ? ' is-visible' : ''}`} style={{ left: position.left, top: position.top, width: position.width, height: tipHeight }} role="status" aria-hidden={!isVisible}>
                 <button type="button" className="tutorial-popover-close" onClick={onClose} aria-label="Закрыть подсказку">×</button>
                 {children}
             </aside>
