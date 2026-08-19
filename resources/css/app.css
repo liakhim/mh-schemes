@@ -18,6 +18,16 @@
     height: 100dvh;
 }
 
+@media (pointer: coarse) {
+    .spa-scheme-meta-field input,
+    .spa-scheme-meta-field textarea,
+    .spa-device-preview-info-block input,
+    .spa-device-preview-meta-copy form input,
+    .title-editor-input {
+        font-size: 16px;
+    }
+}
+
 .home-page {
     position: relative;
     isolation: isolate;
