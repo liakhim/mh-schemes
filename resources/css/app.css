@@ -26,6 +26,10 @@
     .title-editor-input {
         font-size: 16px;
     }
+
+    .selection-page input[type="text"] {
+        font-size: 16px !important;
+    }
 }
 
 .home-page {
