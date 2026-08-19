@@ -5333,6 +5333,38 @@
     box-sizing: border-box;
 }
 
+.sel-added-leader {
+    margin: auto 0 6px;
+}
+
+.sel-added-remove-button {
+    background: transparent;
+    transition: background 0.15s;
+}
+
+.sel-boilers-content .sel-added-remove-button:hover,
+.sel-boilers-content .sel-added-remove-button:focus-visible {
+    background: #fef2f2;
+    outline: none;
+}
+
+.sel-boilers-content .sel-added-remove-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+}
+
+.sel-boilers-content .sel-added-block {
+    padding: 14px;
+}
+
+.sel-boilers-content .sel-added-title {
+    font-size: 16px;
+}
+
 /* Последняя строка списка котлов возвращает к поиску следующей модели. */
 .sel-added-boiler-search-row {
     margin-top: 10px;
@@ -7147,6 +7179,10 @@
     .sel-added-line {
         margin: 6px 0;
         font-size: 13px;
+    }
+
+    .sel-boilers-content .sel-added-line {
+        font-size: 12px;
     }
 
     .sel-field-label {

@@ -2418,9 +2418,12 @@ const BoilerConnectionSwitch = ({ connectionType, onChange, tutorialRef, onTutor
 const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, price = null, disabled = false, control = null, hideCount = false, removeFirst = false, align = 'flex-end', trailing = null }) => {
     const removeButton = onRemove ? (
         <button
+            className="sel-added-remove-button"
             onClick={onRemove}
-            style={{ border: 'none', background: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
+            style={{ border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
             title="Удалить"
+            onMouseEnter={(event) => { event.currentTarget.style.background = '#fef2f2'; }}
+            onMouseLeave={(event) => { event.currentTarget.style.background = 'transparent'; }}
         >
             ×
         </button>
@@ -2518,7 +2521,7 @@ const AddedDevicesTitle = ({ children }) => (
  * хватает высоты кадра, снизу продолжается этот цвет, а не белый край.
  * `position` перебивает привязку фона (по умолчанию — правый верхний угол).
  */
-const CardPhotoBackdrop = ({ image, aspectRatio = null, width = null, blur = 5, position = null, fallbackColor = null, cover = false }) => (
+const CardPhotoBackdrop = ({ image, aspectRatio = null, width = null, blur = 5, position = null, fallbackColor = null, cover = false, maskGradient = 'linear-gradient(to right, transparent 0%, transparent 25%, rgba(0, 0, 0, 0.15) 40%, rgba(0, 0, 0, 0.55) 55%, #000 72%, #000 100%)' }) => (
     <>
         <div
             aria-hidden
@@ -2542,8 +2545,8 @@ const CardPhotoBackdrop = ({ image, aspectRatio = null, width = null, blur = 5, 
                 backgroundRepeat: 'no-repeat',
                 backgroundPosition: position || (aspectRatio ? 'center right' : 'right top'),
                 backgroundSize: aspectRatio || cover ? 'cover' : '100% auto',
-                maskImage: 'linear-gradient(to right, transparent 0%, transparent 25%, rgba(0, 0, 0, 0.15) 40%, rgba(0, 0, 0, 0.55) 55%, #000 72%, #000 100%)',
-                WebkitMaskImage: 'linear-gradient(to right, transparent 0%, transparent 25%, rgba(0, 0, 0, 0.15) 40%, rgba(0, 0, 0, 0.55) 55%, #000 72%, #000 100%)',
+                maskImage: maskGradient,
+                WebkitMaskImage: maskGradient,
                 pointerEvents: 'none',
             }}
         />
@@ -5175,6 +5178,7 @@ const SelectionApp = () => {
                         blur={3}
                         position="right -70px"
                         fallbackColor={CARD_PHOTO_TAIL_COLOR.boilerRoom}
+                        maskGradient="linear-gradient(to right, transparent 0%, transparent 25%, rgba(0, 0, 0, 0.15) 50%, rgba(0, 0, 0, 0.55) 65%, rgb(0, 0, 0) 77%, rgb(0, 0, 0) 100%)"
                     />
                     <div
                         className="sel-boilers-content"
@@ -5236,6 +5240,7 @@ const SelectionApp = () => {
                                                     />
                                                 ) : null}
                                                 hideCount
+                                                align="center"
                                                 onRemove={() => removeBoiler(index)}
                                             />
                                         );
@@ -5304,7 +5309,7 @@ const SelectionApp = () => {
                                             onClick={() => setBoilerQuery('')}
                                             style={{
                                                 position: 'absolute',
-                                                right: 8,
+                                                right: 12,
                                                 top: '50%',
                                                 transform: 'translateY(-50%)',
                                                 display: 'inline-flex',
@@ -5318,7 +5323,7 @@ const SelectionApp = () => {
                                                 background: 'transparent',
                                                 color: '#dc2626',
                                                 cursor: 'pointer',
-                                                fontSize: 18,
+                                                fontSize: 16,
                                                 lineHeight: 1,
                                                 transition: 'background 0.15s',
                                             }}
@@ -5432,7 +5437,7 @@ const SelectionApp = () => {
                             onClose={() => setBoilerTutorialStep(null)}
                             tipHeight={132}
                         >
-                            <span>В данном блоке отображается список добавленных в Вашу систему котлов</span>
+                            <span>Выбранный котел добавлен в список котлов Вашей системы</span>
                             <button className="tutorial-popover-action" type="button" onClick={() => setBoilerTutorialStep(boilerTutorialNextStep || 'connection')}>Далее</button>
                         </TutorialPopover>
                         <TutorialPopover
