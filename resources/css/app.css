@@ -5729,6 +5729,34 @@ html:has(.selection-body),
     transform: translateY(0);
 }
 
+@keyframes tutorial-popover-attention {
+    0%, 100% {
+        box-shadow: 0 12px 28px rgb(15 23 42 / 0.18);
+    }
+
+    50% {
+        box-shadow: 0 0 0 5px rgb(34 197 94 / 0.42), 0 16px 32px rgb(15 23 42 / 0.24);
+    }
+}
+
+@keyframes tutorial-popover-wiggle {
+    0%, 100% {
+        transform: translateY(0) rotate(0deg);
+    }
+
+    20%, 60% {
+        transform: translateY(0) rotate(-0.8deg);
+    }
+
+    40%, 80% {
+        transform: translateY(0) rotate(0.8deg);
+    }
+}
+
+.tutorial-popover.is-attention-requested {
+    animation: tutorial-popover-attention 520ms ease-out, tutorial-popover-wiggle 520ms ease-in-out;
+}
+
 .tutorial-popover-close {
     position: absolute;
     top: 50%;

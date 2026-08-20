@@ -6,6 +6,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
     const [isRendered, setIsRendered] = useState(open);
     const [isVisible, setIsVisible] = useState(false);
     const [popoverElement, setPopoverElement] = useState(null);
+    const [isAttentionRequested, setIsAttentionRequested] = useState(false);
 
     useLayoutEffect(() => {
         setIsRendered(open);
@@ -111,6 +112,10 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                 <div
                     className="tutorial-popover-content-blocker"
                     aria-hidden="true"
+                    onClick={() => {
+                        setIsAttentionRequested(false);
+                        requestAnimationFrame(() => setIsAttentionRequested(true));
+                    }}
                     style={{
                         left: mask.left + mask.viewportOffsetLeft,
                         top: mask.top + mask.viewportOffsetTop,
@@ -124,7 +129,16 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                 <circle cx={position.lineStartX} cy={position.lineStartY} r="4" />
                 <circle cx={position.lineEndX} cy={position.lineEndY} r="4" />
             </svg>
-            <aside ref={setPopoverElement} className={`tutorial-popover${isVisible ? ' is-visible' : ''}`} style={{ left: position.popoverLeft, top: position.popoverTop, width: position.width }} role="status" aria-hidden={!isVisible}>
+            <aside
+                ref={setPopoverElement}
+                className={`tutorial-popover${isVisible ? ' is-visible' : ''}${isAttentionRequested ? ' is-attention-requested' : ''}`}
+                style={{ left: position.popoverLeft, top: position.popoverTop, width: position.width }}
+                role="status"
+                aria-hidden={!isVisible}
+                onAnimationEnd={(event) => {
+                    if (event.animationName === 'tutorial-popover-attention') setIsAttentionRequested(false);
+                }}
+            >
                 <button type="button" className="tutorial-popover-close" onClick={onClose} aria-label="Закрыть подсказку"><span aria-hidden="true">×</span></button>
                 <div className="tutorial-popover-title">{title}</div>
                 <p className="tutorial-popover-description">{description}</p>
