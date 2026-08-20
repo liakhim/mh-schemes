@@ -8,6 +8,7 @@ const PORT_ENTRY_SPREAD = 0.5;
 const PORT_KEY_PRECISION = 100;
 const RealisticConnectionLinesContext = createContext(false);
 const pendingLayerSpreadFrames = new WeakMap();
+const registeredLayerLines = new WeakMap();
 
 export const RealisticConnectionLines = ({ children }) => (
     <RealisticConnectionLinesContext.Provider value>
@@ -62,7 +63,10 @@ const setSpreadPoints = (node, spreadOffset, orientation) => {
 const spreadSharedPortEntries = (layer) => {
     if (!layer) return;
     const groups = new Map();
-    layer.find('Line').forEach((node) => {
+    const lines = registeredLayerLines.get(layer);
+    if (!lines) return;
+    lines.forEach((node) => {
+        if (node.isDestroyed?.()) return;
         if (node.stroke() === 'white') return;
         const basePoints = getBasePoints(node);
         node.points(basePoints);
@@ -94,6 +98,19 @@ export const Line = ({ points, strokeWidth = 1, ...props }) => {
     const lineRef = useRef(null);
     const realistic = useContext(RealisticConnectionLinesContext);
     const isColoredConnection = realistic && props.stroke && props.stroke !== 'white' && strokeWidth === 1;
+
+    useLayoutEffect(() => {
+        const node = lineRef.current;
+        const layer = node?.getLayer();
+        if (!node || !layer) return undefined;
+        const lines = registeredLayerLines.get(layer) || new Set();
+        lines.add(node);
+        registeredLayerLines.set(layer, lines);
+        return () => {
+            lines.delete(node);
+            scheduleSharedPortSpread(layer);
+        };
+    }, []);
 
     useLayoutEffect(() => {
         const node = lineRef.current;
