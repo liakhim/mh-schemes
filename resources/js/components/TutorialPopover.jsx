@@ -174,7 +174,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
             >
                 <button type="button" className="tutorial-popover-close" onClick={onClose} aria-label="Закрыть подсказку"><span aria-hidden="true">×</span></button>
                 <div className="tutorial-popover-title">{title}</div>
-                <p className="tutorial-popover-description">{description}</p>
+                {description && <p className="tutorial-popover-description">{description}</p>}
                 {children}
             </aside>
         </>

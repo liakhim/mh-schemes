@@ -5504,6 +5504,7 @@ const SelectionApp = () => {
                             onClose={() => setBoilerTutorialStep(null)}
                             showMask
                             title="Введите название котла или производителя в это поле"
+                            description=""
                         />
                         <TutorialPopover
                             anchorRef={boilerAddedListTutorialRef}
@@ -5513,6 +5514,7 @@ const SelectionApp = () => {
                             showMask
                             type="blockContent"
                             title="Выбранный котел добавлен в список котлов Вашей системы"
+                            description=""
                         >
                             <button className="tutorial-popover-action" type="button" onClick={() => setBoilerTutorialStep(boilerTutorialNextStep || 'connection')}>Далее</button>
                         </TutorialPopover>
@@ -5525,6 +5527,7 @@ const SelectionApp = () => {
                             onClose={() => setBoilerTutorialStep(null)}
                             showMask
                             title="Выберите нужный котел"
+                            description=""
                         />
                         <TutorialPopover
                             anchorRef={boilerConnectionTutorialRef}
@@ -5544,6 +5547,7 @@ const SelectionApp = () => {
                             onClose={() => setBoilerTutorialStep(null)}
                             showMask
                             title="Добавьте другие котлы, если это требуется"
+                            description="Введите название другого котла или производителя на следующем шаге"
                         />
                         <TutorialPopover
                             anchorRef={boilerSearchInputRef}
