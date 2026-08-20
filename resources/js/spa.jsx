@@ -3664,10 +3664,20 @@ const App = () => {
             setRenderedProExtRight(null);
             return;
         }
-        const rightEdges = Object.values(extBodyNodeRefs.current)
-            .filter((node) => node?.getLayer?.())
-            .map((node) => node.x() + node.width())
-            .filter(Number.isFinite);
+        const rightEdges = Object.entries(extBodyNodeRefs.current).flatMap(([collisionId, node]) => {
+            if (!node?.getLayer?.()) return [];
+            const bodyRect = {
+                left: node.x(),
+                top: node.y(),
+                right: node.x() + node.width(),
+                bottom: node.y() + node.height(),
+            };
+            // Wi-Fi-линия должна начинаться после фактического footprint EXT,
+            // включая занятые каналы IO4, а не только после корпуса модуля.
+            return getModuleObjectCollisionRects(collisionId, bodyRect)
+                .map((rect) => rect.right)
+                .filter(Number.isFinite);
+        });
         const nextRight = rightEdges.length > 0 ? Math.max(...rightEdges) : null;
         setRenderedProExtRight((current) => (
             current === nextRight || (current != null && nextRight != null && Math.abs(current - nextRight) < 0.01)
