@@ -18,6 +18,11 @@
     height: 100dvh;
 }
 
+html:has(.selection-body),
+.selection-body {
+    overscroll-behavior-y: none;
+}
+
 @media (pointer: coarse) {
     .spa-scheme-meta-field input,
     .spa-scheme-meta-field textarea,

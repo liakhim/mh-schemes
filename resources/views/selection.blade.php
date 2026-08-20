@@ -16,7 +16,7 @@
     @endif
     @vite('resources/js/selection.jsx')
 </head>
-<body>
+<body class="selection-body">
     <div id="selection-app"></div>
 </body>
 </html>
