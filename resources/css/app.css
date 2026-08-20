@@ -7363,11 +7363,11 @@ html:has(.selection-body),
     }
 
     .tutorial-popover-close {
-        top: 50%;
-        right: 8px;
         width: 24px;
         height: 24px;
         font-size: 20px;
+        top: 5px;
+        right: 8px;
     }
 
     .tutorial-popover-action {

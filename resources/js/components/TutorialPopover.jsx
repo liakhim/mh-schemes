@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = true, scopeRef, open, onClose, title, description = 'Подробное описание подсказки', children, maxWidth = 440, showMask = false, type = null }) => {
@@ -7,6 +7,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
     const [isVisible, setIsVisible] = useState(false);
     const [popoverElement, setPopoverElement] = useState(null);
     const [isAttentionRequested, setIsAttentionRequested] = useState(false);
+    const maskRef = useRef(null);
+    const contentBlockerRef = useRef(null);
 
     useLayoutEffect(() => {
         setIsRendered(open);
@@ -15,7 +17,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
 
     useLayoutEffect(() => {
         if (!open) return undefined;
-        const updatePosition = () => {
+        const updatePosition = (maskOnly = false) => {
             const anchorRect = anchorRef.current?.getBoundingClientRect();
             const scopeRect = scopeRef.current?.getBoundingClientRect();
             if (!anchorRect || !scopeRect) return;
@@ -35,7 +37,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
             const viewportOffsetLeft = viewport?.offsetLeft || 0;
             const viewportOffsetTop = viewport?.offsetTop || 0;
             const viewportPadding = 12;
-            const width = Math.min(maxWidth, scopeRect.width, viewportWidth - viewportPadding * 2);
+            const maxPopoverWidth = viewportWidth <= 760 ? 360 : maxWidth;
+            const width = Math.min(maxPopoverWidth, viewportWidth - viewportPadding * 2);
             const left = Math.min(
                 Math.max(viewportPadding - scopeRect.left, anchorRect.left - scopeRect.left),
                 viewportWidth - viewportPadding - width - scopeRect.left,
@@ -44,7 +47,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
             // Подсказка всегда находится над активным элементом. Она не меняет
             // сторону размещения в зависимости от видимой области экрана.
             const top = anchorRect.top - scopeRect.top - popoverHeight - 40;
-            setPosition({
+            const nextPosition = {
                 left,
                 top,
                 width,
@@ -63,7 +66,17 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                     viewportOffsetLeft,
                     viewportOffsetTop,
                 },
+            };
+            const maskStyle = {
+                left: `${nextPosition.mask.left + nextPosition.mask.viewportOffsetLeft}px`,
+                top: `${nextPosition.mask.top + nextPosition.mask.viewportOffsetTop}px`,
+                width: `${nextPosition.mask.right - nextPosition.mask.left}px`,
+                height: `${nextPosition.mask.bottom - nextPosition.mask.top}px`,
+            };
+            [maskRef.current, contentBlockerRef.current].filter(Boolean).forEach((element) => {
+                Object.assign(element.style, maskStyle);
             });
+            if (!maskOnly) setPosition(nextPosition);
         };
 
         let frameId;
@@ -71,12 +84,16 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
             cancelAnimationFrame(frameId);
             frameId = requestAnimationFrame(updatePosition);
         };
+        const syncMaskOnScroll = () => {
+            updatePosition(true);
+            schedulePositionUpdate();
+        };
 
         updatePosition();
         window.addEventListener('resize', schedulePositionUpdate);
-        window.addEventListener('scroll', schedulePositionUpdate, true);
+        window.addEventListener('scroll', syncMaskOnScroll, true);
         window.visualViewport?.addEventListener('resize', schedulePositionUpdate);
-        window.visualViewport?.addEventListener('scroll', schedulePositionUpdate);
+        window.visualViewport?.addEventListener('scroll', syncMaskOnScroll);
         const observer = new ResizeObserver(schedulePositionUpdate);
         if (anchorRef.current) observer.observe(anchorRef.current);
         if (scopeRef.current) observer.observe(scopeRef.current);
@@ -84,9 +101,9 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
         return () => {
             cancelAnimationFrame(frameId);
             window.removeEventListener('resize', schedulePositionUpdate);
-            window.removeEventListener('scroll', schedulePositionUpdate, true);
+            window.removeEventListener('scroll', syncMaskOnScroll, true);
             window.visualViewport?.removeEventListener('resize', schedulePositionUpdate);
-            window.visualViewport?.removeEventListener('scroll', schedulePositionUpdate);
+            window.visualViewport?.removeEventListener('scroll', syncMaskOnScroll);
             observer.disconnect();
         };
     }, [anchorRef, highlightActive, maxWidth, open, popoverElement, scopeRef]);
@@ -98,6 +115,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
         <>
             {showMask && (
                 <div
+                    ref={maskRef}
                     className={`tutorial-popover-mask${isVisible ? '' : ' is-solid'}`}
                     aria-hidden="true"
                     style={isVisible ? {
@@ -110,6 +128,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
             )}
             {type === 'blockContent' && (
                 <div
+                    ref={contentBlockerRef}
                     className="tutorial-popover-content-blocker"
                     aria-hidden="true"
                     onClick={() => {
