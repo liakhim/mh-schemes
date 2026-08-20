@@ -36,6 +36,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
             const viewportPageTop = viewport?.pageTop ?? window.scrollY;
             const viewportOffsetLeft = viewport?.offsetLeft || 0;
             const viewportOffsetTop = viewport?.offsetTop || 0;
+            const layoutViewportHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
+            const isKeyboardViewport = Boolean(viewport && viewportHeight < layoutViewportHeight - 120);
             const viewportPadding = 12;
             const maxPopoverWidth = viewportWidth <= 760 ? 360 : maxWidth;
             const width = Math.min(maxPopoverWidth, viewportWidth - viewportPadding * 2);
@@ -67,11 +69,17 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                     viewportOffsetTop,
                     viewportPageLeft,
                     viewportPageTop,
+                    isKeyboardViewport,
                 },
             };
+            const maskLeft = nextPosition.mask.left + nextPosition.mask.viewportOffsetLeft
+                + (nextPosition.mask.isKeyboardViewport ? 0 : nextPosition.mask.viewportPageLeft);
+            const maskTop = nextPosition.mask.top + nextPosition.mask.viewportOffsetTop
+                + (nextPosition.mask.isKeyboardViewport ? 0 : nextPosition.mask.viewportPageTop);
             const maskStyle = {
-                left: `${nextPosition.mask.left + nextPosition.mask.viewportPageLeft + nextPosition.mask.viewportOffsetLeft}px`,
-                top: `${nextPosition.mask.top + nextPosition.mask.viewportPageTop + nextPosition.mask.viewportOffsetTop}px`,
+                position: nextPosition.mask.isKeyboardViewport ? 'fixed' : 'absolute',
+                left: `${maskLeft}px`,
+                top: `${maskTop}px`,
                 width: `${nextPosition.mask.right - nextPosition.mask.left}px`,
                 height: `${nextPosition.mask.bottom - nextPosition.mask.top}px`,
             };
@@ -113,6 +121,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
     if (!isRendered || !position) return null;
 
     const mask = position.mask;
+    const maskLeft = mask.left + mask.viewportOffsetLeft + (mask.isKeyboardViewport ? 0 : mask.viewportPageLeft);
+    const maskTop = mask.top + mask.viewportOffsetTop + (mask.isKeyboardViewport ? 0 : mask.viewportPageTop);
     return createPortal((
         <>
             {showMask && (
@@ -121,8 +131,9 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                     className={`tutorial-popover-mask${isVisible ? '' : ' is-solid'}`}
                     aria-hidden="true"
                     style={isVisible ? {
-                        left: mask.left + mask.viewportPageLeft + mask.viewportOffsetLeft,
-                        top: mask.top + mask.viewportPageTop + mask.viewportOffsetTop,
+                        position: mask.isKeyboardViewport ? 'fixed' : 'absolute',
+                        left: maskLeft,
+                        top: maskTop,
                         width: mask.right - mask.left,
                         height: mask.bottom - mask.top,
                     } : undefined}
@@ -138,8 +149,9 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                         requestAnimationFrame(() => setIsAttentionRequested(true));
                     }}
                     style={{
-                        left: mask.left + mask.viewportPageLeft + mask.viewportOffsetLeft,
-                        top: mask.top + mask.viewportPageTop + mask.viewportOffsetTop,
+                        position: mask.isKeyboardViewport ? 'fixed' : 'absolute',
+                        left: maskLeft,
+                        top: maskTop,
                         width: mask.right - mask.left,
                         height: mask.bottom - mask.top,
                     }}
