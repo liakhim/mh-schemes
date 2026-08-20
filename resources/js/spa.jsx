@@ -3364,7 +3364,8 @@ const App = () => {
                 const minGap = EXT_SLOT_MIN_GAP_MULTIPLIER * indentValue;
                 const controllerExtraGap = hasNonEmptyControllerOneWireLine ? 8 * indentValue : 0;
                 const ecosmartExtLineLeftOffset = currentControllerType === 'ecosmart' ? 45 * indentValue : 0;
-                const baseX = controllerImg.width + minGap + controllerExtraGap - ecosmartExtLineLeftOffset;
+                const ecosmartThermostatLeftOffset = isEcosmartThermostatExtLine ? 20 * indentValue : 0;
+                const baseX = controllerImg.width + minGap + controllerExtraGap - ecosmartExtLineLeftOffset - ecosmartThermostatLeftOffset;
                 const hasNonEmptyExtOneWire = (moduleDevice, moduleIndex) => (
                     !!moduleDevice
                     && (canonicalDeviceType(moduleDevice?.type) === 'rl6' || canonicalDeviceType(moduleDevice?.type) === 'rl6s')
@@ -3461,7 +3462,7 @@ const App = () => {
                 const offset = extOffsets?.[offsetKey] || { x: 0, y: 0 };
                 const baseX = getExtSlotX(slotIndex);
                 const baseY = isEcosmartThermostatExtLine
-                    ? -2.25 * currentModuleHeightValue - 5 * indentValue + slotIndex * 9 * indentValue
+                    ? -2.25 * currentModuleHeightValue - 25 * indentValue + slotIndex * 9 * indentValue
                     : controllerImg.height - size.height;
                 const isInitialPosition = offset.x === 0 && offset.y === 0;
                 const x = isInitialPosition
