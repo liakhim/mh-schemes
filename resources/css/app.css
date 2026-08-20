@@ -5649,7 +5649,7 @@ html:has(.selection-body),
 }
 
 .tutorial-popover-mask {
-    position: fixed;
+    position: absolute;
     z-index: 2000;
     border-radius: 10px;
     box-shadow: 0 0 0 100vmax rgb(15 23 42 / 0.68);
@@ -5665,7 +5665,7 @@ html:has(.selection-body),
 }
 
 .tutorial-popover-content-blocker {
-    position: fixed;
+    position: absolute;
     z-index: 2001;
     pointer-events: auto;
 }

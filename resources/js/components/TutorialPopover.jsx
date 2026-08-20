@@ -65,11 +65,13 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                     bottom: Math.min(viewportHeight, maskRect.bottom + 8),
                     viewportOffsetLeft,
                     viewportOffsetTop,
+                    viewportPageLeft,
+                    viewportPageTop,
                 },
             };
             const maskStyle = {
-                left: `${nextPosition.mask.left + nextPosition.mask.viewportOffsetLeft}px`,
-                top: `${nextPosition.mask.top + nextPosition.mask.viewportOffsetTop}px`,
+                left: `${nextPosition.mask.left + nextPosition.mask.viewportPageLeft + nextPosition.mask.viewportOffsetLeft}px`,
+                top: `${nextPosition.mask.top + nextPosition.mask.viewportPageTop + nextPosition.mask.viewportOffsetTop}px`,
                 width: `${nextPosition.mask.right - nextPosition.mask.left}px`,
                 height: `${nextPosition.mask.bottom - nextPosition.mask.top}px`,
             };
@@ -119,8 +121,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                     className={`tutorial-popover-mask${isVisible ? '' : ' is-solid'}`}
                     aria-hidden="true"
                     style={isVisible ? {
-                        left: mask.left + mask.viewportOffsetLeft,
-                        top: mask.top + mask.viewportOffsetTop,
+                        left: mask.left + mask.viewportPageLeft + mask.viewportOffsetLeft,
+                        top: mask.top + mask.viewportPageTop + mask.viewportOffsetTop,
                         width: mask.right - mask.left,
                         height: mask.bottom - mask.top,
                     } : undefined}
@@ -136,8 +138,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                         requestAnimationFrame(() => setIsAttentionRequested(true));
                     }}
                     style={{
-                        left: mask.left + mask.viewportOffsetLeft,
-                        top: mask.top + mask.viewportOffsetTop,
+                        left: mask.left + mask.viewportPageLeft + mask.viewportOffsetLeft,
+                        top: mask.top + mask.viewportPageTop + mask.viewportOffsetTop,
                         width: mask.right - mask.left,
                         height: mask.bottom - mask.top,
                     }}
