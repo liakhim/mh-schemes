@@ -4205,17 +4205,17 @@ html:has(.selection-body),
 
 .sel-group-label::before {
     content: counter(sel-chapter);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: #e07020;
     color: #fff;
-    font-size: 13px;
+    background: #e07020;
+    border-radius: 50%;
+    flex-shrink: 0;
+    justify-content: center;
+    align-items: center;
+    width: 20px;
+    height: 20px;
+    font-size: 9px;
     font-weight: 800;
+    display: inline-flex;
 }
 
 /* Двухколоночная раскладка: слева липкая навигация по разделам,
@@ -7470,10 +7470,11 @@ html:has(.selection-body),
     }
 
     .sel-group-label {
-        margin-bottom: 14px;
+        margin-bottom: 12px;
         padding-top: 10px;
         padding-bottom: 8px;
         font-size: 10px;
+        gap: 6px;
     }
 
     /* Липкая панель «Подобранный контроллер» — компактная по высоте:
