@@ -5644,7 +5644,7 @@
 }
 
 .tutorial-popover-mask {
-    position: absolute;
+    position: fixed;
     z-index: 2000;
     border-radius: 10px;
     box-shadow: 0 0 0 100vmax rgb(15 23 42 / 0.68);

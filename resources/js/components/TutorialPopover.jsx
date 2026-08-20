@@ -1,10 +1,11 @@
 import React, { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = true, scopeRef, open, onClose, title, description = 'Подробное описание подсказки', children, maxWidth = 440, tipHeight = 100, showMask = false }) => {
+const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = true, scopeRef, open, onClose, title, description = 'Подробное описание подсказки', children, maxWidth = 440, showMask = false }) => {
     const [position, setPosition] = useState(null);
     const [isRendered, setIsRendered] = useState(open);
     const [isVisible, setIsVisible] = useState(false);
+    const [popoverElement, setPopoverElement] = useState(null);
 
     useLayoutEffect(() => {
         setIsRendered(open);
@@ -36,9 +37,10 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                 Math.max(viewportPadding - scopeRect.left, anchorRect.left - scopeRect.left),
                 viewportWidth - viewportPadding - width - scopeRect.left,
             );
+            const popoverHeight = popoverElement?.getBoundingClientRect().height || 0;
             // Подсказка всегда находится над активным элементом. Она не меняет
             // сторону размещения в зависимости от видимой области экрана.
-            const top = anchorRect.top - scopeRect.top - tipHeight - 40;
+            const top = anchorRect.top - scopeRect.top - popoverHeight - 40;
             setPosition({
                 left,
                 top,
@@ -48,15 +50,13 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                 lineStartX: viewportPageLeft + anchorRect.left + anchorRect.width / 2,
                 lineStartY: viewportPageTop + anchorRect.top,
                 lineEndX: viewportPageLeft + scopeRect.left + left + 24,
-                lineEndY: viewportPageTop + scopeRect.top + top + tipHeight,
-                lineBendY: viewportPageTop + scopeRect.top + top + tipHeight + 16,
+                lineEndY: viewportPageTop + scopeRect.top + top + popoverHeight,
+                lineBendY: viewportPageTop + scopeRect.top + top + popoverHeight + 16,
                 mask: {
                     left: Math.max(0, maskRect.left - 8),
                     top: Math.max(0, maskRect.top - 8),
                     right: Math.min(viewportWidth, maskRect.right + 8),
                     bottom: Math.min(viewportHeight, maskRect.bottom + 8),
-                    pageLeft: viewportPageLeft,
-                    pageTop: viewportPageTop,
                 },
             });
         };
@@ -75,6 +75,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
         const observer = new ResizeObserver(schedulePositionUpdate);
         if (anchorRef.current) observer.observe(anchorRef.current);
         if (scopeRef.current) observer.observe(scopeRef.current);
+        if (popoverElement) observer.observe(popoverElement);
         return () => {
             cancelAnimationFrame(frameId);
             window.removeEventListener('resize', schedulePositionUpdate);
@@ -83,7 +84,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
             window.visualViewport?.removeEventListener('scroll', schedulePositionUpdate);
             observer.disconnect();
         };
-    }, [anchorRef, highlightActive, maxWidth, open, scopeRef, tipHeight]);
+    }, [anchorRef, highlightActive, maxWidth, open, popoverElement, scopeRef]);
 
     if (!isRendered || !position) return null;
 
@@ -95,8 +96,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                     className={`tutorial-popover-mask${isVisible ? '' : ' is-solid'}`}
                     aria-hidden="true"
                     style={isVisible ? {
-                        left: mask.left + mask.pageLeft,
-                        top: mask.top + mask.pageTop,
+                        left: mask.left,
+                        top: mask.top,
                         width: mask.right - mask.left,
                         height: mask.bottom - mask.top,
                     } : undefined}
@@ -107,7 +108,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                 <circle cx={position.lineStartX} cy={position.lineStartY} r="4" />
                 <circle cx={position.lineEndX} cy={position.lineEndY} r="4" />
             </svg>
-            <aside className={`tutorial-popover${isVisible ? ' is-visible' : ''}`} style={{ left: position.popoverLeft, top: position.popoverTop, width: position.width, height: tipHeight }} role="status" aria-hidden={!isVisible}>
+            <aside ref={setPopoverElement} className={`tutorial-popover${isVisible ? ' is-visible' : ''}`} style={{ left: position.popoverLeft, top: position.popoverTop, width: position.width }} role="status" aria-hidden={!isVisible}>
                 <button type="button" className="tutorial-popover-close" onClick={onClose} aria-label="Закрыть подсказку"><span aria-hidden="true">×</span></button>
                 <div className="tutorial-popover-title">{title}</div>
                 <p className="tutorial-popover-description">{description}</p>

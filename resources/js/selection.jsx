@@ -3473,7 +3473,6 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'connection'}
         onClose={() => onTutorialStepChange(null)}
-        tipHeight={120}
         showMask
         title="Выберите тип подключения смесительного узла"
     >
@@ -3489,7 +3488,6 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'servo'}
         onClose={() => onTutorialStepChange(null)}
-        tipHeight={120}
         showMask
         title="Выберите тип питания вашего сервопривода"
     >
@@ -5512,7 +5510,6 @@ const SelectionApp = () => {
                             scopeRef={boilerTutorialScopeRef}
                             open={boilerTutorialStep === 'added-list'}
                             onClose={() => setBoilerTutorialStep(null)}
-                            tipHeight={120}
                             showMask
                             title="Выбранный котел добавлен в список котлов Вашей системы"
                         >
@@ -5533,7 +5530,6 @@ const SelectionApp = () => {
                             scopeRef={boilerTutorialScopeRef}
                             open={boilerTutorialStep === 'connection'}
                             onClose={() => setBoilerTutorialStep(null)}
-                            tipHeight={132}
                             showMask
                             title="Выберите тип подключения котла"
                             description="Измените тип подключения, если котёл является резервным и будет подключен на релейный выход контроллера."
