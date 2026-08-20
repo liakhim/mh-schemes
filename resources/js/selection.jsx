@@ -3326,10 +3326,11 @@ const SegmentedField = ({
     onChange,
     testIdPrefix,
     fieldRef = null,
+    className = '',
     isAvailable = () => true,
     unavailableTitle = null,
 }) => (
-    <div ref={fieldRef}>
+    <div ref={fieldRef} className={className}>
         <ThermostatFieldLabel>{label}</ThermostatFieldLabel>
         <div
             style={{
@@ -3437,6 +3438,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
                 onChange={onConnectionModeChange}
                 testIdPrefix="mixing-connection"
                 fieldRef={connectionRef}
+                className="sel-mixing-field"
             />
             <SegmentedField
                 label="Сервопривод"
@@ -3445,6 +3447,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
                 onChange={onServoChange}
                 testIdPrefix="mixing-servo"
                 fieldRef={servoRef}
+                className="sel-mixing-field"
                 isAvailable={(value) => connectionMode !== 'wifi' || value === '220'}
                 unavailableTitle="Для Wi-Fi используется сервопривод 220V"
             />
@@ -3455,6 +3458,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
                 onChange={onSensorChange}
                 testIdPrefix="mixing-sensor"
                 fieldRef={sensorRef}
+                className="sel-mixing-field"
                 isAvailable={(value) => connectionMode === 'wifi'
                     ? value === 'digital'
                     : isMixingCombinationAvailable(servo, value)}
@@ -3470,6 +3474,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         open={tutorialStep === 'connection'}
         onClose={() => onTutorialStepChange(null)}
         tipHeight={120}
+        showMask
         title="Выберите тип подключения смесительного узла"
     >
         <button className="tutorial-popover-action" type="button" onClick={() => {
@@ -3485,6 +3490,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         open={tutorialStep === 'servo'}
         onClose={() => onTutorialStepChange(null)}
         tipHeight={120}
+        showMask
         title="Выберите тип питания вашего сервопривода"
     >
         <button className="tutorial-popover-action" type="button" onClick={() => {
@@ -3499,6 +3505,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'sensor'}
         onClose={() => onTutorialStepChange(null)}
+        showMask
         title="Выберите датчик"
     />
     </div>
@@ -4075,6 +4082,9 @@ const SelectionApp = () => {
     const controllerSelectionSourceRef = useRef('default');
     const controllerPanelRef = useRef(null);
     const previousControllerTypeRef = useRef(null);
+    useEffect(() => {
+        if (boilerTutorialStep) window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [boilerTutorialStep]);
     const startSelectionFromScratch = useCallback(() => {
         removeSelectionDraft();
         upsRequestSourceRef.current = null;
