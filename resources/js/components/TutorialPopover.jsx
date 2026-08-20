@@ -36,15 +36,9 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                 Math.max(viewportPadding - scopeRect.left, anchorRect.left - scopeRect.left),
                 viewportWidth - viewportPadding - width - scopeRect.left,
             );
-            const topAbove = anchorRect.top - scopeRect.top - tipHeight - 40;
-            const topBelow = anchorRect.bottom - scopeRect.top + 28;
-            const fitsAbove = topAbove + scopeRect.top >= viewportPadding;
-            const fitsBelow = topBelow + scopeRect.top + tipHeight <= viewportHeight - viewportPadding;
-            const placement = fitsAbove || !fitsBelow ? 'above' : 'below';
-            const preferredTop = placement === 'above' ? topAbove : topBelow;
-            const minTop = viewportPadding - scopeRect.top;
-            const maxTop = viewportHeight - viewportPadding - tipHeight - scopeRect.top;
-            const top = Math.min(Math.max(minTop, preferredTop), Math.max(minTop, maxTop));
+            // Подсказка всегда находится над активным элементом. Она не меняет
+            // сторону размещения в зависимости от видимой области экрана.
+            const top = anchorRect.top - scopeRect.top - tipHeight - 40;
             setPosition({
                 left,
                 top,
@@ -52,10 +46,10 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                 popoverLeft: viewportPageLeft + scopeRect.left + left,
                 popoverTop: viewportPageTop + scopeRect.top + top,
                 lineStartX: viewportPageLeft + anchorRect.left + anchorRect.width / 2,
-                lineStartY: viewportPageTop + (placement === 'above' ? anchorRect.top : anchorRect.bottom),
+                lineStartY: viewportPageTop + anchorRect.top,
                 lineEndX: viewportPageLeft + scopeRect.left + left + 24,
-                lineEndY: viewportPageTop + scopeRect.top + (placement === 'above' ? top + tipHeight : top),
-                lineBendY: viewportPageTop + scopeRect.top + (placement === 'above' ? top + tipHeight + 16 : top - 16),
+                lineEndY: viewportPageTop + scopeRect.top + top + tipHeight,
+                lineBendY: viewportPageTop + scopeRect.top + top + tipHeight + 16,
                 mask: {
                     left: Math.max(0, maskRect.left - 8),
                     top: Math.max(0, maskRect.top - 8),
