@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = true, scopeRef, open, onClose, title, description = 'Подробное описание подсказки', children, maxWidth = 440, showMask = false }) => {
+const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = true, scopeRef, open, onClose, title, description = 'Подробное описание подсказки', children, maxWidth = 440, showMask = false, type = null }) => {
     const [position, setPosition] = useState(null);
     const [isRendered, setIsRendered] = useState(open);
     const [isVisible, setIsVisible] = useState(false);
@@ -105,6 +105,18 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                         width: mask.right - mask.left,
                         height: mask.bottom - mask.top,
                     } : undefined}
+                />
+            )}
+            {type === 'blockContent' && (
+                <div
+                    className="tutorial-popover-content-blocker"
+                    aria-hidden="true"
+                    style={{
+                        left: mask.left + mask.viewportOffsetLeft,
+                        top: mask.top + mask.viewportOffsetTop,
+                        width: mask.right - mask.left,
+                        height: mask.bottom - mask.top,
+                    }}
                 />
             )}
             <svg className={`tutorial-popover-line${isVisible ? ' is-visible' : ''}`} aria-hidden="true">

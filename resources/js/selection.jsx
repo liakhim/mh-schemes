@@ -5511,6 +5511,7 @@ const SelectionApp = () => {
                             open={boilerTutorialStep === 'added-list'}
                             onClose={() => setBoilerTutorialStep(null)}
                             showMask
+                            type="blockContent"
                             title="Выбранный котел добавлен в список котлов Вашей системы"
                         >
                             <button className="tutorial-popover-action" type="button" onClick={() => setBoilerTutorialStep(boilerTutorialNextStep || 'connection')}>Далее</button>

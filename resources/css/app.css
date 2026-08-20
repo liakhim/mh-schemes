@@ -5664,6 +5664,12 @@ html:has(.selection-body),
     box-shadow: none;
 }
 
+.tutorial-popover-content-blocker {
+    position: fixed;
+    z-index: 2001;
+    pointer-events: auto;
+}
+
 .tutorial-popover-line.is-visible {
     opacity: 1;
 }
