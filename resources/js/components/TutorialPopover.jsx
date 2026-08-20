@@ -31,6 +31,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
             const viewportHeight = viewport?.height || window.innerHeight;
             const viewportPageLeft = viewport?.pageLeft ?? window.scrollX;
             const viewportPageTop = viewport?.pageTop ?? window.scrollY;
+            const viewportOffsetLeft = viewport?.offsetLeft || 0;
+            const viewportOffsetTop = viewport?.offsetTop || 0;
             const viewportPadding = 12;
             const width = Math.min(maxWidth, scopeRect.width, viewportWidth - viewportPadding * 2);
             const left = Math.min(
@@ -57,6 +59,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                     top: Math.max(0, maskRect.top - 8),
                     right: Math.min(viewportWidth, maskRect.right + 8),
                     bottom: Math.min(viewportHeight, maskRect.bottom + 8),
+                    viewportOffsetLeft,
+                    viewportOffsetTop,
                 },
             });
         };
@@ -96,8 +100,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
                     className={`tutorial-popover-mask${isVisible ? '' : ' is-solid'}`}
                     aria-hidden="true"
                     style={isVisible ? {
-                        left: mask.left,
-                        top: mask.top,
+                        left: mask.left + mask.viewportOffsetLeft,
+                        top: mask.top + mask.viewportOffsetTop,
                         width: mask.right - mask.left,
                         height: mask.bottom - mask.top,
                     } : undefined}
