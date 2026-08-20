@@ -725,6 +725,7 @@ const getRelayStatsForLimits = (scheme, limits) => {
         relayS: strictRelayS + (flexibleRelayDevices - flexibleRelayOnRelay),
         strictRelay,
         strictRelayS,
+        baseStrictRelayS,
         flexibleRelayDevices,
         flexibleRelayOnRelay,
     };
@@ -1108,6 +1109,11 @@ const getControllerRecommendation = (scheme, controllerType, upsRequested = fals
             additionalProExtModules += bl2Count;
         }
 
+        const initialRelayStats = getRelayStatsForLimits(candidateScheme, limits);
+        const strictRelaySModuleCount = Math.ceil(Math.max(0, initialRelayStats.baseStrictRelayS - limits.relayS) / 6);
+        limits.relayS += strictRelaySModuleCount * 6;
+        limits.oneWire += strictRelaySModuleCount * 6;
+        oneWireLineCount += strictRelaySModuleCount;
         const baseRelayStats = getRelayStatsForLimits(candidateScheme, limits);
         const relayDeficit = Math.max(0, baseRelayStats.relay - limits.relay);
         const flexibleRelayOverflow = Math.max(0, baseRelayStats.flexibleRelayDevices - baseRelayStats.flexibleRelayOnRelay);
@@ -1133,9 +1139,9 @@ const getControllerRecommendation = (scheme, controllerType, upsRequested = fals
         oneWireLineCount += oneWireModuleCount;
         limits.relay += oneWireModuleCount * 6;
         addModules('rl6', relayModuleCount + oneWireModuleCount);
-        addModules('rl6s', relaySModuleCount);
+        addModules('rl6s', strictRelaySModuleCount + relaySModuleCount);
         if (controllerType === 'pro') {
-            additionalProExtModules += relayModuleCount + relaySModuleCount + oneWireModuleCount;
+            additionalProExtModules += relayModuleCount + strictRelaySModuleCount + relaySModuleCount + oneWireModuleCount;
         }
 
         const mixedIoPlan = getSelectionMixedIoPlan(candidateScheme, stats, controllerType);
@@ -1578,6 +1584,20 @@ const withRequiredModules = (scheme) => {
         return changed ? { ...scheme, one_wire_modules: oneWireModules } : scheme;
     }
 
+    const initialRelayStats = getRelayStatsForLimits(scheme, limits);
+    const strictRelaySModuleCount = Math.ceil(Math.max(0, initialRelayStats.baseStrictRelayS - limits.relayS) / 6);
+    if (strictRelaySModuleCount > 0) {
+        extModules = [
+            ...extModules,
+            ...Array.from({ length: strictRelaySModuleCount }, () => makeExtModule('rl6s', AUTO_REQUIRED_MODULE_SOURCE)),
+        ];
+        changed = true;
+        limits = {
+            ...limits,
+            relayS: limits.relayS + strictRelaySModuleCount * 6,
+            oneWire: limits.oneWire + strictRelaySModuleCount * 6,
+        };
+    }
     const baseRelayStats = getRelayStatsForLimits(scheme, limits);
     const relayDeficit = Math.max(0, baseRelayStats.relay - limits.relay);
     const flexibleRelayOverflow = Math.max(0, baseRelayStats.flexibleRelayDevices - baseRelayStats.flexibleRelayOnRelay);
