@@ -6107,10 +6107,11 @@ const SchemeCanvas = ({
                                          )
                                      );
                                      const getExtSlotX = (slotIndex) => {
-                                         const minGap = EXT_SLOT_MIN_GAP_MULTIPLIER * indentSize;
-                                         const controllerExtraGap = hasNonEmptyControllerOneWireLine ? 8 * indentSize : 0;
-                                         const ecosmartExtLineLeftOffset = controllerType === 'ecosmart' ? 45 * indentSize : 0;
-                                         const baseX = controllerImage.width + minGap + controllerExtraGap - ecosmartExtLineLeftOffset;
+                                          const minGap = EXT_SLOT_MIN_GAP_MULTIPLIER * indentSize;
+                                          const controllerExtraGap = hasNonEmptyControllerOneWireLine ? 8 * indentSize : 0;
+                                          const ecosmartExtLineLeftOffset = controllerType === 'ecosmart' ? 45 * indentSize : 0;
+                                          const ecosmartThermostatLeftOffset = isEcosmartThermostatExtLine ? 20 * indentSize : 0;
+                                          const baseX = controllerImage.width + minGap + controllerExtraGap - ecosmartExtLineLeftOffset - ecosmartThermostatLeftOffset;
                                         const hasNonEmptyExtOneWire = (moduleDevice, moduleIndex) => (
                                             !!moduleDevice
                                             && (canonicalDeviceType(moduleDevice?.type) === 'rl6' || canonicalDeviceType(moduleDevice?.type) === 'rl6s')
@@ -6199,7 +6200,7 @@ const SchemeCanvas = ({
                                         const offset = extSlotOffsets[getExtOffsetKey(slotDevice, slotIndex)] || { x: 0, y: 0 };
                                         const baseX = getExtSlotX(slotIndex);
                                           const baseY = isEcosmartThermostatExtLine
-                                               ? -2.25 * moduleHeightValue - 5 * indentSize + slotIndex * 10 * indentSize
+                                               ? -2.25 * moduleHeightValue - 25 * indentSize + slotIndex * 10 * indentSize
                                              : controllerImage.height - slotSize.height;
                                         const isInitialPosition = offset.x === 0 && offset.y === 0;
                                         return {
@@ -6212,7 +6213,7 @@ const SchemeCanvas = ({
                                         const slotSize = slotDevice ? getExtModuleSize(slotDevice) : { width: EXT_SLOT_SIZE, height: EXT_SLOT_SIZE };
                                         const baseX = getExtSlotX(slotIndex);
                                           const baseY = isEcosmartThermostatExtLine
-                                               ? -2.25 * moduleHeightValue - 5 * indentSize + slotIndex * 10 * indentSize
+                                               ? -2.25 * moduleHeightValue - 25 * indentSize + slotIndex * 10 * indentSize
                                              : controllerImage.height - slotSize.height;
                                         return {
                                             x: snapToGrid(baseX, indentSize),
@@ -6243,7 +6244,7 @@ const SchemeCanvas = ({
                                         const offset = extSlotOffsets[getExtOffsetKey(slotDevice, slotIndex)] || { x: 0, y: 0 };
                                         const baseX = getExtSlotX(slotIndex);
                                          const baseY = isEcosmartThermostatExtLine
-                                               ? -2.25 * moduleHeightValue - 5 * indentSize + slotIndex * 10 * indentSize
+                                               ? -2.25 * moduleHeightValue - 25 * indentSize + slotIndex * 10 * indentSize
                                              : controllerImage.height - slotSize.height;
                                         const isInitialPosition = offset.x === 0 && offset.y === 0;
                                         return {
