@@ -127,8 +127,12 @@ const WifiLine = ({
                                         return right;
                                     };
                                     const getProExtRight = () => {
-                                        if (Number.isFinite(renderedProExtRight)) return renderedProExtRight;
                                         const extLineItems = [...memoExtModules, ...memoExtLineThermostatDevices];
+                                        const lastExtType = canonicalDeviceType(extLineItems[extLineItems.length - 1]?.type);
+                                        // У термостата крайние 1-wire/EXT-провода выходят
+                                        // правее корпуса, поэтому Wi-Fi-паре нужен clearance.
+                                        const terminalClearance = lastExtType === 'thermostat' ? 4 * indentSize : 0;
+                                        if (Number.isFinite(renderedProExtRight)) return renderedProExtRight + terminalClearance;
                                         const showVisibleEmptyExtSlot = showEmptySlots && extLineItems.length < 12;
                                         if (extLineItems.length === 0) {
                                             return showVisibleEmptyExtSlot
@@ -150,7 +154,7 @@ const WifiLine = ({
                                                 : (lastType === 'rl6s' ? 9 * indentSize : 0);
                                             right += lastExtraGap + EXT_SLOT_MIN_GAP_MULTIPLIER * indentSize + EXT_SLOT_SIZE;
                                         }
-                                        return right;
+                                        return right + terminalClearance;
                                     };
                                     const hasVisibleProExtSlot = memoExtModules.length > 0
                                         || memoExtLineThermostatDevices.length > 0
