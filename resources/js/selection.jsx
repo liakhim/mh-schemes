@@ -602,6 +602,10 @@ const getRelaySUsedSlots = (moduleItem) => (Array.isArray(moduleItem?.relay_s_de
     .filter(Boolean)
     .reduce((usedSlots, device) => usedSlots + (hasConnectionType(device, 'double_relay') ? 2 : 1), 0);
 
+const getRelayUsedSlots = (moduleItem) => (Array.isArray(moduleItem?.relay_devices) ? moduleItem.relay_devices : [])
+    .filter(Boolean)
+    .reduce((usedSlots, device) => usedSlots + (hasConnectionType(device, 'double_relay') ? 2 : 1), 0);
+
 const getAvailableWifiMixingUnits = (scheme) => {
     const wifiModules = Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : [];
     const freePairsOnExistingModules = wifiModules
@@ -611,6 +615,17 @@ const getAvailableWifiMixingUnits = (scheme) => {
         ), 0);
     const freeWifiModuleSlots = Math.max(0, getWifiModuleCapacity('pro') - wifiModules.length);
     return freePairsOnExistingModules + freeWifiModuleSlots * WIFI_MIXING_UNITS_PER_MODULE;
+};
+
+const getAvailableWifiRelaySlots = (scheme) => {
+    const wifiModules = Array.isArray(scheme?.wifi_modules) ? scheme.wifi_modules : [];
+    const freeSlotsOnExistingModules = wifiModules.reduce((freeSlots, moduleItem) => {
+        const type = canonicalType(moduleItem?.type);
+        if (type === 'rl6w') return freeSlots + Math.max(0, 6 - getRelayUsedSlots(moduleItem));
+        if (type === 'rl6sw') return freeSlots + Math.max(0, 6 - getRelaySUsedSlots(moduleItem));
+        return freeSlots;
+    }, 0);
+    return freeSlotsOnExistingModules + Math.max(0, getWifiModuleCapacity('pro') - wifiModules.length) * 6;
 };
 
 /**
@@ -3146,6 +3161,7 @@ const SectionEquipmentCard = ({
     // Плотная верстка списка: мельче заголовок, строка и счетчик, меньше
     // отступов — блок ниже, а вместе с ним и карточка.
     addedDense = false,
+    addedTutorialRef = null,
     onAddUnit,
     onRemoveUnit,
     addLabel,
@@ -3154,6 +3170,7 @@ const SectionEquipmentCard = ({
     addTestId = null,
     addDisabled = false,
     addDisabledTitle = null,
+    addTutorialRef = null,
     incrementDisabled = false,
     // Строка или функция от строки списка: у карточки с несколькими вариантами
     // оборудования счетчики должны различаться (насос 220V и насос 0-10V).
@@ -3163,7 +3180,7 @@ const SectionEquipmentCard = ({
     children = null,
 }) => {
     const addedBlock = addedRows.length > 0 ? (
-        <AddedDevicesBlock marginTop={0} dense={addedDense}>
+        <AddedDevicesBlock marginTop={0} dense={addedDense} tutorialRef={addedTutorialRef}>
             <AddedDevicesTitle>{addedTitle}</AddedDevicesTitle>
             {addedRows.map((row) => {
                 const rowQtyTestId = typeof qtyTestId === 'function' ? qtyTestId(row) : qtyTestId;
@@ -3195,6 +3212,7 @@ const SectionEquipmentCard = ({
     const addButton = showAdd ? (
         <button
             className="selection-add-button"
+            ref={addTutorialRef}
             onClick={onAdd}
             data-test-id={addTestId || undefined}
             disabled={addDisabled}
@@ -3408,6 +3426,9 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
     const connectionRef = useRef(null);
     const servoRef = useRef(null);
     const sensorRef = useRef(null);
+    const addRef = useRef(null);
+    const addedListRef = useRef(null);
+    const selectedTemplateAdded = addedRows.some((row) => row.label === template.label);
 
     return (
     <div ref={tutorialScopeRef} style={{ position: 'relative', flex: '1 1 100%', minWidth: 0 }}>
@@ -3435,13 +3456,15 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         description={template.description}
         addedTitle="Добавленные смесительные узлы:"
         addedRows={addedRows}
+        addedTutorialRef={addedListRef}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
         addLabel={`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
         onAdd={onAdd}
+        addTutorialRef={addRef}
         // Как только этот вариант узла попал в список, количеством управляет
         // счетчик в строке — большая кнопка становится лишней и прячется.
-        showAdd={!addedRows.some((row) => row.label === template.label)}
+        showAdd={!selectedTemplateAdded}
         addTestId="add-mixing-unit"
         addDisabled={connectionMode === 'wifi' && wifiMixingLimitReached}
         addDisabledTitle="Нет свободных RELAY-S пар или Wi-Fi слотов для смесительного узла."
@@ -3495,10 +3518,10 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         onClose={() => onTutorialStepChange(null)}
         showMask
         title="Выберите тип подключения смесительного узла"
+        description="Выберите «По проводу», если привод и датчик подключаются кабелем к контроллеру. Wi-Fi доступен только для совместимого узла 220V с цифровым датчиком."
     >
         <button className="tutorial-popover-action" type="button" onClick={() => {
             onConnectionModeChange('wired');
-            onTutorialStepChange('servo');
         }}>
             Оставить "По проводу"
         </button>
@@ -3509,11 +3532,11 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         open={tutorialStep === 'servo'}
         onClose={() => onTutorialStepChange(null)}
         showMask
-        title="Выберите тип питания вашего сервопривода"
+        title="Какой сигнал принимает сервопривод?"
+        description="Посмотрите маркировку или паспорт привода. Выберите 220V для привода с питанием 220 В или 0-10V для привода с аналоговым управляющим сигналом."
     >
         <button className="tutorial-popover-action" type="button" onClick={() => {
             onServoChange('220');
-            onTutorialStepChange('sensor');
         }}>
             Оставить "220V"
         </button>
@@ -3524,7 +3547,137 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         open={tutorialStep === 'sensor'}
         onClose={() => onTutorialStepChange(null)}
         showMask
-        title="Выберите датчик"
+        title="Какой датчик установлен в узле?"
+        description={connectionMode === 'wifi'
+            ? 'Для Wi-Fi используется цифровой датчик. Тип датчика уже выбран автоматически.'
+            : servo === '010'
+                ? 'Для привода 0-10V нужен NTC-датчик. Цифровой датчик с этим вариантом не используется.'
+                : 'Цифровой датчик подключается по линии 1-Wire, а NTC - к температурному входу. Тип указан на датчике или в его паспорте.'}
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onSensorChange(connectionMode === 'wifi' ? 'digital' : 'ntc')}>
+            {connectionMode === 'wifi' ? 'Продолжить' : 'Выбрать NTC'}
+        </button>
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={selectedTemplateAdded ? addedListRef : addRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'add'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title={selectedTemplateAdded ? 'Выбранный смесительный узел уже добавлен' : 'Проверьте выбранный вариант и добавьте узел'}
+        description={selectedTemplateAdded
+            ? 'Измените количество этого варианта кнопками + и - в списке ниже.'
+            : `Выбрано: ${connectionMode === 'wifi' ? 'Wi-Fi' : 'проводное подключение'}, привод ${servo === '220' ? '220V' : '0-10V'}, датчик ${sensor === 'digital' ? 'цифровой' : 'NTC'}.`}
+    >
+        {selectedTemplateAdded && (
+            <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('add-more')}>Показать счётчик</button>
+        )}
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'added-list'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        type="blockContent"
+        title="Смесительный узел добавлен в систему"
+        description="В этом списке отображаются все добавленные варианты смесительных узлов."
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('add-more')}>Далее</button>
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'add-more'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title="Изменяйте количество смесительных узлов"
+        description="Кнопки + и - изменяют количество одинаковых узлов. Чтобы добавить другой вариант, измените параметры выше. Необходимые модули контроллера будут учтены автоматически."
+    />
+    </div>
+    );
+};
+
+const GvsBoilerCard = ({ template, onAdd, addedRows = [], onAddUnit, onRemoveUnit, showJsonDetails = false, tutorialStep = null, onTutorialStepChange }) => {
+    const tutorialScopeRef = useRef(null);
+    const addRef = useRef(null);
+    const addedListRef = useRef(null);
+    const hasAddedBoiler = addedRows.length > 0;
+
+    return (
+    <div ref={tutorialScopeRef} style={{ position: 'relative', flex: '1 1 100%', minWidth: 0 }}>
+    <SectionEquipmentCard
+        image={GVS_BOILER_BACKGROUND_PATH}
+        backgroundColor="#555351"
+        backgroundPosition="right -100px"
+        title={template.label}
+        headerAction={(
+            <button
+                className="selection-option-button selection-tutorial-trigger"
+                type="button"
+                data-active={Boolean(tutorialStep)}
+                aria-pressed={Boolean(tutorialStep)}
+                aria-label={tutorialStep ? 'Закрыть обучение по настройке бойлера ГВС' : 'Показать подсказку по настройке бойлера ГВС'}
+                title={tutorialStep ? 'Закрыть обучение' : 'Как добавить бойлер ГВС'}
+                onClick={() => onTutorialStepChange(tutorialStep ? null : 'intro')}
+            >
+                <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
+                <span className="selection-tutorial-trigger-copy">
+                    <strong>Подсказки</strong>
+                    <small><span className="selection-tutorial-trigger-status" aria-hidden="true" />{tutorialStep ? 'Включены' : 'Выключены'}</small>
+                </span>
+            </button>
+        )}
+        description={template.description}
+        addedTitle="Добавленные бойлеры ГВС:"
+        addedRows={addedRows}
+        addedTutorialRef={addedListRef}
+        onAddUnit={onAddUnit}
+        onRemoveUnit={onRemoveUnit}
+        addLabel="Добавить бойлер ГВС"
+        onAdd={onAdd}
+        addTutorialRef={addRef}
+        showAdd={!hasAddedBoiler}
+        addTestId="add-gvs-boiler"
+        qtyTestId="gvs-qty"
+        jsonData={{ wired_device: template.wiredDevice, sensors: template.sensors }}
+        showJsonDetails={showJsonDetails}
+    />
+    <TutorialPopover
+        anchorRef={hasAddedBoiler ? addedListRef : addRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'intro'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title={hasAddedBoiler ? 'Бойлер ГВС уже добавлен в систему' : 'Добавьте бойлер косвенного нагрева'}
+        description={hasAddedBoiler
+            ? 'Измените количество добавленных бойлеров кнопками + и - в списке ниже.'
+            : 'Добавляйте этот элемент, если горячая вода готовится в бойлере от теплоносителя системы отопления. Вместе с ним будут учтены насос бойлера и датчик температуры.'}
+    >
+        {hasAddedBoiler && (
+            <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('count')}>Показать счётчик</button>
+        )}
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'added-list'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        type="blockContent"
+        title="Бойлер ГВС добавлен в систему"
+        description="В списке отображаются бойлеры косвенного нагрева, выбранные для этой системы."
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('count')}>Далее</button>
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'count'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title="Укажите количество бойлеров ГВС"
+        description="Кнопки + и - изменяют количество бойлеров. Для каждого бойлера система автоматически учитывает насос и датчик температуры."
     />
     </div>
     );
@@ -3535,7 +3688,16 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
  * смесительном узле. В списке добавленного 220V и 0-10V остаются отдельными
  * строками со своими счетчиками.
  */
-const PumpCard = ({ template, pumpType, onPumpTypeChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, showJsonDetails = false }) => (
+const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, onPumpTypeChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, wifiPumpLimitReached = false, showJsonDetails = false, tutorialStep = null, onTutorialStepChange }) => {
+    const tutorialScopeRef = useRef(null);
+    const connectionRef = useRef(null);
+    const pumpTypeRef = useRef(null);
+    const addRef = useRef(null);
+    const addedListRef = useRef(null);
+    const selectedTemplateAdded = addedRows.some((row) => row.label === template.label);
+
+    return (
+    <div ref={tutorialScopeRef} style={{ position: 'relative', flex: '1 1 100%', minWidth: 0 }}>
     <SectionEquipmentCard
         image={PUMP_BACKGROUND_PATH}
         backgroundColor={CARD_PHOTO_TAIL_COLOR.pumpRoom}
@@ -3543,29 +3705,232 @@ const PumpCard = ({ template, pumpType, onPumpTypeChange, onAdd, addedRows = [],
         // пустая стена, а сама насосная группа оставалась за нижней границей.
         backgroundPosition="right -150px"
         title={template.label}
+        headerAction={(
+            <button
+                className="selection-option-button selection-tutorial-trigger"
+                type="button"
+                data-active={Boolean(tutorialStep)}
+                aria-pressed={Boolean(tutorialStep)}
+                aria-label={tutorialStep ? 'Закрыть обучение по настройке насоса' : 'Показать подсказку по настройке насоса'}
+                title={tutorialStep ? 'Закрыть обучение' : 'Как добавить насос'}
+                onClick={() => onTutorialStepChange(tutorialStep ? null : 'connection')}
+            >
+                <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
+                <span className="selection-tutorial-trigger-copy">
+                    <strong>Подсказки</strong>
+                    <small><span className="selection-tutorial-trigger-status" aria-hidden="true" />{tutorialStep ? 'Включены' : 'Выключены'}</small>
+                </span>
+            </button>
+        )}
         description={template.description}
         addedTitle="Добавленные насосы:"
         addedRows={addedRows}
+        addedTutorialRef={addedListRef}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
         addLabel={`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
         onAdd={onAdd}
+        addTutorialRef={addRef}
         // Выбранный тип уже в списке — количеством управляет счетчик строки.
-        showAdd={!addedRows.some((row) => row.label === template.label)}
+        showAdd={!selectedTemplateAdded}
         addTestId="add-pump"
+        addDisabled={connectionMode === 'wifi' && wifiPumpLimitReached}
+        addDisabledTitle="Нет свободных Wi-Fi-модулей или релейных каналов для насоса."
         qtyTestId={(row) => `pump-${PUMP_TEMPLATES.find((item) => item.label === row.label)?.pump}-qty`}
         jsonData={{ wired_device: template.wiredDevice }}
         showJsonDetails={showJsonDetails}
     >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+            <SegmentedField
+                label="Тип подключения"
+                options={MIXING_CONNECTION_OPTIONS}
+                value={connectionMode}
+                onChange={onConnectionModeChange}
+                testIdPrefix="pump-connection"
+                fieldRef={connectionRef}
+                className="sel-mixing-field"
+            />
+            <SegmentedField
+                label="Управление"
+                options={PUMP_TYPE_OPTIONS}
+                value={pumpType}
+                onChange={onPumpTypeChange}
+                testIdPrefix="pump-type"
+                fieldRef={pumpTypeRef}
+                className="sel-mixing-field"
+                isAvailable={(value) => connectionMode !== 'wifi' || value === '220'}
+                unavailableTitle="Для Wi-Fi используется насос 220V"
+            />
+        </div>
+    </SectionEquipmentCard>
+    <TutorialPopover
+        anchorRef={connectionRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'connection'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title="Как подключён насос?"
+        description="Выберите «По проводу», если насос подключается к контроллеру кабелем. Wi-Fi подходит для насоса 220V и использует свободный модуль RL6W или RL6SW."
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onConnectionModeChange('wired')}>Оставить «По проводу»</button>
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={pumpTypeRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'type'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title="Какой тип управления у насоса?"
+        description={connectionMode === 'wifi'
+            ? 'Для Wi-Fi доступен насос 220V. Насос 0-10V требует проводного подключения к управляющим входам контроллера.'
+            : 'Посмотрите маркировку или паспорт насоса. Выберите 220V для обычного релейного управления или 0-10V для аналогового управляющего сигнала.'}
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onPumpTypeChange('220')}>Оставить 220V</button>
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={selectedTemplateAdded ? addedListRef : addRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'add'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title={selectedTemplateAdded ? 'Выбранный насос уже добавлен' : 'Проверьте выбранный вариант и добавьте насос'}
+        description={selectedTemplateAdded
+            ? 'Измените количество этого варианта кнопками + и - в списке ниже.'
+            : `Выбрано: ${connectionMode === 'wifi' ? 'Wi-Fi' : 'проводное подключение'}, управление ${pumpType === '220' ? '220V' : '0-10V'}.`}
+    >
+        {selectedTemplateAdded && <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('count')}>Показать счётчик</button>}
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'added-list'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        type="blockContent"
+        title="Насос добавлен в систему"
+        description="В списке отображаются все добавленные варианты насосов."
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('count')}>Далее</button>
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'count'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title="Изменяйте количество насосов"
+        description="Кнопки + и - изменяют количество одинаковых насосов. Для Wi-Fi варианта система распределит насосы по свободным каналам Wi-Fi модулей."
+    />
+    </div>
+    );
+};
+
+const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, wifiRelayLimitReached = false, showJsonDetails = false, tutorialStep = null, onTutorialStepChange }) => {
+    const tutorialScopeRef = useRef(null);
+    const connectionRef = useRef(null);
+    const addRef = useRef(null);
+    const addedListRef = useRef(null);
+    const selectedTemplateAdded = addedRows.some((row) => row.label === template.label);
+
+    return (
+    <div ref={tutorialScopeRef} style={{ position: 'relative', flex: '1 1 100%', minWidth: 0 }}>
+    <SectionEquipmentCard
+        image={ZONES_BACKGROUND_PATH}
+        backgroundWidth={560}
+        backgroundColor={CARD_PHOTO_TAIL_COLOR.zonesRoom}
+        title={template.label}
+        headerAction={(
+            <button
+                className="selection-option-button selection-tutorial-trigger"
+                type="button"
+                data-active={Boolean(tutorialStep)}
+                aria-pressed={Boolean(tutorialStep)}
+                aria-label={tutorialStep ? 'Закрыть обучение по настройке зон' : 'Показать подсказку по настройке зон'}
+                title={tutorialStep ? 'Закрыть обучение' : 'Как добавить зону'}
+                onClick={() => onTutorialStepChange(tutorialStep ? null : 'connection')}
+            >
+                <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
+                <span className="selection-tutorial-trigger-copy">
+                    <strong>Подсказки</strong>
+                    <small><span className="selection-tutorial-trigger-status" aria-hidden="true" />{tutorialStep ? 'Включены' : 'Выключены'}</small>
+                </span>
+            </button>
+        )}
+        description="Определите, на сколько зон будет разделена система, чтобы эффективно управлять оборудованием через двухходовые сервоприводы."
+        addedTitle="Добавленные зоны:"
+        addedRows={addedRows}
+        addedTutorialRef={addedListRef}
+        onAddUnit={onAddUnit}
+        onRemoveUnit={onRemoveUnit}
+        addLabel="Добавить зону"
+        onAdd={onAdd}
+        addTutorialRef={addRef}
+        showAdd={!selectedTemplateAdded}
+        addTestId="add-zone"
+        addDisabled={connectionMode === 'wifi' && wifiRelayLimitReached}
+        addDisabledTitle="Нет свободных Wi-Fi-модулей или релейных каналов для зоны."
+        qtyTestId="zone-qty"
+        jsonData={template.wiredDevice}
+        showJsonDetails={showJsonDetails}
+    >
         <SegmentedField
-            label="Управление"
-            options={PUMP_TYPE_OPTIONS}
-            value={pumpType}
-            onChange={onPumpTypeChange}
-            testIdPrefix="pump-type"
+            label="Тип подключения"
+            options={MIXING_CONNECTION_OPTIONS}
+            value={connectionMode}
+            onChange={onConnectionModeChange}
+            testIdPrefix="zone-connection"
+            fieldRef={connectionRef}
+            className="sel-mixing-field"
         />
     </SectionEquipmentCard>
-);
+    <TutorialPopover
+        anchorRef={connectionRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'connection'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title="Как подключён сервопривод зоны?"
+        description="Выберите «По проводу», если сервопривод подключается к контроллеру кабелем. При Wi-Fi подключении он будет размещён на свободном канале модуля RL6W или RL6SW."
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onConnectionModeChange('wired')}>Оставить «По проводу»</button>
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={selectedTemplateAdded ? addedListRef : addRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'add'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title={selectedTemplateAdded ? 'Выбранная зона уже добавлена' : 'Проверьте вариант и добавьте зону'}
+        description={selectedTemplateAdded
+            ? 'Измените количество этого варианта кнопками + и - в списке ниже.'
+            : `Выбрано ${connectionMode === 'wifi' ? 'Wi-Fi' : 'проводное'} подключение.`}
+    >
+        {selectedTemplateAdded && <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('count')}>Показать счётчик</button>}
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'added-list'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        type="blockContent"
+        title="Зона добавлена в систему"
+        description="В списке отображаются все добавленные варианты зон."
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('count')}>Далее</button>
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'count'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title="Изменяйте количество зон"
+        description="Кнопки + и - изменяют количество одинаковых зон. Wi-Fi сервоприводы автоматически распределяются по свободным каналам Wi-Fi модулей."
+    />
+    </div>
+    );
+};
 
 /** Карточка датчика: options задает варианты, selectedKey выбор, stepper счетчик. */
 const AddedDevicesBlock = ({ children, marginTop = 24, compact = false, dense = false, tutorialRef = null }) => (
@@ -4065,7 +4430,13 @@ const SelectionApp = () => {
     const [mixingSensor, setMixingSensor] = useState('digital');
     const [mixingConnectionMode, setMixingConnectionMode] = useState('wired');
     const [mixingTutorialStep, setMixingTutorialStep] = useState(null);
+    const [gvsBoilerTutorialStep, setGvsBoilerTutorialStep] = useState(null);
     const [pumpType, setPumpType] = useState('220');
+    const [pumpConnectionMode, setPumpConnectionMode] = useState('wired');
+    const [pumpTutorialStep, setPumpTutorialStep] = useState(null);
+    const [zoneConnectionMode, setZoneConnectionMode] = useState('wired');
+    const [zoneTutorialStep, setZoneTutorialStep] = useState(null);
+    const [otherEquipmentConnectionMode, setOtherEquipmentConnectionMode] = useState('wired');
     const [wiredTemperatureSensorKey, setWiredTemperatureSensorKey] = useState('wired-wall-digital');
     const [wirelessTemperatureSensorKey, setWirelessTemperatureSensorKey] = useState('wireless-wall');
     const [temperatureSensorConnection, setTemperatureSensorConnection] = useState('wired');
@@ -4344,13 +4715,31 @@ const SelectionApp = () => {
             ? { ...template, label: 'Сервопривод 220V с цифровым датчиком с подключением по WI-FI', connectionMode: 'wifi' }
             : template;
     }, [mixingConnectionMode, mixingServo, mixingSensor]);
-    const pumpTemplate = useMemo(
-        () => PUMP_TEMPLATES.find((item) => item.pump === pumpType) || PUMP_TEMPLATES[0],
-        [pumpType],
-    );
+    const pumpTemplate = useMemo(() => {
+        const template = PUMP_TEMPLATES.find((item) => item.pump === pumpType) || PUMP_TEMPLATES[0];
+        return pumpConnectionMode === 'wifi'
+            ? { ...template, label: 'Насос 220V с подключением по WI-FI', connectionMode: 'wifi' }
+            : template;
+    }, [pumpConnectionMode, pumpType]);
+    const zoneTemplate = useMemo(() => (
+        zoneConnectionMode === 'wifi'
+            ? { ...ZONE_TEMPLATES[0], label: 'Зона с подключением по WI-FI', connectionMode: 'wifi' }
+            : ZONE_TEMPLATES[0]
+    ), [zoneConnectionMode]);
+    const otherEquipmentTemplate = useMemo(() => (
+        otherEquipmentConnectionMode === 'wifi'
+            ? {
+                ...OTHER_EQUIP_TEMPLATES[0],
+                label: 'Прочее оборудование с подключением по WI-FI',
+                connectionMode: 'wifi',
+                wiredDevice: { ...OTHER_EQUIP_TEMPLATES[0].wiredDevice, connection_type: 'relay|relay-s' },
+            }
+            : OTHER_EQUIP_TEMPLATES[0]
+    ), [otherEquipmentConnectionMode]);
     // Строки списка нужны дважды: в самом списке и в условии показа кнопки.
     const gvsBoilerRows = getGroupedDeviceRows(incomingScheme, 'gvs', GVS_TEMPLATES);
     const pumpCardRows = getGroupedDeviceRows(incomingScheme, 'pump', PUMP_TEMPLATES);
+    const wifiRelayLimitReached = getAvailableWifiRelaySlots(incomingScheme) <= 0;
     const zoneRows = getGroupedDeviceRows(incomingScheme, 'zone', ZONE_TEMPLATES);
     const otherEquipmentRows = getGroupedDeviceRows(incomingScheme, 'other', OTHER_EQUIP_TEMPLATES);
     const thermostatRows = getThermostatRows(incomingScheme);
@@ -4626,6 +5015,36 @@ const SelectionApp = () => {
                 _group: group,
                 _label: template.label,
             }));
+            if (template.connectionMode === 'wifi' && ['pump', 'zone', 'other'].includes(group)) {
+                if (getAvailableWifiRelaySlots(prev) <= 0) return prev;
+                const wifiModules = Array.isArray(prev.wifi_modules) ? prev.wifi_modules : [];
+                const reusableModuleIndex = wifiModules.findIndex((moduleItem) => {
+                    const type = canonicalType(moduleItem?.type);
+                    return (type === 'rl6w' && getRelayUsedSlots(moduleItem) < 6)
+                        || (type === 'rl6sw' && getRelaySUsedSlots(moduleItem) < 6);
+                });
+                const reusableModule = wifiModules[reusableModuleIndex];
+                const moduleType = canonicalType(reusableModule?.type) || 'rl6w';
+                const moduleId = reusableModule?.id ?? `wifi-${group}-${generateId()}`;
+                const wifiRelayDevice = { ...servo, connection_mode: 'wifi', ownerWifiModuleId: moduleId };
+                const lineKey = moduleType === 'rl6sw' ? 'relay_s_devices' : 'relay_devices';
+                return resolveSelectionScheme({
+                    ...prev,
+                    wifi_modules: reusableModule
+                        ? wifiModules.map((moduleItem, moduleIndex) => (moduleIndex === reusableModuleIndex ? {
+                            ...moduleItem,
+                            [lineKey]: [...(Array.isArray(moduleItem[lineKey]) ? moduleItem[lineKey] : []), wifiRelayDevice],
+                        } : moduleItem))
+                        : [...wifiModules, {
+                            id: moduleId,
+                            type: 'rl6w',
+                            device_type: 'module',
+                            connection_type: 'WIFI',
+                            _auto_source: `selection-wifi-${group}`,
+                            relay_devices: [wifiRelayDevice],
+                        }],
+                });
+            }
             if (template.connectionMode === 'wifi') {
                 if (getAvailableWifiMixingUnits(prev) <= 0) return prev;
                 const wifiModules = Array.isArray(prev.wifi_modules) ? prev.wifi_modules : [];
@@ -4685,7 +5104,7 @@ const SelectionApp = () => {
                         .filter((device) => String(device?._uid) !== String(unitUid)),
                 }))
                 .filter((moduleItem) => (
-                    moduleItem?._auto_source !== 'selection-wifi-mixing'
+                    !['selection-wifi-mixing', 'selection-wifi-pump', 'selection-wifi-zone', 'selection-wifi-other'].includes(moduleItem?._auto_source)
                     || moduleItem.relay_devices.length > 0
                     || moduleItem.relay_s_devices.length > 0
                     || moduleItem.one_wire_devices.length > 0
@@ -5610,9 +6029,12 @@ const SelectionApp = () => {
                         sensor={mixingSensor}
                         onSensorChange={(sensor) => {
                             setMixingSensor(sensor);
-                            if (mixingTutorialStep === 'sensor') setMixingTutorialStep(null);
+                            if (mixingTutorialStep === 'sensor') setMixingTutorialStep('add');
                         }}
-                        onAdd={() => addMixingUnit(mixingTemplate, 'mixing')}
+                        onAdd={() => {
+                            addMixingUnit(mixingTemplate, 'mixing');
+                            if (mixingTutorialStep === 'add') setMixingTutorialStep('added-list');
+                        }}
                         addedRows={getGroupedDeviceRows(incomingScheme, 'mixing', MIXING_TEMPLATES)}
                         onAddUnit={(row) => addMixingUnit(
                             MIXING_TEMPLATES.find((item) => item.label === row.label)
@@ -5638,26 +6060,21 @@ const SelectionApp = () => {
                 <h2>Бойлеры ГВС</h2>
                 <SectionSubtitle>Какое количество бойлеров косвенного нагрева подключено после гидравлического разделителя?</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    <SectionEquipmentCard
-                        image={GVS_BOILER_BACKGROUND_PATH}
-                        backgroundColor="#555351"
-                        backgroundPosition="right -100px"
-                        title={GVS_TEMPLATES[0].label}
-                        description={GVS_TEMPLATES[0].description}
-                        addedTitle="Добавленные бойлеры ГВС:"
+                    <GvsBoilerCard
+                        template={GVS_TEMPLATES[0]}
                         addedRows={gvsBoilerRows}
                         onAddUnit={(row) => addMixingUnit(
                             GVS_TEMPLATES.find((item) => item.label === row.label) || GVS_TEMPLATES[0],
                             'gvs',
                         )}
                         onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
-                        addLabel="Добавить бойлер ГВС"
-                        onAdd={() => addMixingUnit(GVS_TEMPLATES[0], 'gvs')}
-                        showAdd={gvsBoilerRows.length === 0}
-                        addTestId="add-gvs-boiler"
-                        qtyTestId="gvs-qty"
-                        jsonData={{ wired_device: GVS_TEMPLATES[0].wiredDevice, sensors: GVS_TEMPLATES[0].sensors }}
+                        onAdd={() => {
+                            addMixingUnit(GVS_TEMPLATES[0], 'gvs');
+                            if (gvsBoilerTutorialStep === 'intro') setGvsBoilerTutorialStep('added-list');
+                        }}
                         showJsonDetails={showJsonDetails}
+                        tutorialStep={gvsBoilerTutorialStep}
+                        onTutorialStepChange={setGvsBoilerTutorialStep}
                     />
                 </div>
             </section>
@@ -5668,16 +6085,34 @@ const SelectionApp = () => {
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <PumpCard
                         template={pumpTemplate}
+                        connectionMode={pumpConnectionMode}
+                        onConnectionModeChange={(mode) => {
+                            setPumpConnectionMode(mode);
+                            if (mode === 'wifi') setPumpType('220');
+                            if (pumpTutorialStep === 'connection') setPumpTutorialStep('type');
+                        }}
                         pumpType={pumpType}
-                        onPumpTypeChange={setPumpType}
-                        onAdd={() => addMixingUnit(pumpTemplate, 'pump')}
+                        onPumpTypeChange={(type) => {
+                            setPumpType(type);
+                            if (pumpTutorialStep === 'type') setPumpTutorialStep('add');
+                        }}
+                        onAdd={() => {
+                            addMixingUnit(pumpTemplate, 'pump');
+                            if (pumpTutorialStep === 'add') setPumpTutorialStep('added-list');
+                        }}
                         addedRows={pumpCardRows}
                         onAddUnit={(row) => addMixingUnit(
-                            PUMP_TEMPLATES.find((item) => item.label === row.label) || pumpTemplate,
+                            PUMP_TEMPLATES.find((item) => item.label === row.label)
+                            || (row.label === 'Насос 220V с подключением по WI-FI'
+                                ? { ...PUMP_TEMPLATES[0], label: row.label, connectionMode: 'wifi' }
+                                : pumpTemplate),
                             'pump',
                         )}
                         onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                        wifiPumpLimitReached={wifiRelayLimitReached}
                         showJsonDetails={showJsonDetails}
+                        tutorialStep={pumpTutorialStep}
+                        onTutorialStepChange={setPumpTutorialStep}
                     />
                 </div>
 
@@ -5727,23 +6162,29 @@ const SelectionApp = () => {
                     <h2>Зональное управление</h2>
                     <SectionSubtitle>Настройте управление системой с помощью зонирования</SectionSubtitle>
                     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                        <SectionEquipmentCard
-                            image={ZONES_BACKGROUND_PATH}
-                            backgroundWidth={560}
-                            backgroundColor={CARD_PHOTO_TAIL_COLOR.zonesRoom}
-                            title={ZONE_TEMPLATES[0].label}
-                            description="Определите, на сколько зон будет разделена система, чтобы эффективно управлять оборудованием черех двухходовые сервоприводы."
-                            addedTitle="Добавленные зоны:"
+                        <ZoneCard
+                            template={zoneTemplate}
+                            connectionMode={zoneConnectionMode}
+                            onConnectionModeChange={(mode) => {
+                                setZoneConnectionMode(mode);
+                                if (zoneTutorialStep === 'connection') setZoneTutorialStep('add');
+                            }}
                             addedRows={zoneRows}
-                            onAddUnit={() => addMixingUnit(ZONE_TEMPLATES[0], 'zone')}
+                            onAddUnit={(row) => addMixingUnit(
+                                row.label === 'Зона с подключением по WI-FI'
+                                    ? { ...ZONE_TEMPLATES[0], label: row.label, connectionMode: 'wifi' }
+                                    : ZONE_TEMPLATES[0],
+                                'zone',
+                            )}
                             onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
-                            addLabel="Добавить зону"
-                            onAdd={() => addMixingUnit(ZONE_TEMPLATES[0], 'zone')}
-                            showAdd={zoneRows.length === 0}
-                            addTestId="add-zone"
-                            qtyTestId="zone-qty"
-                            jsonData={ZONE_TEMPLATES[0].wiredDevice}
+                            onAdd={() => {
+                                addMixingUnit(zoneTemplate, 'zone');
+                                if (zoneTutorialStep === 'add') setZoneTutorialStep('added-list');
+                            }}
+                            wifiRelayLimitReached={wifiRelayLimitReached}
                             showJsonDetails={showJsonDetails}
+                            tutorialStep={zoneTutorialStep}
+                            onTutorialStepChange={setZoneTutorialStep}
                         />
                     </div>
                 </section>
@@ -5759,23 +6200,41 @@ const SelectionApp = () => {
                         image={OTHER_EQUIP_BACKGROUND_PATH}
                         backgroundWidth={520}
                         backgroundColor={CARD_PHOTO_TAIL_COLOR.otherRoom}
-                        title={OTHER_EQUIP_TEMPLATES[0].label}
+                        title={otherEquipmentTemplate.label}
                         description="Сирены, реле и другие устройства, которыми контроллер управляет через релейный выход. Каждое занимает один релейный порт."
                         addedTitle="Добавленное оборудование:"
                         addedRows={otherEquipmentRows}
                         onAddUnit={(row) => addMixingUnit(
-                            OTHER_EQUIP_TEMPLATES.find((item) => item.label === row.label) || OTHER_EQUIP_TEMPLATES[0],
+                            row.label === 'Прочее оборудование с подключением по WI-FI'
+                                ? {
+                                    ...OTHER_EQUIP_TEMPLATES[0],
+                                    label: row.label,
+                                    connectionMode: 'wifi',
+                                    wiredDevice: { ...OTHER_EQUIP_TEMPLATES[0].wiredDevice, connection_type: 'relay|relay-s' },
+                                }
+                                : OTHER_EQUIP_TEMPLATES[0],
                             'other',
                         )}
                         onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
                         addLabel="Добавить оборудование"
-                        onAdd={() => addMixingUnit(OTHER_EQUIP_TEMPLATES[0], 'other')}
-                        showAdd={otherEquipmentRows.length === 0}
+                        onAdd={() => addMixingUnit(otherEquipmentTemplate, 'other')}
+                        showAdd={!otherEquipmentRows.some((row) => row.label === otherEquipmentTemplate.label)}
                         addTestId="add-other-equipment"
+                        addDisabled={otherEquipmentConnectionMode === 'wifi' && wifiRelayLimitReached}
+                        addDisabledTitle="Нет свободных Wi-Fi-модулей или релейных каналов для оборудования."
                         qtyTestId="other-equipment-qty"
-                        jsonData={OTHER_EQUIP_TEMPLATES[0].wiredDevice}
+                        jsonData={otherEquipmentTemplate.wiredDevice}
                         showJsonDetails={showJsonDetails}
-                    />
+                    >
+                        <SegmentedField
+                            label="Тип подключения"
+                            options={MIXING_CONNECTION_OPTIONS}
+                            value={otherEquipmentConnectionMode}
+                            onChange={setOtherEquipmentConnectionMode}
+                            testIdPrefix="other-equipment-connection"
+                            className="sel-mixing-field"
+                        />
+                    </SectionEquipmentCard>
                 </div>
 
             </section>
