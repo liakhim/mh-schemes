@@ -34,6 +34,8 @@ import DeviceIndicator from './DeviceIndicator';
 import { DeviceInfoBlock as EditableInfoTitle } from './DeviceInfoBlock';
 import SlotDeleteButton from './SlotDeleteButton';
 
+const isFlaskSensorType = (type) => String(canonicalDeviceType(type) || '').startsWith('flask-sensor');
+
 const WifiLine = ({
     wifiLineEnabled,
     memoWifiModules,
@@ -532,12 +534,23 @@ const WifiLine = ({
                                                                 const toY = sensor
                                                                     ? slotPos.y + to.y * ONE_WIRE_SLOT_SIZE
                                                                     : slotPos.y + to.y;
+                                                                const targetType = canonicalDeviceType(sensor?.type);
+                                                                // Настенный цифровой датчик подключается к боковым
+                                                                // контактам напрямую, как на controller 1-wire линии.
+                                                                if (targetType === 'wall-digital-sensor') {
+                                                                    return [{
+                                                                        key: `${name}-${sensorIndex}`,
+                                                                        role: name,
+                                                                        points: [toX, toY, fromX, toY, fromX, fromY],
+                                                                    }];
+                                                                }
                                                                 const bendY = getOneWireBendY({
                                                                     slotTop: slotPos.y,
                                                                     slotHeight: ONE_WIRE_SLOT_SIZE,
                                                                     offset: (linkIndex + 1) * indentSize,
                                                                     fromY,
                                                                     toY,
+                                                                    isTargetThermostat: targetType === 'thermostat' || isFlaskSensorType(targetType),
                                                                 });
 
                                                                 return [{
