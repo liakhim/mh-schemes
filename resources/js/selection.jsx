@@ -3589,7 +3589,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
                 label="Тип подключения"
                 options={MIXING_CONNECTION_OPTIONS}
                 value={connectionMode}
-                onChange={onConnectionModeChange}
+                onChange={(value) => { onConnectionModeChange(value); if (tutorialStep === 'configuration') onTutorialStepChange('configuration-add'); }}
                 testIdPrefix="mixing-connection"
                 fieldRef={connectionRef}
                 className="sel-mixing-field"
@@ -3598,7 +3598,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
                 label="Сервопривод"
                 options={MIXING_SERVO_OPTIONS}
                 value={servo}
-                onChange={onServoChange}
+                onChange={(value) => { onServoChange(value); if (tutorialStep === 'configuration') onTutorialStepChange('configuration-add'); }}
                 testIdPrefix="mixing-servo"
                 fieldRef={servoRef}
                 className="sel-mixing-field"
@@ -3609,7 +3609,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
                 label="Датчик"
                 options={MIXING_SENSOR_OPTIONS}
                 value={sensor}
-                onChange={onSensorChange}
+                onChange={(value) => { onSensorChange(value); if (tutorialStep === 'configuration') onTutorialStepChange('configuration-add'); }}
                 testIdPrefix="mixing-sensor"
                 fieldRef={sensorRef}
                 className="sel-mixing-field"
@@ -3715,6 +3715,16 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         showMask
         title="Добавьте другой вид смесительного узла"
         description="Измените конфигурацию добавления, чтобы добавить другой вид смесительных узлов в систему."
+    />
+    <TutorialPopover
+        anchorRef={mixingSettingsRef}
+        highlightRef={addRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'configuration-add'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title="Добавьте новую конфигурацию"
+        description="Настройки изменены. Нажмите кнопку добавления, чтобы включить новый вариант смесительного узла в систему."
     >
         <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange(null)}>Понятно</button>
     </TutorialPopover>
