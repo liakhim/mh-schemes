@@ -4276,34 +4276,6 @@ html:has(.selection-body),
     width: 240px;
 }
 
-.sel-footer {
-    position: relative;
-    margin-top: 56px;
-    padding: 26px 24px;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 14px 14px 0 0;
-    background:
-        radial-gradient(circle at 50% 130%, rgba(224, 112, 32, 0.18), transparent 38%),
-        linear-gradient(135deg, #111318, #050607 72%);
-    color: rgba(255, 255, 255, 0.7);
-    box-shadow: 0 18px 44px rgba(5, 6, 7, 0.18), inset 0 1px rgba(255, 255, 255, 0.05);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-align: center;
-}
-
-.sel-footer::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 30%;
-    right: 30%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(224, 112, 32, 0.8), transparent);
-}
-
 .sel-liquid-header {
     position: fixed;
     top: 12px;
@@ -4392,15 +4364,6 @@ html:has(.selection-body),
 
 .sel-mode-panel {
     min-width: 0;
-}
-
-.sel-mode-title {
-    margin-bottom: 5px;
-    color: #475569;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
 }
 
 .sel-mode-controls {
@@ -4713,24 +4676,6 @@ html:has(.selection-body),
     background: #f8fafc;
 }
 
-/* Sticky header */
-.sel-sticky-top {
-    position: sticky;
-    top: 0;
-    z-index: 200;
-    background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(241, 245, 249, 0.66)),
-        rgba(255, 255, 255, 0.72);
-    backdrop-filter: blur(18px) saturate(150%);
-    -webkit-backdrop-filter: blur(18px) saturate(150%);
-    margin: -24px -24px 28px;
-    padding: 14px 24px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    border-top: 0;
-    border-radius: 0 0 20px 20px;
-    box-shadow: 0 10px 30px rgba(32, 39, 56, 0.1), inset 0 1px rgba(255, 255, 255, 0.7);
-}
-
 .sel-header {
     padding-bottom: 12px;
     display: flex;
@@ -4797,15 +4742,6 @@ html:has(.selection-body),
     padding: 24px;
     border: 1px solid var(--line);
     border-radius: 10px;
-    background: var(--card);
-}
-
-/* Компактная карточка шаблона: заголовок, описание, кнопка добавления. */
-.sel-card-compact {
-    gap: 8px;
-    padding: 16px;
-    border: 1px solid var(--line);
-    border-radius: 12px;
     background: var(--card);
 }
 
@@ -5549,7 +5485,7 @@ html:has(.selection-body),
     height: 38px;
     padding: 4px 9px;
     border: 1px solid rgba(203, 213, 225, 0.9);
-    border-radius: 999px;
+    border-radius: 10px;
     color: #475569;
     background: rgba(241, 245, 249, 0.9);
     cursor: pointer;
@@ -5949,12 +5885,6 @@ html:has(.selection-body),
     font-size: 13px;
 }
 
-.selection-page button.selection-add-button-sm {
-    padding: 7px 16px;
-    border-radius: 8px;
-    font-size: 13px;
-}
-
 .sel-card:hover {
     border-color: #e07020 !important;
     box-shadow: 0 6px 20px rgba(224, 112, 32, 0.12);
@@ -5977,13 +5907,6 @@ html:has(.selection-body),
     margin-bottom: 20px;
     padding-bottom: 10px;
     border-bottom: 1px solid var(--line);
-}
-
-.sel-card-title {
-    font-weight: 700;
-    font-size: 14px;
-    line-height: 1.4;
-    color: var(--text);
 }
 
 /* Панель «Подобранный контроллер»: липкая колонка справа от основного
@@ -6792,8 +6715,7 @@ html:has(.selection-body),
         width: 126px;
     }
 
-    .sel-header-brand span,
-    .sel-mode-title {
+    .sel-header-brand span {
         display: none;
     }
 }
@@ -6853,8 +6775,7 @@ html:has(.selection-body),
         width: 104px;
     }
 
-    .sel-header-brand span,
-    .sel-mode-title {
+    .sel-header-brand span {
         display: none;
     }
 
@@ -6902,13 +6823,6 @@ html:has(.selection-body),
 
     .sel-layout-spacer {
         display: none;
-    }
-
-    .sel-footer {
-        margin-top: 32px;
-        padding: 20px 14px;
-        border-radius: 12px 12px 0 0;
-        font-size: 11px;
     }
 
     .sel-manual-controller-picker {
@@ -6976,8 +6890,7 @@ html:has(.selection-body),
     }
 
     .sel-controller-panel-glow,
-    .sel-controller-panel-header,
-    .sel-stuck-controllers-note {
+    .sel-controller-panel-header {
         display: none;
     }
 
@@ -7136,12 +7049,6 @@ html:has(.selection-body),
         display: none;
     }
 
-    .sel-sticky-top {
-        margin: -12px -12px 20px;
-        padding: 10px 12px;
-        border-radius: 0 0 14px 14px;
-    }
-
     .sel-header {
         gap: 10px;
         padding-bottom: 10px;
@@ -7242,10 +7149,6 @@ html:has(.selection-body),
         right: 12px;
     }
 
-    .selection-page .sel-card-compact {
-        padding: 14px;
-    }
-
     /* Мельче шрифты внутри карточек: заголовок/описание/строки списка. */
     .sel-card-heading {
         font-size: 15px;
@@ -7258,10 +7161,6 @@ html:has(.selection-body),
     /* Лид карточки котлов длиннее прочих описаний — на телефоне ещё мельче. */
     .sel-boilers-lead {
         font-size: 12px;
-    }
-
-    .sel-card-title {
-        font-size: 13px;
     }
 
     .sel-added-block {
@@ -7298,11 +7197,6 @@ html:has(.selection-body),
         font-size: 12px;
     }
 
-    .selection-page button.selection-add-button-sm {
-        padding: 7px 14px;
-        font-size: 12.5px;
-    }
-
     /* Сегментированные переключатели: на телефоне их в ряду до трёх.
        Кружок выбора цвета исключён: он не текстовый, а квадратный 36x36 с
        `border-box`, и вертикальные 7px паддинга этого правила (оно перебивало
@@ -7317,7 +7211,7 @@ html:has(.selection-body),
         min-width: 0;
         height: 30px;
         padding: 3px 6px;
-        border-radius: 8px;
+        border-radius: 10px;
         gap: 4px;
         flex-direction: row;
         flex-wrap: nowrap;
@@ -7475,15 +7369,6 @@ html:has(.selection-body),
         padding-bottom: 8px;
         font-size: 10px;
         gap: 6px;
-    }
-
-    /* Липкая панель «Подобранный контроллер» — компактная по высоте:
-       карточки в одну строку со свайпом, картинки и подписи ужаты. */
-    .sel-stuck-controllers-title {
-        padding-top: 6px !important;
-        font-size: 11px !important;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
     }
 
     .sel-stuck-controllers {

@@ -3162,6 +3162,7 @@ const SectionEquipmentCard = ({
     // отступов — блок ниже, а вместе с ним и карточка.
     addedDense = false,
     addedTutorialRef = null,
+    counterTutorialRef = null,
     onAddUnit,
     onRemoveUnit,
     addLabel,
@@ -3194,6 +3195,7 @@ const SectionEquipmentCard = ({
                         hideCount
                         control={(
                             <QtyStepper
+                                tutorialRef={counterTutorialRef}
                                 count={row.count}
                                 dense={addedDense}
                                 onDecrement={() => onRemoveUnit(row)}
@@ -3368,7 +3370,7 @@ const SegmentedField = ({
     isAvailable = () => true,
     unavailableTitle = null,
 }) => (
-    <div ref={fieldRef} className={className}>
+    <div ref={fieldRef} className={className} style={{ alignSelf: 'flex-start', width: 'fit-content', maxWidth: '100%' }}>
         <ThermostatFieldLabel>{label}</ThermostatFieldLabel>
         <div
             style={{
@@ -3426,8 +3428,10 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
     const connectionRef = useRef(null);
     const servoRef = useRef(null);
     const sensorRef = useRef(null);
+    const mixingSettingsRef = useRef(null);
     const addRef = useRef(null);
     const addedListRef = useRef(null);
+    const counterRef = useRef(null);
     const selectedTemplateAdded = addedRows.some((row) => row.label === template.label);
 
     return (
@@ -3457,6 +3461,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         addedTitle="Добавленные смесительные узлы:"
         addedRows={addedRows}
         addedTutorialRef={addedListRef}
+        counterTutorialRef={counterRef}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
         addLabel={`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
@@ -3473,7 +3478,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         showJsonDetails={showJsonDetails}
     >
         {/* Оба переключателя в одном ряду; на узкой карточке переносятся. */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+        <div ref={mixingSettingsRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 24, width: 'fit-content', maxWidth: '100%' }}>
             <SegmentedField
                 label="Тип подключения"
                 options={MIXING_CONNECTION_OPTIONS}
@@ -3586,14 +3591,27 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('add-more')}>Далее</button>
     </TutorialPopover>
     <TutorialPopover
-        anchorRef={addedListRef}
+        anchorRef={counterRef}
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'add-more'}
         onClose={() => onTutorialStepChange(null)}
         showMask
         title="Изменяйте количество смесительных узлов"
         description="Кнопки + и - изменяют количество одинаковых узлов. Чтобы добавить другой вариант, измените параметры выше. Необходимые модули контроллера будут учтены автоматически."
-    />
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('configuration')}>Далее</button>
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={mixingSettingsRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'configuration'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title="Добавьте другой вид смесительного узла"
+        description="Измените конфигурацию добавления, чтобы добавить другой вид смесительных узлов в систему."
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange(null)}>Понятно</button>
+    </TutorialPopover>
     </div>
     );
 };
@@ -3602,6 +3620,7 @@ const GvsBoilerCard = ({ template, onAdd, addedRows = [], onAddUnit, onRemoveUni
     const tutorialScopeRef = useRef(null);
     const addRef = useRef(null);
     const addedListRef = useRef(null);
+    const counterRef = useRef(null);
     const hasAddedBoiler = addedRows.length > 0;
 
     return (
@@ -3632,6 +3651,7 @@ const GvsBoilerCard = ({ template, onAdd, addedRows = [], onAddUnit, onRemoveUni
         addedTitle="Добавленные бойлеры ГВС:"
         addedRows={addedRows}
         addedTutorialRef={addedListRef}
+        counterTutorialRef={counterRef}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
         addLabel="Добавить бойлер ГВС"
@@ -3644,7 +3664,7 @@ const GvsBoilerCard = ({ template, onAdd, addedRows = [], onAddUnit, onRemoveUni
         showJsonDetails={showJsonDetails}
     />
     <TutorialPopover
-        anchorRef={hasAddedBoiler ? addedListRef : addRef}
+        anchorRef={hasAddedBoiler ? counterRef : addRef}
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'intro'}
         onClose={() => onTutorialStepChange(null)}
@@ -3671,14 +3691,16 @@ const GvsBoilerCard = ({ template, onAdd, addedRows = [], onAddUnit, onRemoveUni
         <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('count')}>Далее</button>
     </TutorialPopover>
     <TutorialPopover
-        anchorRef={addedListRef}
+        anchorRef={counterRef}
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'count'}
         onClose={() => onTutorialStepChange(null)}
         showMask
         title="Укажите количество бойлеров ГВС"
         description="Кнопки + и - изменяют количество бойлеров. Для каждого бойлера система автоматически учитывает насос и датчик температуры."
-    />
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange(null)}>Понятно</button>
+    </TutorialPopover>
     </div>
     );
 };
@@ -3692,8 +3714,10 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
     const tutorialScopeRef = useRef(null);
     const connectionRef = useRef(null);
     const pumpTypeRef = useRef(null);
+    const pumpSettingsRef = useRef(null);
     const addRef = useRef(null);
     const addedListRef = useRef(null);
+    const counterRef = useRef(null);
     const selectedTemplateAdded = addedRows.some((row) => row.label === template.label);
 
     return (
@@ -3726,6 +3750,7 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         addedTitle="Добавленные насосы:"
         addedRows={addedRows}
         addedTutorialRef={addedListRef}
+        counterTutorialRef={counterRef}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
         addLabel={`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
@@ -3740,7 +3765,7 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         jsonData={{ wired_device: template.wiredDevice }}
         showJsonDetails={showJsonDetails}
     >
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+        <div ref={pumpSettingsRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 24, width: 'fit-content', maxWidth: '100%' }}>
             <SegmentedField
                 label="Тип подключения"
                 options={MIXING_CONNECTION_OPTIONS}
@@ -3782,10 +3807,12 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         showMask
         title="Какой тип управления у насоса?"
         description={connectionMode === 'wifi'
-            ? 'Для Wi-Fi доступен насос 220V. Насос 0-10V требует проводного подключения к управляющим входам контроллера.'
+            ? 'По Wi-Fi подключаются насосы с питанием 220V.'
             : 'Посмотрите маркировку или паспорт насоса. Выберите 220V для обычного релейного управления или 0-10V для аналогового управляющего сигнала.'}
     >
-        <button className="tutorial-popover-action" type="button" onClick={() => onPumpTypeChange('220')}>Оставить 220V</button>
+        <button className="tutorial-popover-action" type="button" onClick={() => onPumpTypeChange('220')}>
+            {connectionMode === 'wifi' ? 'Далее' : 'Оставить 220V'}
+        </button>
     </TutorialPopover>
     <TutorialPopover
         anchorRef={selectedTemplateAdded ? addedListRef : addRef}
@@ -3813,31 +3840,45 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('count')}>Далее</button>
     </TutorialPopover>
     <TutorialPopover
-        anchorRef={addedListRef}
+        anchorRef={counterRef}
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'count'}
         onClose={() => onTutorialStepChange(null)}
         showMask
         title="Изменяйте количество насосов"
         description="Кнопки + и - изменяют количество одинаковых насосов. Для Wi-Fi варианта система распределит насосы по свободным каналам Wi-Fi модулей."
-    />
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('configuration')}>Далее</button>
+    </TutorialPopover>
+    <TutorialPopover
+        anchorRef={pumpSettingsRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'configuration'}
+        onClose={() => onTutorialStepChange(null)}
+        showMask
+        title="Добавьте другой вид насоса"
+        description="Измените конфигурацию добавления насосов, чтобы добавить другой вид насоса в систему."
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange(null)}>Понятно</button>
+    </TutorialPopover>
     </div>
     );
 };
 
-const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, wifiRelayLimitReached = false, showJsonDetails = false, tutorialStep = null, onTutorialStepChange }) => {
+const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, wifiRelayLimitReached = false, showJsonDetails = false, tutorialStep = null, onTutorialStepChange, isOtherEquipment = false }) => {
     const tutorialScopeRef = useRef(null);
     const connectionRef = useRef(null);
     const addRef = useRef(null);
     const addedListRef = useRef(null);
+    const counterRef = useRef(null);
     const selectedTemplateAdded = addedRows.some((row) => row.label === template.label);
 
     return (
     <div ref={tutorialScopeRef} style={{ position: 'relative', flex: '1 1 100%', minWidth: 0 }}>
     <SectionEquipmentCard
-        image={ZONES_BACKGROUND_PATH}
-        backgroundWidth={560}
-        backgroundColor={CARD_PHOTO_TAIL_COLOR.zonesRoom}
+        image={isOtherEquipment ? OTHER_EQUIP_BACKGROUND_PATH : ZONES_BACKGROUND_PATH}
+        backgroundWidth={isOtherEquipment ? 520 : 560}
+        backgroundColor={isOtherEquipment ? CARD_PHOTO_TAIL_COLOR.otherRoom : CARD_PHOTO_TAIL_COLOR.zonesRoom}
         title={template.label}
         headerAction={(
             <button
@@ -3845,8 +3886,8 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
                 type="button"
                 data-active={Boolean(tutorialStep)}
                 aria-pressed={Boolean(tutorialStep)}
-                aria-label={tutorialStep ? 'Закрыть обучение по настройке зон' : 'Показать подсказку по настройке зон'}
-                title={tutorialStep ? 'Закрыть обучение' : 'Как добавить зону'}
+                aria-label={tutorialStep ? 'Закрыть обучение по настройке оборудования' : `Показать подсказку по настройке ${isOtherEquipment ? 'оборудования' : 'зон'}`}
+                title={tutorialStep ? 'Закрыть обучение' : `Как добавить ${isOtherEquipment ? 'оборудование' : 'зону'}`}
                 onClick={() => onTutorialStepChange(tutorialStep ? null : 'connection')}
             >
                 <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
@@ -3856,20 +3897,23 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
                 </span>
             </button>
         )}
-        description="Определите, на сколько зон будет разделена система, чтобы эффективно управлять оборудованием через двухходовые сервоприводы."
-        addedTitle="Добавленные зоны:"
+        description={isOtherEquipment
+            ? 'Сирены, реле и другие устройства, которыми контроллер управляет через релейный выход. Каждое занимает один релейный порт.'
+            : 'Определите, на сколько зон будет разделена система, чтобы эффективно управлять оборудованием через двухходовые сервоприводы.'}
+        addedTitle={isOtherEquipment ? 'Добавленное оборудование:' : 'Добавленные зоны:'}
         addedRows={addedRows}
         addedTutorialRef={addedListRef}
+        counterTutorialRef={counterRef}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
-        addLabel="Добавить зону"
+        addLabel={isOtherEquipment ? 'Добавить оборудование' : 'Добавить зону'}
         onAdd={onAdd}
         addTutorialRef={addRef}
         showAdd={!selectedTemplateAdded}
-        addTestId="add-zone"
+        addTestId={isOtherEquipment ? 'add-other-equipment' : 'add-zone'}
         addDisabled={connectionMode === 'wifi' && wifiRelayLimitReached}
-        addDisabledTitle="Нет свободных Wi-Fi-модулей или релейных каналов для зоны."
-        qtyTestId="zone-qty"
+        addDisabledTitle={`Нет свободных Wi-Fi-модулей или релейных каналов для ${isOtherEquipment ? 'оборудования' : 'зоны'}.`}
+        qtyTestId={isOtherEquipment ? 'other-equipment-qty' : 'zone-qty'}
         jsonData={template.wiredDevice}
         showJsonDetails={showJsonDetails}
     >
@@ -3878,7 +3922,7 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
             options={MIXING_CONNECTION_OPTIONS}
             value={connectionMode}
             onChange={onConnectionModeChange}
-            testIdPrefix="zone-connection"
+            testIdPrefix={isOtherEquipment ? 'other-equipment-connection' : 'zone-connection'}
             fieldRef={connectionRef}
             className="sel-mixing-field"
         />
@@ -3889,8 +3933,10 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
         open={tutorialStep === 'connection'}
         onClose={() => onTutorialStepChange(null)}
         showMask
-        title="Как подключён сервопривод зоны?"
-        description="Выберите «По проводу», если сервопривод подключается к контроллеру кабелем. При Wi-Fi подключении он будет размещён на свободном канале модуля RL6W или RL6SW."
+        title={isOtherEquipment ? 'Как подключено оборудование?' : 'Как подключён сервопривод зоны?'}
+        description={isOtherEquipment
+            ? 'Выберите «По проводу», если оборудование подключается к контроллеру кабелем. При Wi-Fi подключении оно будет размещено на свободном канале модуля RL6W или RL6SW.'
+            : 'Выберите «По проводу», если сервопривод подключается к контроллеру кабелем. При Wi-Fi подключении он будет размещён на свободном канале модуля RL6W или RL6SW.'}
     >
         <button className="tutorial-popover-action" type="button" onClick={() => onConnectionModeChange('wired')}>Оставить «По проводу»</button>
     </TutorialPopover>
@@ -3900,7 +3946,9 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
         open={tutorialStep === 'add'}
         onClose={() => onTutorialStepChange(null)}
         showMask
-        title={selectedTemplateAdded ? 'Выбранная зона уже добавлена' : 'Проверьте вариант и добавьте зону'}
+        title={selectedTemplateAdded
+            ? `Выбранн${isOtherEquipment ? 'ое оборудование уже добавлено' : 'ая зона уже добавлена'}`
+            : `Проверьте вариант и добавьте ${isOtherEquipment ? 'оборудование' : 'зону'}`}
         description={selectedTemplateAdded
             ? 'Измените количество этого варианта кнопками + и - в списке ниже.'
             : `Выбрано ${connectionMode === 'wifi' ? 'Wi-Fi' : 'проводное'} подключение.`}
@@ -3914,20 +3962,37 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
         onClose={() => onTutorialStepChange(null)}
         showMask
         type="blockContent"
-        title="Зона добавлена в систему"
-        description="В списке отображаются все добавленные варианты зон."
+        title={isOtherEquipment ? 'Оборудование добавлено в систему' : 'Зона добавлена в систему'}
+        description={`В списке отображаются все добавленные варианты ${isOtherEquipment ? 'оборудования' : 'зон'}.`}
     >
         <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('count')}>Далее</button>
     </TutorialPopover>
     <TutorialPopover
-        anchorRef={addedListRef}
+        anchorRef={counterRef}
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'count'}
         onClose={() => onTutorialStepChange(null)}
         showMask
-        title="Изменяйте количество зон"
-        description="Кнопки + и - изменяют количество одинаковых зон. Wi-Fi сервоприводы автоматически распределяются по свободным каналам Wi-Fi модулей."
-    />
+        title={isOtherEquipment ? 'Изменяйте количество оборудования' : 'Изменяйте количество зон'}
+        description={isOtherEquipment
+            ? 'Кнопки + и - изменяют количество одинакового оборудования. Wi-Fi устройства автоматически распределяются по свободным каналам Wi-Fi модулей.'
+            : 'Кнопки + и - изменяют количество одинаковых зон. Wi-Fi сервоприводы автоматически распределяются по свободным каналам Wi-Fi модулей.'}
+    >
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange(isOtherEquipment ? 'configuration' : null)}>Далее</button>
+    </TutorialPopover>
+    {isOtherEquipment && (
+        <TutorialPopover
+            anchorRef={connectionRef}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'configuration'}
+            onClose={() => onTutorialStepChange(null)}
+            showMask
+            title="Добавьте другой вид оборудования"
+            description="Измените конфигурацию добавления, чтобы добавить другой вид оборудования в систему."
+        >
+            <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange(null)}>Понятно</button>
+        </TutorialPopover>
+    )}
     </div>
     );
 };
@@ -3968,13 +4033,13 @@ const QTY_STEPPER_DENSE_STYLE = {
     fontSize: 12,
 };
 
-const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false, incrementDisabled = false, allowZero = false, dense = false, decTestId = null, incTestId = null }) => {
+const QtyStepper = ({ count, onDecrement, onIncrement, disabled = false, incrementDisabled = false, allowZero = false, dense = false, decTestId = null, incTestId = null, tutorialRef = null }) => {
     if (!count && !allowZero) return null;
     const blockStyle = dense ? QTY_STEPPER_DENSE_STYLE : QTY_STEPPER_BLOCK_STYLE;
     const decrementDisabled = disabled || (allowZero && count <= 0);
     const addDisabled = disabled || incrementDisabled;
     return (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: dense ? 3 : 4, flexShrink: 0 }}>
+        <div ref={tutorialRef} style={{ display: 'inline-flex', alignItems: 'center', gap: dense ? 3 : 4, flexShrink: 0 }}>
             <button
                 type="button"
                 title="Убрать одно"
@@ -4437,9 +4502,18 @@ const SelectionApp = () => {
     const [zoneConnectionMode, setZoneConnectionMode] = useState('wired');
     const [zoneTutorialStep, setZoneTutorialStep] = useState(null);
     const [otherEquipmentConnectionMode, setOtherEquipmentConnectionMode] = useState('wired');
+    const [otherEquipmentTutorialStep, setOtherEquipmentTutorialStep] = useState(null);
     const [wiredTemperatureSensorKey, setWiredTemperatureSensorKey] = useState('wired-wall-digital');
     const [wirelessTemperatureSensorKey, setWirelessTemperatureSensorKey] = useState('wireless-wall');
     const [temperatureSensorConnection, setTemperatureSensorConnection] = useState('wired');
+    const [temperatureSensorTutorialStep, setTemperatureSensorTutorialStep] = useState(null);
+    const temperatureSensorTutorialScopeRef = useRef(null);
+    const temperatureSensorConnectionRef = useRef(null);
+    const temperatureSensorPlacementRef = useRef(null);
+    const temperatureSensorKindRef = useRef(null);
+    const temperatureSensorAddRef = useRef(null);
+    const temperatureSensorAddedListRef = useRef(null);
+    const temperatureSensorCounterRef = useRef(null);
     const [isBuildingScheme, setIsBuildingScheme] = useState(false);
     const [buildSchemeError, setBuildSchemeError] = useState('');
     const [boilerQuery, setBoilerQuery] = useState('');
@@ -6196,13 +6270,13 @@ const SelectionApp = () => {
             <section style={{ flex: '1 1 360px', minWidth: 0 }}>
                 <SectionSubtitle>Какое количество прочего оборудования (сирены и т.д.) будет управляться с помощью контроллера?</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    <SectionEquipmentCard
-                        image={OTHER_EQUIP_BACKGROUND_PATH}
-                        backgroundWidth={520}
-                        backgroundColor={CARD_PHOTO_TAIL_COLOR.otherRoom}
-                        title={otherEquipmentTemplate.label}
-                        description="Сирены, реле и другие устройства, которыми контроллер управляет через релейный выход. Каждое занимает один релейный порт."
-                        addedTitle="Добавленное оборудование:"
+                    <ZoneCard
+                        template={otherEquipmentTemplate}
+                        connectionMode={otherEquipmentConnectionMode}
+                        onConnectionModeChange={(mode) => {
+                            setOtherEquipmentConnectionMode(mode);
+                            if (otherEquipmentTutorialStep === 'connection') setOtherEquipmentTutorialStep('add');
+                        }}
                         addedRows={otherEquipmentRows}
                         onAddUnit={(row) => addMixingUnit(
                             row.label === 'Прочее оборудование с подключением по WI-FI'
@@ -6216,25 +6290,16 @@ const SelectionApp = () => {
                             'other',
                         )}
                         onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
-                        addLabel="Добавить оборудование"
-                        onAdd={() => addMixingUnit(otherEquipmentTemplate, 'other')}
-                        showAdd={!otherEquipmentRows.some((row) => row.label === otherEquipmentTemplate.label)}
-                        addTestId="add-other-equipment"
-                        addDisabled={otherEquipmentConnectionMode === 'wifi' && wifiRelayLimitReached}
-                        addDisabledTitle="Нет свободных Wi-Fi-модулей или релейных каналов для оборудования."
-                        qtyTestId="other-equipment-qty"
-                        jsonData={otherEquipmentTemplate.wiredDevice}
+                        onAdd={() => {
+                            addMixingUnit(otherEquipmentTemplate, 'other');
+                            if (otherEquipmentTutorialStep === 'add') setOtherEquipmentTutorialStep('added-list');
+                        }}
+                        wifiRelayLimitReached={wifiRelayLimitReached}
                         showJsonDetails={showJsonDetails}
-                    >
-                        <SegmentedField
-                            label="Тип подключения"
-                            options={MIXING_CONNECTION_OPTIONS}
-                            value={otherEquipmentConnectionMode}
-                            onChange={setOtherEquipmentConnectionMode}
-                            testIdPrefix="other-equipment-connection"
-                            className="sel-mixing-field"
-                        />
-                    </SectionEquipmentCard>
+                        tutorialStep={otherEquipmentTutorialStep}
+                        onTutorialStepChange={setOtherEquipmentTutorialStep}
+                        isOtherEquipment
+                    />
                 </div>
 
             </section>
@@ -6247,12 +6312,32 @@ const SelectionApp = () => {
                 <h2>Датчики температуры</h2>
                 <SectionSubtitle>Выберите тип подключения, расположение и количество датчиков температуры</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <div ref={temperatureSensorTutorialScopeRef} style={{ position: 'relative', flex: '1 1 100%', minWidth: 0 }}>
                     <SectionEquipmentCard
                         image={THERMOSTAT_ROOM_IMAGE_PATH}
                         backgroundWidth={520}
                         backgroundColor={CARD_PHOTO_TAIL_COLOR.thermostatRoom}
+                        headerAction={(
+                            <button
+                                className="selection-option-button selection-tutorial-trigger"
+                                type="button"
+                                data-active={Boolean(temperatureSensorTutorialStep)}
+                                aria-pressed={Boolean(temperatureSensorTutorialStep)}
+                                aria-label={temperatureSensorTutorialStep ? 'Закрыть обучение по настройке датчиков температуры' : 'Показать подсказку по настройке датчиков температуры'}
+                                title={temperatureSensorTutorialStep ? 'Закрыть обучение' : 'Как добавить датчик температуры'}
+                                onClick={() => setTemperatureSensorTutorialStep(temperatureSensorTutorialStep ? null : 'connection')}
+                            >
+                                <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
+                                <span className="selection-tutorial-trigger-copy">
+                                    <strong>Подсказки</strong>
+                                    <small><span className="selection-tutorial-trigger-status" aria-hidden="true" />{temperatureSensorTutorialStep ? 'Включены' : 'Выключены'}</small>
+                                </span>
+                            </button>
+                        )}
                         addedTitle="Добавленные датчики температуры:"
                         addedRows={temperatureSensorRows}
+                        addedTutorialRef={temperatureSensorAddedListRef}
+                        counterTutorialRef={temperatureSensorCounterRef}
                         onAddUnit={(row) => addTemperatureSensor(
                             TEMPERATURE_SENSOR_TEMPLATES.find((template) => template.key === row.templateKey)
                             || temperatureSensorTemplate,
@@ -6262,45 +6347,125 @@ const SelectionApp = () => {
                             removeSchemeItemById(removeKey.target, removeKey.id);
                         }}
                         addLabel={temperatureSensorTemplate?.addLabel || 'Добавить датчик'}
-                        onAdd={() => addTemperatureSensor(temperatureSensorTemplate)}
+                        onAdd={() => {
+                            addTemperatureSensor(temperatureSensorTemplate);
+                            if (temperatureSensorTutorialStep === 'add') setTemperatureSensorTutorialStep('added-list');
+                        }}
                         showAdd={!temperatureSensorRows.some((row) => row.templateKey === temperatureSensorTemplate?.key)}
                         addTestId="add-temperature-sensor"
+                        addTutorialRef={temperatureSensorAddRef}
                         qtyTestId={(row) => `temperature-sensor-${row.templateKey}-qty`}
                         jsonData={temperatureSensorTemplate?.data}
                         showJsonDetails={showJsonDetails}
                     >
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
-                            <div>
+                            <div ref={temperatureSensorConnectionRef}>
                                 <ThermostatFieldLabel>Тип подключения</ThermostatFieldLabel>
                                 <SegmentedToggle
                                     options={TEMPERATURE_SENSOR_CONNECTIONS}
                                     value={temperatureSensorConnection}
-                                    onChange={setTemperatureSensorConnection}
+                                    onChange={(value) => {
+                                        setTemperatureSensorConnection(value);
+                                        if (temperatureSensorTutorialStep === 'connection') setTemperatureSensorTutorialStep('placement');
+                                    }}
                                     testIdPrefix="temperature-sensor-connection"
                                 />
                             </div>
-                            <div>
+                            <div ref={temperatureSensorPlacementRef}>
                                 <ThermostatFieldLabel>Расположение</ThermostatFieldLabel>
                                 <SegmentedToggle
                                     options={temperatureSensorPlacementOptions}
                                     value={temperatureSensorPlacement}
-                                    onChange={selectTemperatureSensorPlacement}
+                                    onChange={(value) => {
+                                        selectTemperatureSensorPlacement(value);
+                                        if (temperatureSensorTutorialStep === 'placement') {
+                                            setTemperatureSensorTutorialStep(temperatureSensorConnection === 'wired' ? 'kind' : 'add');
+                                        }
+                                    }}
                                     testIdPrefix="temperature-sensor-placement"
                                 />
                             </div>
                             {!isWirelessTemperatureSensor && (
-                                <div>
+                                <div ref={temperatureSensorKindRef}>
                                     <ThermostatFieldLabel>Тип датчика</ThermostatFieldLabel>
                                     <SegmentedToggle
                                         options={temperatureSensorKindOptions}
                                         value={temperatureSensorKind}
-                                        onChange={selectTemperatureSensorKind}
+                                        onChange={(value) => {
+                                            selectTemperatureSensorKind(value);
+                                            if (temperatureSensorTutorialStep === 'kind') setTemperatureSensorTutorialStep('add');
+                                        }}
                                         testIdPrefix="temperature-sensor-kind"
                                     />
                                 </div>
                             )}
                         </div>
                     </SectionEquipmentCard>
+                    <TutorialPopover
+                        anchorRef={temperatureSensorConnectionRef}
+                        scopeRef={temperatureSensorTutorialScopeRef}
+                        open={temperatureSensorTutorialStep === 'connection'}
+                        onClose={() => setTemperatureSensorTutorialStep(null)}
+                        showMask
+                        title="Выберите тип подключения датчика"
+                        description="Проводной датчик подключается к контроллеру кабелем. Беспроводной передаёт температуру по Wi-Fi."
+                    >
+                        <button className="tutorial-popover-action" type="button" onClick={() => {
+                            setTemperatureSensorConnection('wired');
+                            setTemperatureSensorTutorialStep('placement');
+                        }}>Оставить «По проводу»</button>
+                    </TutorialPopover>
+                    <TutorialPopover
+                        anchorRef={temperatureSensorPlacementRef}
+                        scopeRef={temperatureSensorTutorialScopeRef}
+                        open={temperatureSensorTutorialStep === 'placement'}
+                        onClose={() => setTemperatureSensorTutorialStep(null)}
+                        showMask
+                        title="Укажите расположение датчика"
+                        description="Выберите, где будет измеряться температура: в помещении, на улице или в контуре отопления."
+                    />
+                    <TutorialPopover
+                        anchorRef={temperatureSensorKindRef}
+                        scopeRef={temperatureSensorTutorialScopeRef}
+                        open={temperatureSensorTutorialStep === 'kind'}
+                        onClose={() => setTemperatureSensorTutorialStep(null)}
+                        showMask
+                        title="Выберите тип проводного датчика"
+                        description="Тип датчика указан в его маркировке или паспорте."
+                    />
+                    <TutorialPopover
+                        anchorRef={temperatureSensorAddRef}
+                        scopeRef={temperatureSensorTutorialScopeRef}
+                        open={temperatureSensorTutorialStep === 'add'}
+                        onClose={() => setTemperatureSensorTutorialStep(null)}
+                        showMask
+                        title="Добавьте датчик температуры"
+                        description="Проверьте выбранную конфигурацию и добавьте датчик в систему."
+                    />
+                    <TutorialPopover
+                        anchorRef={temperatureSensorAddedListRef}
+                        scopeRef={temperatureSensorTutorialScopeRef}
+                        open={temperatureSensorTutorialStep === 'added-list'}
+                        onClose={() => setTemperatureSensorTutorialStep(null)}
+                        showMask
+                        type="blockContent"
+                        title="Датчик добавлен в систему"
+                        description="В списке отображаются все добавленные датчики температуры."
+                    >
+                        <button className="tutorial-popover-action" type="button" onClick={() => setTemperatureSensorTutorialStep('count')}>Далее</button>
+                    </TutorialPopover>
+                    <TutorialPopover
+                        anchorRef={temperatureSensorCounterRef}
+                        scopeRef={temperatureSensorTutorialScopeRef}
+                        open={temperatureSensorTutorialStep === 'count'}
+                        onClose={() => setTemperatureSensorTutorialStep(null)}
+                        showMask
+                        title="Изменяйте количество датчиков"
+                        description="Кнопки + и - изменяют количество одинаковых датчиков температуры."
+                    >
+                        <button className="tutorial-popover-action" type="button" onClick={() => setTemperatureSensorTutorialStep(null)}>Понятно</button>
+                    </TutorialPopover>
+                    </div>
                 </div>
 
             </section>

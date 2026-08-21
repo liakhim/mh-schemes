@@ -1,6 +1,31 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+const getContentRect = (element) => {
+    const fallbackRect = element?.getBoundingClientRect();
+    if (!fallbackRect) return null;
+
+    // У кнопок и полей дочерний span может покрывать только иконку или текст,
+    // тогда как подсказка должна открывать весь интерактивный элемент.
+    if (element.matches('button, input, textarea, select')) return fallbackRect;
+
+    // Flex-контейнер anchor может занимать всю строку, хотя его содержимое
+    // заметно уже. Маска должна выделять именно видимые дочерние элементы.
+    const childRects = Array.from(element.children)
+        .map((child) => child.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0);
+    if (childRects.length === 0) return fallbackRect;
+
+    return {
+        left: Math.min(...childRects.map((rect) => rect.left)),
+        top: Math.min(...childRects.map((rect) => rect.top)),
+        right: Math.max(...childRects.map((rect) => rect.right)),
+        bottom: Math.max(...childRects.map((rect) => rect.bottom)),
+        get width() { return this.right - this.left; },
+        get height() { return this.bottom - this.top; },
+    };
+};
+
 const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = true, scopeRef, open, onClose, title, description = 'Подробное описание подсказки', children, maxWidth = 440, showMask = false, type = null }) => {
     const [position, setPosition] = useState(null);
     const [isRendered, setIsRendered] = useState(open);
@@ -18,7 +43,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
     useLayoutEffect(() => {
         if (!open) return undefined;
         const updatePosition = (maskOnly = false) => {
-            const anchorRect = anchorRef.current?.getBoundingClientRect();
+            const anchorRect = getContentRect(anchorRef.current);
             const scopeRect = scopeRef.current?.getBoundingClientRect();
             if (!anchorRect || !scopeRect) return;
             const highlightRect = highlightActive ? highlightRef?.current?.getBoundingClientRect() : null;

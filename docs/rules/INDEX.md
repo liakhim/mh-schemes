@@ -60,6 +60,12 @@
 - Просмотр: `resources/js/components/SelectionConfigModal.jsx`
 - Хранение: `schemes.selection_config`
 
+## Selection Tutorials
+
+- Файл правил: `docs/rules/selection-tutorials.md`
+- Компонент подсказки: `resources/js/components/TutorialPopover.jsx`
+- Сценарии: `resources/js/selection.jsx` (котлы, смесительные узлы, бойлеры ГВС, насосы, зоны)
+
 ## Full Source
 
 - Полный журнал: `JOURNAL.md`
