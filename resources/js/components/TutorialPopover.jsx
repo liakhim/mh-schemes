@@ -7,7 +7,7 @@ const getContentRect = (element) => {
 
     // У кнопок и полей дочерний span может покрывать только иконку или текст,
     // тогда как подсказка должна открывать весь интерактивный элемент.
-    if (element.matches('button, input, textarea, select')) return fallbackRect;
+    if (element.matches('button, input, textarea, select, label')) return fallbackRect;
 
     // Flex-контейнер anchor может занимать всю строку, хотя его содержимое
     // заметно уже. Маска должна выделять именно видимые дочерние элементы.
@@ -26,7 +26,7 @@ const getContentRect = (element) => {
     };
 };
 
-const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = true, scopeRef, open, onClose, title, description = 'Подробное описание подсказки', children, maxWidth = 440, showMask = false, type = null }) => {
+const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], highlightActive = true, scopeRef, open, onClose, title, description = 'Подробное описание подсказки', children, maxWidth = 440, showMask = false, type = null }) => {
     const [position, setPosition] = useState(null);
     const [isRendered, setIsRendered] = useState(open);
     const [isVisible, setIsVisible] = useState(false);
@@ -46,12 +46,14 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
             const anchorRect = getContentRect(anchorRef.current);
             const scopeRect = scopeRef.current?.getBoundingClientRect();
             if (!anchorRect || !scopeRect) return;
-            const highlightRect = highlightActive ? highlightRef?.current?.getBoundingClientRect() : null;
-            const maskRect = highlightRect ? {
-                left: Math.min(anchorRect.left, highlightRect.left),
-                top: Math.min(anchorRect.top, highlightRect.top),
-                right: Math.max(anchorRect.right, highlightRect.right),
-                bottom: Math.max(anchorRect.bottom, highlightRect.bottom),
+            const highlightRects = highlightActive
+                ? [highlightRef, ...highlightRefs].map((ref) => getContentRect(ref?.current)).filter(Boolean)
+                : [];
+            const maskRect = highlightRects.length > 0 ? {
+                left: Math.min(anchorRect.left, ...highlightRects.map((rect) => rect.left)),
+                top: Math.min(anchorRect.top, ...highlightRects.map((rect) => rect.top)),
+                right: Math.max(anchorRect.right, ...highlightRects.map((rect) => rect.right)),
+                bottom: Math.max(anchorRect.bottom, ...highlightRects.map((rect) => rect.bottom)),
             } : anchorRect;
 
             const viewport = window.visualViewport;
@@ -141,7 +143,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightActive = tru
             window.visualViewport?.removeEventListener('scroll', syncMaskOnScroll);
             observer.disconnect();
         };
-    }, [anchorRef, highlightActive, maxWidth, open, popoverElement, scopeRef]);
+    }, [anchorRef, highlightActive, highlightRef, maxWidth, open, popoverElement, scopeRef]);
 
     if (!isRendered || !position) return null;
 

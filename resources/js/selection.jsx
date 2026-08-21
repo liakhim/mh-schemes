@@ -2692,8 +2692,19 @@ const ThermostatFieldLabel = ({ children }) => (
 );
 
 /** Карточка термостата: callbacks меняют тип подключения, цвет, датчик пола и добавляют устройство. */
-const ThermostatCard = ({ template, connection, onConnectionChange, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, showAdd = true, addedRows = [], onRemoveRow, onRemoveRowCompletely, onAddRow, showJsonDetails = false }) => (
+const ThermostatCard = ({ template, connection, onConnectionChange, color, onColorChange, hasFloorSensor, onFloorSensorChange, onAdd, showAdd = true, addedRows = [], onRemoveRow, onRemoveRowCompletely, onAddRow, showJsonDetails = false, tutorialStep = null, onTutorialStepChange }) => {
+    const tutorialScopeRef = useRef(null);
+    const connectionRef = useRef(null);
+    const colorRef = useRef(null);
+    const floorSensorRef = useRef(null);
+    const addRef = useRef(null);
+    const addedListRef = useRef(null);
+    const counterRef = useRef(null);
+    const selectedTemplateAdded = addedRows.some((row) => row.templateKey === `${connection}|${color}|${hasFloorSensor ? 'floor' : 'no-floor'}`);
+
+    return (
     <div
+        ref={tutorialScopeRef}
         className="sel-card sel-card-static sel-card-section sel-thermostat-card"
         style={{
             flex: '1 1 100%',
@@ -2716,6 +2727,20 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             width="48%"
             fallbackColor={CARD_PHOTO_TAIL_COLOR.thermostatRoom}
         />
+        <div className="sel-card-header-action">
+        <button
+            className="selection-option-button selection-tutorial-trigger"
+            type="button"
+            data-active={Boolean(tutorialStep)}
+            aria-pressed={Boolean(tutorialStep)}
+            aria-label={tutorialStep ? 'Закрыть обучение по настройке термостата' : 'Показать подсказку по настройке термостата'}
+            title={tutorialStep ? 'Закрыть обучение' : 'Как добавить термостат'}
+            onClick={() => onTutorialStepChange(tutorialStep ? null : 'connection')}
+        >
+            <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
+            <span className="selection-tutorial-trigger-copy"><strong>Подсказки</strong><small><span className="selection-tutorial-trigger-status" aria-hidden="true" />{tutorialStep ? 'Включены' : 'Выключены'}</small></span>
+        </button>
+        </div>
 
         {/* Содержимое карточки лежит одним позиционированным слоем: слой
             размытия у `CardPhotoBackdrop` спозиционирован и растянут на всю
@@ -2725,9 +2750,10 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             на всех. */}
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 20 }}>
         {addedRows.length > 0 && (
+            <div ref={addedListRef} style={{ maxWidth: 620 }}>
             <AddedDevicesBlock marginTop={0} compact>
                 <AddedDevicesTitle>Добавленные термостаты:</AddedDevicesTitle>
-                {addedRows.map((row) => {
+                {addedRows.map((row, index) => {
                     const [, thermostatColor = 'black', floorSensor] = String(row.templateKey || '').split('|');
                     return (
                         <AddedDeviceLine
@@ -2757,6 +2783,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                             onRemove={() => onRemoveRowCompletely(row)}
                             control={(
                                 <QtyStepper
+                                    tutorialRef={index === 0 ? counterRef : null}
                                     count={row.count}
                                     onDecrement={() => onRemoveRow(row)}
                                     onIncrement={() => onAddRow(row)}
@@ -2768,6 +2795,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                     );
                 })}
             </AddedDevicesBlock>
+            </div>
         )}
 
         <div
@@ -2806,7 +2834,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             {/* Тип подключения и датчик пола — в одном ряду; выравнивание по
                 нижнему краю, чтобы капсула и чекбокс стояли на одной линии. */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
-            <div>
+            <div ref={connectionRef}>
                 <ThermostatFieldLabel>Тип подключения</ThermostatFieldLabel>
                 {/* Сегментированный переключатель: два взаимоисключающих варианта в одной капсуле. */}
                 <div
@@ -2828,7 +2856,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                                 type="button"
                                 data-test-id={`thermostat-connection-${item.value}`}
                                 data-active={isActive}
-                                onClick={() => onConnectionChange(item.value)}
+                                onClick={() => { onConnectionChange(item.value); if (tutorialStep === 'connection') onTutorialStepChange('color'); if (tutorialStep === 'configuration') onTutorialStepChange('configuration-changed'); }}
                                 style={{
                                     padding: '9px 18px',
                                     border: `1px solid ${isActive ? '#e3e7ef' : 'transparent'}`,
@@ -2849,7 +2877,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                 </div>
             </div>
 
-                <label
+                <label ref={floorSensorRef}
                     style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -2866,14 +2894,14 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                     <input
                         type="checkbox"
                         checked={hasFloorSensor}
-                        onChange={(event) => onFloorSensorChange(event.target.checked)}
+                        onChange={(event) => { onFloorSensorChange(event.target.checked); if (tutorialStep === 'floor-sensor') onTutorialStepChange('add'); if (tutorialStep === 'configuration') onTutorialStepChange('configuration-changed'); }}
                         style={{ width: 16, height: 16, margin: 0, accentColor: '#e07020', cursor: 'pointer' }}
                     />
                     Добавить датчик пола
                 </label>
             </div>
 
-            <div>
+            <div ref={colorRef} style={{ alignSelf: 'flex-start' }}>
                 <ThermostatFieldLabel>
                     Цвет
                     <span style={{ fontWeight: 500, letterSpacing: 0, textTransform: 'none', fontSize: 12.5, color: '#667089' }}>
@@ -2892,7 +2920,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                                 title={item.label}
                                 aria-label={item.label}
                                 aria-pressed={isActive}
-                                onClick={() => onColorChange(item.value)}
+                                onClick={() => { onColorChange(item.value); if (tutorialStep === 'color') onTutorialStepChange('floor-sensor'); if (tutorialStep === 'configuration') onTutorialStepChange('configuration-changed'); }}
                                 style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -2933,8 +2961,12 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                 добавленный вариант возвращает кнопку. */}
             {showAdd && (
                 <button
+                    ref={addRef}
                     className="selection-add-button"
-                    onClick={onAdd}
+                    onClick={() => {
+                        onAdd();
+                        if (tutorialStep === 'configuration-changed') onTutorialStepChange(null);
+                    }}
                     data-test-id="add-thermostat"
                 >
                     {`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
@@ -3010,8 +3042,82 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
         </div>
         </div>
         </div>
+        <TutorialPopover
+            anchorRef={connectionRef}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'connection'}
+            onClose={() => onTutorialStepChange(null)}
+            showMask
+            title="Выберите тип подключения термостата"
+            description="Выберите «По проводу», если термостат подключается к контроллеру кабелем. Беспроводной термостат передаёт данные по Wi-Fi."
+        >
+            <button className="tutorial-popover-action" type="button" onClick={() => { onConnectionChange('wired'); onTutorialStepChange('color'); }}>Оставить «По проводу»</button>
+        </TutorialPopover>
+        <TutorialPopover anchorRef={colorRef} scopeRef={tutorialScopeRef} open={tutorialStep === 'color'} onClose={() => onTutorialStepChange(null)} showMask title="Выберите цвет термостата" description="Выберите цвет корпуса термостата." />
+        <TutorialPopover anchorRef={floorSensorRef} scopeRef={tutorialScopeRef} open={tutorialStep === 'floor-sensor'} onClose={() => onTutorialStepChange(null)} showMask title="Нужен ли датчик пола?" description="Включите опцию, если к термостату подключается датчик температуры пола." />
+        <TutorialPopover
+            anchorRef={selectedTemplateAdded ? addedListRef : addRef}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'add'}
+            onClose={() => onTutorialStepChange(null)}
+            showMask
+            title={selectedTemplateAdded ? 'Выбранный термостат уже добавлен' : 'Проверьте выбранный вариант и добавьте термостат'}
+            description={selectedTemplateAdded ? 'Измените количество этого варианта кнопками + и - в списке ниже.' : 'Проверьте выбранные подключение, цвет и датчик пола.'}
+        >
+            {selectedTemplateAdded && <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('count')}>Показать счётчик</button>}
+        </TutorialPopover>
+        <TutorialPopover
+            anchorRef={addedListRef}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'added-list'}
+            onClose={() => onTutorialStepChange(null)}
+            showMask
+            type="blockContent"
+            title="Термостат добавлен в систему"
+            description="В этом списке отображаются все добавленные варианты термостатов."
+        >
+            <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('count')}>Далее</button>
+        </TutorialPopover>
+        <TutorialPopover
+            anchorRef={counterRef}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'count'}
+            onClose={() => onTutorialStepChange(null)}
+            showMask
+            title="Изменяйте количество термостатов"
+            description="Кнопки + и - изменяют количество одинаковых термостатов."
+        >
+            <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('configuration')}>Далее</button>
+        </TutorialPopover>
+        <TutorialPopover
+            anchorRef={connectionRef}
+            highlightRef={colorRef}
+            highlightRefs={[floorSensorRef]}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'configuration'}
+            onClose={() => onTutorialStepChange(null)}
+            showMask
+            title="Добавьте другой вид термостата"
+            description="Измените тип подключения, цвет или датчик пола, чтобы добавить в систему другой вариант термостата."
+        >
+            <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange(null)}>Понятно</button>
+        </TutorialPopover>
+        <TutorialPopover
+            anchorRef={connectionRef}
+            highlightRef={colorRef}
+            highlightRefs={[floorSensorRef, addRef]}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'configuration-changed'}
+            onClose={() => onTutorialStepChange(null)}
+            showMask
+            title="Добавьте новую конфигурацию"
+            description="Настройки изменены. Нажмите кнопку добавления, чтобы включить новый вариант термостата в систему."
+        >
+            <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange(null)}>Понятно</button>
+        </TutorialPopover>
     </div>
-);
+    );
+};
 
 /**
  * Карточка уличного радиодатчика. Датчик в схеме может быть только один,
@@ -4491,6 +4597,7 @@ const SelectionApp = () => {
     const [wiredThermostatHasFloorSensor, setWiredThermostatHasFloorSensor] = useState(false);
     const [wirelessThermostatColor, setWirelessThermostatColor] = useState('black');
     const [wirelessThermostatHasFloorSensor, setWirelessThermostatHasFloorSensor] = useState(false);
+    const [thermostatTutorialStep, setThermostatTutorialStep] = useState(null);
     const [mixingServo, setMixingServo] = useState('220');
     const [mixingSensor, setMixingSensor] = useState('digital');
     const [mixingConnectionMode, setMixingConnectionMode] = useState('wired');
@@ -6210,12 +6317,17 @@ const SelectionApp = () => {
                     <ThermostatCard
                         template={thermostatTemplate}
                         connection={thermostatConnection}
-                        onConnectionChange={setThermostatConnection}
+                        onConnectionChange={(connection) => {
+                            setThermostatConnection(connection);
+                        }}
                         color={isWirelessThermostat ? wirelessThermostatColor : wiredThermostatColor}
                         onColorChange={isWirelessThermostat ? setWirelessThermostatColor : setWiredThermostatColor}
                         hasFloorSensor={isWirelessThermostat ? wirelessThermostatHasFloorSensor : wiredThermostatHasFloorSensor}
                         onFloorSensorChange={isWirelessThermostat ? setWirelessThermostatHasFloorSensor : setWiredThermostatHasFloorSensor}
-                        onAdd={() => addThermostat(thermostatTemplate)}
+                        onAdd={() => {
+                            addThermostat(thermostatTemplate);
+                            if (thermostatTutorialStep === 'add') setThermostatTutorialStep('added-list');
+                        }}
                         showAdd={!thermostatRows.some((row) => row.templateKey === thermostatTemplateKey)}
                         addedRows={thermostatRows}
                         onRemoveRow={(row) => {
@@ -6234,6 +6346,8 @@ const SelectionApp = () => {
                             }));
                         }}
                         showJsonDetails={showJsonDetails}
+                        tutorialStep={thermostatTutorialStep}
+                        onTutorialStepChange={setThermostatTutorialStep}
                     />
                 </div>
             </section>
