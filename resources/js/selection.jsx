@@ -4514,6 +4514,12 @@ const SelectionApp = () => {
     const temperatureSensorAddRef = useRef(null);
     const temperatureSensorAddedListRef = useRef(null);
     const temperatureSensorCounterRef = useRef(null);
+    const [leakTutorialStep, setLeakTutorialStep] = useState(null);
+    const leakTutorialScopeRef = useRef(null);
+    const leakAddRef = useRef(null);
+    const leakListRef = useRef(null);
+    const leakZoneCounterRef = useRef(null);
+    const leakValveCounterRef = useRef(null);
     const [isBuildingScheme, setIsBuildingScheme] = useState(false);
     const [buildSchemeError, setBuildSchemeError] = useState('');
     const [boilerQuery, setBoilerQuery] = useState('');
@@ -6521,6 +6527,7 @@ const SelectionApp = () => {
                     Количество запорных клапанов задаётся отдельно.
                 </SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <div ref={leakTutorialScopeRef} style={{ position: 'relative', flex: '1 1 100%', minWidth: 0 }}>
                     <SectionEquipmentCard
                         image={LEAK_ZONE_BACKGROUND_PATH}
                         backgroundWidth={520}
@@ -6529,13 +6536,34 @@ const SelectionApp = () => {
                         backgroundCover
                         title="Контроль протечки воды"
                         description="Датчики каждой зоны собираются в один шлейф и занимают один дискретный вход. Запорные клапаны задаются общим количеством, каждый занимает два соседних релейных порта."
+                        headerAction={(
+                            <button
+                                className="selection-option-button selection-tutorial-trigger"
+                                type="button"
+                                data-active={Boolean(leakTutorialStep)}
+                                aria-pressed={Boolean(leakTutorialStep)}
+                                aria-label={leakTutorialStep ? 'Закрыть обучение по контролю протечки' : 'Показать подсказку по контролю протечки'}
+                                title={leakTutorialStep ? 'Закрыть обучение' : 'Как настроить контроль протечки'}
+                                onClick={() => setLeakTutorialStep(leakTutorialStep ? null : 'add-zone')}
+                            >
+                                <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
+                                <span className="selection-tutorial-trigger-copy">
+                                    <strong>Подсказки</strong>
+                                    <small><span className="selection-tutorial-trigger-status" aria-hidden="true" />{leakTutorialStep ? 'Включены' : 'Выключены'}</small>
+                                </span>
+                            </button>
+                        )}
                         addLabel="Добавить группу датчиков протечки"
-                        onAdd={addLeakZone}
+                        onAdd={() => {
+                            addLeakZone();
+                            if (leakTutorialStep === 'add-zone') setLeakTutorialStep('added-list');
+                        }}
                         addTestId="add-leak-zone"
+                        addTutorialRef={leakAddRef}
                         jsonData={LEAK_ZONE_JSON_EXAMPLE}
                         showJsonDetails={showJsonDetails}
                     >
-                        <AddedDevicesBlock marginTop={0}>
+                        <AddedDevicesBlock marginTop={0} tutorialRef={leakListRef}>
                             {leakZoneRows.length > 0 && (
                                 <>
                                 <AddedDevicesTitle>Добавленные устройства контроля протечки воды:</AddedDevicesTitle>
@@ -6557,6 +6585,7 @@ const SelectionApp = () => {
                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                                             <span style={{ color: '#475569', fontSize: 13 }}>Датчики</span>
                                             <QtyStepper
+                                                tutorialRef={index === 0 ? leakZoneCounterRef : null}
                                                 count={zone.sensorCount}
                                                 onDecrement={() => changeLeakZoneSensors(zone.id, -1)}
                                                 onIncrement={() => changeLeakZoneSensors(zone.id, 1)}
@@ -6592,6 +6621,7 @@ const SelectionApp = () => {
                                     Запорные клапаны
                                 </span>
                                 <QtyStepper
+                                    tutorialRef={leakValveCounterRef}
                                     count={leakValveCount}
                                     allowZero
                                     onDecrement={() => changeLeakValves(-1)}
@@ -6602,6 +6632,50 @@ const SelectionApp = () => {
                             </div>
                         </AddedDevicesBlock>
                     </SectionEquipmentCard>
+                    <TutorialPopover
+                        anchorRef={leakAddRef}
+                        scopeRef={leakTutorialScopeRef}
+                        open={leakTutorialStep === 'add-zone'}
+                        onClose={() => setLeakTutorialStep(null)}
+                        showMask
+                        title="Добавьте группу датчиков протечки"
+                        description="Все датчики одной группы образуют шлейф и занимают один дискретный вход. Для независимой зоны добавьте отдельную группу."
+                    />
+                    <TutorialPopover
+                        anchorRef={leakListRef}
+                        scopeRef={leakTutorialScopeRef}
+                        open={leakTutorialStep === 'added-list'}
+                        onClose={() => setLeakTutorialStep(null)}
+                        showMask
+                        type="blockContent"
+                        title="Группа датчиков добавлена"
+                        description="В каждой группе можно указать число датчиков, подключённых к одному шлейфу."
+                    >
+                        <button className="tutorial-popover-action" type="button" onClick={() => setLeakTutorialStep('zone-count')}>Далее</button>
+                    </TutorialPopover>
+                    <TutorialPopover
+                        anchorRef={leakZoneCounterRef}
+                        scopeRef={leakTutorialScopeRef}
+                        open={leakTutorialStep === 'zone-count'}
+                        onClose={() => setLeakTutorialStep(null)}
+                        showMask
+                        title="Укажите количество датчиков в группе"
+                        description="Кнопки + и - изменяют число датчиков в выбранном шлейфе."
+                    >
+                        <button className="tutorial-popover-action" type="button" onClick={() => setLeakTutorialStep('valve-count')}>Далее</button>
+                    </TutorialPopover>
+                    <TutorialPopover
+                        anchorRef={leakValveCounterRef}
+                        scopeRef={leakTutorialScopeRef}
+                        open={leakTutorialStep === 'valve-count'}
+                        onClose={() => setLeakTutorialStep(null)}
+                        showMask
+                        title="Укажите количество запорных клапанов"
+                        description="Клапаны задаются отдельно от зон. Каждый клапан занимает два соседних релейных порта."
+                    >
+                        <button className="tutorial-popover-action" type="button" onClick={() => setLeakTutorialStep(null)}>Понятно</button>
+                    </TutorialPopover>
+                    </div>
                 </div>
 
             </section>
