@@ -3051,7 +3051,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             title="Выберите тип подключения термостата"
             description="Выберите «По проводу», если термостат подключается к контроллеру кабелем. Беспроводной термостат передаёт данные по Wi-Fi."
         >
-            <button className="tutorial-popover-action" type="button" onClick={() => { onConnectionChange('wired'); onTutorialStepChange('color'); }}>Оставить «По проводу»</button>
+            <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('color')}>Далее без изменений</button>
         </TutorialPopover>
         <TutorialPopover anchorRef={colorRef} scopeRef={tutorialScopeRef} open={tutorialStep === 'color'} onClose={() => onTutorialStepChange(null)} showMask title="Выберите цвет термостата" description="Выберите цвет корпуса термостата." />
         <TutorialPopover anchorRef={floorSensorRef} scopeRef={tutorialScopeRef} open={tutorialStep === 'floor-sensor'} onClose={() => onTutorialStepChange(null)} showMask title="Нужен ли датчик пола?" description="Включите опцию, если к термостату подключается датчик температуры пола." />
@@ -3261,6 +3261,7 @@ const SectionEquipmentCard = ({
     description = null,
     addedTitle,
     addedRows = [],
+    addedRowsAlign = 'center',
     // Список добавленного во всю ширину карточки, а не внутри текстовой колонки:
     // строке со счетчиком тесно в узкой колонке половинной карточки.
     addedFullWidth = false,
@@ -3289,7 +3290,7 @@ const SectionEquipmentCard = ({
     const addedBlock = addedRows.length > 0 ? (
         <AddedDevicesBlock marginTop={0} dense={addedDense} tutorialRef={addedTutorialRef}>
             <AddedDevicesTitle>{addedTitle}</AddedDevicesTitle>
-            {addedRows.map((row) => {
+            {addedRows.map((row, index) => {
                 const rowQtyTestId = typeof qtyTestId === 'function' ? qtyTestId(row) : qtyTestId;
                 const rowIncrementDisabled = typeof incrementDisabled === 'function'
                     ? incrementDisabled(row)
@@ -3298,10 +3299,11 @@ const SectionEquipmentCard = ({
                     <AddedDeviceLine
                         key={row.label}
                         label={row.label}
+                        align={addedRowsAlign}
                         hideCount
                         control={(
                             <QtyStepper
-                                tutorialRef={counterTutorialRef}
+                                tutorialRef={index === 0 ? counterTutorialRef : null}
                                 count={row.count}
                                 dense={addedDense}
                                 onDecrement={() => onRemoveUnit(row)}
@@ -3631,10 +3633,8 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         title="Выберите тип подключения смесительного узла"
         description="Выберите «По проводу», если привод и датчик подключаются кабелем к контроллеру. Wi-Fi доступен только для совместимого узла 220V с цифровым датчиком."
     >
-        <button className="tutorial-popover-action" type="button" onClick={() => {
-            onConnectionModeChange('wired');
-        }}>
-            Оставить "По проводу"
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('servo')}>
+            Далее без изменений
         </button>
     </TutorialPopover>
     <TutorialPopover
@@ -3646,10 +3646,8 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         title="Какой сигнал принимает сервопривод?"
         description="Посмотрите маркировку или паспорт привода. Выберите 220V для привода с питанием 220 В или 0-10V для привода с аналоговым управляющим сигналом."
     >
-        <button className="tutorial-popover-action" type="button" onClick={() => {
-            onServoChange('220');
-        }}>
-            Оставить "220V"
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('sensor')}>
+            Далее без изменений
         </button>
     </TutorialPopover>
     <TutorialPopover
@@ -3665,8 +3663,8 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
                 ? 'Для привода 0-10V нужен NTC-датчик. Цифровой датчик с этим вариантом не используется.'
                 : 'Цифровой датчик подключается по линии 1-Wire, а NTC - к температурному входу. Тип указан на датчике или в его паспорте.'}
     >
-        <button className="tutorial-popover-action" type="button" onClick={() => onSensorChange(connectionMode === 'wifi' ? 'digital' : 'ntc')}>
-            {connectionMode === 'wifi' ? 'Продолжить' : 'Выбрать NTC'}
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('add')}>
+            Далее без изменений
         </button>
     </TutorialPopover>
     <TutorialPopover
@@ -3913,7 +3911,7 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         title="Как подключён насос?"
         description="Выберите «По проводу», если насос подключается к контроллеру кабелем. Wi-Fi подходит для насоса 220V и использует свободный модуль RL6W или RL6SW."
     >
-        <button className="tutorial-popover-action" type="button" onClick={() => onConnectionModeChange('wired')}>Оставить «По проводу»</button>
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('type')}>Далее без изменений</button>
     </TutorialPopover>
     <TutorialPopover
         anchorRef={pumpTypeRef}
@@ -3926,8 +3924,8 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
             ? 'По Wi-Fi подключаются насосы с питанием 220V.'
             : 'Посмотрите маркировку или паспорт насоса. Выберите 220V для обычного релейного управления или 0-10V для аналогового управляющего сигнала.'}
     >
-        <button className="tutorial-popover-action" type="button" onClick={() => onPumpTypeChange('220')}>
-            {connectionMode === 'wifi' ? 'Далее' : 'Оставить 220V'}
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('add')}>
+            Далее без изменений
         </button>
     </TutorialPopover>
     <TutorialPopover
@@ -4054,7 +4052,7 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
             ? 'Выберите «По проводу», если оборудование подключается к контроллеру кабелем. При Wi-Fi подключении оно будет размещено на свободном канале модуля RL6W или RL6SW.'
             : 'Выберите «По проводу», если сервопривод подключается к контроллеру кабелем. При Wi-Fi подключении он будет размещён на свободном канале модуля RL6W или RL6SW.'}
     >
-        <button className="tutorial-popover-action" type="button" onClick={() => onConnectionModeChange('wired')}>Оставить «По проводу»</button>
+        <button className="tutorial-popover-action" type="button" onClick={() => onTutorialStepChange('add')}>Далее без изменений</button>
     </TutorialPopover>
     <TutorialPopover
         anchorRef={selectedTemplateAdded ? addedListRef : addRef}
@@ -5026,6 +5024,8 @@ const SelectionApp = () => {
             removeKey: { target, id: device.id },
         })));
     }, [incomingScheme]);
+    const isTemperatureSensorTemplateAdded = temperatureSensorRows
+        .some((row) => row.templateKey === temperatureSensorTemplate?.key);
 
 
     // После паузы во вводе ищет котлы по текущему запросу;
@@ -5599,12 +5599,18 @@ const SelectionApp = () => {
                 upsRequested: sourceUpsRequested,
                 upsRequestSource: hasSchemeOverride && sourceUpsRequested ? 'manual' : upsRequestSourceRef.current,
                 editor: {
+                    thermostatConnection,
                     wiredThermostatColor,
                     wiredThermostatHasFloorSensor,
                     wirelessThermostatColor,
                     wirelessThermostatHasFloorSensor,
+                    mixingConnectionMode,
                     mixingServo,
                     mixingSensor,
+                    pumpConnectionMode,
+                    pumpType,
+                    zoneConnectionMode,
+                    otherEquipmentConnectionMode,
                     wiredTemperatureSensorKey,
                     wirelessTemperatureSensorKey,
                     temperatureSensorConnection,
@@ -5657,12 +5663,18 @@ const SelectionApp = () => {
         requestedControllerType,
         controllerSelectionSource,
         upsRequested,
+        thermostatConnection,
         wiredThermostatColor,
         wiredThermostatHasFloorSensor,
         wirelessThermostatColor,
         wirelessThermostatHasFloorSensor,
+        mixingConnectionMode,
         mixingServo,
         mixingSensor,
+        pumpConnectionMode,
+        pumpType,
+        zoneConnectionMode,
+        otherEquipmentConnectionMode,
         wiredTemperatureSensorKey,
         wirelessTemperatureSensorKey,
         temperatureSensorConnection,
@@ -6481,7 +6493,7 @@ const SelectionApp = () => {
                             addTemperatureSensor(temperatureSensorTemplate);
                             if (temperatureSensorTutorialStep === 'add') setTemperatureSensorTutorialStep('added-list');
                         }}
-                        showAdd={!temperatureSensorRows.some((row) => row.templateKey === temperatureSensorTemplate?.key)}
+                        showAdd={!isTemperatureSensorTemplateAdded}
                         addTestId="add-temperature-sensor"
                         addTutorialRef={temperatureSensorAddRef}
                         qtyTestId={(row) => `temperature-sensor-${row.templateKey}-qty`}
@@ -6540,10 +6552,7 @@ const SelectionApp = () => {
                         title="Выберите тип подключения датчика"
                         description="Проводной датчик подключается к контроллеру кабелем. Беспроводной передаёт температуру по Wi-Fi."
                     >
-                        <button className="tutorial-popover-action" type="button" onClick={() => {
-                            setTemperatureSensorConnection('wired');
-                            setTemperatureSensorTutorialStep('placement');
-                        }}>Оставить «По проводу»</button>
+                        <button className="tutorial-popover-action" type="button" onClick={() => setTemperatureSensorTutorialStep('placement')}>Далее без изменений</button>
                     </TutorialPopover>
                     <TutorialPopover
                         anchorRef={temperatureSensorPlacementRef}
@@ -6552,7 +6561,7 @@ const SelectionApp = () => {
                         onClose={() => setTemperatureSensorTutorialStep(null)}
                         showMask
                         title="Укажите расположение датчика"
-                        description="Выберите, где будет измеряться температура: в помещении, на улице или в контуре отопления."
+                        description="Выберите исполнение датчика: настенное или в колбе. Для беспроводного подключения доступен только настенный вариант."
                     />
                     <TutorialPopover
                         anchorRef={temperatureSensorKindRef}
@@ -6564,14 +6573,20 @@ const SelectionApp = () => {
                         description="Тип датчика указан в его маркировке или паспорте."
                     />
                     <TutorialPopover
-                        anchorRef={temperatureSensorAddRef}
+                        anchorRef={isTemperatureSensorTemplateAdded ? temperatureSensorAddedListRef : temperatureSensorAddRef}
                         scopeRef={temperatureSensorTutorialScopeRef}
                         open={temperatureSensorTutorialStep === 'add'}
                         onClose={() => setTemperatureSensorTutorialStep(null)}
                         showMask
-                        title="Добавьте датчик температуры"
-                        description="Проверьте выбранную конфигурацию и добавьте датчик в систему."
-                    />
+                        title={isTemperatureSensorTemplateAdded ? 'Выбранный датчик уже добавлен' : 'Добавьте датчик температуры'}
+                        description={isTemperatureSensorTemplateAdded
+                            ? 'Измените количество этого варианта кнопками + и - в списке ниже.'
+                            : 'Проверьте выбранную конфигурацию и добавьте датчик в систему.'}
+                    >
+                        {isTemperatureSensorTemplateAdded && (
+                            <button className="tutorial-popover-action" type="button" onClick={() => setTemperatureSensorTutorialStep('count')}>Показать счётчик</button>
+                        )}
+                    </TutorialPopover>
                     <TutorialPopover
                         anchorRef={temperatureSensorAddedListRef}
                         scopeRef={temperatureSensorTutorialScopeRef}
@@ -6644,7 +6659,7 @@ const SelectionApp = () => {
 
             </div>{/* /Датчики и защита flex */}
 
-            <section>
+            <section className="sel-leak-section">
                 <h2>Контроль протечки воды</h2>
                 <SectionSubtitle>
                     Все датчики одной группы занимают один дискретный вход контроллера или модуля.

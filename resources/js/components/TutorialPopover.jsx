@@ -17,10 +17,12 @@ const getContentRect = (element) => {
     if (childRects.length === 0) return fallbackRect;
 
     return {
-        left: Math.min(...childRects.map((rect) => rect.left)),
-        top: Math.min(...childRects.map((rect) => rect.top)),
-        right: Math.max(...childRects.map((rect) => rect.right)),
-        bottom: Math.max(...childRects.map((rect) => rect.bottom)),
+        // Потомки scroll-контейнера могут выходить за его видимую область.
+        // Маска не должна открывать строки, скрытые overflow-границами.
+        left: Math.max(fallbackRect.left, Math.min(...childRects.map((rect) => rect.left))),
+        top: Math.max(fallbackRect.top, Math.min(...childRects.map((rect) => rect.top))),
+        right: Math.min(fallbackRect.right, Math.max(...childRects.map((rect) => rect.right))),
+        bottom: Math.min(fallbackRect.bottom, Math.max(...childRects.map((rect) => rect.bottom))),
         get width() { return this.right - this.left; },
         get height() { return this.bottom - this.top; },
     };

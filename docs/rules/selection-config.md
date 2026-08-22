@@ -31,7 +31,7 @@
 - `requested_controller_type` сохраняет выбор пользователя до автоматического согласования совместимости.
 - `resolved_controller_type` содержит контроллер, с которым была создана схема.
 - `leak_zone_count` содержит число независимых шлейфов датчиков протечки, а `leak_valve_count` - общее число независимых запорных клапанов.
-- `editor` хранит настройки карточек добавления оборудования, но не временное UI-состояние.
+- `editor` хранит настройки карточек добавления оборудования, но не временное UI-состояние. В version 1 сохраняются `thermostat_connection`, цвета и датчики пола проводного/беспроводного термостата, `mixing_connection_mode`, `mixing_servo`, `mixing_sensor`, `pump_connection_mode`, `pump_type`, `zone_connection_mode`, `other_equipment_connection_mode`, ключи проводного/беспроводного датчика температуры и `temperature_sensor_connection`.
 - Котлы из интеграции могут содержать `catalog_ref` с `source`, `catalog_id` и `bus_type`.
 - `POST /api/schemes` принимает снимок. Обычный `PATCH /api/schemes/{id}` его игнорирует.
 - Копия схемы наследует снимок исходного подбора.

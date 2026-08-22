@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('/selection - Wi-Fi mixing units', () => {
     test.beforeEach(async ({ page }) => {
+        await page.context().addCookies([{ name: 'PHPSESSID', value: '1', domain: 'localhost', path: '/' }]);
         await page.goto('/selection');
         await page.getByTestId('reset-equipment').click();
         await page.getByTestId('reset-equipment-confirm').click();
@@ -26,13 +27,13 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByTitle('Как настроить смесительный узел').click();
         await expect(page.getByText('Выберите тип подключения смесительного узла')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Оставить "По проводу"' }).click();
+        await page.getByRole('button', { name: 'Далее без изменений' }).click();
         await expect(page.getByText('Какой сигнал принимает сервопривод?')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Оставить "220V"' }).click();
+        await page.getByRole('button', { name: 'Далее без изменений' }).click();
         await expect(page.getByText('Какой датчик установлен в узле?')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Выбрать NTC' }).click();
+        await page.getByRole('button', { name: 'Далее без изменений' }).click();
         await expect(page.getByText('Проверьте выбранный вариант и добавьте узел')).toBeVisible();
 
         await page.getByTestId('add-mixing-unit').click();
@@ -40,6 +41,11 @@ test.describe('/selection - Wi-Fi mixing units', () => {
 
         await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Изменяйте количество смесительных узлов')).toBeVisible();
+
+        await page.getByRole('button', { name: 'Далее' }).click();
+        await expect(page.getByText('Добавьте другой вид смесительного узла')).toBeVisible();
+        await page.getByTestId('mixing-sensor-ntc').click();
+        await expect(page.getByText('Добавьте новую конфигурацию')).toBeVisible();
     });
 
     test('Wi-Fi pump uses the 220V variant', async ({ page }) => {
@@ -54,10 +60,10 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByTitle('Как добавить насос').click();
         await expect(page.getByText('Как подключён насос?')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Оставить «По проводу»' }).click();
+        await page.getByRole('button', { name: 'Далее без изменений' }).click();
         await expect(page.getByText('Какой тип управления у насоса?')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Оставить 220V' }).click();
+        await page.getByRole('button', { name: 'Далее без изменений' }).click();
         await expect(page.getByText('Проверьте выбранный вариант и добавьте насос')).toBeVisible();
 
         await page.getByTestId('add-pump').click();
@@ -78,7 +84,7 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByTitle('Как добавить зону').click();
         await expect(page.getByText('Как подключён сервопривод зоны?')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Оставить «По проводу»' }).click();
+        await page.getByRole('button', { name: 'Далее без изменений' }).click();
         await expect(page.getByText('Проверьте вариант и добавьте зону')).toBeVisible();
 
         await page.getByTestId('add-zone').click();
