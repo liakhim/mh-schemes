@@ -16,6 +16,7 @@ import { test, expect } from '@playwright/test';
  */
 test.describe('/selection — панель «Подобранный контроллер»', () => {
     test.beforeEach(async ({ page }) => {
+        await page.context().addCookies([{ name: 'PHPSESSID', value: '1', domain: 'localhost', path: '/' }]);
         await page.goto('/selection');
         await page.getByTestId('reset-equipment').click();
         await page.getByTestId('reset-equipment-confirm').click();
@@ -33,6 +34,12 @@ test.describe('/selection — панель «Подобранный контро
 
     /** Забирает и очищает накопленный список анимаций панели. */
     const takeAnimations = (page) => page.evaluate(() => window.__panelAnimations.splice(0));
+
+    test('карточка показывает название без описания контроллера', async ({ page }) => {
+        const card = page.getByTestId('controller-card-go');
+        await expect(card.locator('.sel-stuck-controller-copy strong')).toBeVisible();
+        await expect(card.locator('small')).toHaveCount(0);
+    });
 
     test('смена контроллера играет только подъём, без повторного входа', async ({ page }) => {
         // 5 зон превышают релейную ёмкость go и переводят подбор на smart2.

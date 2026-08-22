@@ -4191,7 +4191,7 @@ const SEL_CHAPTERS = [
 
 const SelectionQuickNav = () => (
     <nav className="sel-quick-nav" aria-label="Разделы подбора">
-        {SEL_CHAPTERS.map((item, index) => (
+        {SEL_CHAPTERS.map((item) => (
             <a
                 key={item.id}
                 href={`#${item.id}`}
@@ -4200,7 +4200,6 @@ const SelectionQuickNav = () => (
                     document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
             >
-                <span>{index + 1}</span>
                 {item.label}
             </a>
         ))}
@@ -6721,17 +6720,6 @@ const SelectionApp = () => {
                                         <span style={{ flex: '1 1 130px', fontWeight: 700, fontSize: 14 }}>
                                             {`Группа датчиков протечки ${index + 1}`}
                                         </span>
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                                            <span style={{ color: '#475569', fontSize: 13 }}>Датчики</span>
-                                            <QtyStepper
-                                                tutorialRef={index === 0 ? leakZoneCounterRef : null}
-                                                count={zone.sensorCount}
-                                                onDecrement={() => changeLeakZoneSensors(zone.id, -1)}
-                                                onIncrement={() => changeLeakZoneSensors(zone.id, 1)}
-                                                decTestId={`leak-zone-sensor-qty-dec-${index}`}
-                                                incTestId={`leak-zone-sensor-qty-inc-${index}`}
-                                            />
-                                        </span>
                                         <button
                                             type="button"
                                             className="selection-remove-icon"
@@ -6743,6 +6731,14 @@ const SelectionApp = () => {
                                         >
                                             ×
                                         </button>
+                                        <QtyStepper
+                                            tutorialRef={index === 0 ? leakZoneCounterRef : null}
+                                            count={zone.sensorCount}
+                                            onDecrement={() => changeLeakZoneSensors(zone.id, -1)}
+                                            onIncrement={() => changeLeakZoneSensors(zone.id, 1)}
+                                            decTestId={`leak-zone-sensor-qty-dec-${index}`}
+                                            incTestId={`leak-zone-sensor-qty-inc-${index}`}
+                                        />
                                     </div>
                                 ))}
                                 </>
@@ -7004,7 +7000,7 @@ const SelectionApp = () => {
                     </label>
                 )}
                 <div className="sel-stuck-controllers">
-                    {panelControllerTemplates.map((item, index) => {
+                    {panelControllerTemplates.map((item) => {
                         const isActive = incomingScheme.controller?.type === item.value.type;
                         const isGoFamilySwitch = (controllerType === 'go' && item.value.type === 'go+')
                             || (controllerType === 'go+' && item.value.type === 'go');
@@ -7012,7 +7008,7 @@ const SelectionApp = () => {
                         return (
                             <button
                                 type="button"
-                                key={index}
+                                key={item.value.type}
                                 className="selection-option-button sel-stuck-controller-card"
                                 data-test-id={`controller-card-${item.value.type}`}
                                 data-active={isActive}
@@ -7029,7 +7025,6 @@ const SelectionApp = () => {
                                 </span>
                                 <span className="sel-stuck-controller-copy">
                                     <strong>{item.label}</strong>
-                                    <small>{CONTROLLER_CARD_DESCRIPTIONS[item.value.type] || ''}</small>
                                 </span>
                             </button>
                         );
@@ -7076,9 +7071,7 @@ const SelectionApp = () => {
                         </span>
                         <span className="sel-controller-action-copy">
                             <strong>
-                                {/* Перенос нужен узкой панели на десктопе; на телефоне `br`
-                                    скрывается стилями, и пробел склеивает подпись в строку. */}
-                                {isBuildingScheme ? 'Сохраняем...' : <>Схема<br /> подключения</>}
+                                {isBuildingScheme ? 'Сохраняем...' : 'Схема подключения'}
                             </strong>
                         </span>
                         <svg className="sel-controller-action-arrow" viewBox="0 0 24 24" aria-hidden="true">
