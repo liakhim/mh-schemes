@@ -21,15 +21,23 @@ test.describe('/selection - tutorial scenarios', () => {
         const mask = page.locator('.tutorial-popover-mask');
         const connectionField = page.getByTestId('thermostat-connection-wireless').locator('..').locator('..');
         await expect(popover).toContainText('Выберите тип подключения термостата');
-        await expect.poll(async () => {
-            const [popoverBox, headerBox] = await Promise.all([popover.boundingBox(), header.boundingBox()]);
-            return popoverBox && headerBox ? popoverBox.y - (headerBox.y + headerBox.height) : -1;
-        }).toBeGreaterThanOrEqual(12);
         const geometry = await Promise.all([popover.boundingBox(), connectionField.boundingBox()]);
         expect(geometry[0].y + geometry[0].height).toBeLessThanOrEqual(geometry[1].y);
         await expect(mask).not.toHaveClass(/is-solid/);
-        await page.evaluate(() => window.scrollBy(0, 300));
+        const initialScrollY = await page.evaluate(() => window.scrollY);
+        const headerBox = await header.boundingBox();
+        const overlapScroll = Math.max(0, geometry[0].y - (headerBox.y + headerBox.height - 12));
+        await page.evaluate((distance) => window.scrollBy(0, distance), overlapScroll);
+        await expect(popover).toBeVisible();
+        await expect(mask).not.toHaveClass(/is-solid/);
+        await expect.poll(async () => (await popover.boundingBox())?.y ?? Infinity).toBeLessThan(headerBox.y + headerBox.height);
+        const overlappingBox = await popover.boundingBox();
+        await page.evaluate((distance) => window.scrollBy(0, distance), overlappingBox.y + 24);
         await expect(mask).toHaveClass(/is-solid/);
+        await expect(popover).toBeHidden();
+        await page.evaluate((scrollY) => window.scrollTo(0, scrollY), initialScrollY);
+        await expect(mask).not.toHaveClass(/is-solid/);
+        await expect(popover).toBeVisible();
 
         await page.getByRole('button', { name: 'Далее без изменений' }).click();
         await expect(page.getByTestId('thermostat-connection-wireless')).toHaveAttribute('data-active', 'true');
@@ -38,8 +46,6 @@ test.describe('/selection - tutorial scenarios', () => {
         await page.getByTestId('add-thermostat').click();
 
         await expect(popover).toContainText('Термостат добавлен в систему');
-        await page.evaluate(() => window.scrollBy(0, -300));
-        await expect(mask).not.toHaveClass(/is-solid/);
         const blocker = page.locator('.tutorial-popover-content-blocker');
         await expect(blocker).toBeVisible();
         await blocker.click({ position: { x: 2, y: 2 } });

@@ -42,6 +42,20 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
 
     useLayoutEffect(() => {
         if (!open) return undefined;
+        const frameId = requestAnimationFrame(() => {
+            const anchorRect = getContentRect(anchorRef.current);
+            if (!anchorRect) return;
+            const popoverHeight = popoverElement?.getBoundingClientRect().height || 0;
+            const desiredTop = anchorRect.top - popoverHeight - 40;
+            if (desiredTop < 12 || desiredTop + popoverHeight > window.innerHeight - 12) {
+                anchorRef.current?.scrollIntoView({ block: 'center', inline: 'nearest' });
+            }
+        });
+        return () => cancelAnimationFrame(frameId);
+    }, [anchorRef, open, popoverElement, title]);
+
+    useLayoutEffect(() => {
+        if (!open) return undefined;
         const updatePosition = () => {
             const anchorRect = getContentRect(anchorRef.current);
             const scopeRect = scopeRef.current?.getBoundingClientRect();
@@ -73,8 +87,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
                 viewportWidth - viewportPadding - width - scopeRect.left,
             );
             const popoverHeight = popoverElement?.getBoundingClientRect().height || 0;
-            const headerRect = document.querySelector('.sel-liquid-header')?.getBoundingClientRect();
-            const safeViewportTop = Math.max(viewportOffsetTop + viewportPadding, (headerRect?.bottom || 0) + 12);
+            const safeViewportTop = viewportOffsetTop + viewportPadding;
             const safeViewportBottom = viewportOffsetTop + viewportHeight - viewportPadding;
             const desiredViewportTop = anchorRect.top - popoverHeight - 40;
             const isPopoverInViewport = popoverHeight === 0 || (
@@ -142,7 +155,8 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
     if (!isRendered || !position) return null;
 
     const mask = position.mask;
-    const showMaskHole = isVisible && position.isPopoverInViewport;
+    const showPopover = isVisible && position.isPopoverInViewport;
+    const showMaskHole = showPopover;
     const maskLeft = mask.left + mask.viewportOffsetLeft + (mask.isKeyboardViewport ? 0 : mask.viewportPageLeft);
     const maskTop = mask.top + mask.viewportOffsetTop + (mask.isKeyboardViewport ? 0 : mask.viewportPageTop);
     return createPortal((
@@ -184,10 +198,10 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
             </svg>
             <aside
                 ref={setPopoverElement}
-                className={`tutorial-popover${isVisible ? ' is-visible' : ''}${isAttentionRequested ? ' is-attention-requested' : ''}`}
+                className={`tutorial-popover${showPopover ? ' is-visible' : ''}${isAttentionRequested ? ' is-attention-requested' : ''}`}
                 style={{ left: position.popoverLeft, top: position.popoverTop, width: position.width }}
                 role="status"
-                aria-hidden={!isVisible}
+                aria-hidden={!showPopover}
                 onAnimationEnd={(event) => {
                     if (event.animationName === 'tutorial-popover-attention') setIsAttentionRequested(false);
                 }}
