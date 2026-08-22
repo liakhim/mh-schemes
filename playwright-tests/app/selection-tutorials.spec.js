@@ -17,10 +17,19 @@ test.describe('/selection - tutorial scenarios', () => {
         await page.getByTitle('Как добавить термостат').click();
 
         const popover = page.locator('.tutorial-popover.is-visible');
+        const header = page.locator('.sel-liquid-header');
+        const mask = page.locator('.tutorial-popover-mask');
         const connectionField = page.getByTestId('thermostat-connection-wireless').locator('..').locator('..');
         await expect(popover).toContainText('Выберите тип подключения термостата');
+        await expect.poll(async () => {
+            const [popoverBox, headerBox] = await Promise.all([popover.boundingBox(), header.boundingBox()]);
+            return popoverBox && headerBox ? popoverBox.y - (headerBox.y + headerBox.height) : -1;
+        }).toBeGreaterThanOrEqual(12);
         const geometry = await Promise.all([popover.boundingBox(), connectionField.boundingBox()]);
         expect(geometry[0].y + geometry[0].height).toBeLessThanOrEqual(geometry[1].y);
+        await expect(mask).not.toHaveClass(/is-solid/);
+        await page.evaluate(() => window.scrollBy(0, 300));
+        await expect(mask).toHaveClass(/is-solid/);
 
         await page.getByRole('button', { name: 'Далее без изменений' }).click();
         await expect(page.getByTestId('thermostat-connection-wireless')).toHaveAttribute('data-active', 'true');
@@ -29,6 +38,8 @@ test.describe('/selection - tutorial scenarios', () => {
         await page.getByTestId('add-thermostat').click();
 
         await expect(popover).toContainText('Термостат добавлен в систему');
+        await page.evaluate(() => window.scrollBy(0, -300));
+        await expect(mask).not.toHaveClass(/is-solid/);
         const blocker = page.locator('.tutorial-popover-content-blocker');
         await expect(blocker).toBeVisible();
         await blocker.click({ position: { x: 2, y: 2 } });

@@ -5678,7 +5678,6 @@ const SelectionApp = () => {
         wirelessTemperatureSensorKey,
         temperatureSensorConnection,
     ]);
-
     return (
         <div
             className={showJsonDetails ? 'selection-page selection-show-json' : 'selection-page selection-hide-json'}
