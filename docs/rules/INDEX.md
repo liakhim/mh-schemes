@@ -64,7 +64,8 @@
 
 - Файл правил: `docs/rules/selection-tutorials.md`
 - Компонент подсказки: `resources/js/components/TutorialPopover.jsx`
-- Сценарии: `resources/js/selection.jsx` (котлы, смесительные узлы, бойлеры ГВС, насосы, зоны)
+- Сценарии: `resources/js/selection.jsx` (котлы, смесительные узлы, бойлеры ГВС, насосы, термостаты, зоны, прочее оборудование, датчики температуры, контроль протечки)
+- E2E: `playwright-tests/app/selection-tutorials.spec.js`
 
 ## Full Source
 

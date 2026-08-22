@@ -1,6 +1,29 @@
 import React, { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+const VIEWPORT_PADDING = 12;
+const POPOVER_GAP = 40;
+const HIGHLIGHT_PADDING = 8;
+const MOBILE_BREAKPOINT = 760;
+const MOBILE_MAX_WIDTH = 360;
+const KEYBOARD_VIEWPORT_DELTA = 120;
+
+const getViewportMetrics = () => {
+    const viewport = window.visualViewport;
+    const height = viewport?.height || window.innerHeight;
+    const layoutHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
+
+    return {
+        width: viewport?.width || window.innerWidth,
+        height,
+        pageLeft: viewport?.pageLeft ?? window.scrollX,
+        pageTop: viewport?.pageTop ?? window.scrollY,
+        offsetLeft: viewport?.offsetLeft || 0,
+        offsetTop: viewport?.offsetTop || 0,
+        isKeyboardViewport: Boolean(viewport && height < layoutHeight - KEYBOARD_VIEWPORT_DELTA),
+    };
+};
+
 const getContentRect = (element) => {
     const fallbackRect = element?.getBoundingClientRect();
     if (!fallbackRect) return null;
@@ -16,38 +39,39 @@ const getContentRect = (element) => {
         .filter((rect) => rect.width > 0 && rect.height > 0);
     if (childRects.length === 0) return fallbackRect;
 
+    const left = Math.max(fallbackRect.left, Math.min(...childRects.map((rect) => rect.left)));
+    const top = Math.max(fallbackRect.top, Math.min(...childRects.map((rect) => rect.top)));
+    const right = Math.min(fallbackRect.right, Math.max(...childRects.map((rect) => rect.right)));
+    const bottom = Math.min(fallbackRect.bottom, Math.max(...childRects.map((rect) => rect.bottom)));
+
     return {
         // Потомки scroll-контейнера могут выходить за его видимую область.
         // Маска не должна открывать строки, скрытые overflow-границами.
-        left: Math.max(fallbackRect.left, Math.min(...childRects.map((rect) => rect.left))),
-        top: Math.max(fallbackRect.top, Math.min(...childRects.map((rect) => rect.top))),
-        right: Math.min(fallbackRect.right, Math.max(...childRects.map((rect) => rect.right))),
-        bottom: Math.min(fallbackRect.bottom, Math.max(...childRects.map((rect) => rect.bottom))),
-        get width() { return this.right - this.left; },
-        get height() { return this.bottom - this.top; },
+        left,
+        top,
+        right,
+        bottom,
+        width: right - left,
+        height: bottom - top,
     };
 };
 
-const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], highlightActive = true, scopeRef, open, onClose, title, description = 'Подробное описание подсказки', children, maxWidth = 440, showMask = false, type = null }) => {
+const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], highlightActive = true, scopeRef, open, onClose, title, description = null, children, maxWidth = 440, showMask = false, type = null }) => {
     const [position, setPosition] = useState(null);
-    const [isRendered, setIsRendered] = useState(open);
-    const [isVisible, setIsVisible] = useState(false);
     const [popoverElement, setPopoverElement] = useState(null);
     const [isAttentionRequested, setIsAttentionRequested] = useState(false);
-
-    useLayoutEffect(() => {
-        setIsRendered(open);
-        setIsVisible(open);
-    }, [open]);
 
     useLayoutEffect(() => {
         if (!open) return undefined;
         const frameId = requestAnimationFrame(() => {
             const anchorRect = getContentRect(anchorRef.current);
             if (!anchorRect) return;
+            const viewport = getViewportMetrics();
             const popoverHeight = popoverElement?.getBoundingClientRect().height || 0;
-            const desiredTop = anchorRect.top - popoverHeight - 40;
-            if (desiredTop < 12 || desiredTop + popoverHeight > window.innerHeight - 12) {
+            const desiredTop = anchorRect.top - popoverHeight - POPOVER_GAP;
+            const safeTop = viewport.offsetTop + VIEWPORT_PADDING;
+            const safeBottom = viewport.offsetTop + viewport.height - VIEWPORT_PADDING;
+            if (desiredTop < safeTop || desiredTop + popoverHeight > safeBottom) {
                 anchorRef.current?.scrollIntoView({ block: 'center', inline: 'nearest' });
             }
         });
@@ -70,26 +94,17 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
                 bottom: Math.max(anchorRect.bottom, ...highlightRects.map((rect) => rect.bottom)),
             } : anchorRect;
 
-            const viewport = window.visualViewport;
-            const viewportWidth = viewport?.width || window.innerWidth;
-            const viewportHeight = viewport?.height || window.innerHeight;
-            const viewportPageLeft = viewport?.pageLeft ?? window.scrollX;
-            const viewportPageTop = viewport?.pageTop ?? window.scrollY;
-            const viewportOffsetLeft = viewport?.offsetLeft || 0;
-            const viewportOffsetTop = viewport?.offsetTop || 0;
-            const layoutViewportHeight = Math.max(window.innerHeight, document.documentElement.clientHeight);
-            const isKeyboardViewport = Boolean(viewport && viewportHeight < layoutViewportHeight - 120);
-            const viewportPadding = 12;
-            const maxPopoverWidth = viewportWidth <= 760 ? 360 : maxWidth;
-            const width = Math.min(maxPopoverWidth, viewportWidth - viewportPadding * 2);
+            const viewport = getViewportMetrics();
+            const maxPopoverWidth = viewport.width <= MOBILE_BREAKPOINT ? MOBILE_MAX_WIDTH : maxWidth;
+            const width = Math.min(maxPopoverWidth, viewport.width - VIEWPORT_PADDING * 2);
             const left = Math.min(
-                Math.max(viewportPadding - scopeRect.left, anchorRect.left - scopeRect.left),
-                viewportWidth - viewportPadding - width - scopeRect.left,
+                Math.max(VIEWPORT_PADDING - scopeRect.left, anchorRect.left - scopeRect.left),
+                viewport.width - VIEWPORT_PADDING - width - scopeRect.left,
             );
             const popoverHeight = popoverElement?.getBoundingClientRect().height || 0;
-            const safeViewportTop = viewportOffsetTop + viewportPadding;
-            const safeViewportBottom = viewportOffsetTop + viewportHeight - viewportPadding;
-            const desiredViewportTop = anchorRect.top - popoverHeight - 40;
+            const safeViewportTop = viewport.offsetTop + VIEWPORT_PADDING;
+            const safeViewportBottom = viewport.offsetTop + viewport.height - VIEWPORT_PADDING;
+            const desiredViewportTop = anchorRect.top - popoverHeight - POPOVER_GAP;
             const isPopoverInViewport = popoverHeight === 0 || (
                 desiredViewportTop >= safeViewportTop
                 && desiredViewportTop + popoverHeight <= safeViewportBottom
@@ -99,24 +114,24 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
                 left,
                 top,
                 width,
-                popoverLeft: viewportPageLeft + scopeRect.left + left,
-                popoverTop: viewportPageTop + scopeRect.top + top,
-                lineStartX: viewportPageLeft + anchorRect.left + anchorRect.width / 2,
-                lineStartY: viewportPageTop + anchorRect.top,
-                lineEndX: viewportPageLeft + scopeRect.left + left + 24,
-                lineEndY: viewportPageTop + scopeRect.top + top + popoverHeight,
-                lineBendY: viewportPageTop + scopeRect.top + top + popoverHeight + 16,
+                popoverLeft: viewport.pageLeft + scopeRect.left + left,
+                popoverTop: viewport.pageTop + scopeRect.top + top,
+                lineStartX: viewport.pageLeft + anchorRect.left + anchorRect.width / 2,
+                lineStartY: viewport.pageTop + anchorRect.top,
+                lineEndX: viewport.pageLeft + scopeRect.left + left + 24,
+                lineEndY: viewport.pageTop + scopeRect.top + top + popoverHeight,
+                lineBendY: viewport.pageTop + scopeRect.top + top + popoverHeight + 16,
                 isPopoverInViewport,
                 mask: {
-                    left: Math.max(0, maskRect.left - 8),
-                    top: Math.max(0, maskRect.top - 8),
-                    right: Math.min(viewportWidth, maskRect.right + 8),
-                    bottom: Math.min(viewportHeight, maskRect.bottom + 8),
-                    viewportOffsetLeft,
-                    viewportOffsetTop,
-                    viewportPageLeft,
-                    viewportPageTop,
-                    isKeyboardViewport,
+                    left: Math.max(0, maskRect.left - HIGHLIGHT_PADDING),
+                    top: Math.max(0, maskRect.top - HIGHLIGHT_PADDING),
+                    right: Math.min(viewport.width, maskRect.right + HIGHLIGHT_PADDING),
+                    bottom: Math.min(viewport.height, maskRect.bottom + HIGHLIGHT_PADDING),
+                    viewportOffsetLeft: viewport.offsetLeft,
+                    viewportOffsetTop: viewport.offsetTop,
+                    viewportPageLeft: viewport.pageLeft,
+                    viewportPageTop: viewport.pageTop,
+                    isKeyboardViewport: viewport.isKeyboardViewport,
                 },
             };
             setPosition(nextPosition);
@@ -127,16 +142,11 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
             cancelAnimationFrame(frameId);
             frameId = requestAnimationFrame(() => updatePosition());
         };
-        const syncMaskOnScroll = () => {
-            updatePosition();
-        };
-
         updatePosition();
         window.addEventListener('resize', schedulePositionUpdate);
-        window.addEventListener('scroll', syncMaskOnScroll, true);
-        document.addEventListener('scroll', syncMaskOnScroll, true);
+        document.addEventListener('scroll', schedulePositionUpdate, true);
         window.visualViewport?.addEventListener('resize', schedulePositionUpdate);
-        window.visualViewport?.addEventListener('scroll', syncMaskOnScroll);
+        window.visualViewport?.addEventListener('scroll', schedulePositionUpdate);
         const observer = new ResizeObserver(schedulePositionUpdate);
         if (anchorRef.current) observer.observe(anchorRef.current);
         if (scopeRef.current) observer.observe(scopeRef.current);
@@ -144,28 +154,26 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
         return () => {
             cancelAnimationFrame(frameId);
             window.removeEventListener('resize', schedulePositionUpdate);
-            window.removeEventListener('scroll', syncMaskOnScroll, true);
-            document.removeEventListener('scroll', syncMaskOnScroll, true);
+            document.removeEventListener('scroll', schedulePositionUpdate, true);
             window.visualViewport?.removeEventListener('resize', schedulePositionUpdate);
-            window.visualViewport?.removeEventListener('scroll', syncMaskOnScroll);
+            window.visualViewport?.removeEventListener('scroll', schedulePositionUpdate);
             observer.disconnect();
         };
     }, [anchorRef, highlightActive, highlightRef, maxWidth, open, popoverElement, scopeRef]);
 
-    if (!isRendered || !position) return null;
+    if (!open || !position) return null;
 
     const mask = position.mask;
-    const showPopover = isVisible && position.isPopoverInViewport;
-    const showMaskHole = showPopover;
+    const showPopover = position.isPopoverInViewport;
     const maskLeft = mask.left + mask.viewportOffsetLeft + (mask.isKeyboardViewport ? 0 : mask.viewportPageLeft);
     const maskTop = mask.top + mask.viewportOffsetTop + (mask.isKeyboardViewport ? 0 : mask.viewportPageTop);
     return createPortal((
         <>
             {showMask && (
                 <div
-                    className={`tutorial-popover-mask${showMaskHole ? '' : ' is-solid'}`}
+                    className={`tutorial-popover-mask${showPopover ? '' : ' is-solid'}`}
                     aria-hidden="true"
-                    style={showMaskHole ? {
+                    style={showPopover ? {
                         position: mask.isKeyboardViewport ? 'fixed' : 'absolute',
                         left: maskLeft,
                         top: maskTop,
@@ -174,7 +182,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
                     } : undefined}
                 />
             )}
-            {type === 'blockContent' && showMaskHole && (
+            {type === 'blockContent' && showPopover && (
                 <div
                     className="tutorial-popover-content-blocker"
                     aria-hidden="true"
@@ -191,7 +199,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
                     }}
                 />
             )}
-            <svg className={`tutorial-popover-line${showMaskHole ? ' is-visible' : ''}`} aria-hidden="true">
+            <svg className={`tutorial-popover-line${showPopover ? ' is-visible' : ''}`} aria-hidden="true">
                 <path d={`M ${position.lineStartX} ${position.lineStartY} V ${position.lineBendY} H ${position.lineEndX} V ${position.lineEndY}`} />
                 <circle cx={position.lineStartX} cy={position.lineStartY} r="4" />
                 <circle cx={position.lineEndX} cy={position.lineEndY} r="4" />
