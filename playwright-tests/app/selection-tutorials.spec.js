@@ -33,6 +33,10 @@ test.describe('/selection - tutorial scenarios', () => {
         await expect.poll(async () => (await popover.boundingBox())?.y ?? Infinity).toBeLessThan(headerBox.y + headerBox.height);
         const overlappingBox = await popover.boundingBox();
         await page.evaluate((distance) => window.scrollBy(0, distance), overlappingBox.y + 24);
+        await expect(mask).not.toHaveClass(/is-solid/);
+        await expect(popover).toBeVisible();
+        const highlightedBox = await connectionField.boundingBox();
+        await page.evaluate((distance) => window.scrollBy(0, distance), highlightedBox.y + highlightedBox.height + 12);
         await expect(mask).toHaveClass(/is-solid/);
         await expect(popover).toBeHidden();
         await page.evaluate((scrollY) => window.scrollTo(0, scrollY), initialScrollY);

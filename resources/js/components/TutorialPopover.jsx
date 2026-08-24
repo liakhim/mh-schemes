@@ -1,5 +1,6 @@
 import React, { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import crossIcon from '../../assets/icons/cross.svg';
 
 const VIEWPORT_PADDING = 12;
 const POPOVER_GAP = 40;
@@ -102,12 +103,12 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
                 viewport.width - VIEWPORT_PADDING - width - scopeRect.left,
             );
             const popoverHeight = popoverElement?.getBoundingClientRect().height || 0;
-            const safeViewportTop = viewport.offsetTop + VIEWPORT_PADDING;
-            const safeViewportBottom = viewport.offsetTop + viewport.height - VIEWPORT_PADDING;
             const desiredViewportTop = anchorRect.top - popoverHeight - POPOVER_GAP;
-            const isPopoverInViewport = popoverHeight === 0 || (
-                desiredViewportTop >= safeViewportTop
-                && desiredViewportTop + popoverHeight <= safeViewportBottom
+            const isMaskInViewport = (
+                maskRect.right + HIGHLIGHT_PADDING > viewport.offsetLeft
+                && maskRect.left - HIGHLIGHT_PADDING < viewport.offsetLeft + viewport.width
+                && maskRect.bottom + HIGHLIGHT_PADDING > viewport.offsetTop
+                && maskRect.top - HIGHLIGHT_PADDING < viewport.offsetTop + viewport.height
             );
             const top = desiredViewportTop - scopeRect.top;
             const nextPosition = {
@@ -121,7 +122,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
                 lineEndX: viewport.pageLeft + scopeRect.left + left + 24,
                 lineEndY: viewport.pageTop + scopeRect.top + top + popoverHeight,
                 lineBendY: viewport.pageTop + scopeRect.top + top + popoverHeight + 16,
-                isPopoverInViewport,
+                isMaskInViewport,
                 mask: {
                     left: Math.max(0, maskRect.left - HIGHLIGHT_PADDING),
                     top: Math.max(0, maskRect.top - HIGHLIGHT_PADDING),
@@ -164,7 +165,7 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
     if (!open || !position) return null;
 
     const mask = position.mask;
-    const showPopover = position.isPopoverInViewport;
+    const showPopover = position.isMaskInViewport;
     const maskLeft = mask.left + mask.viewportOffsetLeft + (mask.isKeyboardViewport ? 0 : mask.viewportPageLeft);
     const maskTop = mask.top + mask.viewportOffsetTop + (mask.isKeyboardViewport ? 0 : mask.viewportPageTop);
     return createPortal((
@@ -214,7 +215,9 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
                     if (event.animationName === 'tutorial-popover-attention') setIsAttentionRequested(false);
                 }}
             >
-                <button type="button" className="tutorial-popover-close" onClick={onClose} aria-label="Закрыть подсказку"><span aria-hidden="true">×</span></button>
+                <button type="button" className="tutorial-popover-close" onClick={onClose} aria-label="Закрыть подсказку">
+                    <img className="tutorial-popover-close-icon" src={crossIcon} alt="" aria-hidden="true" />
+                </button>
                 <div className="tutorial-popover-title">{title}</div>
                 {description && <p className="tutorial-popover-description">{description}</p>}
                 {children}
