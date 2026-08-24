@@ -5555,7 +5555,7 @@ html:has(.selection-body),
     height: 6px;
     flex: 0 0 6px;
     border-radius: 50%;
-    background: #f1f5f9;
+    background: #cbd5e1;
 }
 
 .selection-tutorial-trigger[data-active="true"] .selection-tutorial-trigger-copy small {
@@ -5649,6 +5649,36 @@ html:has(.selection-body),
     line-height: 1.28;
 }
 
+.tutorial-popover-header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.tutorial-popover-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    padding: 3px 6px;
+    border: 0;
+    border-radius: 5px;
+    color: #64748b;
+    background: transparent;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.tutorial-popover-back:hover:not(:disabled),
+.tutorial-popover-back:focus-visible {
+    color: #334155;
+    background: #f8fafc;
+    outline: none;
+}
+
 .tutorial-popover-description {
     margin: 7px 0 0;
     color: #64748b;
@@ -5738,6 +5768,11 @@ html:has(.selection-body),
     border-color: #c85e18;
     background: #fff0e4;
     outline: none;
+}
+
+.tutorial-popover-action:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 /* Название устройства — единственный элемент строки, который сжимается: счётчик,

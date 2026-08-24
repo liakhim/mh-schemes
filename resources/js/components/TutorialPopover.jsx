@@ -57,7 +57,7 @@ const getContentRect = (element) => {
     };
 };
 
-const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], highlightActive = true, scopeRef, open, onClose, title, description = null, children, maxWidth = 440, showMask = false, type = null }) => {
+const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], highlightActive = true, scopeRef, open, onClose, onBack = null, onNext = onClose, nextDisabled = false, showNext = true, title, description = null, children, maxWidth = 440, showMask = false, type = null }) => {
     const [position, setPosition] = useState(null);
     const [popoverElement, setPopoverElement] = useState(null);
     const [isAttentionRequested, setIsAttentionRequested] = useState(false);
@@ -218,9 +218,18 @@ const TutorialPopover = ({ anchorRef, highlightRef = null, highlightRefs = [], h
                 <button type="button" className="tutorial-popover-close" onClick={onClose} aria-label="Закрыть подсказку">
                     <img className="tutorial-popover-close-icon" src={crossIcon} alt="" aria-hidden="true" />
                 </button>
-                <div className="tutorial-popover-title">{title}</div>
+                <div className="tutorial-popover-header">
+                    {onBack && (
+                        <button type="button" className="tutorial-popover-back" onClick={onBack}>
+                            <span aria-hidden="true">←</span>
+                            Назад
+                        </button>
+                    )}
+                    <div className="tutorial-popover-title">{title}</div>
+                </div>
                 {description && <p className="tutorial-popover-description">{description}</p>}
                 {children}
+                {showNext && <button className="tutorial-popover-action" type="button" onClick={onNext} disabled={nextDisabled}>Далее</button>}
             </aside>
         </>
     ), document.body);

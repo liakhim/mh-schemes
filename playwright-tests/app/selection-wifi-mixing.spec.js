@@ -12,7 +12,7 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByTestId('mixing-connection-wifi').click();
         await page.getByTestId('add-mixing-unit').click();
         await expect(page.getByTestId('controller-card-smart2')).toHaveAttribute('data-active', 'true');
-        await expect(page.getByText('Сервопривод 220V с цифровым датчиком с подключением по WI-FI')).toBeVisible();
+        await expect(page.locator('.sel-added-label').getByText('Сервопривод 220V с цифровым датчиком с подключением по WI-FI')).toBeVisible();
 
         await page.getByTestId('mixing-connection-wired').click();
         await page.getByTestId('add-mixing-unit').click();
@@ -27,16 +27,18 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByTitle('Как настроить смесительный узел').click();
         await expect(page.getByText('Выберите тип подключения смесительного узла')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Далее без изменений' }).click();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Какой сигнал принимает сервопривод?')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Далее без изменений' }).click();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Какой датчик установлен в узле?')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Далее без изменений' }).click();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Проверьте выбранный вариант и добавьте узел')).toBeVisible();
 
         await page.getByTestId('add-mixing-unit').click();
+        await expect(page.getByText('Выбранный смесительный узел уже добавлен')).toBeVisible();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Смесительный узел добавлен в систему')).toBeVisible();
 
         await page.getByRole('button', { name: 'Далее' }).click();
@@ -45,6 +47,8 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Добавьте другой вид смесительного узла')).toBeVisible();
         await page.getByTestId('mixing-sensor-ntc').click();
+        await expect(page.getByText('Добавьте другой вид смесительного узла')).toBeVisible();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Добавьте новую конфигурацию')).toBeVisible();
     });
 
@@ -53,20 +57,22 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await expect(page.getByTestId('pump-type-010')).toBeDisabled();
 
         await page.getByTestId('add-pump').click();
-        await expect(page.getByText('Насос 220V с подключением по WI-FI')).toBeVisible();
+        await expect(page.locator('.sel-added-label').getByText('Насос 220V с подключением по WI-FI')).toBeVisible();
     });
 
     test('pump tutorial guides selection through adding and counting pumps', async ({ page }) => {
         await page.getByTitle('Как добавить насос').click();
         await expect(page.getByText('Как подключён насос?')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Далее без изменений' }).click();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Какой тип управления у насоса?')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Далее без изменений' }).click();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Проверьте выбранный вариант и добавьте насос')).toBeVisible();
 
         await page.getByTestId('add-pump').click();
+        await expect(page.getByText('Выбранный насос уже добавлен')).toBeVisible();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Насос добавлен в систему')).toBeVisible();
 
         await page.getByRole('button', { name: 'Далее' }).click();
@@ -77,17 +83,19 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByTestId('zone-connection-wifi').click();
         await page.getByTestId('add-zone').click();
 
-        await expect(page.getByText('Зона с подключением по WI-FI')).toBeVisible();
+        await expect(page.locator('.sel-added-label').getByText('Зона с подключением по WI-FI')).toBeVisible();
     });
 
     test('zone tutorial guides selection through adding and counting zones', async ({ page }) => {
         await page.getByTitle('Как добавить зону').click();
         await expect(page.getByText('Как подключён сервопривод зоны?')).toBeVisible();
 
-        await page.getByRole('button', { name: 'Далее без изменений' }).click();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Проверьте вариант и добавьте зону')).toBeVisible();
 
         await page.getByTestId('add-zone').click();
+        await expect(page.getByText('Выбранная зона уже добавлена')).toBeVisible();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Зона добавлена в систему')).toBeVisible();
 
         await page.getByRole('button', { name: 'Далее' }).click();
@@ -98,6 +106,25 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByTestId('other-equipment-connection-wifi').click();
         await page.getByTestId('add-other-equipment').click();
 
-        await expect(page.getByText('Прочее оборудование с подключением по WI-FI')).toBeVisible();
+        await expect(page.locator('.sel-added-label').getByText('Прочее оборудование с подключением по WI-FI')).toBeVisible();
+    });
+
+    test('other equipment tutorial advances only through navigation buttons', async ({ page }) => {
+        await page.getByTitle('Как добавить оборудование').click();
+        const popover = page.locator('.tutorial-popover.is-visible');
+
+        await expect(popover).toContainText('Как подключено оборудование?');
+        await page.getByTestId('other-equipment-connection-wifi').click();
+        await expect(popover).toContainText('Как подключено оборудование?');
+        await popover.getByRole('button', { name: 'Далее' }).click();
+
+        await page.getByTestId('add-other-equipment').click();
+        await expect(popover).toContainText('Выбранное оборудование уже добавлено');
+        await popover.getByRole('button', { name: 'Далее' }).click();
+        await expect(popover).toContainText('Оборудование добавлено в систему');
+        await popover.getByRole('button', { name: 'Далее' }).click();
+        await expect(popover).toContainText('Изменяйте количество оборудования');
+        await popover.getByRole('button', { name: 'Далее' }).click();
+        await expect(popover).toContainText('Добавьте другой вид оборудования');
     });
 });

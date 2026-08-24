@@ -43,11 +43,18 @@ test.describe('/selection - tutorial scenarios', () => {
         await expect(mask).not.toHaveClass(/is-solid/);
         await expect(popover).toBeVisible();
 
-        await page.getByRole('button', { name: 'Далее без изменений' }).click();
+        await expect(popover.getByRole('button', { name: 'Назад' })).toHaveCount(0);
+        await popover.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByTestId('thermostat-connection-wireless')).toHaveAttribute('data-active', 'true');
         await page.getByRole('button', { name: 'Белый' }).click();
+        await expect(popover).toContainText('Выберите цвет термостата');
+        await popover.getByRole('button', { name: 'Далее' }).click();
         await page.getByLabel('Добавить датчик пола').check();
+        await expect(popover).toContainText('Нужен ли датчик пола?');
+        await popover.getByRole('button', { name: 'Далее' }).click();
         await page.getByTestId('add-thermostat').click();
+        await expect(popover).toContainText('Выбранный термостат уже добавлен');
+        await popover.getByRole('button', { name: 'Далее' }).click();
 
         await expect(popover).toContainText('Термостат добавлен в систему');
         const blocker = page.locator('.tutorial-popover-content-blocker');
@@ -55,36 +62,46 @@ test.describe('/selection - tutorial scenarios', () => {
         await blocker.click({ position: { x: 2, y: 2 } });
         await expect(popover).toHaveClass(/is-attention-requested/);
 
-        await page.getByRole('button', { name: 'Далее' }).click();
+        await popover.getByRole('button', { name: 'Далее' }).click();
         await expect(popover).toContainText('Изменяйте количество термостатов');
-        await page.getByRole('button', { name: 'Далее' }).click();
+        await popover.getByRole('button', { name: 'Назад' }).click();
+        await expect(popover).toContainText('Термостат добавлен в систему');
+        await popover.getByRole('button', { name: 'Далее' }).click();
+        await popover.getByRole('button', { name: 'Далее' }).click();
         await expect(popover).toContainText('Добавьте другой вид термостата');
         await page.getByRole('button', { name: 'Серебристый' }).click();
+        await expect(popover).toContainText('Добавьте другой вид термостата');
+        await popover.getByRole('button', { name: 'Далее' }).click();
         await expect(popover).toContainText('Добавьте новую конфигурацию');
-        await page.getByRole('button', { name: 'Закрыть подсказку' }).click();
+        await popover.getByRole('button', { name: 'Далее' }).click();
         await expect(popover).toBeHidden();
     });
 
     test('temperature sensor tutorial uses the added list when the current variant already exists', async ({ page }) => {
         const startTutorial = () => page.getByTitle('Как добавить датчик температуры').click();
         const advanceToAdd = async () => {
-            await page.getByRole('button', { name: 'Далее без изменений' }).click();
+            await page.locator('.tutorial-popover.is-visible').getByRole('button', { name: 'Далее' }).click();
             await page.getByTestId('temperature-sensor-placement-wall').click();
+            await page.locator('.tutorial-popover.is-visible').getByRole('button', { name: 'Далее' }).click();
             await page.getByTestId('temperature-sensor-kind-digital').click();
+            await page.locator('.tutorial-popover.is-visible').getByRole('button', { name: 'Далее' }).click();
         };
 
         await startTutorial();
         await advanceToAdd();
         await page.getByTestId('add-temperature-sensor').click();
+        await expect(page.getByText('Выбранный датчик уже добавлен')).toBeVisible();
+        await page.locator('.tutorial-popover.is-visible').getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Датчик добавлен в систему')).toBeVisible();
-        await page.getByRole('button', { name: 'Далее' }).click();
-        await page.getByRole('button', { name: 'Понятно' }).click();
+        await page.locator('.tutorial-popover.is-visible').getByRole('button', { name: 'Далее' }).click();
+        await page.locator('.tutorial-popover.is-visible').getByRole('button', { name: 'Далее' }).click();
 
         await startTutorial();
         await advanceToAdd();
         await expect(page.getByText('Выбранный датчик уже добавлен')).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Показать счётчик' })).toBeVisible();
-        await page.getByRole('button', { name: 'Показать счётчик' }).click();
+        await page.locator('.tutorial-popover.is-visible').getByRole('button', { name: 'Далее' }).click();
+        await expect(page.getByText('Датчик добавлен в систему')).toBeVisible();
+        await page.locator('.tutorial-popover.is-visible').getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Изменяйте количество датчиков')).toBeVisible();
     });
 
@@ -92,12 +109,14 @@ test.describe('/selection - tutorial scenarios', () => {
         await page.getByTitle('Как настроить контроль протечки').click();
         await expect(page.getByText('Добавьте группу датчиков протечки', { exact: true })).toBeVisible();
         await page.getByTestId('add-leak-zone').click();
+        await expect(page.getByText('Добавьте группу датчиков протечки', { exact: true })).toBeVisible();
+        await page.locator('.tutorial-popover.is-visible').getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Группа датчиков добавлена')).toBeVisible();
         await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Укажите количество датчиков в группе')).toBeVisible();
         await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Укажите количество запорных клапанов')).toBeVisible();
-        await page.getByRole('button', { name: 'Понятно' }).click();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.locator('.tutorial-popover')).toBeHidden();
     });
 });
@@ -125,8 +144,11 @@ test.describe('/selection - boiler tutorial', () => {
         await expect(page.getByText('Выбранный котел добавлен в список котлов Вашей системы')).toBeVisible();
         await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Выберите тип подключения котла')).toBeVisible();
-        await page.getByRole('button', { name: 'Оставить без изменений' }).click();
+        await page.getByTitle('Подключение: BUS').click();
+        await expect(page.getByText('Выберите тип подключения котла')).toBeVisible();
+        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Добавьте другие котлы, если это требуется')).toBeVisible();
+        await expect(page.locator('.tutorial-popover.is-visible').getByRole('button', { name: 'Далее' })).toHaveCount(0);
         await page.getByTestId('boiler-search-restart').click();
         await expect(page.getByText('Добавьте дополнительный котел из списка')).toBeVisible();
         await page.getByRole('button', { name: 'Закрыть подсказку' }).click();
