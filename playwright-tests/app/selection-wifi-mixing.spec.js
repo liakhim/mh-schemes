@@ -37,8 +37,6 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await expect(page.getByText('Проверьте выбранный вариант и добавьте узел')).toBeVisible();
 
         await page.getByTestId('add-mixing-unit').click();
-        await expect(page.getByText('Выбранный смесительный узел уже добавлен')).toBeVisible();
-        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Смесительный узел добавлен в систему')).toBeVisible();
 
         await page.getByRole('button', { name: 'Далее' }).click();
@@ -47,9 +45,65 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Добавьте другой вид смесительного узла')).toBeVisible();
         await page.getByTestId('mixing-sensor-ntc').click();
-        await expect(page.getByText('Добавьте другой вид смесительного узла')).toBeVisible();
+        await expect(page.getByText('Проверьте выбранный вариант и добавьте узел')).toBeVisible();
+        await expect(page.getByText('Выбрано: проводное подключение, привод 220V, датчик NTC.')).toBeVisible();
+
+        const maskBox = await page.locator('.tutorial-popover-mask').boundingBox();
+        const settingsBox = await page.getByTestId('mixing-connection-wired').locator('..').locator('..').locator('..').boundingBox();
+        const addBox = await page.getByTestId('add-mixing-unit').boundingBox();
+        expect(maskBox.x).toBeLessThanOrEqual(settingsBox.x);
+        expect(maskBox.x + maskBox.width).toBeGreaterThanOrEqual(settingsBox.x + settingsBox.width);
+        expect(maskBox.y + maskBox.height).toBeGreaterThanOrEqual(addBox.y + addBox.height);
+
+        await page.getByTestId('add-mixing-unit').click();
+        await expect(page.getByText('Смесительный узел добавлен в систему')).toBeVisible();
+        await expect(page.getByText('Новая конфигурация добавлена в список смесительных узлов.')).toBeVisible();
+        const confirmationMaskBox = await page.locator('.tutorial-popover-mask').boundingBox();
+        const addedTitleBox = await page.getByText('Добавленные смесительные узлы:', { exact: true }).boundingBox();
+        const addedRowBox = await page.locator('.sel-added-label').filter({ hasText: 'NTC' }).last().boundingBox();
+        expect(confirmationMaskBox.x).toBeLessThanOrEqual(addedTitleBox.x);
+        expect(confirmationMaskBox.y).toBeLessThanOrEqual(addedTitleBox.y);
+        expect(confirmationMaskBox.x + confirmationMaskBox.width).toBeGreaterThanOrEqual(addedRowBox.x + addedRowBox.width);
+        expect(confirmationMaskBox.y + confirmationMaskBox.height).toBeGreaterThanOrEqual(addedRowBox.y + addedRowBox.height);
         await page.getByRole('button', { name: 'Далее' }).click();
-        await expect(page.getByText('Добавьте новую конфигурацию')).toBeVisible();
+        await expect(page.getByText('Изменяйте количество смесительных узлов')).toBeVisible();
+        await expect(page.getByTitle('Закрыть обучение')).toHaveAttribute('aria-pressed', 'true');
+        const counterMaskBox = await page.locator('.tutorial-popover-mask').boundingBox();
+        const ntcCounterBox = await page.locator('.sel-added-line').filter({ hasText: 'NTC' }).getByTitle('Добавить ещё').boundingBox();
+        expect(counterMaskBox.x).toBeLessThanOrEqual(ntcCounterBox.x);
+        expect(counterMaskBox.y).toBeLessThanOrEqual(ntcCounterBox.y);
+        expect(counterMaskBox.x + counterMaskBox.width).toBeGreaterThanOrEqual(ntcCounterBox.x + ntcCounterBox.width);
+        expect(counterMaskBox.y + counterMaskBox.height).toBeGreaterThanOrEqual(ntcCounterBox.y + ntcCounterBox.height);
+
+        await page.getByRole('button', { name: 'Далее' }).click();
+        await page.getByTestId('mixing-sensor-digital').click();
+        await expect(page.getByText('Данный вариант уже добавлен в систему')).toBeVisible();
+        await expect(page.getByText('Измените его количество в таблице «Добавленные смесительные узлы». Чтобы добавить новый вид смесительного узла, продолжайте менять конфигурацию.')).toBeVisible();
+        await expect(page.getByText('Смесительный узел добавлен в систему')).toHaveCount(0);
+        const existingVariantMaskBox = await page.locator('.tutorial-popover-mask').boundingBox();
+        const existingSettingsBox = await page.getByTestId('mixing-connection-wired').locator('..').locator('..').locator('..').boundingBox();
+        expect(existingVariantMaskBox.x).toBeLessThanOrEqual(existingSettingsBox.x);
+        expect(existingVariantMaskBox.x + existingVariantMaskBox.width).toBeGreaterThanOrEqual(existingSettingsBox.x + existingSettingsBox.width);
+        await page.getByRole('button', { name: 'Далее' }).click();
+        await expect(page.getByText('Смесительный узел добавлен в систему')).toBeVisible();
+    });
+
+    test('mixing tutorial finishes on the table when all variants are added', async ({ page }) => {
+        await page.getByTestId('add-mixing-unit').click();
+        await page.getByTestId('mixing-sensor-ntc').click();
+        await page.getByTestId('add-mixing-unit').click();
+        await page.getByTestId('mixing-servo-010').click();
+        await page.getByTestId('add-mixing-unit').click();
+        await page.getByTestId('mixing-connection-wifi').click();
+        await page.getByTestId('add-mixing-unit').click();
+
+        await expect(page.getByTestId('mixing-connection-wired')).toHaveCount(0);
+        await expect(page.getByTestId('add-mixing-unit')).toHaveCount(0);
+        await page.getByTitle('Как настроить смесительный узел').click();
+        await expect(page.getByText('Все возможные смесительные узлы уже добавлены')).toBeVisible();
+        await expect(page.getByText('Вы можете менять их количество в таблице «Добавленные смесительные узлы».')).toBeVisible();
+        await page.getByRole('button', { name: 'Далее' }).click();
+        await expect(page.locator('.tutorial-popover')).toBeHidden();
     });
 
     test('Wi-Fi pump uses the 220V variant', async ({ page }) => {

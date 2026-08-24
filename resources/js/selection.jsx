@@ -3267,6 +3267,7 @@ const SectionEquipmentCard = ({
     addedDense = false,
     addedTutorialRef = null,
     counterTutorialRef = null,
+    counterTutorialLabel = null,
     onAddUnit,
     onRemoveUnit,
     addLabel,
@@ -3300,7 +3301,7 @@ const SectionEquipmentCard = ({
                         hideCount
                         control={(
                             <QtyStepper
-                                tutorialRef={index === 0 ? counterTutorialRef : null}
+                                tutorialRef={(counterTutorialLabel ? row.label === counterTutorialLabel : index === 0) ? counterTutorialRef : null}
                                 count={row.count}
                                 dense={addedDense}
                                 onDecrement={() => onRemoveUnit(row)}
@@ -3538,6 +3539,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
     const addedListRef = useRef(null);
     const counterRef = useRef(null);
     const selectedTemplateAdded = addedRows.some((row) => row.label === template.label);
+    const allMixingVariantsAdded = addedRows.length >= MIXING_TEMPLATES.length + 1;
 
     return (
     <div ref={tutorialScopeRef} style={{ position: 'relative', flex: '1 1 100%', minWidth: 0 }}>
@@ -3553,7 +3555,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
                 aria-pressed={Boolean(tutorialStep)}
                 aria-label={tutorialStep ? 'Закрыть обучение по настройке смесительного узла' : 'Показать подсказку по настройке смесительного узла'}
                 title={tutorialStep ? 'Закрыть обучение' : 'Как настроить смесительный узел'}
-                onClick={() => onTutorialStepChange(tutorialStep ? null : 'connection')}
+                onClick={() => onTutorialStepChange(tutorialStep ? null : (allMixingVariantsAdded ? 'configuration-added' : 'connection'))}
             >
                 <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
                 <span className="selection-tutorial-trigger-copy">
@@ -3567,14 +3569,18 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         addedRows={addedRows}
         addedTutorialRef={addedListRef}
         counterTutorialRef={counterRef}
+        counterTutorialLabel={template.label}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
         addLabel={`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
-        onAdd={onAdd}
+        onAdd={() => {
+            onAdd();
+            if (tutorialStep === 'configuration-add') onTutorialStepChange('configuration-added');
+        }}
         addTutorialRef={addRef}
         // Как только этот вариант узла попал в список, количеством управляет
         // счетчик в строке — большая кнопка становится лишней и прячется.
-        showAdd={!selectedTemplateAdded}
+        showAdd={!selectedTemplateAdded && !allMixingVariantsAdded}
         addTestId="add-mixing-unit"
         addDisabled={connectionMode === 'wifi' && wifiMixingLimitReached}
         addDisabledTitle="Нет свободных RELAY-S пар или Wi-Fi слотов для смесительного узла."
@@ -3583,12 +3589,15 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         showJsonDetails={showJsonDetails}
     >
         {/* Оба переключателя в одном ряду; на узкой карточке переносятся. */}
-        <div ref={mixingSettingsRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 24, width: 'fit-content', maxWidth: '100%' }}>
+        {!allMixingVariantsAdded && <div ref={mixingSettingsRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 24, width: 'fit-content', maxWidth: '100%' }}>
             <SegmentedField
                 label="Тип подключения"
                 options={MIXING_CONNECTION_OPTIONS}
                 value={connectionMode}
-                onChange={onConnectionModeChange}
+                onChange={(value) => {
+                    onConnectionModeChange(value);
+                    if (tutorialStep === 'configuration') onTutorialStepChange('configuration-add');
+                }}
                 testIdPrefix="mixing-connection"
                 fieldRef={connectionRef}
                 className="sel-mixing-field"
@@ -3597,7 +3606,10 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
                 label="Сервопривод"
                 options={MIXING_SERVO_OPTIONS}
                 value={servo}
-                onChange={onServoChange}
+                onChange={(value) => {
+                    onServoChange(value);
+                    if (tutorialStep === 'configuration') onTutorialStepChange('configuration-add');
+                }}
                 testIdPrefix="mixing-servo"
                 fieldRef={servoRef}
                 className="sel-mixing-field"
@@ -3608,7 +3620,10 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
                 label="Датчик"
                 options={MIXING_SENSOR_OPTIONS}
                 value={sensor}
-                onChange={onSensorChange}
+                onChange={(value) => {
+                    onSensorChange(value);
+                    if (tutorialStep === 'configuration') onTutorialStepChange('configuration-add');
+                }}
                 testIdPrefix="mixing-sensor"
                 fieldRef={sensorRef}
                 className="sel-mixing-field"
@@ -3619,7 +3634,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
                     ? 'Для Wi-Fi используется цифровой датчик'
                     : 'Цифровой датчик не подключается к сервоприводу 0-10V'}
             />
-        </div>
+        </div>}
     </SectionEquipmentCard>
     <TutorialPopover
         anchorRef={connectionRef}
@@ -3663,33 +3678,22 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         open={tutorialStep === 'add'}
         onClose={() => onTutorialStepChange(null)}
         onBack={() => onTutorialStepChange('sensor')}
-        onNext={() => onTutorialStepChange('added-list')}
+        onNext={() => onTutorialStepChange('add-more')}
         nextDisabled={!selectedTemplateAdded}
         showMask
-        title={selectedTemplateAdded ? 'Выбранный смесительный узел уже добавлен' : 'Проверьте выбранный вариант и добавьте узел'}
+        type={selectedTemplateAdded ? 'blockContent' : null}
+        title={selectedTemplateAdded ? 'Смесительный узел добавлен в систему' : 'Проверьте выбранный вариант и добавьте узел'}
         description={selectedTemplateAdded
-            ? 'Измените количество этого варианта кнопками + и - в списке ниже.'
+            ? 'В этом списке отображаются все добавленные варианты смесительных узлов.'
             : `Выбрано: ${connectionMode === 'wifi' ? 'Wi-Fi' : 'проводное подключение'}, привод ${servo === '220' ? '220V' : '0-10V'}, датчик ${sensor === 'digital' ? 'цифровой' : 'NTC'}.`}
-    />
-    <TutorialPopover
-        anchorRef={addedListRef}
-        scopeRef={tutorialScopeRef}
-        open={tutorialStep === 'added-list'}
-        onClose={() => onTutorialStepChange(null)}
-        onBack={() => onTutorialStepChange('add')}
-        onNext={() => onTutorialStepChange('add-more')}
-        showMask
-        type="blockContent"
-        title="Смесительный узел добавлен в систему"
-        description="В этом списке отображаются все добавленные варианты смесительных узлов."
     />
     <TutorialPopover
         anchorRef={counterRef}
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'add-more'}
         onClose={() => onTutorialStepChange(null)}
-        onBack={() => onTutorialStepChange('added-list')}
-        onNext={() => onTutorialStepChange('configuration')}
+        onBack={() => onTutorialStepChange(addedRows.length > 1 ? 'configuration-added' : 'add')}
+        onNext={() => onTutorialStepChange(allMixingVariantsAdded ? 'configuration-added' : 'configuration')}
         showMask
         title="Изменяйте количество смесительных узлов"
         description="Кнопки + и - изменяют количество одинаковых узлов. Чтобы добавить другой вариант, измените параметры выше. Необходимые модули контроллера будут учтены автоматически."
@@ -3708,14 +3712,32 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
     <TutorialPopover
         anchorRef={mixingSettingsRef}
         highlightRef={addRef}
+        highlightActive={!selectedTemplateAdded}
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'configuration-add'}
         onClose={() => onTutorialStepChange(null)}
         onBack={() => onTutorialStepChange('configuration')}
-        onNext={() => onTutorialStepChange(null)}
+        onNext={() => onTutorialStepChange('configuration-added')}
+        nextDisabled={!selectedTemplateAdded}
         showMask
-        title="Добавьте новую конфигурацию"
-        description="Настройки изменены. Нажмите кнопку добавления, чтобы включить новый вариант смесительного узла в систему."
+        title={selectedTemplateAdded ? 'Данный вариант уже добавлен в систему' : 'Проверьте выбранный вариант и добавьте узел'}
+        description={selectedTemplateAdded
+            ? 'Измените его количество в таблице «Добавленные смесительные узлы». Чтобы добавить новый вид смесительного узла, продолжайте менять конфигурацию.'
+            : `Выбрано: ${connectionMode === 'wifi' ? 'Wi-Fi' : 'проводное подключение'}, привод ${servo === '220' ? '220V' : '0-10V'}, датчик ${sensor === 'digital' ? 'цифровой' : 'NTC'}.`}
+    />
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'configuration-added'}
+        onClose={() => onTutorialStepChange(null)}
+        onBack={allMixingVariantsAdded ? null : () => onTutorialStepChange('configuration-add')}
+        onNext={() => onTutorialStepChange(allMixingVariantsAdded ? null : 'add-more')}
+        showMask
+        type="blockContent"
+        title={allMixingVariantsAdded ? 'Все возможные смесительные узлы уже добавлены' : 'Смесительный узел добавлен в систему'}
+        description={allMixingVariantsAdded
+            ? 'Вы можете менять их количество в таблице «Добавленные смесительные узлы».'
+            : 'Новая конфигурация добавлена в список смесительных узлов.'}
     />
     </div>
     );
