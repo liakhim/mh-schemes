@@ -2857,11 +2857,17 @@ const App = () => {
         setScheme((s) => {
             const moduleIndex = io4ChannelMenuPos.slotIndex;
             const channelIndex = io4ChannelMenuPos.channelIndex;
-            const devicePayload = { id: Date.now(), type, additions: [] };
+            const isNtcSensor = type === 'ntc-sensor' || type === 'wall-ntc-sensor';
+            const devicePayload = {
+                id: Date.now(),
+                type,
+                additions: [],
+                ...(isNtcSensor ? { device_type: 'sensor' } : {}),
+            };
             if (Number.isInteger(moduleIndex) && Number.isInteger(channelIndex)) {
                 const connectionType = type === 'pressure-sensor'
                     ? '4-20'
-                    : (type === 'ntc-sensor' ? 'ntc' : 'di');
+                    : (isNtcSensor ? 'ntc' : 'di');
                 return patchExtModuleLine(s, moduleIndex, 'channel_devices', (currentLine) => {
                     const nextLine = [...currentLine];
                     nextLine[channelIndex] = { ...devicePayload, connection_type: connectionType };
@@ -2875,14 +2881,14 @@ const App = () => {
                     sensors: [...sensors, { id: Date.now(), type: 'pressure-sensor', connection_type: '4-20' }],
                 };
             }
-            if (type === 'ntc-sensor') {
+            if (isNtcSensor) {
                 const sensors = Array.isArray(s.sensors) ? s.sensors : [];
                 return {
                     ...s,
                     sensors: [...sensors, {
                         id: Date.now(),
                         device_type: 'sensor',
-                        type: 'ntc-sensor',
+                        type,
                         connection_type: 'ntc',
                     }],
                 };

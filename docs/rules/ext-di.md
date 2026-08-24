@@ -57,6 +57,7 @@
 - `010servo`/`010pump` занимает один канал, вложенный NTC sensor следующий канал.
 - Свободные хвостовые каналы существующего или уже требуемого `io4` могут занимать standalone `ntc-sensor` и `wall-ntc-sensor` с `connection_type='ntc'`; они размещаются после `0-10V`, `4-20` и DI и учитываются до расчёта потребности `ntc-1-wire`.
 - Настенный NTC на `io4` отрисовывается через `resources/assets/sensors/ntcWallSensorLeftPort.svg`.
+- Контекстное меню пустого канала `io4` позволяет вручную выбрать обычный или настенный NTC-датчик; оба получают `connection_type='ntc'` и `device_type='sensor'`.
 - В режиме инсталляции `010pump` и `010servo` не занимают общую GND-клемму пары каналов `io4`; GND-лычка отображается только если она нужна другому устройству этой пары, например NTC-датчику.
 - Размещённый NTC sensor удаляется из `additions` servo в материализованной схеме.
 - SVG `010servo`: `resources/assets/servo/010servoLeftPorts.svg`.

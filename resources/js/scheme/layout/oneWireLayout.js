@@ -64,7 +64,7 @@ export const getOneWireSlotPosition = ({
     const firstDevice = devices[0] || null;
     const firstOffset = offsets[getOffsetKey(firstDevice, 0)] || { x: 0, y: 0 };
     const sideGap = 10 * indentSize;
-    const ntcTopOffset = 22 * indentSize;
+    const ntcTopOffset = 25 * indentSize;
     let x = firstSlotX + firstOffset.x;
     let y = firstSlotY + firstSlotExtraY + firstOffset.y;
 

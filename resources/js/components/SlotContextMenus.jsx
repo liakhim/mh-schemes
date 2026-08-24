@@ -520,7 +520,10 @@ const SlotContextMenus = ({
                 Датчик давления
             </div>
             <div className="ctx-menu-item" onClick={() => addIo4ChannelDevice('ntc-sensor')}>
-                NTC датчик
+                Обычный NTC-датчик
+            </div>
+            <div className="ctx-menu-item" onClick={() => addIo4ChannelDevice('wall-ntc-sensor')}>
+                Настенный NTC-датчик
             </div>
         </SlotContextMenu>}
         {di6ChannelMenuPos && <SlotContextMenu

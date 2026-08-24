@@ -6472,7 +6472,7 @@ const SchemeCanvas = ({
                                                   const bl2RinnaiAdapterX = bl2BusSlotX + bl2BoilerWidth + 4 * indentSize;
                                                  const bl2RinnaiAdapterY = bl2BusSlotY + (bl2BoilerHeight - bl2RinnaiAdapterHeight) / 2;
                                                 const extOneWireGap = 2 * indentSize;
-                                                const extNtcTopExtraOffset = 22 * indentSize;
+                                                const extNtcTopExtraOffset = 25 * indentSize;
                                                 const extNtcSideExtraGap = 10 * indentSize;
                                                 const getExtOneWireSlotSize = (owDevice) => {
                                                     if (!owDevice) return { width: ONE_WIRE_SLOT_SIZE, height: ONE_WIRE_SLOT_SIZE };
