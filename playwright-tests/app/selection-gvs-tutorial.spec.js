@@ -13,8 +13,6 @@ test.describe('/selection - GVS boiler tutorial', () => {
         await expect(page.getByText('Добавьте бойлер косвенного нагрева')).toBeVisible();
 
         await page.getByTestId('add-gvs-boiler').click();
-        await expect(page.getByText('Бойлер ГВС уже добавлен в систему')).toBeVisible();
-        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Бойлер ГВС добавлен в систему')).toBeVisible();
 
         await page.getByRole('button', { name: 'Далее' }).click();

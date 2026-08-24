@@ -3791,36 +3791,25 @@ const GvsBoilerCard = ({ template, onAdd, addedRows = [], onAddUnit, onRemoveUni
         showJsonDetails={showJsonDetails}
     />
     <TutorialPopover
-        anchorRef={hasAddedBoiler ? counterRef : addRef}
+        anchorRef={hasAddedBoiler ? addedListRef : addRef}
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'intro'}
         onClose={() => onTutorialStepChange(null)}
-        onNext={() => onTutorialStepChange('added-list')}
+        onNext={() => onTutorialStepChange('count')}
         nextDisabled={!hasAddedBoiler}
         showMask
-        title={hasAddedBoiler ? 'Бойлер ГВС уже добавлен в систему' : 'Добавьте бойлер косвенного нагрева'}
+        type={hasAddedBoiler ? 'blockContent' : null}
+        title={hasAddedBoiler ? 'Бойлер ГВС добавлен в систему' : 'Добавьте бойлер косвенного нагрева'}
         description={hasAddedBoiler
-            ? 'Измените количество добавленных бойлеров кнопками + и - в списке ниже.'
+            ? 'В списке отображаются бойлеры косвенного нагрева, выбранные для этой системы.'
             : 'Добавляйте этот элемент, если горячая вода готовится в бойлере от теплоносителя системы отопления. Вместе с ним будут учтены насос бойлера и датчик температуры.'}
-    />
-    <TutorialPopover
-        anchorRef={addedListRef}
-        scopeRef={tutorialScopeRef}
-        open={tutorialStep === 'added-list'}
-        onClose={() => onTutorialStepChange(null)}
-        onBack={() => onTutorialStepChange('intro')}
-        onNext={() => onTutorialStepChange('count')}
-        showMask
-        type="blockContent"
-        title="Бойлер ГВС добавлен в систему"
-        description="В списке отображаются бойлеры косвенного нагрева, выбранные для этой системы."
     />
     <TutorialPopover
         anchorRef={counterRef}
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'count'}
         onClose={() => onTutorialStepChange(null)}
-        onBack={() => onTutorialStepChange('added-list')}
+        onBack={() => onTutorialStepChange('intro')}
         onNext={() => onTutorialStepChange(null)}
         showMask
         title="Укажите количество бойлеров ГВС"
