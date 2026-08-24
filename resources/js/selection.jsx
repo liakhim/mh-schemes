@@ -4014,6 +4014,7 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
     const addedListRef = useRef(null);
     const counterRef = useRef(null);
     const selectedTemplateAdded = addedRows.some((row) => row.label === template.label);
+    const allOtherEquipmentVariantsAdded = isOtherEquipment && addedRows.length >= 2;
 
     return (
     <div ref={tutorialScopeRef} style={{ position: 'relative', flex: '1 1 100%', minWidth: 0 }}>
@@ -4030,7 +4031,7 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
                 aria-pressed={Boolean(tutorialStep)}
                 aria-label={tutorialStep ? 'Закрыть обучение по настройке оборудования' : `Показать подсказку по настройке ${isOtherEquipment ? 'оборудования' : 'зон'}`}
                 title={tutorialStep ? 'Закрыть обучение' : `Как добавить ${isOtherEquipment ? 'оборудование' : 'зону'}`}
-                onClick={() => onTutorialStepChange(tutorialStep ? null : 'connection')}
+                onClick={() => onTutorialStepChange(tutorialStep ? null : (allOtherEquipmentVariantsAdded ? 'configuration-added' : 'connection'))}
             >
                 <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
                 <span className="selection-tutorial-trigger-copy">
@@ -4046,12 +4047,16 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
         addedRows={addedRows}
         addedTutorialRef={addedListRef}
         counterTutorialRef={counterRef}
+        counterTutorialLabel={template.label}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
         addLabel={isOtherEquipment ? 'Добавить оборудование' : 'Добавить зону'}
-        onAdd={onAdd}
+        onAdd={() => {
+            onAdd();
+            if (isOtherEquipment && tutorialStep === 'configuration-add') onTutorialStepChange('configuration-added');
+        }}
         addTutorialRef={addRef}
-        showAdd={!selectedTemplateAdded}
+        showAdd={!selectedTemplateAdded && !allOtherEquipmentVariantsAdded}
         addTestId={isOtherEquipment ? 'add-other-equipment' : 'add-zone'}
         addDisabled={connectionMode === 'wifi' && wifiRelayLimitReached}
         addDisabledTitle={`Нет свободных Wi-Fi-модулей или релейных каналов для ${isOtherEquipment ? 'оборудования' : 'зоны'}.`}
@@ -4059,15 +4064,18 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
         jsonData={template.wiredDevice}
         showJsonDetails={showJsonDetails}
     >
-        <SegmentedField
+        {!allOtherEquipmentVariantsAdded && <SegmentedField
             label="Тип подключения"
             options={MIXING_CONNECTION_OPTIONS}
             value={connectionMode}
-            onChange={onConnectionModeChange}
+            onChange={(value) => {
+                onConnectionModeChange(value);
+                if (isOtherEquipment && tutorialStep === 'configuration') onTutorialStepChange('configuration-add');
+            }}
             testIdPrefix={isOtherEquipment ? 'other-equipment-connection' : 'zone-connection'}
             fieldRef={connectionRef}
             className="sel-mixing-field"
-        />
+        />}
     </SectionEquipmentCard>
     <TutorialPopover
         anchorRef={connectionRef}
@@ -4087,35 +4095,24 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
         open={tutorialStep === 'add'}
         onClose={() => onTutorialStepChange(null)}
         onBack={() => onTutorialStepChange('connection')}
-        onNext={() => onTutorialStepChange('added-list')}
+        onNext={() => onTutorialStepChange('count')}
         nextDisabled={!selectedTemplateAdded}
         showMask
+        type={selectedTemplateAdded ? 'blockContent' : null}
         title={selectedTemplateAdded
-            ? `Выбранн${isOtherEquipment ? 'ое оборудование уже добавлено' : 'ая зона уже добавлена'}`
+            ? `${isOtherEquipment ? 'Оборудование добавлено' : 'Зона добавлена'} в систему`
             : `Проверьте вариант и добавьте ${isOtherEquipment ? 'оборудование' : 'зону'}`}
         description={selectedTemplateAdded
-            ? 'Измените количество этого варианта кнопками + и - в списке ниже.'
+            ? `В списке отображаются все добавленные варианты ${isOtherEquipment ? 'оборудования' : 'зон'}.`
             : `Выбрано ${connectionMode === 'wifi' ? 'Wi-Fi' : 'проводное'} подключение.`}
-    />
-    <TutorialPopover
-        anchorRef={addedListRef}
-        scopeRef={tutorialScopeRef}
-        open={tutorialStep === 'added-list'}
-        onClose={() => onTutorialStepChange(null)}
-        onBack={() => onTutorialStepChange('add')}
-        onNext={() => onTutorialStepChange('count')}
-        showMask
-        type="blockContent"
-        title={isOtherEquipment ? 'Оборудование добавлено в систему' : 'Зона добавлена в систему'}
-        description={`В списке отображаются все добавленные варианты ${isOtherEquipment ? 'оборудования' : 'зон'}.`}
     />
     <TutorialPopover
         anchorRef={counterRef}
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'count'}
         onClose={() => onTutorialStepChange(null)}
-        onBack={() => onTutorialStepChange('added-list')}
-        onNext={() => onTutorialStepChange(isOtherEquipment ? 'configuration' : null)}
+        onBack={() => onTutorialStepChange(isOtherEquipment && addedRows.length > 1 ? 'configuration-added' : 'add')}
+        onNext={() => onTutorialStepChange(isOtherEquipment ? (allOtherEquipmentVariantsAdded ? 'configuration-added' : 'configuration') : null)}
         showMask
         title={isOtherEquipment ? 'Изменяйте количество оборудования' : 'Изменяйте количество зон'}
         description={isOtherEquipment
@@ -4129,10 +4126,44 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
             open={tutorialStep === 'configuration'}
             onClose={() => onTutorialStepChange(null)}
             onBack={() => onTutorialStepChange('count')}
-            onNext={() => onTutorialStepChange(null)}
+            onNext={() => onTutorialStepChange(selectedTemplateAdded ? null : 'configuration-add')}
             showMask
             title="Добавьте другой вид оборудования"
             description="Измените конфигурацию добавления, чтобы добавить другой вид оборудования в систему."
+        />
+    )}
+    {isOtherEquipment && (
+        <TutorialPopover
+            anchorRef={connectionRef}
+            highlightRef={addRef}
+            highlightActive={!selectedTemplateAdded}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'configuration-add'}
+            onClose={() => onTutorialStepChange(null)}
+            onBack={() => onTutorialStepChange('configuration')}
+            onNext={() => onTutorialStepChange('configuration-added')}
+            nextDisabled={!selectedTemplateAdded}
+            showMask
+            title={selectedTemplateAdded ? 'Данный вариант уже добавлен в систему' : 'Проверьте вариант и добавьте оборудование'}
+            description={selectedTemplateAdded
+                ? 'Измените его количество в таблице «Добавленное оборудование». Чтобы добавить новый вид оборудования, продолжайте менять конфигурацию.'
+                : `Выбрано ${connectionMode === 'wifi' ? 'Wi-Fi' : 'проводное'} подключение.`}
+        />
+    )}
+    {isOtherEquipment && (
+        <TutorialPopover
+            anchorRef={addedListRef}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'configuration-added'}
+            onClose={() => onTutorialStepChange(null)}
+            onBack={allOtherEquipmentVariantsAdded ? null : () => onTutorialStepChange('configuration-add')}
+            onNext={() => onTutorialStepChange(allOtherEquipmentVariantsAdded ? null : 'count')}
+            showMask
+            type="blockContent"
+            title={allOtherEquipmentVariantsAdded ? 'Все возможные варианты оборудования уже добавлены' : 'Оборудование добавлено в систему'}
+            description={allOtherEquipmentVariantsAdded
+                ? 'Вы можете менять их количество в таблице «Добавленное оборудование».'
+                : 'Новая конфигурация добавлена в список оборудования.'}
         />
     )}
     </div>

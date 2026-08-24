@@ -162,8 +162,6 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await expect(page.getByText('Проверьте вариант и добавьте зону')).toBeVisible();
 
         await page.getByTestId('add-zone').click();
-        await expect(page.getByText('Выбранная зона уже добавлена')).toBeVisible();
-        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Зона добавлена в систему')).toBeVisible();
 
         await page.getByRole('button', { name: 'Далее' }).click();
@@ -187,12 +185,20 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await popover.getByRole('button', { name: 'Далее' }).click();
 
         await page.getByTestId('add-other-equipment').click();
-        await expect(popover).toContainText('Выбранное оборудование уже добавлено');
-        await popover.getByRole('button', { name: 'Далее' }).click();
         await expect(popover).toContainText('Оборудование добавлено в систему');
         await popover.getByRole('button', { name: 'Далее' }).click();
         await expect(popover).toContainText('Изменяйте количество оборудования');
         await popover.getByRole('button', { name: 'Далее' }).click();
         await expect(popover).toContainText('Добавьте другой вид оборудования');
+        await page.getByTestId('other-equipment-connection-wired').click();
+        await expect(popover).toContainText('Проверьте вариант и добавьте оборудование');
+        const maskBox = await page.locator('.tutorial-popover-mask').boundingBox();
+        const switchBox = await page.getByTestId('other-equipment-connection-wired').locator('..').locator('..').boundingBox();
+        const addBox = await page.getByTestId('add-other-equipment').boundingBox();
+        expect(maskBox.x).toBeLessThanOrEqual(switchBox.x);
+        expect(maskBox.x + maskBox.width).toBeGreaterThanOrEqual(switchBox.x + switchBox.width);
+        expect(maskBox.y + maskBox.height).toBeGreaterThanOrEqual(addBox.y + addBox.height);
+        await page.getByTestId('add-other-equipment').click();
+        await expect(popover).toContainText('Все возможные варианты оборудования уже добавлены');
     });
 });
