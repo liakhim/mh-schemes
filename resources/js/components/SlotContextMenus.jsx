@@ -31,6 +31,8 @@ const SlotContextMenus = ({
     setDi6ChannelMenuPos,
     controllerDiMenuPos,
     setControllerDiMenuPos,
+    ntcSlotMenuPos,
+    setNtcSlotMenuPos,
     addOneWireDeviceAtSlot,
     normalizePowerModuleType,
     getControllerType,
@@ -52,6 +54,7 @@ const SlotContextMenus = ({
     addIo4ChannelDevice,
     addDi6ChannelDevice,
     addControllerDiDeviceFromMenu,
+    addNtcSensorFromMenu,
 }) => (
     <>
         {slotMenuPos && <SlotContextMenu
@@ -111,6 +114,18 @@ const SlotContextMenus = ({
             >
                 Беспроводной термостат
             </div>
+        </SlotContextMenu>}
+        {ntcSlotMenuPos && <SlotContextMenu
+            position={ntcSlotMenuPos}
+            onClose={() => setNtcSlotMenuPos(null)}
+        >
+            <div className="ctx-menu-item" onClick={() => addNtcSensorFromMenu('ntc-sensor')}>
+                Обычный NTC-датчик
+            </div>
+            <div className="ctx-menu-item" onClick={() => addNtcSensorFromMenu('wall-ntc-sensor')}>
+                Настенный NTC-датчик
+            </div>
+            <div className="ctx-menu-item" onClick={() => setNtcSlotMenuPos(null)}>Отмена</div>
         </SlotContextMenu>}
         {thermostatMenuPos && <SlotContextMenu
             position={thermostatMenuPos}

@@ -1,4 +1,4 @@
-import { canonicalDeviceType } from './deviceTypes.js';
+import { canonicalDeviceType, isStandaloneNtcSensor } from './deviceTypes.js';
 
 const wirelessDeviceNames = {
     thermostat: 'Беспроводной термостат',
@@ -30,6 +30,8 @@ const materializedDeviceNames = {
     'leak-sensor': 'Датчик протечки',
     'leak-loop': 'Зона контроля протечки',
     'pressure-sensor': 'Датчик давления',
+    'ntc-sensor': 'NTC-датчик в колбе',
+    'wall-ntc-sensor': 'Настенный NTC-датчик',
     'mixing-ntc-sensor': 'NTC смесителя',
     'boiler-ntc-sensor': 'Датчик бойлера',
     '010pump': 'Насос 0-10V',
@@ -90,7 +92,7 @@ const makeDeviceTitle = (device, counters) => {
 
 const withDeviceTitle = (device, counters) => {
     if (!device || typeof device !== 'object') return device;
-    if (canonicalDeviceType(device.type) === 'ntc-sensor') return device;
+    if (isStandaloneNtcSensor(device)) return device;
 
     return {
         ...device,

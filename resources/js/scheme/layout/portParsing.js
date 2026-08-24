@@ -34,6 +34,11 @@ export const parsePorts = async (svgUrl) => {
     document.body.appendChild(svgEl);
     const svgWidth = parseFloat(svgEl.getAttribute('width'));
     const svgHeight = parseFloat(svgEl.getAttribute('height'));
+    const viewBox = String(svgEl.getAttribute('viewBox') || '')
+        .trim()
+        .split(/[\s,]+/)
+        .map(Number);
+    const [viewBoxX = 0, viewBoxY = 0, viewBoxWidth = svgWidth, viewBoxHeight = svgHeight] = viewBox;
     const ports = [];
 
     svgEl.querySelectorAll('[class]').forEach((el) => {
@@ -42,10 +47,10 @@ export const parsePorts = async (svgUrl) => {
         if (bbox && bbox.width > 0) {
             const port = {
                 name,
-                x: (bbox.x + bbox.width / 2) / svgWidth,
-                y: (bbox.y + bbox.height / 2) / svgHeight,
-                width: bbox.width / svgWidth,
-                height: bbox.height / svgHeight,
+                x: (bbox.x + bbox.width / 2 - viewBoxX) / viewBoxWidth,
+                y: (bbox.y + bbox.height / 2 - viewBoxY) / viewBoxHeight,
+                width: bbox.width / viewBoxWidth,
+                height: bbox.height / viewBoxHeight,
             };
             ports.push(port);
             getPortAliases(name).forEach((aliasName) => {

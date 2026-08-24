@@ -20,7 +20,7 @@ const normalizeNtcSensor = (sensor, index) => ({
     ...sensor,
     id: sensor?.id ?? `ntc-sensor-${index}`,
     device_type: 'sensor',
-    type: 'ntc-sensor',
+    type: canonicalDeviceType(sensor?.type) === 'wall-ntc-sensor' ? 'wall-ntc-sensor' : 'ntc-sensor',
     connection_type: 'ntc',
 });
 

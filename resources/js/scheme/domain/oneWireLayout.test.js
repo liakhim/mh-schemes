@@ -28,8 +28,8 @@ test('one-wire geometry applies the NTC top offset consistently', () => {
         moduleHeightValue: 200,
     };
 
-    assert.deepEqual(getOneWireSlotPosition({ ...options, slotIndex: 0 }), { x: 183, y: 300 });
-    assert.deepEqual(getOneWireSlotPosition({ ...options, slotIndex: 1 }), { x: 334, y: 416 });
+    assert.deepEqual(getOneWireSlotPosition({ ...options, slotIndex: 0 }), { x: 183, y: 380 });
+    assert.deepEqual(getOneWireSlotPosition({ ...options, slotIndex: 1 }), { x: 334, y: 496 });
 });
 
 test('one-wire offset follows a device ID after the previous device is removed', () => {

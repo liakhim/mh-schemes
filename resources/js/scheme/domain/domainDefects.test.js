@@ -361,6 +361,50 @@ test('uses an existing IO4 tail for standalone NTC before creating NTC-1-wire', 
     assert.equal(result.controller.one_wire_devices.some(({ type }) => type === 'ntc-1-wire'), false);
 });
 
+test('uses an existing IO4 tail for a wall NTC sensor without changing its type', () => {
+    const wallNtc = { id: 'wall-ntc', type: 'wall-ntc-sensor', device_type: 'sensor', connection_type: 'ntc' };
+    const result = materializeBalancedOneWireScheme({
+        controller: { type: 'pro', one_wire_devices: [] },
+        ext_modules: [{ id: 'io4-wall', type: 'io4', channel_devices: [{ id: 'occupied', type: 'discrete_signal', connection_type: 'di' }] }],
+        one_wire_modules: [],
+        sensors: [wallNtc],
+        wired_devices: [],
+    });
+
+    assert.equal(result.ext_modules[0].channel_devices[1].id, wallNtc.id);
+    assert.equal(result.ext_modules[0].channel_devices[1].type, 'wall-ntc-sensor');
+    assert.equal(result.sensors.some(({ id }) => id === wallNtc.id), false);
+    assert.equal(result.controller.one_wire_devices.some(({ type }) => type === 'ntc-1-wire'), false);
+});
+
+test('preserves the wall NTC sensor type when assigning it to NTC-1-wire', () => {
+    const result = materializeBalancedOneWireScheme({
+        controller: {
+            type: 'smart2',
+            one_wire_devices: [{ id: 'ntc-module-wall', type: 'ntc-1-wire', connection_type: '1-wire' }],
+        },
+        ext_modules: [],
+        sensors: [{ id: 'wall-ntc-module', type: 'wall-ntc-sensor', device_type: 'sensor', connection_type: 'ntc' }],
+    });
+
+    assert.equal(result.sensors.length, 0);
+    assert.equal(result.controller.one_wire_devices[0].ntc1_devices[0].type, 'wall-ntc-sensor');
+});
+
+test('creates NTC-1-wire when a wall NTC sensor has no available slot', () => {
+    const result = materializeBalancedOneWireScheme({
+        controller: { type: 'smart2', one_wire_devices: [] },
+        ext_modules: [],
+        one_wire_modules: [],
+        sensors: [{ id: 'wall-ntc-auto-module', type: 'wall-ntc-sensor', device_type: 'sensor', connection_type: 'ntc' }],
+    });
+
+    const ntcModule = result.controller.one_wire_devices.find(({ type }) => type === 'ntc-1-wire');
+    assert.ok(ntcModule);
+    assert.equal(ntcModule.ntc1_devices[0].type, 'wall-ntc-sensor');
+    assert.equal(result.sensors.length, 0);
+});
+
 test('materializes public one-wire sources exactly once', () => {
     const result = materializeBalancedOneWireScheme({
         controller: 'pro',

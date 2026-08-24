@@ -2117,7 +2117,6 @@ const TEMPERATURE_SENSOR_TEMPLATES = [
         label: 'Проводной Настенный NTC-датчик',
         addLabel: 'Добавить проводной настенный NTC-датчик температуры',
         target: 'sensors',
-        disabled: true,
         data: {
             id: 3,
             device_type: 'sensor',
@@ -2700,7 +2699,8 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
     const addRef = useRef(null);
     const addedListRef = useRef(null);
     const counterRef = useRef(null);
-    const selectedTemplateAdded = addedRows.some((row) => row.templateKey === `${connection}|${color}|${hasFloorSensor ? 'floor' : 'no-floor'}`);
+    const selectedTemplateKey = `${connection}|${color}|${hasFloorSensor ? 'floor' : 'no-floor'}`;
+    const selectedTemplateAdded = addedRows.some((row) => row.templateKey === selectedTemplateKey);
 
     return (
     <div
@@ -2783,7 +2783,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                             onRemove={() => onRemoveRowCompletely(row)}
                             control={(
                                 <QtyStepper
-                                    tutorialRef={index === 0 ? counterRef : null}
+                                    tutorialRef={row.templateKey === selectedTemplateKey ? counterRef : null}
                                     count={row.count}
                                     onDecrement={() => onRemoveRow(row)}
                                     onIncrement={() => onAddRow(row)}
@@ -2856,7 +2856,10 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                                 type="button"
                                 data-test-id={`thermostat-connection-${item.value}`}
                                 data-active={isActive}
-                                onClick={() => onConnectionChange(item.value)}
+                                onClick={() => {
+                                    onConnectionChange(item.value);
+                                    if (tutorialStep === 'configuration') onTutorialStepChange('configuration-changed');
+                                }}
                                 style={{
                                     padding: '9px 18px',
                                     border: `1px solid ${isActive ? '#e3e7ef' : 'transparent'}`,
@@ -2894,7 +2897,10 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                     <input
                         type="checkbox"
                         checked={hasFloorSensor}
-                        onChange={(event) => onFloorSensorChange(event.target.checked)}
+                        onChange={(event) => {
+                            onFloorSensorChange(event.target.checked);
+                            if (tutorialStep === 'configuration') onTutorialStepChange('configuration-changed');
+                        }}
                         style={{ width: 16, height: 16, margin: 0, accentColor: '#e07020', cursor: 'pointer' }}
                     />
                     Добавить датчик пола
@@ -2920,7 +2926,10 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                                 title={item.label}
                                 aria-label={item.label}
                                 aria-pressed={isActive}
-                                onClick={() => onColorChange(item.value)}
+                                onClick={() => {
+                                    onColorChange(item.value);
+                                    if (tutorialStep === 'configuration') onTutorialStepChange('configuration-changed');
+                                }}
                                 style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -2963,7 +2972,10 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
                 <button
                     ref={addRef}
                     className="selection-add-button"
-                    onClick={onAdd}
+                    onClick={() => {
+                        onAdd();
+                        if (tutorialStep === 'configuration-changed') onTutorialStepChange('configuration-added');
+                    }}
                     data-test-id="add-thermostat"
                 >
                     {`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
@@ -3057,30 +3069,19 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             open={tutorialStep === 'add'}
             onClose={() => onTutorialStepChange(null)}
             onBack={() => onTutorialStepChange('floor-sensor')}
-            onNext={() => onTutorialStepChange('added-list')}
+            onNext={() => onTutorialStepChange('count')}
             nextDisabled={!selectedTemplateAdded}
             showMask
-            title={selectedTemplateAdded ? 'Выбранный термостат уже добавлен' : 'Проверьте выбранный вариант и добавьте термостат'}
-            description={selectedTemplateAdded ? 'Измените количество этого варианта кнопками + и - в списке ниже.' : 'Проверьте выбранные подключение, цвет и датчик пола.'}
-        />
-        <TutorialPopover
-            anchorRef={addedListRef}
-            scopeRef={tutorialScopeRef}
-            open={tutorialStep === 'added-list'}
-            onClose={() => onTutorialStepChange(null)}
-            onBack={() => onTutorialStepChange('add')}
-            onNext={() => onTutorialStepChange('count')}
-            showMask
-            type="blockContent"
-            title="Термостат добавлен в систему"
-            description="В этом списке отображаются все добавленные варианты термостатов."
+            type={selectedTemplateAdded ? 'blockContent' : null}
+            title={selectedTemplateAdded ? 'Термостат добавлен в систему' : 'Проверьте выбранный вариант и добавьте термостат'}
+            description={selectedTemplateAdded ? 'В этом списке отображаются все добавленные варианты термостатов.' : 'Проверьте выбранные подключение, цвет и датчик пола.'}
         />
         <TutorialPopover
             anchorRef={counterRef}
             scopeRef={tutorialScopeRef}
             open={tutorialStep === 'count'}
             onClose={() => onTutorialStepChange(null)}
-            onBack={() => onTutorialStepChange('added-list')}
+            onBack={() => onTutorialStepChange(addedRows.length > 1 ? 'configuration-changed' : 'add')}
             onNext={() => onTutorialStepChange('configuration')}
             showMask
             title="Изменяйте количество термостатов"
@@ -3094,7 +3095,7 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             open={tutorialStep === 'configuration'}
             onClose={() => onTutorialStepChange(null)}
             onBack={() => onTutorialStepChange('count')}
-            onNext={() => onTutorialStepChange(showAdd ? 'configuration-changed' : null)}
+            onNext={() => onTutorialStepChange('configuration-changed')}
             showMask
             title="Добавьте другой вид термостата"
             description="Измените тип подключения, цвет или датчик пола, чтобы добавить в систему другой вариант термостата."
@@ -3107,10 +3108,37 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             open={tutorialStep === 'configuration-changed'}
             onClose={() => onTutorialStepChange(null)}
             onBack={() => onTutorialStepChange('configuration')}
-            onNext={() => onTutorialStepChange(null)}
+            onNext={() => onTutorialStepChange('configuration-existing')}
+            nextDisabled={!selectedTemplateAdded}
             showMask
-            title="Добавьте новую конфигурацию"
-            description="Настройки изменены. Нажмите кнопку добавления, чтобы включить новый вариант термостата в систему."
+            title={selectedTemplateAdded ? 'Данный вариант уже добавлен в систему' : 'Проверьте новую конфигурацию и добавьте термостат'}
+            description={selectedTemplateAdded
+                ? 'Измените его количество в таблице «Добавленные термостаты». Чтобы добавить новый вариант, продолжайте менять конфигурацию.'
+                : 'Проверьте тип подключения, цвет и датчик пола, затем добавьте новый вариант термостата.'}
+        />
+        <TutorialPopover
+            anchorRef={addedListRef}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'configuration-added'}
+            onClose={() => onTutorialStepChange(null)}
+            onBack={() => onTutorialStepChange('configuration-changed')}
+            onNext={() => onTutorialStepChange('count')}
+            showMask
+            type="blockContent"
+            title="Термостат добавлен в систему"
+            description="Новая конфигурация добавлена в таблицу «Добавленные термостаты»."
+        />
+        <TutorialPopover
+            anchorRef={addedListRef}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'configuration-existing'}
+            onClose={() => onTutorialStepChange(null)}
+            onBack={() => onTutorialStepChange('configuration-changed')}
+            onNext={() => onTutorialStepChange('count')}
+            showMask
+            type="blockContent"
+            title="Данный вариант находится в таблице"
+            description="Используйте его счётчик, чтобы изменить количество термостатов этой конфигурации."
         />
     </div>
     );
@@ -3268,6 +3296,7 @@ const SectionEquipmentCard = ({
     addedTutorialRef = null,
     counterTutorialRef = null,
     counterTutorialLabel = null,
+    counterTutorialTemplateKey = null,
     onAddUnit,
     onRemoveUnit,
     addLabel,
@@ -3301,7 +3330,11 @@ const SectionEquipmentCard = ({
                         hideCount
                         control={(
                             <QtyStepper
-                                tutorialRef={(counterTutorialLabel ? row.label === counterTutorialLabel : index === 0) ? counterTutorialRef : null}
+                                tutorialRef={(counterTutorialTemplateKey
+                                    ? row.templateKey === counterTutorialTemplateKey
+                                    : counterTutorialLabel
+                                        ? row.label === counterTutorialLabel
+                                        : index === 0) ? counterTutorialRef : null}
                                 count={row.count}
                                 dense={addedDense}
                                 onDecrement={() => onRemoveUnit(row)}
@@ -3692,7 +3725,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'add-more'}
         onClose={() => onTutorialStepChange(null)}
-        onBack={() => onTutorialStepChange(addedRows.length > 1 ? 'configuration-added' : 'add')}
+        onBack={() => onTutorialStepChange(addedRows.length > 1 ? 'configuration-add' : 'add')}
         onNext={() => onTutorialStepChange(allMixingVariantsAdded ? 'configuration-added' : 'configuration')}
         showMask
         title="Изменяйте количество смесительных узлов"
@@ -3704,7 +3737,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         open={tutorialStep === 'configuration'}
         onClose={() => onTutorialStepChange(null)}
         onBack={() => onTutorialStepChange('add-more')}
-        onNext={() => onTutorialStepChange(selectedTemplateAdded ? null : 'configuration-add')}
+        onNext={() => onTutorialStepChange('configuration-add')}
         showMask
         title="Добавьте другой вид смесительного узла"
         description="Измените конфигурацию добавления, чтобы добавить другой вид смесительных узлов в систему."
@@ -3717,7 +3750,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         open={tutorialStep === 'configuration-add'}
         onClose={() => onTutorialStepChange(null)}
         onBack={() => onTutorialStepChange('configuration')}
-        onNext={() => onTutorialStepChange('configuration-added')}
+        onNext={() => onTutorialStepChange('configuration-existing')}
         nextDisabled={!selectedTemplateAdded}
         showMask
         title={selectedTemplateAdded ? 'Данный вариант уже добавлен в систему' : 'Проверьте выбранный вариант и добавьте узел'}
@@ -3738,6 +3771,18 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         description={allMixingVariantsAdded
             ? 'Вы можете менять их количество в таблице «Добавленные смесительные узлы».'
             : 'Новая конфигурация добавлена в список смесительных узлов.'}
+    />
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'configuration-existing'}
+        onClose={() => onTutorialStepChange(null)}
+        onBack={() => onTutorialStepChange('configuration-add')}
+        onNext={() => onTutorialStepChange('add-more')}
+        showMask
+        type="blockContent"
+        title="Данный вариант находится в таблице"
+        description="Используйте его счётчик, чтобы изменить количество смесительных узлов этой конфигурации."
     />
     </div>
     );
@@ -3956,7 +4001,7 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'count'}
         onClose={() => onTutorialStepChange(null)}
-        onBack={() => onTutorialStepChange(addedRows.length > 1 ? 'configuration-added' : 'add')}
+        onBack={() => onTutorialStepChange(addedRows.length > 1 ? 'configuration-add' : 'add')}
         onNext={() => onTutorialStepChange(allPumpVariantsAdded ? 'configuration-added' : 'configuration')}
         showMask
         title="Изменяйте количество насосов"
@@ -3968,7 +4013,7 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         open={tutorialStep === 'configuration'}
         onClose={() => onTutorialStepChange(null)}
         onBack={() => onTutorialStepChange('count')}
-        onNext={() => onTutorialStepChange(selectedTemplateAdded ? null : 'configuration-add')}
+        onNext={() => onTutorialStepChange('configuration-add')}
         showMask
         title="Добавьте другой вид насоса"
         description="Измените конфигурацию добавления насосов, чтобы добавить другой вид насоса в систему."
@@ -3981,7 +4026,7 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         open={tutorialStep === 'configuration-add'}
         onClose={() => onTutorialStepChange(null)}
         onBack={() => onTutorialStepChange('configuration')}
-        onNext={() => onTutorialStepChange('configuration-added')}
+        onNext={() => onTutorialStepChange('configuration-existing')}
         nextDisabled={!selectedTemplateAdded}
         showMask
         title={selectedTemplateAdded ? 'Данный вариант уже добавлен в систему' : 'Проверьте выбранный вариант и добавьте насос'}
@@ -4002,6 +4047,18 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         description={allPumpVariantsAdded
             ? 'Вы можете менять их количество в таблице «Добавленные насосы».'
             : 'Новая конфигурация добавлена в список насосов.'}
+    />
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'configuration-existing'}
+        onClose={() => onTutorialStepChange(null)}
+        onBack={() => onTutorialStepChange('configuration-add')}
+        onNext={() => onTutorialStepChange('count')}
+        showMask
+        type="blockContent"
+        title="Данный вариант находится в таблице"
+        description="Используйте его счётчик, чтобы изменить количество насосов этой конфигурации."
     />
     </div>
     );
@@ -4111,7 +4168,7 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'count'}
         onClose={() => onTutorialStepChange(null)}
-        onBack={() => onTutorialStepChange(isOtherEquipment && addedRows.length > 1 ? 'configuration-added' : 'add')}
+        onBack={() => onTutorialStepChange(isOtherEquipment && addedRows.length > 1 ? 'configuration-add' : 'add')}
         onNext={() => onTutorialStepChange(isOtherEquipment ? (allOtherEquipmentVariantsAdded ? 'configuration-added' : 'configuration') : null)}
         showMask
         title={isOtherEquipment ? 'Изменяйте количество оборудования' : 'Изменяйте количество зон'}
@@ -4126,7 +4183,7 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
             open={tutorialStep === 'configuration'}
             onClose={() => onTutorialStepChange(null)}
             onBack={() => onTutorialStepChange('count')}
-            onNext={() => onTutorialStepChange(selectedTemplateAdded ? null : 'configuration-add')}
+            onNext={() => onTutorialStepChange('configuration-add')}
             showMask
             title="Добавьте другой вид оборудования"
             description="Измените конфигурацию добавления, чтобы добавить другой вид оборудования в систему."
@@ -4141,7 +4198,7 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
             open={tutorialStep === 'configuration-add'}
             onClose={() => onTutorialStepChange(null)}
             onBack={() => onTutorialStepChange('configuration')}
-            onNext={() => onTutorialStepChange('configuration-added')}
+            onNext={() => onTutorialStepChange('configuration-existing')}
             nextDisabled={!selectedTemplateAdded}
             showMask
             title={selectedTemplateAdded ? 'Данный вариант уже добавлен в систему' : 'Проверьте вариант и добавьте оборудование'}
@@ -4164,6 +4221,20 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
             description={allOtherEquipmentVariantsAdded
                 ? 'Вы можете менять их количество в таблице «Добавленное оборудование».'
                 : 'Новая конфигурация добавлена в список оборудования.'}
+        />
+    )}
+    {isOtherEquipment && (
+        <TutorialPopover
+            anchorRef={addedListRef}
+            scopeRef={tutorialScopeRef}
+            open={tutorialStep === 'configuration-existing'}
+            onClose={() => onTutorialStepChange(null)}
+            onBack={() => onTutorialStepChange('configuration-add')}
+            onNext={() => onTutorialStepChange('count')}
+            showMask
+            type="blockContent"
+            title="Данный вариант находится в таблице"
+            description="Используйте его счётчик, чтобы изменить количество оборудования этой конфигурации."
         />
     )}
     </div>
@@ -4688,6 +4759,7 @@ const SelectionApp = () => {
     const temperatureSensorAddedListRef = useRef(null);
     const temperatureSensorCounterRef = useRef(null);
     const [leakTutorialStep, setLeakTutorialStep] = useState(null);
+    const leakTutorialInitialZoneCountRef = useRef(0);
     const leakTutorialScopeRef = useRef(null);
     const leakAddRef = useRef(null);
     const leakListRef = useRef(null);
@@ -4889,6 +4961,7 @@ const SelectionApp = () => {
         id: zone.id,
         sensorCount: getLeakZoneSensors(zone).length,
     })), [incomingScheme]);
+    const hasNewLeakTutorialZone = leakZoneRows.length > leakTutorialInitialZoneCountRef.current;
     const leakValveCount = useMemo(() => getLeakValves(incomingScheme).length, [incomingScheme]);
     const equipmentOfferSections = useMemo(
         () => (isOfferModalOpen ? getEquipmentOfferSections(incomingScheme, controllerType) : []),
@@ -5040,8 +5113,7 @@ const SelectionApp = () => {
     ), [incomingScheme.wireless_devices]);
 
     // Объединённая карточка датчиков температуры: три переключателя вместо двух
-    // отдельных карточек. Беспроводной вариант существует только настенный, а
-    // настенного NTC-датчика нет — недоступные комбинации гасятся.
+    // отдельных карточек. Беспроводной вариант существует только настенный.
     const isWirelessTemperatureSensor = temperatureSensorConnection === 'wireless';
     const temperatureSensorTemplate = isWirelessTemperatureSensor
         ? wirelessTemperatureSensorTemplate
@@ -5053,13 +5125,10 @@ const SelectionApp = () => {
     const temperatureSensorPlacementOptions = useMemo(() => TEMPERATURE_SENSOR_PLACEMENTS.map((item) => (
         item.value === 'flask' && isWirelessTemperatureSensor ? { ...item, disabled: true } : item
     )), [isWirelessTemperatureSensor]);
-    const temperatureSensorKindOptions = useMemo(() => TEMPERATURE_SENSOR_KINDS.map((item) => (
-        item.value === 'ntc' && temperatureSensorPlacement === 'wall' ? { ...item, disabled: true } : item
-    )), [temperatureSensorPlacement]);
+    const temperatureSensorKindOptions = TEMPERATURE_SENSOR_KINDS;
     const selectTemperatureSensorPlacement = useCallback((placement) => {
         setWiredTemperatureSensorKey((current) => {
-            // Настенного NTC-датчика в каталоге нет, поэтому на стену уходит цифровой.
-            const kind = placement === 'wall' || !current.endsWith('-ntc') ? 'digital' : 'ntc';
+            const kind = current.endsWith('-ntc') ? 'ntc' : 'digital';
             return `wired-${placement}-${kind}`;
         });
     }, []);
@@ -6227,7 +6296,11 @@ const SelectionApp = () => {
                             scopeRef={boilerTutorialScopeRef}
                             open={boilerTutorialStep === 'added-list'}
                             onClose={() => setBoilerTutorialStep(null)}
-                            onBack={() => setBoilerTutorialStep('select')}
+                            onBack={() => {
+                                setBoilerTutorialNextStep(null);
+                                setBoilerDropdownOpen(true);
+                                setBoilerTutorialStep('select');
+                            }}
                             onNext={() => setBoilerTutorialStep(boilerTutorialNextStep || 'connection')}
                             showMask
                             type="blockContent"
@@ -6521,6 +6594,7 @@ const SelectionApp = () => {
                         addedRows={temperatureSensorRows}
                         addedTutorialRef={temperatureSensorAddedListRef}
                         counterTutorialRef={temperatureSensorCounterRef}
+                        counterTutorialTemplateKey={temperatureSensorTemplate?.key}
                         onAddUnit={(row) => addTemperatureSensor(
                             TEMPERATURE_SENSOR_TEMPLATES.find((template) => template.key === row.templateKey)
                             || temperatureSensorTemplate,
@@ -6608,32 +6682,21 @@ const SelectionApp = () => {
                         open={temperatureSensorTutorialStep === 'add'}
                         onClose={() => setTemperatureSensorTutorialStep(null)}
                         onBack={() => setTemperatureSensorTutorialStep(isWirelessTemperatureSensor ? 'placement' : 'kind')}
-                        onNext={() => setTemperatureSensorTutorialStep('added-list')}
+                        onNext={() => setTemperatureSensorTutorialStep('count')}
                         nextDisabled={!isTemperatureSensorTemplateAdded}
                         showMask
-                        title={isTemperatureSensorTemplateAdded ? 'Выбранный датчик уже добавлен' : 'Добавьте датчик температуры'}
+                        type={isTemperatureSensorTemplateAdded ? 'blockContent' : null}
+                        title={isTemperatureSensorTemplateAdded ? 'Датчик добавлен в систему' : 'Добавьте датчик температуры'}
                         description={isTemperatureSensorTemplateAdded
-                            ? 'Измените количество этого варианта кнопками + и - в списке ниже.'
+                            ? 'В списке отображаются все добавленные датчики температуры.'
                             : 'Проверьте выбранную конфигурацию и добавьте датчик в систему.'}
-                    />
-                    <TutorialPopover
-                        anchorRef={temperatureSensorAddedListRef}
-                        scopeRef={temperatureSensorTutorialScopeRef}
-                        open={temperatureSensorTutorialStep === 'added-list'}
-                        onClose={() => setTemperatureSensorTutorialStep(null)}
-                        onBack={() => setTemperatureSensorTutorialStep('add')}
-                        onNext={() => setTemperatureSensorTutorialStep('count')}
-                        showMask
-                        type="blockContent"
-                        title="Датчик добавлен в систему"
-                        description="В списке отображаются все добавленные датчики температуры."
                     />
                     <TutorialPopover
                         anchorRef={temperatureSensorCounterRef}
                         scopeRef={temperatureSensorTutorialScopeRef}
                         open={temperatureSensorTutorialStep === 'count'}
                         onClose={() => setTemperatureSensorTutorialStep(null)}
-                        onBack={() => setTemperatureSensorTutorialStep('added-list')}
+                        onBack={() => setTemperatureSensorTutorialStep('add')}
                         onNext={() => setTemperatureSensorTutorialStep(null)}
                         showMask
                         title="Изменяйте количество датчиков"
@@ -6712,7 +6775,14 @@ const SelectionApp = () => {
                                 aria-pressed={Boolean(leakTutorialStep)}
                                 aria-label={leakTutorialStep ? 'Закрыть обучение по контролю протечки' : 'Показать подсказку по контролю протечки'}
                                 title={leakTutorialStep ? 'Закрыть обучение' : 'Как настроить контроль протечки'}
-                                onClick={() => setLeakTutorialStep(leakTutorialStep ? null : 'add-zone')}
+                                onClick={() => {
+                                    if (leakTutorialStep) {
+                                        setLeakTutorialStep(null);
+                                    } else {
+                                        leakTutorialInitialZoneCountRef.current = leakZoneRows.length;
+                                        setLeakTutorialStep('add-zone');
+                                    }
+                                }}
                             >
                                 <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
                                 <span className="selection-tutorial-trigger-copy">
@@ -6759,7 +6829,7 @@ const SelectionApp = () => {
                                             ×
                                         </button>
                                         <QtyStepper
-                                            tutorialRef={index === 0 ? leakZoneCounterRef : null}
+                                            tutorialRef={index === leakZoneRows.length - 1 ? leakZoneCounterRef : null}
                                             count={zone.sensorCount}
                                             onDecrement={() => changeLeakZoneSensors(zone.id, -1)}
                                             onIncrement={() => changeLeakZoneSensors(zone.id, 1)}
@@ -6795,34 +6865,25 @@ const SelectionApp = () => {
                         </AddedDevicesBlock>
                     </SectionEquipmentCard>
                     <TutorialPopover
-                        anchorRef={leakAddRef}
+                        anchorRef={hasNewLeakTutorialZone ? leakListRef : leakAddRef}
                         scopeRef={leakTutorialScopeRef}
                         open={leakTutorialStep === 'add-zone'}
                         onClose={() => setLeakTutorialStep(null)}
-                        onNext={() => setLeakTutorialStep('added-list')}
-                        nextDisabled={leakZoneRows.length === 0}
-                        showMask
-                        title="Добавьте группу датчиков протечки"
-                        description="Все датчики одной группы образуют шлейф и занимают один дискретный вход. Для независимой зоны добавьте отдельную группу."
-                    />
-                    <TutorialPopover
-                        anchorRef={leakListRef}
-                        scopeRef={leakTutorialScopeRef}
-                        open={leakTutorialStep === 'added-list'}
-                        onClose={() => setLeakTutorialStep(null)}
-                        onBack={() => setLeakTutorialStep('add-zone')}
                         onNext={() => setLeakTutorialStep('zone-count')}
+                        nextDisabled={!hasNewLeakTutorialZone}
                         showMask
-                        type="blockContent"
-                        title="Группа датчиков добавлена"
-                        description="В каждой группе можно указать число датчиков, подключённых к одному шлейфу."
+                        type={hasNewLeakTutorialZone ? 'blockContent' : null}
+                        title={hasNewLeakTutorialZone ? 'Группа датчиков добавлена' : 'Добавьте группу датчиков протечки'}
+                        description={hasNewLeakTutorialZone
+                            ? 'В каждой группе можно указать число датчиков, подключённых к одному шлейфу.'
+                            : 'Все датчики одной группы образуют шлейф и занимают один дискретный вход. Для независимой зоны добавьте отдельную группу.'}
                     />
                     <TutorialPopover
                         anchorRef={leakZoneCounterRef}
                         scopeRef={leakTutorialScopeRef}
                         open={leakTutorialStep === 'zone-count'}
                         onClose={() => setLeakTutorialStep(null)}
-                        onBack={() => setLeakTutorialStep('added-list')}
+                        onBack={() => setLeakTutorialStep('add-zone')}
                         onNext={() => setLeakTutorialStep('valve-count')}
                         showMask
                         title="Укажите количество датчиков в группе"

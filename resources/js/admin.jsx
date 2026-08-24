@@ -37,7 +37,7 @@ const deviceImagePaths = {
     'flask-sensor': new URL('../assets/sensors/flaskSensor.svg', import.meta.url).href,
     'ntc-sensor': new URL('../assets/sensors/ntcSensorLeftPort.svg', import.meta.url).href,
     'wall-digital-sensor': new URL('../assets/sensors/wallDigitalSensor.svg', import.meta.url).href,
-    'wall-ntc-sensor': new URL('../assets/sensors/ntcSensorLeftPort.svg', import.meta.url).href,
+    'wall-ntc-sensor': new URL('../assets/sensors/ntcWallSensorLeftPort.svg', import.meta.url).href,
     'flask-sensor-gvs-boiler': new URL('../assets/sensors/flaskSensor.svg', import.meta.url).href,
     'flask-sensor-mixing-unit': new URL('../assets/sensors/flaskSensor.svg', import.meta.url).href,
     'mixing-ntc-sensor': new URL('../assets/sensors/ntcSensorLeftPort.svg', import.meta.url).href,

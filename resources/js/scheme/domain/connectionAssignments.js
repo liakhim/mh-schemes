@@ -1,4 +1,4 @@
-import { canonicalDeviceType } from './deviceTypes.js';
+import { canonicalDeviceType, isStandaloneNtcSensor } from './deviceTypes.js';
 
 export const CONNECTION_LAYOUT_VERSION = 1;
 
@@ -46,9 +46,6 @@ const isBusBoiler = (device) => getDeviceType(device) === 'smart'
 const isPressureSensor = (device) => getDeviceType(device) === 'pressure-sensor'
     && hasConnectionType(device, '4-20');
 
-const isDirectNtcSensor = (device) => getDeviceType(device) === 'ntc-sensor'
-    && hasConnectionType(device, 'ntc');
-
 const isDiscreteDevice = (device) => new Set([
     'discrete_pool',
     'discrete_fire_alarm',
@@ -65,7 +62,7 @@ const isIo4Device = (device) => {
     return isPressureSensor(device)
         || isDiscreteDevice(device)
         || ((type === '010servo' || type === '010pump') && hasConnectionType(device, 'di'))
-        || isDirectNtcSensor(device)
+        || isStandaloneNtcSensor(device)
         || isMixingNtcSensor(device);
 };
 

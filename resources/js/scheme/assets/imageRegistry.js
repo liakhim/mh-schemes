@@ -1,4 +1,4 @@
-import { canonicalDeviceType, getThermostatColor } from '../domain/deviceTypes';
+import { canonicalDeviceType, getThermostatColor } from '../domain/deviceTypes.js';
 
 export const controllerImagePaths = {
     'go': new URL('../../../assets/controllers/go/go.svg', import.meta.url).href,
@@ -26,6 +26,8 @@ export const wirelessDeviceImagePaths = {
     'wall-digital-sensor': new URL('../../../assets/sensors/wallDigitalSensor.svg', import.meta.url).href,
     'ntc-sensor': new URL('../../../assets/sensors/ntcSensorRightPort.svg', import.meta.url).href,
     'ntc-sensor-left': new URL('../../../assets/sensors/ntcSensorLeftPort.svg', import.meta.url).href,
+    'wall-ntc-sensor': new URL('../../../assets/sensors/ntcWallSensorRightPort.svg', import.meta.url).href,
+    'wall-ntc-sensor-left': new URL('../../../assets/sensors/ntcWallSensorLeftPort.svg', import.meta.url).href,
     'boiler-ntc-sensor': new URL('../../../assets/sensors/ntcSensorLeftPort.svg', import.meta.url).href,
     'mixing-ntc-sensor': new URL('../../../assets/sensors/ntcSensorLeftPort.svg', import.meta.url).href,
     'pressure-sensor': new URL('../../../assets/sensors/pressureSensor.svg', import.meta.url).href,
@@ -115,6 +117,9 @@ export const getWirelessDeviceImageKey = (device) => {
     }
     if (normalizedType === 'ntc-sensor' || normalizedType === 'mixing-ntc-sensor') {
         return device?.port_side === 'left' ? 'ntc-sensor-left' : 'ntc-sensor';
+    }
+    if (normalizedType === 'wall-ntc-sensor') {
+        return device?.port_side === 'left' ? 'wall-ntc-sensor-left' : 'wall-ntc-sensor';
     }
     // Зона протечки рисуется тем же датчиком: отдельного изображения шлейфа нет.
     if (normalizedType === 'leak-loop') {

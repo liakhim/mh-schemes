@@ -88,6 +88,50 @@ test('round trip keeps a standalone NTC sensor on its exact IO4 channel', () => 
     assert.equal(countDevice(reopened, sensor.id), 1);
 });
 
+test('round trip keeps a wall NTC sensor type and exact IO4 channel', () => {
+    const sensor = {
+        id: 'wall-ntc-io4',
+        type: 'wall-ntc-sensor',
+        device_type: 'sensor',
+        connection_type: 'ntc',
+    };
+    const channels = [];
+    channels[3] = sensor;
+    const { saved, reopened } = serializeAndReopen({
+        controller: { type: 'pro', one_wire_devices: [] },
+        ext_modules: [{ id: 'io4-wall-ntc', type: 'io4', channel_devices: channels }],
+        one_wire_modules: [],
+    });
+
+    assert.equal(saved.connection_layout.assignments[0].device_type, 'wall-ntc-sensor');
+    assert.equal(reopened.ext_modules[0].channel_devices[3].id, sensor.id);
+    assert.equal(reopened.ext_modules[0].channel_devices[3].type, 'wall-ntc-sensor');
+    assert.equal(countDevice(reopened, sensor.id), 1);
+});
+
+test('round trip preserves a wall NTC sensor assigned to NTC-1-wire', () => {
+    const sensor = {
+        id: 'wall-ntc-module-round-trip',
+        type: 'wall-ntc-sensor',
+        device_type: 'sensor',
+        connection_type: 'ntc',
+    };
+    const { saved, reopened } = serializeAndReopen({
+        controller: {
+            type: 'smart2',
+            one_wire_devices: [{
+                id: 'wall-ntc-module',
+                type: 'ntc-1-wire',
+                connection_type: '1-wire',
+                ntc1_devices: [sensor],
+            }],
+        },
+    });
+
+    assert.equal(saved.sensors[0].type, 'wall-ntc-sensor');
+    assert.equal(reopened.controller.one_wire_devices[0].ntc1_devices[0].type, 'wall-ntc-sensor');
+});
+
 test('flask GVS boiler sensor ignores a corrupted IO4 assignment and stays on one-wire', () => {
     const sensor = {
         id: 'gvs-corrupt-io4',

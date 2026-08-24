@@ -23,6 +23,7 @@ export const INSTALLATION_DEVICE_TYPE_TITLES = {
     thermostat: 'Термостат',
     'flask-sensor': 'Датчик температуры',
     'ntc-sensor': 'NTC датчик',
+    'wall-ntc-sensor': 'Настенный NTC датчик',
     'leak-sensor': 'Датчик протечки',
     'leak-loop': 'Зона контроля протечки',
     pressure: 'Датчик давления',

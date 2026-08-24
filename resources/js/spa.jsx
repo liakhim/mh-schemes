@@ -848,6 +848,7 @@ const App = () => {
     const [wifiOneWireMenuPos, setWifiOneWireMenuPos] = useState(null);
     const [io4ChannelMenuPos, setIo4ChannelMenuPos] = useState(null);
     const [di6ChannelMenuPos, setDi6ChannelMenuPos] = useState(null);
+    const [ntcSlotMenuPos, setNtcSlotMenuPos] = useState(null);
     const [controllerDiMenuPos, setControllerDiMenuPos] = useState(null);
     const [thermostatMenuPos, setThermostatMenuPos] = useState(null);
     const [useInitialOneWireBalance, setUseInitialOneWireBalance] = useState(false);
@@ -1539,7 +1540,7 @@ const App = () => {
      * @param {boolean} mark Добавить маркер; false удаляет его.
      * @returns {object} Новая схема.
      */
-    const patchNtcSlotMarkerInOneWire = (currentScheme, target, ntcSlotIndex, lineKey = 'ntc1_devices', mark = true) => {
+    const patchNtcSlotMarkerInOneWire = (currentScheme, target, ntcSlotIndex, lineKey = 'ntc1_devices', mark = true, sensorType = 'ntc-sensor') => {
         const targetId = target?.id;
         const patchCollection = (collection) => {
             if (!Array.isArray(collection)) return { next: collection, updated: false };
@@ -1554,7 +1555,7 @@ const App = () => {
                     current[ntcSlotIndex] = {
                         id: Date.now(),
                         device_type: 'sensor',
-                        type: 'ntc-sensor',
+                        type: sensorType,
                         connection_type: 'ntc',
                     };
                 } else {
@@ -1588,13 +1589,13 @@ const App = () => {
         return currentScheme;
     };
 
-    const addOneWireNtcSensorAtSlot = (slotIndex, ntcSlotIndex, lineKey = 'ntc1_devices') => {
+    const addOneWireNtcSensorAtSlot = (slotIndex, ntcSlotIndex, lineKey = 'ntc1_devices', sensorType = 'ntc-sensor') => {
         setUseInitialOneWireBalance(false);
         setScheme((s) => {
             const oneWireDevices = getOneWireDevicesFromScheme(s);
             const target = oneWireDevices[slotIndex];
             if (!target || canonicalDeviceType(target?.type) !== 'ntc-1-wire') return s;
-            return patchNtcSlotMarkerInOneWire(s, target, ntcSlotIndex, lineKey, true);
+            return patchNtcSlotMarkerInOneWire(s, target, ntcSlotIndex, lineKey, true, sensorType);
         });
     };
 
@@ -1707,7 +1708,7 @@ const App = () => {
     };
 
     const isNumberedNtcSensor = (sensor) => (
-        canonicalDeviceType(sensor?.type) === 'ntc-sensor'
+        ['ntc-sensor', 'wall-ntc-sensor'].includes(canonicalDeviceType(sensor?.type))
         && String(sensor?.connection_type || '').toLowerCase() === 'ntc'
     );
 
@@ -3157,7 +3158,7 @@ const App = () => {
         setRl2sRelayMenuPos(null);
     };
 
-    const addExtNtcSensorAtSlot = (moduleIndex, slotIndex, ntcSlotIndex, lineKey = 'ntc1_devices') => {
+    const addExtNtcSensorAtSlot = (moduleIndex, slotIndex, ntcSlotIndex, lineKey = 'ntc1_devices', sensorType = 'ntc-sensor') => {
         setUseInitialOneWireBalance(false);
         setScheme((s) => {
             const extModules = Array.isArray(s.ext_modules) ? s.ext_modules : [];
@@ -3168,7 +3169,7 @@ const App = () => {
             const sensorPayload = {
                 id: Date.now(),
                 device_type: 'sensor',
-                type: 'ntc-sensor',
+                type: sensorType,
                 connection_type: 'ntc',
             };
             const nextModules = extModules.map((moduleItem, idx) => {
@@ -3186,6 +3187,27 @@ const App = () => {
             });
             return { ...s, ext_modules: nextModules };
         });
+    };
+
+    const addNtcSensorFromMenu = (sensorType) => {
+        if (!ntcSlotMenuPos) return;
+        if (ntcSlotMenuPos.owner === 'ext') {
+            addExtNtcSensorAtSlot(
+                ntcSlotMenuPos.moduleIndex,
+                ntcSlotMenuPos.slotIndex,
+                ntcSlotMenuPos.ntcSlotIndex,
+                ntcSlotMenuPos.lineKey,
+                sensorType,
+            );
+        } else {
+            addOneWireNtcSensorAtSlot(
+                ntcSlotMenuPos.slotIndex,
+                ntcSlotMenuPos.ntcSlotIndex,
+                ntcSlotMenuPos.lineKey,
+                sensorType,
+            );
+        }
+        setNtcSlotMenuPos(null);
     };
 
     const rectsOverlap = (a, b) => !(
@@ -4592,9 +4614,7 @@ const App = () => {
                             addEcosmartPump={addEcosmartPump}
                             addEcosmartServo={addEcosmartServo}
                             addEcosmartValve={addEcosmartValve}
-                            addExtNtcSensorAtSlot={addExtNtcSensorAtSlot}
                             addExtThermostatFloorSensor={addExtThermostatFloorSensor}
-                            addOneWireNtcSensorAtSlot={addOneWireNtcSensorAtSlot}
                             aerialImage={aerialImage}
                             busDragStartOffsetsRef={busDragStartOffsetsRef}
                             busSlotOffsets={busSlotOffsets}
@@ -4788,6 +4808,7 @@ const App = () => {
                             setInvalidOneWireDragMap={setInvalidOneWireDragMap}
                             setInvalidWifiDragMap={setInvalidWifiDragMap}
                             setIo4ChannelMenuPos={setIo4ChannelMenuPos}
+                            setNtcSlotMenuPos={setNtcSlotMenuPos}
                             setOneWireMenuPos={setOneWireMenuPos}
                             setOneWireSlotOffsets={setOneWireSlotOffsets}
                             setPowerMenuPos={setPowerMenuPos}
@@ -5615,6 +5636,7 @@ const App = () => {
                 io4ChannelMenuPos={io4ChannelMenuPos} setIo4ChannelMenuPos={setIo4ChannelMenuPos}
                 di6ChannelMenuPos={di6ChannelMenuPos} setDi6ChannelMenuPos={setDi6ChannelMenuPos}
                 controllerDiMenuPos={controllerDiMenuPos} setControllerDiMenuPos={setControllerDiMenuPos}
+                ntcSlotMenuPos={ntcSlotMenuPos} setNtcSlotMenuPos={setNtcSlotMenuPos}
                 addOneWireDeviceAtSlot={addOneWireDeviceAtSlot}
                 normalizePowerModuleType={normalizePowerModuleType}
                 getControllerType={getControllerType} getSmart2DiPortUsage={getSmart2DiPortUsage}
@@ -5643,6 +5665,7 @@ const App = () => {
                 addExtOneWireDeviceAtSlot={addExtOneWireDeviceAtSlot}
                 addIo4ChannelDevice={addIo4ChannelDevice} addDi6ChannelDevice={addDi6ChannelDevice}
                 addControllerDiDeviceFromMenu={addControllerDiDeviceFromMenu}
+                addNtcSensorFromMenu={addNtcSensorFromMenu}
             />
         </main>
     );

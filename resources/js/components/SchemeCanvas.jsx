@@ -67,9 +67,7 @@ const SchemeCanvas = ({
     addEcosmartPump,
     addEcosmartServo,
     addEcosmartValve,
-    addExtNtcSensorAtSlot,
     addExtThermostatFloorSensor,
-    addOneWireNtcSensorAtSlot,
     aerialImage,
     busDragStartOffsetsRef,
     busSlotOffsets,
@@ -263,6 +261,7 @@ const SchemeCanvas = ({
     setInvalidOneWireDragMap,
     setInvalidWifiDragMap,
     setIo4ChannelMenuPos,
+    setNtcSlotMenuPos,
     setOneWireMenuPos,
     setOneWireSlotOffsets,
     setPowerMenuPos,
@@ -6473,7 +6472,7 @@ const SchemeCanvas = ({
                                                   const bl2RinnaiAdapterX = bl2BusSlotX + bl2BoilerWidth + 4 * indentSize;
                                                  const bl2RinnaiAdapterY = bl2BusSlotY + (bl2BoilerHeight - bl2RinnaiAdapterHeight) / 2;
                                                 const extOneWireGap = 2 * indentSize;
-                                                const extNtcTopExtraOffset = 12 * indentSize;
+                                                const extNtcTopExtraOffset = 22 * indentSize;
                                                 const extNtcSideExtraGap = 10 * indentSize;
                                                 const getExtOneWireSlotSize = (owDevice) => {
                                                     if (!owDevice) return { width: ONE_WIRE_SLOT_SIZE, height: ONE_WIRE_SLOT_SIZE };
@@ -7191,7 +7190,7 @@ const SchemeCanvas = ({
                                                             const slotVisualDevice = slotDevice
                                                                 ? {
                                                                     ...slotDevice,
-                                                                    port_side: canonicalDeviceType(slotDevice?.type) === 'ntc-sensor' || canonicalDeviceType(slotDevice?.type) === 'boiler-ntc-sensor' || canonicalDeviceType(slotDevice?.type) === 'mixing-ntc-sensor'
+                                                                    port_side: canonicalDeviceType(slotDevice?.type) === 'ntc-sensor' || canonicalDeviceType(slotDevice?.type) === 'wall-ntc-sensor' || canonicalDeviceType(slotDevice?.type) === 'boiler-ntc-sensor' || canonicalDeviceType(slotDevice?.type) === 'mixing-ntc-sensor'
                                                                         ? 'left'
                                                                         : slotDevice?.port_side,
                                                                 }
@@ -7200,7 +7199,7 @@ const SchemeCanvas = ({
                                                             const slotDeviceImage = slotDeviceKey ? wirelessImages[slotDeviceKey] : null;
                                                             const slotDevicePorts = slotDeviceKey ? (wirelessPortsByType[slotDeviceKey] || []) : [];
                                                             const slotDeviceType = canonicalDeviceType(slotDevice?.type);
-                                                            const isNtcLikeChannelSensor = slotDeviceType === 'ntc-sensor' || slotDeviceType === 'boiler-ntc-sensor' || slotDeviceType === 'mixing-ntc-sensor';
+                                                            const isNtcLikeChannelSensor = slotDeviceType === 'ntc-sensor' || slotDeviceType === 'wall-ntc-sensor' || slotDeviceType === 'boiler-ntc-sensor' || slotDeviceType === 'mixing-ntc-sensor';
                                                             const pressureSensorIndex = slotDeviceType === 'pressure-sensor'
                                                                 ? (pressureSensorsInSystem.findIndex((sensor) => {
                                                                     if (slotDevice?.id != null && sensor?.id != null) return slotDevice.id === sensor.id;
@@ -7208,7 +7207,7 @@ const SchemeCanvas = ({
                                                                 }) + 1)
                                                                 : 0;
                                                             const pressureInfoTitle = getDeviceStoredTitle(slotDevice) || (pressureSensorIndex > 0 ? `Датчик давления ${pressureSensorIndex}` : 'Датчик давления');
-                                                            const ntcInfoTitle = slotDeviceType === 'ntc-sensor'
+                                                            const ntcInfoTitle = slotDeviceType === 'ntc-sensor' || slotDeviceType === 'wall-ntc-sensor'
                                                                 ? getNtcSensorTitle(scheme, slotDevice)
                                                                 : getDeviceStoredTitle(slotDevice);
                                                             const pump010Index = slotDeviceType === '010pump'
@@ -7258,7 +7257,9 @@ const SchemeCanvas = ({
                                                                 : (slotDeviceType === '010pump' ? 8 * indentSize : channelSlotWidth);
                                                             const visualSlotHeight = slotDeviceType === 'pressure-sensor'
                                                                 ? 2 * indentSize
-                                                                : (slotDeviceType === '010pump' || slotDeviceType === '010servo' ? 8 * indentSize : channelSlotHeight);
+                                                                : (slotDeviceType === '010pump' || slotDeviceType === '010servo'
+                                                                    ? 8 * indentSize
+                                                                    : (slotDeviceType === 'wall-ntc-sensor' ? 7 * indentSize : channelSlotHeight));
                                                             const imageBoxWidth = isLeakDiDeviceType(slotDeviceType)
                                                                 ? visualSlotWidth * LEAK_DI_DEVICE_IMAGE_SCALE
                                                                 : (slotDeviceType === '010servo' ? visualSlotWidth - indentSize : visualSlotWidth);
@@ -7293,6 +7294,16 @@ const SchemeCanvas = ({
                                                                     onMouseEnter={() => setHoveredNtcSlotKey(channelHoverKey)}
                                                                     onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === channelHoverKey ? null : prev))}
                                                                 >
+                                                                    {hasDevice && slotDeviceImage && (
+                                                                        <Image
+                                                                            image={slotDeviceImage}
+                                                                            x={renderX}
+                                                                            y={renderY}
+                                                                            width={renderSize.width}
+                                                                            height={renderSize.height}
+                                                                            listening={false}
+                                                                        />
+                                                                    )}
                                                                     {fromPort && (
                                                                         <Line
                                                                             points={[
@@ -7513,15 +7524,6 @@ const SchemeCanvas = ({
                                                                                  verticalAlign="middle" device={slotDevice} title={diInfoTitle} />
                                                                          </>
                                                                      )}
-                                                                     {hasDevice && slotDeviceImage && (
-                                                                         <Image
-                                                                             image={slotDeviceImage}
-                                                                            x={renderX}
-                                                                            y={renderY}
-                                                                            width={renderSize.width}
-                                                                            height={renderSize.height}
-                                                                        />
-                                                                    )}
                                                                     {showPorts && hasDevice && slotDevicePorts.map((port, pIdx) => (
                                                                         <Circle
                                                                             key={`io4-channel-port-${slotIndex}-${channelIndex}-${port.name}-${pIdx}`}
@@ -8069,10 +8071,8 @@ const SchemeCanvas = ({
                                                                         <KitBadge x={owX} y={owY + 1} />
                                                                     )}
                                                                     {canonicalDeviceType(owDevice?.type) === 'ntc-1-wire' && (() => {
-                                                                        const ntcSensorImage = wirelessImages['ntc-sensor'] || null;
-                                                                        const ntcSensorPorts = wirelessPortsByType['ntc-sensor'] || [];
                                                                         const ntcSlotWidth = 11 * indentSize;
-                                                                        const ntcSlotHeight = 3 * indentSize;
+                                                                        const ntcSlotHeight = 7 * indentSize;
                                                                         const ntcSlotGap = 3 * indentSize;
                                                                         const lineX = owX - ntcSlotWidth;
                                                                         const lineTotalHeight = NTC_LINE_SLOTS_COUNT * ntcSlotHeight + (NTC_LINE_SLOTS_COUNT - 1) * ntcSlotGap;
@@ -8080,7 +8080,11 @@ const SchemeCanvas = ({
                                                                         return Array.from({ length: NTC_LINE_SLOTS_COUNT }).map((_, ntcIndex) => {
                                                                             const sensor = getNtcSensorFromDeviceLine(owDevice, scheme, ntcIndex, 'ntc1_devices');
                                                                             if (!sensor && !showEmptySlots) return null;
-                                                                            const slotX = lineX;
+                                                                            const ntcSensorKey = getWirelessDeviceImageKey({ ...(sensor || { type: 'ntc-sensor' }), port_side: 'right' });
+                                                                            const ntcSensorImage = wirelessImages[ntcSensorKey] || null;
+                                                                            const ntcSensorPorts = wirelessPortsByType[ntcSensorKey] || [];
+                                                                            const slotVisualWidth = canonicalDeviceType(sensor?.type) === 'wall-ntc-sensor' ? ntcSlotHeight : ntcSlotWidth;
+                                                                            const slotX = lineX + ntcSlotWidth - slotVisualWidth;
                                                                             const slotY = lineY + (NTC_LINE_SLOTS_COUNT - 1 - ntcIndex) * (ntcSlotHeight + ntcSlotGap);
                                                                             const ntcHoverKey = `ext:${slotIndex}:${extOneWireIndex}:${ntcIndex}`;
                                                                             const isNtcHovered = hoveredNtcSlotKey === ntcHoverKey;
@@ -8089,13 +8093,13 @@ const SchemeCanvas = ({
                                                                             const sensorPortA = ntcSensorPorts.find((port) => port.name === 'NTC-A') || ntcSensorPorts.find((port) => String(port?.name || '').startsWith('NTC-')) || null;
                                                                             const sensorPortB = ntcSensorPorts.find((port) => port.name === 'NTC-B') || sensorPortA;
                                                                             const sensorRenderSize = ntcSensorImage
-                                                                                ? getContainSize(ntcSensorImage, ntcSlotWidth, ntcSlotHeight)
-                                                                                : { width: ntcSlotWidth, height: ntcSlotHeight };
-                                                                            const sensorRenderX = slotX + (ntcSlotWidth - sensorRenderSize.width) / 2;
+                                                                                ? getContainSize(ntcSensorImage, slotVisualWidth, ntcSlotHeight)
+                                                                                : { width: slotVisualWidth, height: ntcSlotHeight };
+                                                                            const sensorRenderX = slotX + (slotVisualWidth - sensorRenderSize.width) / 2;
                                                                             const sensorRenderY = slotY + (ntcSlotHeight - sensorRenderSize.height) / 2;
-                                                                            const sensorPortAX = sensorPortA ? sensorRenderX + sensorPortA.x * sensorRenderSize.width : slotX + ntcSlotWidth;
+                                                                            const sensorPortAX = sensorPortA ? sensorRenderX + sensorPortA.x * sensorRenderSize.width : slotX + slotVisualWidth;
                                                                             const sensorPortAY = sensorPortA ? sensorRenderY + sensorPortA.y * sensorRenderSize.height : slotY + ntcSlotHeight / 2;
-                                                                            const sensorPortBX = sensorPortB ? sensorRenderX + sensorPortB.x * sensorRenderSize.width : slotX + ntcSlotWidth;
+                                                                            const sensorPortBX = sensorPortB ? sensorRenderX + sensorPortB.x * sensorRenderSize.width : slotX + slotVisualWidth;
                                                                             const sensorPortBY = sensorPortB ? sensorRenderY + sensorPortB.y * sensorRenderSize.height : slotY + ntcSlotHeight / 2;
                                                                             const modulePortA = owPorts.find((port) => port.name === `NTC-${ntcChannel}-A`);
                                                                             const modulePortB = owPorts.find((port) => port.name === `NTC-${ntcChannel}-B`);
@@ -8105,6 +8109,9 @@ const SchemeCanvas = ({
                                                                                     onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
                                                                                     onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
                                                                                 >
+                                                                                    {sensor && ntcSensorImage && (
+                                                                                        <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />
+                                                                                    )}
                                                                                     {sensor && modulePortA && (
                                                                                         <Line
                                                                                             points={[
@@ -8144,25 +8151,13 @@ const SchemeCanvas = ({
                                                                                         collisionOccupied={Boolean(sensor)}
                                                                                         x={slotX}
                                                                                         y={slotY}
-                                                                                        width={ntcSlotWidth}
+                                                                                        width={slotVisualWidth}
                                                                                         height={ntcSlotHeight}
                                                                                         cornerRadius={6}
                                                                                         fill={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_FILL}
                                                                                         stroke={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_STROKE}
                                                                                         strokeWidth={1.2}
                                                                                     />
-                                                                                    {sensor && ntcSensorImage && (() => {
-                                                                                        const size = sensorRenderSize;
-                                                                                        return (
-                                                                                            <Image
-                                                                                                image={ntcSensorImage}
-                                                                                                x={sensorRenderX}
-                                                                                                y={sensorRenderY}
-                                                                                                width={size.width}
-                                                                                                height={size.height}
-                                                                                            />
-                                                                                        );
-                                                                                    })()}
                                                                                     {showPorts && sensor && ntcSensorPorts.map((port) => (
                                                                                         <Circle
                                                                                             key={`ext-ntc1-port-${slotIndex}-${extOneWireIndex}-${ntcIndex}-${port.name}`}
@@ -8177,13 +8172,13 @@ const SchemeCanvas = ({
                                                                                     ))}
                                                                                     {sensor && (
                                                                                         <>
-                                                                                            <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                                                            <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={sensorTitle} />
+                                                                                            <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={slotVisualWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
+                                                                                            <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, slotVisualWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={sensorTitle} />
                                                                                         </>
                                                                                     )}
                                                                                     {sensor && isNtcHovered && (
                                                                                         <SlotDeleteButton
-                                                                                            x={slotX + ntcSlotWidth - 2.5}
+                                                                                            x={slotX + slotVisualWidth - 2.5}
                                                                                             y={slotY + 1.5}
                                                                                             onRemove={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex)}
                                                                                         />
@@ -8205,8 +8200,14 @@ const SchemeCanvas = ({
                                                                                                  y={slotY + ntcSlotHeight / 2}
                                                                                                 radius={10}
                                                                                                 fill={ADD_ACTION_FILL}
-                                                                                                onClick={() => addExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex)}
-                                                                                                onTap={() => addExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex)}
+                                                                                                onClick={(event) => {
+                                                                                                    const pos = event.target.getAbsolutePosition();
+                                                                                                    setNtcSlotMenuPos({ x: pos.x, y: pos.y, owner: 'ext', moduleIndex: slotIndex, slotIndex: extOneWireIndex, ntcSlotIndex: ntcIndex, lineKey: 'ntc1_devices' });
+                                                                                                }}
+                                                                                                onTap={(event) => {
+                                                                                                    const pos = event.target.getAbsolutePosition();
+                                                                                                    setNtcSlotMenuPos({ x: pos.x, y: pos.y, owner: 'ext', moduleIndex: slotIndex, slotIndex: extOneWireIndex, ntcSlotIndex: ntcIndex, lineKey: 'ntc1_devices' });
+                                                                                                }}
                                                                                             />
                                                                                             <Text
                                                                                                 x={slotX + ntcSlotWidth / 2}
@@ -8225,10 +8226,8 @@ const SchemeCanvas = ({
                                                                         });
                                                                     })()}
                                                                     {canonicalDeviceType(owDevice?.type) === 'ntc-1-wire' && (() => {
-                                                                        const ntcSensorImage = wirelessImages['ntc-sensor-left'] || null;
-                                                                        const ntcSensorPorts = wirelessPortsByType['ntc-sensor-left'] || [];
                                                                         const ntcSlotWidth = 11 * indentSize;
-                                                                        const ntcSlotHeight = 3 * indentSize;
+                                                                        const ntcSlotHeight = 7 * indentSize;
                                                                         const ntcSlotGap = 3 * indentSize;
                                                                         const lineX = owX + owWidth;
                                                                         const lineTotalHeight = NTC_LINE_SLOTS_COUNT * ntcSlotHeight + (NTC_LINE_SLOTS_COUNT - 1) * ntcSlotGap;
@@ -8236,6 +8235,10 @@ const SchemeCanvas = ({
                                                                         return Array.from({ length: NTC_LINE_SLOTS_COUNT }).map((_, ntcIndex) => {
                                                                             const sensor = getNtcSensorFromDeviceLine(owDevice, scheme, ntcIndex, 'ntc2_devices');
                                                                             if (!sensor && !showEmptySlots) return null;
+                                                                            const ntcSensorKey = getWirelessDeviceImageKey({ ...(sensor || { type: 'ntc-sensor' }), port_side: 'left' });
+                                                                            const ntcSensorImage = wirelessImages[ntcSensorKey] || null;
+                                                                            const ntcSensorPorts = wirelessPortsByType[ntcSensorKey] || [];
+                                                                            const slotVisualWidth = canonicalDeviceType(sensor?.type) === 'wall-ntc-sensor' ? ntcSlotHeight : ntcSlotWidth;
                                                                             const slotX = lineX;
                                                                             const slotY = lineY + ntcIndex * (ntcSlotHeight + ntcSlotGap);
                                                                             const ntcHoverKey = `ext2:${slotIndex}:${extOneWireIndex}:${ntcIndex}`;
@@ -8244,8 +8247,10 @@ const SchemeCanvas = ({
                                                                             const sensorTitle = getNtcSensorTitle(scheme, sensor, ntcChannel);
                                                                             const sensorPortA = ntcSensorPorts.find((port) => port.name === 'NTC-A') || ntcSensorPorts.find((port) => String(port?.name || '').startsWith('NTC-')) || null;
                                                                             const sensorPortB = ntcSensorPorts.find((port) => port.name === 'NTC-B') || sensorPortA;
-                                                                            const sensorRenderSize = ntcSensorImage ? getContainSize(ntcSensorImage, ntcSlotWidth, ntcSlotHeight) : { width: ntcSlotWidth, height: ntcSlotHeight };
-                                                                            const sensorRenderX = slotX + (ntcSlotWidth - sensorRenderSize.width) / 2;
+                                                                            const sensorRenderSize = ntcSensorImage
+                                                                                ? getContainSize(ntcSensorImage, slotVisualWidth, ntcSlotHeight)
+                                                                                : { width: slotVisualWidth, height: ntcSlotHeight };
+                                                                            const sensorRenderX = slotX + (slotVisualWidth - sensorRenderSize.width) / 2;
                                                                             const sensorRenderY = slotY + (ntcSlotHeight - sensorRenderSize.height) / 2;
                                                                             const sensorPortAX = sensorPortA ? sensorRenderX + sensorPortA.x * sensorRenderSize.width : slotX;
                                                                             const sensorPortAY = sensorPortA ? sensorRenderY + sensorPortA.y * sensorRenderSize.height : slotY + ntcSlotHeight / 2;
@@ -8259,14 +8264,14 @@ const SchemeCanvas = ({
                                                                                     onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
                                                                                     onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
                                                                                 >
+                                                                                    {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
                                                                                     {sensor && modulePortA && <Line points={[sensorPortAX, sensorPortAY, owX + modulePortA.x * owWidth, sensorPortAY, owX + modulePortA.x * owWidth, owY + modulePortA.y * owHeight]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
                                                                                     {sensor && modulePortB && <Line points={[sensorPortBX, sensorPortBY, owX + modulePortB.x * owWidth, sensorPortBY, owX + modulePortB.x * owWidth, owY + modulePortB.y * owHeight]} stroke="#464EE3" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
-                                                                                    <Rect name="module-device-slot" collisionOccupied={Boolean(sensor)} x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_FILL} stroke={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_STROKE} strokeWidth={1.2} />
-                                                                                    {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
+                                                                                    <Rect name="module-device-slot" collisionOccupied={Boolean(sensor)} x={slotX} y={slotY} width={slotVisualWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_FILL} stroke={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_STROKE} strokeWidth={1.2} />
                                                                                     {showPorts && sensor && ntcSensorPorts.map((port) => <Circle key={`ext-ntc2-port-${slotIndex}-${extOneWireIndex}-${ntcIndex}-${port.name}`} x={sensorRenderX + port.x * sensorRenderSize.width} y={sensorRenderY + port.y * sensorRenderSize.height} radius={2.5} fill="red" listening={false} />)}
-                                                                                    {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}
-                                                                                    {sensor && isNtcHovered && <SlotDeleteButton x={slotX + ntcSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} />}
-                                                                                    {!sensor && showEmptySlots && <><EditableInfoTitle x={slotX + ntcSlotWidth - 13} y={slotY + 2} width={10} height={10} text={String(ntcChannel)} fontSize={7} fill="#7b8494" align="right" listening={false} /><Circle x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} radius={10} fill={ADD_ACTION_FILL} onClick={() => addExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} onTap={() => addExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} /><Text x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} text="+" fontSize={15} fill={ADD_ACTION_TEXT_FILL} offsetX={4.5} offsetY={6} listening={false} /></>}
+                                                                                    {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={slotVisualWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, slotVisualWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}
+                                                                                    {sensor && isNtcHovered && <SlotDeleteButton x={slotX + slotVisualWidth - 2.5} y={slotY + 1.5} onRemove={() => removeExtNtcSensorAtSlot(slotIndex, extOneWireIndex, ntcIndex, 'ntc2_devices')} />}
+                                                                                    {!sensor && showEmptySlots && <><EditableInfoTitle x={slotX + ntcSlotWidth - 13} y={slotY + 2} width={10} height={10} text={String(ntcChannel)} fontSize={7} fill="#7b8494" align="right" listening={false} /><Circle x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} radius={10} fill={ADD_ACTION_FILL} onClick={(event) => { const pos = event.target.getAbsolutePosition(); setNtcSlotMenuPos({ x: pos.x, y: pos.y, owner: 'ext', moduleIndex: slotIndex, slotIndex: extOneWireIndex, ntcSlotIndex: ntcIndex, lineKey: 'ntc2_devices' }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setNtcSlotMenuPos({ x: pos.x, y: pos.y, owner: 'ext', moduleIndex: slotIndex, slotIndex: extOneWireIndex, ntcSlotIndex: ntcIndex, lineKey: 'ntc2_devices' }); }} /><Text x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} text="+" fontSize={15} fill={ADD_ACTION_TEXT_FILL} offsetX={4.5} offsetY={6} listening={false} /></>}
                                                                                 </Group>
                                                                             );
                                                                         });
@@ -9138,10 +9143,8 @@ const SchemeCanvas = ({
                                                                     });
                                                                 })()}
                                                                 {normalizedOneWireType === 'ntc-1-wire' && (() => {
-                                                                    const ntcSensorImage = wirelessImages['ntc-sensor'] || null;
-                                                                    const ntcSensorPorts = wirelessPortsByType['ntc-sensor'] || [];
                                                                     const ntcSlotWidth = 11 * indentSize;
-                                                                    const ntcSlotHeight = 3 * indentSize;
+                                                                    const ntcSlotHeight = 7 * indentSize;
                                                                     const ntcSlotGap = 3 * indentSize;
                                                                     const lineX = slotPos.x - ntcSlotWidth;
                                                                     const lineTotalHeight = NTC_LINE_SLOTS_COUNT * ntcSlotHeight + (NTC_LINE_SLOTS_COUNT - 1) * ntcSlotGap;
@@ -9149,7 +9152,11 @@ const SchemeCanvas = ({
                                                                     return Array.from({ length: NTC_LINE_SLOTS_COUNT }).map((_, ntcIndex) => {
                                                                         const sensor = getNtcSensorFromDeviceLine(device, scheme, ntcIndex, 'ntc1_devices');
                                                                         if (!sensor && !showEmptySlots) return null;
-                                                                        const slotX = lineX;
+                                                                        const ntcSensorKey = getWirelessDeviceImageKey({ ...(sensor || { type: 'ntc-sensor' }), port_side: 'right' });
+                                                                        const ntcSensorImage = wirelessImages[ntcSensorKey] || null;
+                                                                        const ntcSensorPorts = wirelessPortsByType[ntcSensorKey] || [];
+                                                                        const slotVisualWidth = canonicalDeviceType(sensor?.type) === 'wall-ntc-sensor' ? ntcSlotHeight : ntcSlotWidth;
+                                                                        const slotX = lineX + ntcSlotWidth - slotVisualWidth;
                                                                         const slotY = lineY + (NTC_LINE_SLOTS_COUNT - 1 - ntcIndex) * (ntcSlotHeight + ntcSlotGap);
                                                                         const ntcHoverKey = `main:${slotIndex}:${ntcIndex}`;
                                                                         const isNtcHovered = hoveredNtcSlotKey === ntcHoverKey;
@@ -9158,13 +9165,13 @@ const SchemeCanvas = ({
                                                                         const sensorPortA = ntcSensorPorts.find((port) => port.name === 'NTC-A') || ntcSensorPorts.find((port) => String(port?.name || '').startsWith('NTC-')) || null;
                                                                         const sensorPortB = ntcSensorPorts.find((port) => port.name === 'NTC-B') || sensorPortA;
                                                                         const sensorRenderSize = ntcSensorImage
-                                                                            ? getContainSize(ntcSensorImage, ntcSlotWidth, ntcSlotHeight)
-                                                                            : { width: ntcSlotWidth, height: ntcSlotHeight };
-                                                                        const sensorRenderX = slotX + (ntcSlotWidth - sensorRenderSize.width) / 2;
+                                                                            ? getContainSize(ntcSensorImage, slotVisualWidth, ntcSlotHeight)
+                                                                            : { width: slotVisualWidth, height: ntcSlotHeight };
+                                                                        const sensorRenderX = slotX + (slotVisualWidth - sensorRenderSize.width) / 2;
                                                                         const sensorRenderY = slotY + (ntcSlotHeight - sensorRenderSize.height) / 2;
-                                                                        const sensorPortAX = sensorPortA ? sensorRenderX + sensorPortA.x * sensorRenderSize.width : slotX + ntcSlotWidth;
+                                                                        const sensorPortAX = sensorPortA ? sensorRenderX + sensorPortA.x * sensorRenderSize.width : slotX + slotVisualWidth;
                                                                         const sensorPortAY = sensorPortA ? sensorRenderY + sensorPortA.y * sensorRenderSize.height : slotY + ntcSlotHeight / 2;
-                                                                        const sensorPortBX = sensorPortB ? sensorRenderX + sensorPortB.x * sensorRenderSize.width : slotX + ntcSlotWidth;
+                                                                        const sensorPortBX = sensorPortB ? sensorRenderX + sensorPortB.x * sensorRenderSize.width : slotX + slotVisualWidth;
                                                                         const sensorPortBY = sensorPortB ? sensorRenderY + sensorPortB.y * sensorRenderSize.height : slotY + ntcSlotHeight / 2;
                                                                         const modulePorts = getDevicePorts(device);
                                                                         const modulePortA = modulePorts.find((port) => port.name === `NTC-${ntcChannel}-A`);
@@ -9175,6 +9182,9 @@ const SchemeCanvas = ({
                                                                                 onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
                                                                                 onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
                                                                             >
+                                                                                {sensor && ntcSensorImage && (
+                                                                                    <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />
+                                                                                )}
                                                                                 {sensor && modulePortA && (
                                                                                     <Line
                                                                                         points={[
@@ -9214,26 +9224,13 @@ const SchemeCanvas = ({
                                                                                         collisionOccupied={Boolean(sensor)}
                                                                                         x={slotX}
                                                                                     y={slotY}
-                                                                                    width={ntcSlotWidth}
+                                                                                    width={slotVisualWidth}
                                                                                     height={ntcSlotHeight}
                                                                                     cornerRadius={6}
                                                                                     fill={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_FILL}
                                                                                     stroke={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_STROKE}
                                                                                     strokeWidth={1.2}
                                                                                 />
-                                                                                {sensor && ntcSensorImage && (() => {
-                                                                                    const size = sensorRenderSize;
-                                                                                    return (
-                                                                                        <Image
-                                                                                            image={ntcSensorImage}
-                                                                                            x={sensorRenderX}
-                                                                                            y={sensorRenderY}
-                                                                                            width={size.width}
-                                                                                            height={size.height}
-                                                                                            listening={false}
-                                                                                        />
-                                                                                    );
-                                                                                })()}
                                                                                 {showPorts && sensor && ntcSensorPorts.map((port) => (
                                                                                     <Circle
                                                                                         key={`onewire-ntc1-port-${slotIndex}-${ntcIndex}-${port.name}`}
@@ -9248,13 +9245,13 @@ const SchemeCanvas = ({
                                                                                 ))}
                                                                                 {sensor && (
                                                                                     <>
-                                                                                        <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                                                        <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={sensorTitle} />
+                                                                                        <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={slotVisualWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
+                                                                                        <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, slotVisualWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={sensorTitle} />
                                                                                     </>
                                                                                 )}
                                                                                 {sensor && isNtcHovered && (
                                                                                     <SlotDeleteButton
-                                                                                        x={slotX + ntcSlotWidth - 2.5}
+                                                                                        x={slotX + slotVisualWidth - 2.5}
                                                                                         y={slotY + 1.5}
                                                                                         onRemove={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex)}
                                                                                     />
@@ -9276,8 +9273,14 @@ const SchemeCanvas = ({
                                                                                              y={slotY + ntcSlotHeight / 2}
                                                                                             radius={10}
                                                                                             fill={ADD_ACTION_FILL}
-                                                                                            onClick={() => addOneWireNtcSensorAtSlot(slotIndex, ntcIndex)}
-                                                                                            onTap={() => addOneWireNtcSensorAtSlot(slotIndex, ntcIndex)}
+                                                                                            onClick={(event) => {
+                                                                                                const pos = event.target.getAbsolutePosition();
+                                                                                                setNtcSlotMenuPos({ x: pos.x, y: pos.y, owner: 'controller', slotIndex, ntcSlotIndex: ntcIndex, lineKey: 'ntc1_devices' });
+                                                                                            }}
+                                                                                            onTap={(event) => {
+                                                                                                const pos = event.target.getAbsolutePosition();
+                                                                                                setNtcSlotMenuPos({ x: pos.x, y: pos.y, owner: 'controller', slotIndex, ntcSlotIndex: ntcIndex, lineKey: 'ntc1_devices' });
+                                                                                            }}
                                                                                         />
                                                                                         <Text
                                                                                             x={slotX + ntcSlotWidth / 2}
@@ -9296,10 +9299,8 @@ const SchemeCanvas = ({
                                                                     });
                                                                 })()}
                                                                 {normalizedOneWireType === 'ntc-1-wire' && (() => {
-                                                                    const ntcSensorImage = wirelessImages['ntc-sensor-left'] || null;
-                                                                    const ntcSensorPorts = wirelessPortsByType['ntc-sensor-left'] || [];
                                                                     const ntcSlotWidth = 11 * indentSize;
-                                                                    const ntcSlotHeight = 3 * indentSize;
+                                                                    const ntcSlotHeight = 7 * indentSize;
                                                                     const ntcSlotGap = 3 * indentSize;
                                                                     const lineX = slotPos.x + slotWidth;
                                                                     const lineTotalHeight = NTC_LINE_SLOTS_COUNT * ntcSlotHeight + (NTC_LINE_SLOTS_COUNT - 1) * ntcSlotGap;
@@ -9307,6 +9308,10 @@ const SchemeCanvas = ({
                                                                     return Array.from({ length: NTC_LINE_SLOTS_COUNT }).map((_, ntcIndex) => {
                                                                         const sensor = getNtcSensorFromDeviceLine(device, scheme, ntcIndex, 'ntc2_devices');
                                                                         if (!sensor && !showEmptySlots) return null;
+                                                                        const ntcSensorKey = getWirelessDeviceImageKey({ ...(sensor || { type: 'ntc-sensor' }), port_side: 'left' });
+                                                                        const ntcSensorImage = wirelessImages[ntcSensorKey] || null;
+                                                                        const ntcSensorPorts = wirelessPortsByType[ntcSensorKey] || [];
+                                                                        const slotVisualWidth = canonicalDeviceType(sensor?.type) === 'wall-ntc-sensor' ? ntcSlotHeight : ntcSlotWidth;
                                                                         const slotX = lineX;
                                                                         const slotY = lineY + ntcIndex * (ntcSlotHeight + ntcSlotGap);
                                                                         const ntcHoverKey = `main2:${slotIndex}:${ntcIndex}`;
@@ -9315,8 +9320,10 @@ const SchemeCanvas = ({
                                                                         const sensorTitle = getNtcSensorTitle(scheme, sensor, ntcChannel);
                                                                         const sensorPortA = ntcSensorPorts.find((port) => port.name === 'NTC-A') || ntcSensorPorts.find((port) => String(port?.name || '').startsWith('NTC-')) || null;
                                                                         const sensorPortB = ntcSensorPorts.find((port) => port.name === 'NTC-B') || sensorPortA;
-                                                                        const sensorRenderSize = ntcSensorImage ? getContainSize(ntcSensorImage, ntcSlotWidth, ntcSlotHeight) : { width: ntcSlotWidth, height: ntcSlotHeight };
-                                                                        const sensorRenderX = slotX + (ntcSlotWidth - sensorRenderSize.width) / 2;
+                                                                        const sensorRenderSize = ntcSensorImage
+                                                                            ? getContainSize(ntcSensorImage, slotVisualWidth, ntcSlotHeight)
+                                                                            : { width: slotVisualWidth, height: ntcSlotHeight };
+                                                                        const sensorRenderX = slotX + (slotVisualWidth - sensorRenderSize.width) / 2;
                                                                         const sensorRenderY = slotY + (ntcSlotHeight - sensorRenderSize.height) / 2;
                                                                         const sensorPortAX = sensorPortA ? sensorRenderX + sensorPortA.x * sensorRenderSize.width : slotX;
                                                                         const sensorPortAY = sensorPortA ? sensorRenderY + sensorPortA.y * sensorRenderSize.height : slotY + ntcSlotHeight / 2;
@@ -9331,14 +9338,14 @@ const SchemeCanvas = ({
                                                                                 onMouseEnter={() => setHoveredNtcSlotKey(ntcHoverKey)}
                                                                                 onMouseLeave={() => setHoveredNtcSlotKey((prev) => (prev === ntcHoverKey ? null : prev))}
                                                                             >
+                                                                                {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
                                                                                 {sensor && modulePortA && <Line points={[sensorPortAX, sensorPortAY, slotPos.x + modulePortA.x * slotWidth, sensorPortAY, slotPos.x + modulePortA.x * slotWidth, slotPos.y + modulePortA.y * slotHeight]} stroke="#212121" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
                                                                                 {sensor && modulePortB && <Line points={[sensorPortBX, sensorPortBY, slotPos.x + modulePortB.x * slotWidth, sensorPortBY, slotPos.x + modulePortB.x * slotWidth, slotPos.y + modulePortB.y * slotHeight]} stroke="#464EE3" strokeWidth={1} lineCap="round" lineJoin="round" listening={false} />}
-                                                                                <Rect name="module-device-slot" collisionOccupied={Boolean(sensor)} x={slotX} y={slotY} width={ntcSlotWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_FILL} stroke={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_STROKE} strokeWidth={1.2} />
-                                                                                {sensor && ntcSensorImage && <Image image={ntcSensorImage} x={sensorRenderX} y={sensorRenderY} width={sensorRenderSize.width} height={sensorRenderSize.height} listening={false} />}
+                                                                                <Rect name="module-device-slot" collisionOccupied={Boolean(sensor)} x={slotX} y={slotY} width={slotVisualWidth} height={ntcSlotHeight} cornerRadius={6} fill={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_FILL} stroke={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_STROKE} strokeWidth={1.2} />
                                                                                 {showPorts && sensor && ntcSensorPorts.map((port) => <Circle key={`onewire-ntc2-port-${slotIndex}-${ntcIndex}-${port.name}`} x={sensorRenderX + port.x * sensorRenderSize.width} y={sensorRenderY + port.y * sensorRenderSize.height} radius={2.5} fill="red" listening={false} />)}
-                                                                                {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={ntcSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, ntcSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}
-                                                                                {sensor && isNtcHovered && <SlotDeleteButton x={slotX + ntcSlotWidth - 2.5} y={slotY + 1.5} onRemove={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} />}
-                                                                                {!sensor && showEmptySlots && <><EditableInfoTitle x={slotX + ntcSlotWidth - 13} y={slotY + 2} width={10} height={10} text={String(ntcChannel)} fontSize={7} fill="#7b8494" align="right" listening={false} /><Circle x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} radius={10} fill={ADD_ACTION_FILL} onClick={() => addOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} onTap={() => addOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} /><Text x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} text="+" fontSize={15} fill={ADD_ACTION_TEXT_FILL} offsetX={4.5} offsetY={6} listening={false} /></>}
+                                                                                {sensor && <><Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={slotVisualWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, slotVisualWidth - 6)} height={INFO_BLOCK_HEIGHT} text={sensorTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={sensorTitle} /></>}
+                                                                                {sensor && isNtcHovered && <SlotDeleteButton x={slotX + slotVisualWidth - 2.5} y={slotY + 1.5} onRemove={() => removeOneWireNtcSensorAtSlot(slotIndex, ntcIndex, 'ntc2_devices')} />}
+                                                                                {!sensor && showEmptySlots && <><EditableInfoTitle x={slotX + ntcSlotWidth - 13} y={slotY + 2} width={10} height={10} text={String(ntcChannel)} fontSize={7} fill="#7b8494" align="right" listening={false} /><Circle x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} radius={10} fill={ADD_ACTION_FILL} onClick={(event) => { const pos = event.target.getAbsolutePosition(); setNtcSlotMenuPos({ x: pos.x, y: pos.y, owner: 'controller', slotIndex, ntcSlotIndex: ntcIndex, lineKey: 'ntc2_devices' }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setNtcSlotMenuPos({ x: pos.x, y: pos.y, owner: 'controller', slotIndex, ntcSlotIndex: ntcIndex, lineKey: 'ntc2_devices' }); }} /><Text x={slotX + ntcSlotWidth / 2} y={slotY + ntcSlotHeight / 2} text="+" fontSize={15} fill={ADD_ACTION_TEXT_FILL} offsetX={4.5} offsetY={6} listening={false} /></>}
                                                                             </Group>
                                                                         );
                                                                     });

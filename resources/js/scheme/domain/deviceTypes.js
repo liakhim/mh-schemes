@@ -12,6 +12,17 @@ export const canonicalDeviceType = (type) => {
     return normalized;
 };
 
+export const hasDeviceConnectionType = (device, connectionType) => String(device?.connection_type || '')
+    .toLowerCase()
+    .split('|')
+    .map((value) => value.trim())
+    .includes(connectionType);
+
+export const isStandaloneNtcSensor = (device) => (
+    ['ntc-sensor', 'wall-ntc-sensor'].includes(canonicalDeviceType(device?.type))
+    && hasDeviceConnectionType(device, 'ntc')
+);
+
 export const getThermostatColor = (device) => {
     const allowedColors = new Set(['black', 'white', 'gray']);
     const normalizedColor = typeof device?.color === 'string' ? device.color.toLowerCase() : 'black';

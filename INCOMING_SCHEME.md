@@ -424,6 +424,8 @@ wired_devices: [
 ```js
 sensors: [
     { id: 4, type: 'pressure-sensor', device_type: 'sensor', connection_type: '4-20' },
+    { id: 5, type: 'ntc-sensor', device_type: 'sensor', connection_type: 'ntc' },
+    { id: 6, type: 'wall-ntc-sensor', device_type: 'sensor', connection_type: 'ntc' },
 ]
 ```
 
@@ -435,6 +437,8 @@ sensors: [
 - `ai`
 
 Во время первичной материализации датчики с `connection_type: '1-wire'` переносятся в сбалансированное 1-wire хранилище.
+
+`ntc-sensor` (датчик в колбе) и `wall-ntc-sensor` (настенный датчик) подбираются одинаково: свободный хвост `io4`, затем `ntc-1-wire`. Материализация и сериализация обязаны сохранять `type`, поскольку он определяет изображение датчика.
 
 Для `ecosmart` вложенные `mixing-ntc-sensor` из `220servo.additions` материализуются во внутреннюю линию `controller.mixing_ntc_devices` только для отрисовки. Эта линия не должна попадать в публичный `incomingScheme`; при сериализации датчики возвращаются в `sensors`, а исходные wired-устройства остаются в `wired_devices`.
 

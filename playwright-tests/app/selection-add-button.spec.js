@@ -12,6 +12,7 @@ import { test, expect } from '@playwright/test';
  */
 test.describe('/selection — кнопка добавления и список добавленного', () => {
     test.beforeEach(async ({ page }) => {
+        await page.context().addCookies([{ name: 'PHPSESSID', value: '1', domain: 'localhost', path: '/' }]);
         await page.goto('/selection');
         await page.getByTestId('reset-equipment').click();
         await page.getByTestId('reset-equipment-confirm').click();
@@ -47,12 +48,17 @@ test.describe('/selection — кнопка добавления и список 
         await expect(add).toBeHidden();
         await page.getByTestId('temperature-sensor-wired-wall-digital-qty-inc').click();
 
+        await page.getByTestId('temperature-sensor-kind-ntc').click();
+        await expect(add).toHaveText('Добавить проводной настенный NTC-датчик температуры');
+        await add.click();
+        await expect(page.getByTestId('temperature-sensor-wired-wall-ntc-qty-inc')).toBeVisible();
+
         await page.getByTestId('temperature-sensor-placement-flask').click();
-        await expect(add).toHaveText('Добавить проводной цифровой датчик температуры в колбе');
+        await expect(add).toHaveText('Добавить проводной NTC-датчик температуры в колбе');
         await expect(add).toBeVisible();
 
-        await page.getByTestId('temperature-sensor-kind-ntc').click();
-        await expect(add).toHaveText('Добавить проводной NTC-датчик температуры в колбе');
+        await page.getByTestId('temperature-sensor-kind-digital').click();
+        await expect(add).toHaveText('Добавить проводной цифровой датчик температуры в колбе');
 
         await page.getByTestId('temperature-sensor-connection-wireless').click();
         await expect(add).toHaveText('Добавить беспроводной настенный датчик температуры');
@@ -63,6 +69,7 @@ test.describe('/selection — кнопка добавления и список 
         // комплектом GO+ строкой «Комплектный», поэтому проверяем саму карточку).
         await expect(page.getByTestId('temperature-sensor-wireless-wall-qty-inc')).toBeVisible();
         await expect(page.getByTestId('temperature-sensor-wired-wall-digital-qty-inc')).toBeVisible();
+        await expect(page.getByTestId('temperature-sensor-wired-wall-ntc-qty-inc')).toBeVisible();
     });
 
     test('прочее оборудование: кнопка скрывается после первого добавления', async ({ page }) => {

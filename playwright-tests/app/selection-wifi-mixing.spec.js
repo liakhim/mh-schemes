@@ -85,7 +85,7 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         expect(existingVariantMaskBox.x).toBeLessThanOrEqual(existingSettingsBox.x);
         expect(existingVariantMaskBox.x + existingVariantMaskBox.width).toBeGreaterThanOrEqual(existingSettingsBox.x + existingSettingsBox.width);
         await page.getByRole('button', { name: 'Далее' }).click();
-        await expect(page.getByText('Смесительный узел добавлен в систему')).toBeVisible();
+        await expect(page.getByText('Данный вариант находится в таблице')).toBeVisible();
     });
 
     test('mixing tutorial finishes on the table when all variants are added', async ({ page }) => {
