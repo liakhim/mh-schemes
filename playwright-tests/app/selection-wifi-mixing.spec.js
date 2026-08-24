@@ -125,12 +125,26 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await expect(page.getByText('Проверьте выбранный вариант и добавьте насос')).toBeVisible();
 
         await page.getByTestId('add-pump').click();
-        await expect(page.getByText('Выбранный насос уже добавлен')).toBeVisible();
-        await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Насос добавлен в систему')).toBeVisible();
 
         await page.getByRole('button', { name: 'Далее' }).click();
         await expect(page.getByText('Изменяйте количество насосов')).toBeVisible();
+    });
+
+    test('pump tutorial finishes on the table when all variants are added', async ({ page }) => {
+        await page.getByTestId('add-pump').click();
+        await page.getByTestId('pump-type-010').click();
+        await page.getByTestId('add-pump').click();
+        await page.getByTestId('pump-connection-wifi').click();
+        await page.getByTestId('add-pump').click();
+
+        await expect(page.getByTestId('pump-connection-wired')).toHaveCount(0);
+        await expect(page.getByTestId('add-pump')).toHaveCount(0);
+        await page.getByTitle('Как добавить насос').click();
+        await expect(page.getByText('Все возможные насосы уже добавлены')).toBeVisible();
+        await expect(page.getByText('Вы можете менять их количество в таблице «Добавленные насосы».')).toBeVisible();
+        await page.getByRole('button', { name: 'Далее' }).click();
+        await expect(page.locator('.tutorial-popover')).toBeHidden();
     });
 
     test('Wi-Fi zone uses a Wi-Fi relay module', async ({ page }) => {

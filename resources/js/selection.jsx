@@ -3844,6 +3844,7 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
     const addedListRef = useRef(null);
     const counterRef = useRef(null);
     const selectedTemplateAdded = addedRows.some((row) => row.label === template.label);
+    const allPumpVariantsAdded = addedRows.length >= PUMP_TEMPLATES.length + 1;
 
     return (
     <div ref={tutorialScopeRef} style={{ position: 'relative', flex: '1 1 100%', minWidth: 0 }}>
@@ -3862,7 +3863,7 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
                 aria-pressed={Boolean(tutorialStep)}
                 aria-label={tutorialStep ? 'Закрыть обучение по настройке насоса' : 'Показать подсказку по настройке насоса'}
                 title={tutorialStep ? 'Закрыть обучение' : 'Как добавить насос'}
-                onClick={() => onTutorialStepChange(tutorialStep ? null : 'connection')}
+                onClick={() => onTutorialStepChange(tutorialStep ? null : (allPumpVariantsAdded ? 'configuration-added' : 'connection'))}
             >
                 <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
                 <span className="selection-tutorial-trigger-copy">
@@ -3876,13 +3877,17 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         addedRows={addedRows}
         addedTutorialRef={addedListRef}
         counterTutorialRef={counterRef}
+        counterTutorialLabel={template.label}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
         addLabel={`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
-        onAdd={onAdd}
+        onAdd={() => {
+            onAdd();
+            if (tutorialStep === 'configuration-add') onTutorialStepChange('configuration-added');
+        }}
         addTutorialRef={addRef}
         // Выбранный тип уже в списке — количеством управляет счетчик строки.
-        showAdd={!selectedTemplateAdded}
+        showAdd={!selectedTemplateAdded && !allPumpVariantsAdded}
         addTestId="add-pump"
         addDisabled={connectionMode === 'wifi' && wifiPumpLimitReached}
         addDisabledTitle="Нет свободных Wi-Fi-модулей или релейных каналов для насоса."
@@ -3890,12 +3895,15 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         jsonData={{ wired_device: template.wiredDevice }}
         showJsonDetails={showJsonDetails}
     >
-        <div ref={pumpSettingsRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 24, width: 'fit-content', maxWidth: '100%' }}>
+        {!allPumpVariantsAdded && <div ref={pumpSettingsRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 24, width: 'fit-content', maxWidth: '100%' }}>
             <SegmentedField
                 label="Тип подключения"
                 options={MIXING_CONNECTION_OPTIONS}
                 value={connectionMode}
-                onChange={onConnectionModeChange}
+                onChange={(value) => {
+                    onConnectionModeChange(value);
+                    if (tutorialStep === 'configuration') onTutorialStepChange('configuration-add');
+                }}
                 testIdPrefix="pump-connection"
                 fieldRef={connectionRef}
                 className="sel-mixing-field"
@@ -3904,14 +3912,17 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
                 label="Управление"
                 options={PUMP_TYPE_OPTIONS}
                 value={pumpType}
-                onChange={onPumpTypeChange}
+                onChange={(value) => {
+                    onPumpTypeChange(value);
+                    if (tutorialStep === 'configuration') onTutorialStepChange('configuration-add');
+                }}
                 testIdPrefix="pump-type"
                 fieldRef={pumpTypeRef}
                 className="sel-mixing-field"
                 isAvailable={(value) => connectionMode !== 'wifi' || value === '220'}
                 unavailableTitle="Для Wi-Fi используется насос 220V"
             />
-        </div>
+        </div>}
     </SectionEquipmentCard>
     <TutorialPopover
         anchorRef={connectionRef}
@@ -3942,33 +3953,22 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         open={tutorialStep === 'add'}
         onClose={() => onTutorialStepChange(null)}
         onBack={() => onTutorialStepChange('type')}
-        onNext={() => onTutorialStepChange('added-list')}
+        onNext={() => onTutorialStepChange('count')}
         nextDisabled={!selectedTemplateAdded}
         showMask
-        title={selectedTemplateAdded ? 'Выбранный насос уже добавлен' : 'Проверьте выбранный вариант и добавьте насос'}
+        type={selectedTemplateAdded ? 'blockContent' : null}
+        title={selectedTemplateAdded ? 'Насос добавлен в систему' : 'Проверьте выбранный вариант и добавьте насос'}
         description={selectedTemplateAdded
-            ? 'Измените количество этого варианта кнопками + и - в списке ниже.'
+            ? 'В списке отображаются все добавленные варианты насосов.'
             : `Выбрано: ${connectionMode === 'wifi' ? 'Wi-Fi' : 'проводное подключение'}, управление ${pumpType === '220' ? '220V' : '0-10V'}.`}
-    />
-    <TutorialPopover
-        anchorRef={addedListRef}
-        scopeRef={tutorialScopeRef}
-        open={tutorialStep === 'added-list'}
-        onClose={() => onTutorialStepChange(null)}
-        onBack={() => onTutorialStepChange('add')}
-        onNext={() => onTutorialStepChange('count')}
-        showMask
-        type="blockContent"
-        title="Насос добавлен в систему"
-        description="В списке отображаются все добавленные варианты насосов."
     />
     <TutorialPopover
         anchorRef={counterRef}
         scopeRef={tutorialScopeRef}
         open={tutorialStep === 'count'}
         onClose={() => onTutorialStepChange(null)}
-        onBack={() => onTutorialStepChange('added-list')}
-        onNext={() => onTutorialStepChange('configuration')}
+        onBack={() => onTutorialStepChange(addedRows.length > 1 ? 'configuration-added' : 'add')}
+        onNext={() => onTutorialStepChange(allPumpVariantsAdded ? 'configuration-added' : 'configuration')}
         showMask
         title="Изменяйте количество насосов"
         description="Кнопки + и - изменяют количество одинаковых насосов. Для Wi-Fi варианта система распределит насосы по свободным каналам Wi-Fi модулей."
@@ -3979,10 +3979,40 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         open={tutorialStep === 'configuration'}
         onClose={() => onTutorialStepChange(null)}
         onBack={() => onTutorialStepChange('count')}
-        onNext={() => onTutorialStepChange(null)}
+        onNext={() => onTutorialStepChange(selectedTemplateAdded ? null : 'configuration-add')}
         showMask
         title="Добавьте другой вид насоса"
         description="Измените конфигурацию добавления насосов, чтобы добавить другой вид насоса в систему."
+    />
+    <TutorialPopover
+        anchorRef={pumpSettingsRef}
+        highlightRef={addRef}
+        highlightActive={!selectedTemplateAdded}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'configuration-add'}
+        onClose={() => onTutorialStepChange(null)}
+        onBack={() => onTutorialStepChange('configuration')}
+        onNext={() => onTutorialStepChange('configuration-added')}
+        nextDisabled={!selectedTemplateAdded}
+        showMask
+        title={selectedTemplateAdded ? 'Данный вариант уже добавлен в систему' : 'Проверьте выбранный вариант и добавьте насос'}
+        description={selectedTemplateAdded
+            ? 'Измените его количество в таблице «Добавленные насосы». Чтобы добавить новый вид насоса, продолжайте менять конфигурацию.'
+            : `Выбрано: ${connectionMode === 'wifi' ? 'Wi-Fi' : 'проводное подключение'}, управление ${pumpType === '220' ? '220V' : '0-10V'}.`}
+    />
+    <TutorialPopover
+        anchorRef={addedListRef}
+        scopeRef={tutorialScopeRef}
+        open={tutorialStep === 'configuration-added'}
+        onClose={() => onTutorialStepChange(null)}
+        onBack={allPumpVariantsAdded ? null : () => onTutorialStepChange('configuration-add')}
+        onNext={() => onTutorialStepChange(allPumpVariantsAdded ? null : 'count')}
+        showMask
+        type="blockContent"
+        title={allPumpVariantsAdded ? 'Все возможные насосы уже добавлены' : 'Насос добавлен в систему'}
+        description={allPumpVariantsAdded
+            ? 'Вы можете менять их количество в таблице «Добавленные насосы».'
+            : 'Новая конфигурация добавлена в список насосов.'}
     />
     </div>
     );
