@@ -3927,6 +3927,7 @@ const App = () => {
                 layoutKey: getInstallationLayoutItemKey('wifi', item, getItemType(item), index),
                 installationLabel: labelInfo.label,
                 isWifiPair: true,
+                powerPreviousLabel: POWER_UNIT_LABEL,
             });
         });
         const standaloneOneWireModules = Array.isArray(scheme?.one_wire_modules) ? scheme.one_wire_modules : [];
@@ -5372,9 +5373,29 @@ const App = () => {
                                                                 />
                                                             );
                                                         })}
-                                                    {getInstallationPorts(item)
-                                                        .filter((port) => isInstallationPortOccupied(item, port))
-                                                        .filter((port) => {
+                                                    {[
+                                                        {
+                                                            portItem: item,
+                                                            portImageX: itemImageX,
+                                                            portImageWidth: itemImageWidth,
+                                                            ports: getInstallationPorts(item),
+                                                        },
+                                                        ...(item.isWifiPair ? [{
+                                                            portItem: {
+                                                                key: `${item.key}:power-unit`,
+                                                                type: 'power-unit',
+                                                                data: {},
+                                                                powerNextLabel: getInstallationItemLabel(item),
+                                                            },
+                                                            portImageX: 0,
+                                                            portImageWidth: dinSize,
+                                                            ports: getInstallationPorts({ type: 'power-unit' })
+                                                                .filter((port) => String(port?.name || '').toUpperCase().includes('12VDC-OUT')),
+                                                        }] : []),
+                                                    ]
+                                                        .flatMap((source) => source.ports.map((port) => ({ ...source, port })))
+                                                        .filter(({ portItem, port }) => isInstallationPortOccupied(portItem, port))
+                                                        .filter(({ portItem, port }) => {
                                                             // Исходящие порты цепочки (справа): EXT-OUT ведёт к следующему
                                                             // модулю расширения, «1-WIRE … OUT» — к следующему устройству
                                                             // на шине 1-wire. Если следующего в цепочке нет, не рисуем ни
@@ -5382,28 +5403,28 @@ const App = () => {
                                                             const portName = String(port?.name || '').toUpperCase();
                                                             if (portName.includes('EXT-OUT')) {
                                                                 // У ecosmart EXT-OUT также питает EXT-термостаты контроллера.
-                                                                const extDevices = Array.isArray(item?.data?.ext_devices) ? item.data.ext_devices : [];
-                                                                return Boolean(item.moduleNextLabel) || extDevices.some(Boolean);
+                                                                const extDevices = Array.isArray(portItem?.data?.ext_devices) ? portItem.data.ext_devices : [];
+                                                                return Boolean(portItem.moduleNextLabel) || extDevices.some(Boolean);
                                                             }
                                                             if (portName.includes('VDC-OUT')) {
-                                                                return Boolean(item.powerNextLabel) || Boolean(getControllerExtFloorThermostat(item));
+                                                                return Boolean(portItem.powerNextLabel) || Boolean(getControllerExtFloorThermostat(portItem));
                                                             }
-                                                            if (portName.includes('1-WIRE') && portName.includes('OUT')) return Boolean(item.oneWireNextLabel);
+                                                            if (portName.includes('1-WIRE') && portName.includes('OUT')) return Boolean(portItem.oneWireNextLabel);
                                                             return true;
                                                         })
-                                                        .map((port, portIndex) => {
+                                                        .map(({ portItem, portImageX, portImageWidth, port }, portIndex) => {
                                                             const isTopPort = port.y < 0.5;
-                                                             const portX = itemImageX + port.x * itemImageWidth;
+                                                             const portX = portImageX + port.x * portImageWidth;
                                                             const portY = port.y * item.image.height;
                                                             const edgeY = isTopPort ? 0 : item.image.height;
                                                             const bendY = isTopPort ? -indentSize * 0.5 : item.image.height + indentSize * 0.5;
                                                             const midY = isTopPort ? bendY + indentSize * 0.2 : bendY - indentSize * 0.2;
-                                                            const labelText = getInstallationMarkerText(getInstallationPortConnectionLabel(item, port, {
+                                                            const labelText = getInstallationMarkerText(getInstallationPortConnectionLabel(portItem, port, {
                                                                 previousLabel: previousInstallationLabel,
                                                                 nextLabel: nextInstallationLabel,
-                                                                powerPreviousLabel: item.powerPreviousLabel,
-                                                                powerNextLabel: item.powerNextLabel,
-                                                                upsDiTargetLabel: item.upsDiTargetLabel,
+                                                                powerPreviousLabel: portItem.powerPreviousLabel,
+                                                                powerNextLabel: portItem.powerNextLabel,
+                                                                upsDiTargetLabel: portItem.upsDiTargetLabel,
                                                             }));
                                                             const labelFontSize = 3;
                                                             const labelWidth = labelText ? 8 : 0;
@@ -5413,10 +5434,10 @@ const App = () => {
                                                             const labelX = portX - labelWidth / 2 + 2;
                                                             const labelY = isTopPort ? bendY - labelHeight - 2 : bendY + 2;
                                                             return (
-                                                                <React.Fragment key={`installation-port-tail-${item.key}-${port.name}-${portIndex}`}>
+                                                                <React.Fragment key={`installation-port-tail-${portItem.key || item.key}-${port.name}-${portIndex}`}>
                                                                     <Line
                                                                         points={[portX, portY, portX, midY, portX + indentSize * 0.25, bendY, portX + indentSize * 0.5, edgeY]}
-                                                                        stroke={getInstallationPortLineColor(port.name, item)}
+                                                                        stroke={getInstallationPortLineColor(port.name, portItem)}
                                                                         strokeWidth={1.25}
                                                                         tension={0.65}
                                                                          lineCap="round"
@@ -5460,7 +5481,7 @@ const App = () => {
                                                                         x={portX}
                                                                         y={portY}
                                                                         radius={2.2}
-                                                                         fill={getInstallationPortLineColor(port.name, item)}
+                                                                        fill={getInstallationPortLineColor(port.name, portItem)}
                                                                          opacity={0.95}
                                                                          perfectDrawEnabled={false}
                                                                          listening={false}

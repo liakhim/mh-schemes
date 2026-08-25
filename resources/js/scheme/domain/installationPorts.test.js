@@ -39,6 +39,16 @@ test('returns installation labels for relay, power and one-wire ports', () => {
     assert.equal(getInstallationPortConnectionLabel({ type: 'pro', data: { relay_devices: [pump] } }, { name: 'RELAY-1-B' }), 'Насос кухни');
     assert.equal(getInstallationPortConnectionLabel({ type: 'pro', data: { relay_devices: [pump] } }, { name: 'RELAY-1-A' }), 'L');
     assert.equal(getInstallationPortConnectionLabel({ type: 'circuit-breaker', data: {} }, { name: 'L-OUT' }), 'Блок питания');
+    assert.equal(getInstallationPortConnectionLabel(
+        { type: 'power-unit', data: {} },
+        { name: '12VDC-OUT-V+' },
+        { powerNextLabel: 'RL6W' },
+    ), 'RL6W');
+    assert.equal(getInstallationPortConnectionLabel(
+        { type: 'rl6w', data: {} },
+        { name: '12VDC-IN-GND' },
+        { powerPreviousLabel: 'Блок питания' },
+    ), 'Блок питания');
     assert.equal(getInstallationPortConnectionLabel({ type: 'rdt2', data: {} }, { name: '1-WIRE-DAT OUT', x: 0.8 }, { nextLabel: 'NTC-1-wire' }), 'NTC-1-wire');
 });
 
