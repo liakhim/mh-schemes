@@ -963,6 +963,11 @@ html:has(.selection-body),
 
 .services-page .sel-liquid-header-inner {
     grid-template-columns: 1fr;
+    min-height: 62px;
+}
+
+.services-page * {
+    border-radius: 10px !important;
 }
 
 .account-settings-page .account-sidebar,
@@ -1135,6 +1140,12 @@ html:has(.selection-body),
 
     .selection-dashboard-table {
         min-width: 620px;
+    }
+}
+
+@media (max-width: 760px) {
+    .services-page .sel-liquid-header-inner {
+        min-height: 36px;
     }
 }
 
