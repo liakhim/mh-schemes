@@ -126,6 +126,7 @@ const PRESSURE_SENSOR_IMAGE_PATH = new URL('../images/thermostats/420sensor.png'
 /** Быстрые подсказки над строкой поиска: подставляют бренд в запрос. */
 
 const MYHEAT_LOGO_PATH = new URL('../assets/logo/logo.svg', import.meta.url).href;
+const SETTINGS_ICON_PATH = new URL('../assets/icons/settings.svg', import.meta.url).href;
 
 const ORANGE = '#e07020';
 
@@ -4336,6 +4337,37 @@ const SelectionQuickNav = () => (
     </nav>
 );
 
+const SelectionSideNavigation = ({ showQuickNav }) => (
+    <div className="sel-side-stack">
+        <aside className="account-sidebar sel-account-sidebar" aria-label="Навигация аккаунта">
+            <nav className="account-navigation sel-account-navigation">
+                <a href="/settings">
+                    <img src={SETTINGS_ICON_PATH} alt="" aria-hidden="true" />
+                    <span>Настройки аккаунта</span>
+                </a>
+                <a href="/user-schemes">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="4" y="5" width="16" height="14" rx="2" />
+                        <path d="M8 9h.01M12 9h.01M16 9h.01M8 15h.01M12 15h.01M16 15h.01" />
+                    </svg>
+                    <span>Созданные схемы</span>
+                </a>
+                <a className="is-active" href="/selection" aria-current="page">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 6h5m4 0h7M4 12h9m4 0h3M4 18h2m4 0h10M9 3v6m6 0v6m-7 0v6" />
+                    </svg>
+                    <span>Подбор оборудования</span>
+                </a>
+            </nav>
+        </aside>
+        {showQuickNav && (
+            <aside className="sel-side-nav" aria-label="Навигация по разделам">
+                <SelectionQuickNav />
+            </aside>
+        )}
+    </div>
+);
+
 const getTemplateLabelByType = (templates, type, fallback) => (
     templates.find((template) => canonicalType(template.wiredDevice?.type || template.data?.type) === canonicalType(type))?.label || fallback
 );
@@ -5982,12 +6014,7 @@ const SelectionApp = () => {
             </header>
 
             <div className="sel-layout">
-            {selectionMode === 'automatic' && (
-                <aside className="sel-side-nav">
-                    <SelectionQuickNav />
-                </aside>
-            )}
-            {selectionMode === 'manual' && <div className="sel-layout-spacer" aria-hidden="true" />}
+            <SelectionSideNavigation showQuickNav={selectionMode === 'automatic'} />
             <div className="sel-layout-content">
             <div key={selectionMode} className="sel-mode-view">
 

@@ -24,6 +24,10 @@
                 </a>
                 <a class="is-active" href="{{ route('user-schemes') }}" aria-current="page">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h.01M12 9h.01M16 9h.01M8 15h.01M12 15h.01M16 15h.01" /></svg>
+                    <span>Созданные схемы</span>
+                </a>
+                <a href="{{ route('selection') }}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h5m4 0h7M4 12h9m4 0h3M4 18h2m4 0h10M9 3v6m6 0v6m-7 0v6" /></svg>
                     <span>Подбор оборудования</span>
                 </a>
             </nav>
