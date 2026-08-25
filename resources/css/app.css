@@ -4704,7 +4704,6 @@ html:has(.selection-body),
     gap: 10px;
     overflow-y: auto;
     overscroll-behavior: contain;
-    scrollbar-gutter: stable;
     z-index: 100;
 }
 
