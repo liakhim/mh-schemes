@@ -12,7 +12,6 @@
         <div class="sel-liquid-header-inner">
             <a class="sel-header-brand" href="{{ route('user-schemes') }}" aria-label="MyHeat, созданные схемы">
                 <img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat">
-                <span>Личный кабинет</span>
             </a>
         </div>
     </header>
