@@ -422,10 +422,10 @@ html:has(.selection-body),
     margin-bottom: 22px;
     padding: 28px;
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.88);
+    border: 0;
     border-radius: 18px;
     background: url('../images/background.jpg') center 48% / cover no-repeat;
-    box-shadow: 0 16px 38px rgba(32, 39, 56, 0.08), inset 0 1px rgba(255, 255, 255, 0.92);
+    box-shadow: 0 16px 38px rgba(32, 39, 56, 0.08);
 }
 
 .selection-dashboard-heading::before {
@@ -504,12 +504,14 @@ html:has(.selection-body),
     width: 100%;
     border-collapse: collapse;
     color: #334155;
-    font-size: 14px;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 12px;
+    line-height: 1.35;
 }
 
 .selection-dashboard-table th,
 .selection-dashboard-table td {
-    padding: 16px 20px;
+    padding: 9px 14px;
     border-bottom: 1px solid #edf0f5;
     text-align: left;
 }
@@ -517,10 +519,9 @@ html:has(.selection-body),
 .selection-dashboard-table th {
     color: #64748b;
     background: rgba(248, 250, 252, 0.82);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
 }
 
 .selection-dashboard-table tbody tr:last-child td {
@@ -538,28 +539,29 @@ html:has(.selection-body),
 
 .selection-dashboard-table td:first-child strong {
     color: #1e293b;
-    font-size: 15px;
+    font-size: 13px;
+    font-weight: 600;
 }
 
 .selection-dashboard-table td:first-child span {
     max-width: 500px;
-    margin-top: 4px;
+    margin-top: 2px;
     overflow: hidden;
     color: #7b8794;
-    font-size: 12px;
+    font-size: 11px;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .selection-dashboard-controller {
     display: inline-flex;
-    padding: 5px 8px;
+    padding: 3px 7px;
     border: 1px solid #dbe3ef;
     border-radius: 999px;
     color: #475569;
     background: #f8fafc;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 11px;
+    font-weight: 600;
 }
 
 .selection-dashboard-table td:last-child {
@@ -568,7 +570,7 @@ html:has(.selection-body),
 
 .selection-dashboard-table td:last-child a {
     color: #c85e18;
-    font-weight: 800;
+    font-weight: 600;
     text-decoration: none;
 }
 
@@ -948,12 +950,12 @@ html:has(.selection-body),
 .services-page .account-shell {
     width: min(1500px, 100%);
     margin: 0 auto;
-    padding-top: 132px;
+    padding-top: 114px;
 }
 
 .services-page .account-sidebar {
     position: sticky;
-    top: 132px;
+    top: 114px;
 }
 
 .account-settings-page .account-sidebar {
@@ -961,12 +963,26 @@ html:has(.selection-body),
     top: 132px;
 }
 
-.services-page .sel-liquid-header-inner {
-    grid-template-columns: 1fr;
-    min-height: 62px;
+.services-page .sel-liquid-header {
+    width: min(calc(100% - 20px), 1480px);
+    min-height: 82px;
 }
 
-.services-page * {
+.services-page .sel-liquid-header-inner {
+    grid-template-columns: 1fr;
+    min-height: 60px;
+}
+
+.services-page .sel-liquid-header,
+.services-page .account-sidebar,
+.services-page .account-navigation a,
+.services-page .selection-dashboard-heading,
+.services-page .selection-dashboard-action,
+.services-page .selection-dashboard-table-wrap,
+.services-page .selection-dashboard-controller,
+.services-page .selection-dashboard-empty a,
+.services-page .selection-dashboard-pagination a,
+.services-page .selection-dashboard-pagination > span {
     border-radius: 10px !important;
 }
 
@@ -1088,7 +1104,7 @@ html:has(.selection-body),
     }
 
     .services-page .account-shell {
-        padding-top: 108px;
+        padding-top: 106px;
     }
 
     .account-liquid-header {
@@ -1144,8 +1160,16 @@ html:has(.selection-body),
 }
 
 @media (max-width: 760px) {
+    .services-page .sel-liquid-header {
+        min-height: 50px;
+    }
+
     .services-page .sel-liquid-header-inner {
         min-height: 36px;
+    }
+
+    .services-page .account-shell {
+        padding-top: 62px;
     }
 }
 
@@ -1161,7 +1185,7 @@ html:has(.selection-body),
     }
 
     .services-page .account-shell {
-        padding-top: 88px;
+        padding-top: 62px;
     }
 
     .account-header-brand img {
