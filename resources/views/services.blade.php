@@ -7,11 +7,14 @@
     @vite(['resources/css/app.css'])
 </head>
 <body class="account-page services-page">
-    <header class="spa-selection-return services-page-header">
-        <a class="spa-selection-return-logo" href="{{ route('user-schemes') }}" aria-label="MyHeat, созданные схемы">
-            <img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat">
-        </a>
-        <span class="spa-selection-return-button">Личный кабинет</span>
+    <header class="sel-liquid-header">
+        <div class="sel-liquid-header-shine" aria-hidden="true"></div>
+        <div class="sel-liquid-header-inner">
+            <a class="sel-header-brand" href="{{ route('user-schemes') }}" aria-label="MyHeat, созданные схемы">
+                <img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat">
+                <span>Личный кабинет</span>
+            </a>
+        </div>
     </header>
     <main class="account-shell">
         <aside class="account-sidebar" aria-label="Навигация аккаунта">

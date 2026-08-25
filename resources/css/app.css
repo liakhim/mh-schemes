@@ -948,12 +948,12 @@ html:has(.selection-body),
 .services-page .account-shell {
     width: min(1500px, 100%);
     margin: 0 auto;
-    padding-top: 82px;
+    padding-top: 132px;
 }
 
 .services-page .account-sidebar {
     position: sticky;
-    top: 82px;
+    top: 132px;
 }
 
 .account-settings-page .account-sidebar {
@@ -961,8 +961,8 @@ html:has(.selection-body),
     top: 132px;
 }
 
-.services-page-header {
-    --scheme-accent: #e07020;
+.services-page .sel-liquid-header-inner {
+    grid-template-columns: 1fr;
 }
 
 .account-settings-page .account-sidebar,
@@ -1083,7 +1083,7 @@ html:has(.selection-body),
     }
 
     .services-page .account-shell {
-        padding-top: 82px;
+        padding-top: 108px;
     }
 
     .account-liquid-header {
@@ -1150,7 +1150,7 @@ html:has(.selection-body),
     }
 
     .services-page .account-shell {
-        padding-top: 82px;
+        padding-top: 88px;
     }
 
     .account-header-brand img {
