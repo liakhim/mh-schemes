@@ -424,16 +424,17 @@ html:has(.selection-body),
     overflow: hidden;
     border: 0;
     border-radius: 18px;
-    background: url('../images/background.jpg') center 48% / cover no-repeat;
+    background: url('../images/background.jpg') center 48% / 112% auto no-repeat;
     box-shadow: 0 16px 38px rgba(32, 39, 56, 0.08);
 }
 
 .selection-dashboard-heading::before {
     position: absolute;
     z-index: -1;
-    inset: 0;
+    inset: -4px;
     background: linear-gradient(105deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.58));
     backdrop-filter: blur(2px) saturate(0.8);
+    -webkit-backdrop-filter: blur(2px) saturate(0.8);
     content: '';
 }
 
@@ -557,11 +558,12 @@ html:has(.selection-body),
     display: inline-flex;
     padding: 3px 7px;
     border: 1px solid #dbe3ef;
-    border-radius: 999px;
+    border-radius: 10px;
     color: #475569;
     background: #f8fafc;
     font-size: 11px;
     font-weight: 600;
+    text-transform: uppercase;
 }
 
 .selection-dashboard-table td:last-child {
@@ -970,6 +972,7 @@ html:has(.selection-body),
 
 .services-page .sel-liquid-header-inner {
     grid-template-columns: 1fr;
+    align-items: center;
     min-height: 60px;
 }
 
