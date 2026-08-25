@@ -5342,26 +5342,10 @@ const App = () => {
                                                                           -wifiTapeWidth / 2, 15,
                                                                       ]}
                                                                       closed
-                                                                      fill="#ead7a4"
-                                                                      stroke="#cfb978"
-                                                                      strokeWidth={0.45}
-                                                                      opacity={0.92}
-                                                                      shadowColor="rgba(74, 61, 34, 0.28)"
-                                                                      shadowBlur={3}
-                                                                      shadowOffset={{ x: 1, y: 2 }}
-                                                                      shadowOpacity={0.8}
-                                                                      perfectDrawEnabled={false}
-                                                                  />
-                                                                  <KonvaLine
-                                                                      points={[-wifiTapeWidth / 2 + 5, 4, wifiTapeWidth / 2 - 5, 3]}
-                                                                      stroke="rgba(255, 250, 224, 0.72)"
-                                                                      strokeWidth={0.7}
-                                                                      perfectDrawEnabled={false}
-                                                                  />
-                                                                  <KonvaLine
-                                                                      points={[-wifiTapeWidth / 2 + 4, 14, wifiTapeWidth / 2 - 6, 15]}
-                                                                      stroke="rgba(132, 108, 55, 0.12)"
-                                                                      strokeWidth={0.55}
+                                                                      fill="#e8d6a6"
+                                                                      stroke="#d2bd82"
+                                                                      strokeWidth={0.35}
+                                                                      opacity={0.86}
                                                                       perfectDrawEnabled={false}
                                                                   />
                                                                   <Text
