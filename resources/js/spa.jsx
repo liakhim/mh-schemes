@@ -911,7 +911,7 @@ const App = () => {
     const [schemeMetadataEditor, setSchemeMetadataEditor] = useState(null);
     const [schemeMetaCollapsed, setSchemeMetaCollapsed] = useState(true);
     const [selectedDevicePreview, setSelectedDevicePreview] = useState(null);
-    const [devicePreviewCollapsed, setDevicePreviewCollapsed] = useState(false);
+    const [devicePreviewCollapsed, setDevicePreviewCollapsed] = useState(true);
     const selectedPreviewSlotNodeRef = useRef(null);
     const [previewTitleEditor, setPreviewTitleEditor] = useState(false);
     const [previewTitleDraft, setPreviewTitleDraft] = useState('');
