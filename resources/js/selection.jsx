@@ -40,6 +40,8 @@ const moduleImagePaths = {
     ecosmartbl2: new URL('../assets/modules/bl2/ecosmartbl2.svg', import.meta.url).href,
     rl6: new URL('../assets/modules/rl6/rl6.svg', import.meta.url).href,
     rl6s: new URL('../assets/modules/rl6s/rl6s.svg', import.meta.url).href,
+    rl6w: new URL('../assets/modules/rl6w/rl6w.svg', import.meta.url).href,
+    rl6sw: new URL('../assets/modules/rl6sw/rl6sw.svg', import.meta.url).href,
     io4: new URL('../assets/modules/io4/io4.svg', import.meta.url).href,
     di6: new URL('../assets/modules/di6/di6.svg', import.meta.url).href,
     rl2: new URL('../assets/modules/rl2/rl2.svg', import.meta.url).href,
@@ -2728,19 +2730,22 @@ const ThermostatCard = ({ template, connection, onConnectionChange, color, onCol
             width="48%"
             fallbackColor={CARD_PHOTO_TAIL_COLOR.thermostatRoom}
         />
-        <div className="sel-card-header-action">
-        <button
-            className="selection-option-button selection-tutorial-trigger"
-            type="button"
-            data-active={Boolean(tutorialStep)}
-            aria-pressed={Boolean(tutorialStep)}
-            aria-label={tutorialStep ? 'Закрыть обучение по настройке термостата' : 'Показать подсказку по настройке термостата'}
-            title={tutorialStep ? 'Закрыть обучение' : 'Как добавить термостат'}
-            onClick={() => onTutorialStepChange(tutorialStep ? null : 'connection')}
-        >
-            <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
-            <span className="selection-tutorial-trigger-copy"><strong>Подсказки</strong><small><span className="selection-tutorial-trigger-status" aria-hidden="true" />{tutorialStep ? 'Включены' : 'Выключены'}</small></span>
-        </button>
+        <div className="sel-card-heading-row">
+            <div className="sel-card-heading">Термостаты</div>
+            <div className="sel-card-header-action">
+                <button
+                    className="selection-option-button selection-tutorial-trigger"
+                    type="button"
+                    data-active={Boolean(tutorialStep)}
+                    aria-pressed={Boolean(tutorialStep)}
+                    aria-label={tutorialStep ? 'Закрыть обучение по настройке термостата' : 'Показать подсказку по настройке термостата'}
+                    title={tutorialStep ? 'Закрыть обучение' : 'Как добавить термостат'}
+                    onClick={() => onTutorialStepChange(tutorialStep ? null : 'connection')}
+                >
+                    <span className="selection-tutorial-trigger-icon" aria-hidden="true">?</span>
+                    <span className="selection-tutorial-trigger-copy"><strong>Подсказки</strong><small><span className="selection-tutorial-trigger-status" aria-hidden="true" />{tutorialStep ? 'Включены' : 'Выключены'}</small></span>
+                </button>
+            </div>
         </div>
 
         {/* Содержимое карточки лежит одним позиционированным слоем: слой
@@ -3401,8 +3406,6 @@ const SectionEquipmentCard = ({
                 cover={backgroundCover}
             />
         )}
-        {headerAction && <div className="sel-card-header-action">{headerAction}</div>}
-
         <div
             className="sel-card-section-copy"
             style={{
@@ -3416,9 +3419,14 @@ const SectionEquipmentCard = ({
         >
             {/* Без заголовка карточка начинается сразу с содержимого: пустой
                 `sel-card-heading` иначе занял бы строку и отступ. */}
-            {title && (
-                <div style={{ maxWidth: contentMaxWidth, ...(headerAction ? { paddingRight: 132 } : {}) }}>
-                    <div className="sel-card-heading">{title}</div>
+            {(title || headerAction) && (
+                <div className="sel-card-heading-row">
+                    {title && (
+                        <div style={{ maxWidth: contentMaxWidth, minWidth: 0 }}>
+                            <div className="sel-card-heading">{title}</div>
+                        </div>
+                    )}
+                    {headerAction && <div className="sel-card-header-action">{headerAction}</div>}
                 </div>
             )}
 
@@ -6600,6 +6608,7 @@ const SelectionApp = () => {
                         image={THERMOSTAT_ROOM_IMAGE_PATH}
                         backgroundWidth={520}
                         backgroundColor={CARD_PHOTO_TAIL_COLOR.thermostatRoom}
+                        title="Датчики температуры"
                         headerAction={(
                             <button
                                 className="selection-option-button selection-tutorial-trigger"

@@ -4824,10 +4824,19 @@ html:has(.selection-body),
 }
 
 .sel-card-header-action {
-    position: absolute;
     z-index: 2;
-    top: 24px;
-    right: 24px;
+    flex: 0 0 auto;
+}
+
+.sel-card-heading-row {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
 }
 
 /* Единый вертикальный ритм секций: раньше отступ задавался инлайном и был
@@ -7331,9 +7340,8 @@ html:has(.selection-body),
         border-radius: 14px;
     }
 
-    .sel-card-header-action {
-        top: 12px;
-        right: 12px;
+    .sel-card-heading-row {
+        gap: 8px;
     }
 
     /* Мельче шрифты внутри карточек: заголовок/описание/строки списка. */

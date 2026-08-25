@@ -12,6 +12,7 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByTestId('mixing-connection-wifi').click();
         await page.getByTestId('add-mixing-unit').click();
         await expect(page.getByTestId('controller-card-smart2')).toHaveAttribute('data-active', 'true');
+        await expect(page.getByTestId('panel-module-rl6sw')).toBeVisible();
         await expect(page.locator('.sel-added-label').getByText('Сервопривод 220V с цифровым датчиком с подключением по WI-FI')).toBeVisible();
 
         await page.getByTestId('mixing-connection-wired').click();
@@ -151,6 +152,7 @@ test.describe('/selection - Wi-Fi mixing units', () => {
         await page.getByTestId('zone-connection-wifi').click();
         await page.getByTestId('add-zone').click();
 
+        await expect(page.getByTestId('panel-module-rl6w')).toBeVisible();
         await expect(page.locator('.sel-added-label').getByText('Зона с подключением по WI-FI')).toBeVisible();
     });
 
