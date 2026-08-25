@@ -14,7 +14,10 @@ Route::get('/auth', function (Request $request) {
     return view('auth');
 })->name('auth');
 Route::post('/auth', function (Request $request) {
-    $request->validate(['email' => ['required', 'string']]);
+    $request->validate([
+        'email' => ['required', 'string'],
+        'password' => ['required', 'string'],
+    ]);
 
     return redirect()->route('settings')->withCookie(cookie('PHPSESSID', '1'));
 })->name('auth.store');

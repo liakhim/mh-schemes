@@ -39,10 +39,20 @@ class PhpSessionCookieMiddlewareTest extends TestCase
             ->assertRedirect(route('user-schemes'));
     }
 
-    public function test_auth_sets_php_session_cookie_for_any_non_empty_email(): void
+    public function test_auth_sets_php_session_cookie_for_any_non_empty_credentials(): void
     {
-        $this->post('/auth', ['email' => 'installer@example.test'])
+        $this->post('/auth', [
+            'email' => 'installer@example.test',
+            'password' => 'any-password',
+        ])
             ->assertRedirect(route('settings'))
             ->assertCookie('PHPSESSID', '1');
+    }
+
+    public function test_auth_requires_a_password(): void
+    {
+        $this->post('/auth', ['email' => 'installer@example.test'])
+            ->assertSessionHasErrors('password')
+            ->assertCookieMissing('PHPSESSID');
     }
 }

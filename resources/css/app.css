@@ -1311,7 +1311,7 @@ html:has(.selection-body),
     text-decoration: none;
 }
 
-.auth-brand .account-logo-lockup img {
+.auth-brand img {
     display: block;
     width: 138px;
     height: auto;
