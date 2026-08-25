@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import Konva from 'konva';
-import { Circle as KonvaCircle, Group, Image, Layer, Rect, Stage, Text } from 'react-konva';
+import { Circle as KonvaCircle, Group, Image, Layer, Line as KonvaLine, Rect, Stage, Text } from 'react-konva';
 import '../css/app.css';
 import {
     AERIAL_HEIGHT,
@@ -4931,11 +4931,12 @@ const App = () => {
 
                                 const gap = 0;
                                 const rowSlotHeight = moduleHeightValue;
-                                const rowGap = 17 * indentSize;
+                                const rowGap = 21 * indentSize;
                                 const rowStep = rowSlotHeight + rowGap;
                                 const innerPanelInset = 16;
+                                const panelTopFrameHeight = 5 * indentSize;
                                 const panelPaddingX = innerPanelInset;
-                                const panelPaddingY = 8 * indentSize;
+                                const panelPaddingY = 12 * indentSize;
                                 const getInstallationItemWidth = (item) => (item.isWifiPair
                                     ? 4 * dinSize
                                     : Math.max(dinSize, Math.round(item.image.width / dinSize) * dinSize));
@@ -5180,9 +5181,9 @@ const App = () => {
                                         ))}
                                         <Rect
                                             x={panelX + innerPanelInset}
-                                            y={panelY + innerPanelInset}
+                                            y={panelY + panelTopFrameHeight}
                                             width={panelWidth - innerPanelInset * 2}
-                                            height={panelHeight - innerPanelInset * 2}
+                                            height={panelHeight - panelTopFrameHeight - innerPanelInset}
                                             cornerRadius={6}
                                             fillLinearGradientStartPoint={{ x: 0, y: 0 }}
                                             fillLinearGradientEndPoint={{ x: 0, y: panelHeight - 32 }}
@@ -5237,6 +5238,12 @@ const App = () => {
                                              const itemImageWidth = item.isWifiPair ? 3 * dinSize : itemWidth;
                                              const isLeftController = isLeftControllerItem(item);
                                              const rackPosition = installationPositionsByKey[item.key] || { row: 0, x: 0 };
+                                             const wifiPairCaption = item.isWifiPair
+                                                 ? `${getInstallationItemLabel(item)} + ${POWER_UNIT_LABEL}`
+                                                 : '';
+                                             const wifiTapeWidth = item.isWifiPair
+                                                 ? Math.min(itemWidth - 12, Math.max(92, wifiPairCaption.length * 3.4 + 18))
+                                                 : 0;
                                              const rackBaseY = startY + (rowSlotHeight - item.image.height) / 2;
                                              const baseX = isLeftController ? leftControllerBaseX : startX + rackPosition.x;
                                              const baseY = isLeftController
@@ -5315,11 +5322,64 @@ const App = () => {
                                                          );
                                                      })()}
                                                       {item.isWifiPair && wirelessImages['power-unit'] && (
-                                                         <>
-                                                             <Image image={wirelessImages['power-unit']} width={dinSize} height={item.image.height} listening={false} />
-                                                             <Text x={0} y={-12} width={itemWidth} text={`${getInstallationItemLabel(item)} + ${POWER_UNIT_LABEL}`} fontSize={6} fill="#4a5568" align="center" listening={false} />
-                                                         </>
-                                                     )}
+                                                          <>
+                                                              <Image image={wirelessImages['power-unit']} width={dinSize} height={item.image.height} listening={false} />
+                                                              <Group
+                                                                  x={itemWidth / 2}
+                                                                  y={-panelPaddingY + panelTopFrameHeight / 2 - 9}
+                                                                  rotation={itemIndex % 2 === 0 ? -0.45 : 0.55}
+                                                                  listening={false}
+                                                              >
+                                                                  <KonvaLine
+                                                                      points={[
+                                                                          -wifiTapeWidth / 2, 2,
+                                                                          -wifiTapeWidth / 2 + 3, 0,
+                                                                          wifiTapeWidth / 2 - 3, 1,
+                                                                          wifiTapeWidth / 2, 3,
+                                                                          wifiTapeWidth / 2 - 1, 16,
+                                                                          wifiTapeWidth / 2 - 4, 18,
+                                                                          -wifiTapeWidth / 2 + 2, 17,
+                                                                          -wifiTapeWidth / 2, 15,
+                                                                      ]}
+                                                                      closed
+                                                                      fill="#ead7a4"
+                                                                      stroke="#cfb978"
+                                                                      strokeWidth={0.45}
+                                                                      opacity={0.92}
+                                                                      shadowColor="rgba(74, 61, 34, 0.28)"
+                                                                      shadowBlur={3}
+                                                                      shadowOffset={{ x: 1, y: 2 }}
+                                                                      shadowOpacity={0.8}
+                                                                      perfectDrawEnabled={false}
+                                                                  />
+                                                                  <KonvaLine
+                                                                      points={[-wifiTapeWidth / 2 + 5, 4, wifiTapeWidth / 2 - 5, 3]}
+                                                                      stroke="rgba(255, 250, 224, 0.72)"
+                                                                      strokeWidth={0.7}
+                                                                      perfectDrawEnabled={false}
+                                                                  />
+                                                                  <KonvaLine
+                                                                      points={[-wifiTapeWidth / 2 + 4, 14, wifiTapeWidth / 2 - 6, 15]}
+                                                                      stroke="rgba(132, 108, 55, 0.12)"
+                                                                      strokeWidth={0.55}
+                                                                      perfectDrawEnabled={false}
+                                                                  />
+                                                                  <Text
+                                                                      x={-wifiTapeWidth / 2 + 7}
+                                                                      y={4}
+                                                                      width={wifiTapeWidth - 14}
+                                                                      height={11}
+                                                                      text={wifiPairCaption}
+                                                                      fontFamily="Segoe Print, Comic Sans MS, cursive"
+                                                                      fontSize={6.2}
+                                                                      fill="#394150"
+                                                                      align="center"
+                                                                      verticalAlign="middle"
+                                                                      listening={false}
+                                                                  />
+                                                              </Group>
+                                                          </>
+                                                      )}
                                                     {goAerialImage && item.key === 'controller' && ['go', 'go+'].includes(controllerType) && (() => {
                                                         const aerialWidth = goAerialImage.width || AERIAL_WIDTH;
                                                         const aerialHeight = goAerialImage.height || AERIAL_HEIGHT;

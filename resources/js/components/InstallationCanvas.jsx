@@ -10,8 +10,8 @@ const getInstallationLayoutMetrics = () => {
     const indentSize = parseInt(indent, 10) || 8;
     const dinSize = parseInt(din, 10) || 40;
     const rowSlotHeight = parseInt(module_height, 10) || 200;
-    const panelPaddingY = 8 * indentSize;
-    const rowGap = 17 * indentSize;
+    const panelPaddingY = 12 * indentSize;
+    const rowGap = 21 * indentSize;
     return {
         dinSize,
         rowSlotHeight,
