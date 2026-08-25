@@ -4150,7 +4150,7 @@ html:has(.selection-body),
 }
 
 .selection-page {
-    --sel-header-height: 108px;
+    --sel-header-height: 92px;
     font-family: "Segoe UI", Tahoma, sans-serif;
     padding: 0 10px !important;
 }
@@ -4158,7 +4158,7 @@ html:has(.selection-body),
 .selection-page::before {
     content: '';
     display: block;
-    height: 132px;
+    height: 116px;
 }
 
 .selection-page section > div {
@@ -6919,7 +6919,7 @@ html:has(.selection-body),
     /* Распорка под фиксированной шапкой считается от её реальной высоты:
        со сжатой шапкой прежние 132px оставляли пустую полосу. */
     .selection-page::before {
-        height: 58px;
+        height: 62px;
     }
 
     /* На телефоне шапка прижата к самому верху и во всю ширину: отступ по 8px
