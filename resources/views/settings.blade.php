@@ -7,15 +7,12 @@
     @vite(['resources/css/app.css'])
 </head>
 <body class="account-page account-settings-page">
-    <header class="account-liquid-header">
-        <div class="account-liquid-header-shine" aria-hidden="true"></div>
-        <a class="account-header-brand" href="{{ route('user-schemes') }}" aria-label="MyHeat, подбор оборудования">
-            <span class="account-logo-lockup"><img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat"><b>PRO</b></span>
-            <span>Личный кабинет</span>
-        </a>
-        <div class="account-header-caption">
-            <strong>Профиль монтажника</strong>
-            <span>Настройте информацию для заказчиков</span>
+    <header class="sel-liquid-header">
+        <div class="sel-liquid-header-shine" aria-hidden="true"></div>
+        <div class="sel-liquid-header-inner">
+            <a class="sel-header-brand" href="{{ route('user-schemes') }}" aria-label="MyHeat, созданные схемы">
+                <img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat">
+            </a>
         </div>
     </header>
     <main class="account-shell">
@@ -28,10 +25,6 @@
                 <a href="{{ route('user-schemes') }}">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h.01M12 9h.01M16 9h.01M8 15h.01M12 15h.01M16 15h.01" /></svg>
                     <span>Подбор оборудования</span>
-                </a>
-                <a href="{{ route('learning') }}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5m0-16v16M8 7h8m-8 4h8" /></svg>
-                    <span>Обучение</span>
                 </a>
             </nav>
         </aside>

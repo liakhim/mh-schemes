@@ -965,17 +965,27 @@ html:has(.selection-body),
     top: 132px;
 }
 
+.account-settings-page .sel-liquid-header,
 .services-page .sel-liquid-header {
     width: min(calc(100% - 20px), 1480px);
     min-height: 82px;
 }
 
+.account-settings-page .sel-liquid-header-inner,
 .services-page .sel-liquid-header-inner {
     grid-template-columns: 1fr;
     align-items: center;
     min-height: 60px;
 }
 
+.account-settings-page .sel-liquid-header,
+.account-settings-page .account-sidebar,
+.account-settings-page .account-navigation a,
+.account-settings-page .account-card,
+.account-settings-page .account-card input,
+.account-settings-page .account-card textarea,
+.account-settings-page .account-toggle span,
+.account-settings-page .account-toggle span::after,
 .services-page .sel-liquid-header,
 .services-page .account-sidebar,
 .services-page .account-navigation a,
@@ -1103,7 +1113,7 @@ html:has(.selection-body),
 
 @media (max-width: 850px) {
     .account-settings-page .account-shell {
-        padding-top: 108px;
+        padding-top: 132px;
     }
 
     .services-page .account-shell {
@@ -1163,12 +1173,18 @@ html:has(.selection-body),
 }
 
 @media (max-width: 760px) {
+    .account-settings-page .sel-liquid-header,
     .services-page .sel-liquid-header {
         min-height: 50px;
     }
 
+    .account-settings-page .sel-liquid-header-inner,
     .services-page .sel-liquid-header-inner {
         min-height: 36px;
+    }
+
+    .account-settings-page .account-shell {
+        padding-top: 58px;
     }
 
     .services-page .account-shell {
@@ -1184,7 +1200,7 @@ html:has(.selection-body),
     }
 
     .account-settings-page .account-shell {
-        padding-top: 88px;
+        padding-top: 58px;
     }
 
     .services-page .account-shell {
@@ -4128,7 +4144,7 @@ html:has(.selection-body),
 .selection-page {
     --sel-header-height: 108px;
     font-family: "Segoe UI", Tahoma, sans-serif;
-    padding: 0 24px !important;
+    padding: 0 10px !important;
 }
 
 .selection-page::before {
@@ -4336,11 +4352,11 @@ html:has(.selection-body),
     top: 12px;
     left: 50%;
     z-index: 1000;
-    width: min(calc(100% - 32px), 1452px);
+    width: min(calc(100% - 20px), 1480px);
     box-sizing: border-box;
     overflow: visible;
     border: 1px solid rgba(255, 255, 255, 0.76);
-    border-radius: 16px;
+    border-radius: 10px;
     background:
         linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(242, 246, 252, 0.58)),
         rgba(255, 255, 255, 0.48);
@@ -6842,7 +6858,7 @@ html:has(.selection-body),
         border-top: 0;
         border-left: 0;
         border-right: 0;
-        border-radius: 0;
+        border-radius: 0 0 10px 10px;
     }
 
     /* Шапка в одну строку: лого слева, переключатель режима прижат вправо и
