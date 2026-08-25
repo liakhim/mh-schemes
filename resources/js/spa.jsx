@@ -5238,11 +5238,12 @@ const App = () => {
                                              const itemImageWidth = item.isWifiPair ? 3 * dinSize : itemWidth;
                                              const isLeftController = isLeftControllerItem(item);
                                              const rackPosition = installationPositionsByKey[item.key] || { row: 0, x: 0 };
-                                             const wifiPairCaption = item.isWifiPair
-                                                 ? `${getInstallationItemLabel(item)} + ${POWER_UNIT_LABEL}`
+                                             const isExpansionModuleItem = item.key !== 'controller' && !powerTypes.has(item.type);
+                                             const installationTapeCaption = isExpansionModuleItem
+                                                 ? `${getInstallationItemLabel(item)}${item.isWifiPair ? ` + ${POWER_UNIT_LABEL}` : ''}`
                                                  : '';
-                                             const wifiTapeWidth = item.isWifiPair
-                                                 ? Math.min(itemWidth - 12, Math.max(92, wifiPairCaption.length * 3.4 + 18))
+                                             const installationTapeWidth = installationTapeCaption
+                                                 ? Math.max(32, Math.min(itemWidth - 8, Math.max(item.isWifiPair ? 116 : 38, installationTapeCaption.length * 3.4 + 18)))
                                                  : 0;
                                              const rackBaseY = startY + (rowSlotHeight - item.image.height) / 2;
                                              const baseX = isLeftController ? leftControllerBaseX : startX + rackPosition.x;
@@ -5322,48 +5323,48 @@ const App = () => {
                                                          );
                                                      })()}
                                                       {item.isWifiPair && wirelessImages['power-unit'] && (
-                                                          <>
-                                                              <Image image={wirelessImages['power-unit']} width={dinSize} height={item.image.height} listening={false} />
-                                                              <Group
-                                                                  x={itemWidth / 2}
-                                                                  y={-panelPaddingY + panelTopFrameHeight / 2 - 9}
-                                                                  rotation={itemIndex % 2 === 0 ? -0.45 : 0.55}
-                                                                  listening={false}
-                                                              >
-                                                                  <KonvaLine
-                                                                      points={[
-                                                                          -wifiTapeWidth / 2, 2,
-                                                                          -wifiTapeWidth / 2 + 3, 0,
-                                                                          wifiTapeWidth / 2 - 3, 1,
-                                                                          wifiTapeWidth / 2, 3,
-                                                                          wifiTapeWidth / 2 - 1, 16,
-                                                                          wifiTapeWidth / 2 - 4, 18,
-                                                                          -wifiTapeWidth / 2 + 2, 17,
-                                                                          -wifiTapeWidth / 2, 15,
-                                                                      ]}
-                                                                      closed
-                                                                      fill="#e8d6a6"
-                                                                      stroke="#d2bd82"
-                                                                      strokeWidth={0.35}
-                                                                      opacity={0.86}
-                                                                      perfectDrawEnabled={false}
-                                                                  />
-                                                                  <Text
-                                                                      x={-wifiTapeWidth / 2 + 7}
-                                                                      y={4}
-                                                                      width={wifiTapeWidth - 14}
-                                                                      height={11}
-                                                                      text={wifiPairCaption}
-                                                                      fontFamily="Segoe Print, Comic Sans MS, cursive"
-                                                                      fontSize={6.2}
-                                                                      fill="#394150"
-                                                                      align="center"
-                                                                      verticalAlign="middle"
-                                                                      listening={false}
-                                                                  />
-                                                              </Group>
-                                                          </>
+                                                          <Image image={wirelessImages['power-unit']} width={dinSize} height={item.image.height} listening={false} />
                                                       )}
+                                                     {installationTapeCaption && (
+                                                         <Group
+                                                             x={itemWidth / 2}
+                                                             y={-panelPaddingY + panelTopFrameHeight / 2 - 9}
+                                                             rotation={itemIndex % 2 === 0 ? -0.45 : 0.55}
+                                                             listening={false}
+                                                         >
+                                                             <KonvaLine
+                                                                 points={[
+                                                                     -installationTapeWidth / 2, 2,
+                                                                     -installationTapeWidth / 2 + 3, 0,
+                                                                     installationTapeWidth / 2 - 3, 1,
+                                                                     installationTapeWidth / 2, 3,
+                                                                     installationTapeWidth / 2 - 1, 16,
+                                                                     installationTapeWidth / 2 - 4, 18,
+                                                                     -installationTapeWidth / 2 + 2, 17,
+                                                                     -installationTapeWidth / 2, 15,
+                                                                 ]}
+                                                                 closed
+                                                                 fill="#e8d6a6"
+                                                                 stroke="#d2bd82"
+                                                                 strokeWidth={0.35}
+                                                                 opacity={0.86}
+                                                                 perfectDrawEnabled={false}
+                                                             />
+                                                             <Text
+                                                                 x={-installationTapeWidth / 2 + 7}
+                                                                 y={4}
+                                                                 width={installationTapeWidth - 14}
+                                                                 height={11}
+                                                                 text={installationTapeCaption}
+                                                                 fontFamily="Segoe Print, Comic Sans MS, cursive"
+                                                                 fontSize={6.2}
+                                                                 fill="#394150"
+                                                                 align="center"
+                                                                 verticalAlign="middle"
+                                                                 listening={false}
+                                                             />
+                                                         </Group>
+                                                     )}
                                                     {goAerialImage && item.key === 'controller' && ['go', 'go+'].includes(controllerType) && (() => {
                                                         const aerialWidth = goAerialImage.width || AERIAL_WIDTH;
                                                         const aerialHeight = goAerialImage.height || AERIAL_HEIGHT;
