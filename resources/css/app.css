@@ -4352,6 +4352,7 @@ html:has(.selection-body),
     top: 12px;
     left: 50%;
     z-index: 1000;
+    display: flex;
     width: min(calc(100% - 20px), 1480px);
     box-sizing: border-box;
     overflow: visible;
@@ -4407,6 +4408,7 @@ html:has(.selection-body),
 
 .sel-liquid-header-inner {
     display: grid;
+    flex: 1 1 auto;
     grid-template-columns: 210px minmax(480px, 1fr) 210px;
     align-items: center;
     gap: 24px;
