@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>MH Schemes - SPA</title>
+    <title>{{ $scheme ? 'MyHeat - '.$scheme->name : 'MyHeat - Новая схема' }}</title>
     @if ($scheme)
     @php
         $initialSchemeRecord = [

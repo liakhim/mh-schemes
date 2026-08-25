@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MH Schemes - Admin</title>
+    <title>MyHeat - Справочник оборудования</title>
     @vite('resources/js/admin.jsx')
 </head>
 <body>

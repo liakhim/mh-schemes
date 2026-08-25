@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MH Schemes - Graphs</title>
+    <title>MyHeat - Графы</title>
     @if (app()->environment('local'))
     <script type="module">
     import RefreshRuntime from '/@react-refresh';
