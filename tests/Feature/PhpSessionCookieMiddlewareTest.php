@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 class PhpSessionCookieMiddlewareTest extends TestCase
@@ -54,5 +56,15 @@ class PhpSessionCookieMiddlewareTest extends TestCase
         $this->post('/auth', ['email' => 'installer@example.test'])
             ->assertSessionHasErrors('password')
             ->assertCookieMissing('PHPSESSID');
+    }
+
+    public function test_auth_displays_a_credentials_error(): void
+    {
+        $errors = (new ViewErrorBag)->put('default', new MessageBag([
+            'credentials' => ['Неверный email или пароль.'],
+        ]));
+
+        $this->view('auth', ['errors' => $errors])
+            ->assertSee('Неверный email или пароль.');
     }
 }

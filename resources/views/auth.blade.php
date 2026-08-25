@@ -15,15 +15,18 @@
         <p>Укажите email и пароль аккаунта монтажника, чтобы продолжить.</p>
         <form method="POST" action="{{ route('auth.store') }}">
             @csrf
+            @error('credentials')
+                <div class="auth-error auth-error-summary" role="alert">{{ $message }}</div>
+            @enderror
             <label for="installer-email">Email аккаунта монтажника</label>
             <input id="installer-email" name="email" type="text" value="{{ old('email') }}" required autofocus>
             @error('email')
-                <span class="auth-error">{{ $message }}</span>
+                <span class="auth-error" role="alert">{{ $message }}</span>
             @enderror
             <label for="installer-password">Пароль</label>
             <input id="installer-password" name="password" type="password" required autocomplete="current-password">
             @error('password')
-                <span class="auth-error">{{ $message }}</span>
+                <span class="auth-error" role="alert">{{ $message }}</span>
             @enderror
             <button type="submit">Продолжить</button>
         </form>

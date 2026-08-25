@@ -1378,6 +1378,14 @@ html:has(.selection-body),
     font-size: 13px;
 }
 
+.auth-error-summary {
+    padding: 10px 12px;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    background: #fef2f2;
+    line-height: 1.4;
+}
+
 .spa-page {
     --scheme-accent: #e07020;
     --accent: var(--scheme-accent);
@@ -6002,6 +6010,7 @@ html:has(.selection-body),
 .selection-page button.selection-add-button {
     align-self: flex-start;
     padding: 12px 26px;
+    border-radius: 10px;
 }
 
 /* Исключение для карточки термостата: здесь колонка настроек и так сжата до
@@ -7370,7 +7379,7 @@ html:has(.selection-body),
 
     .selection-page button.selection-add-button {
         padding: 10px 12px;
-        border-radius: 9px;
+        border-radius: 10px;
         font-size: 12px;
     }
 
