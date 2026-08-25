@@ -13,10 +13,6 @@
             <span class="account-logo-lockup"><img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat"><b>PRO</b></span>
             <span>Личный кабинет</span>
         </a>
-        <div class="account-header-caption">
-            <strong>Подбор оборудования</strong>
-            <span>Создавайте и продолжайте схемы</span>
-        </div>
     </header>
     <main class="account-shell">
         <aside class="account-sidebar" aria-label="Навигация аккаунта">
