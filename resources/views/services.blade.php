@@ -29,21 +29,16 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h.01M12 9h.01M16 9h.01M8 15h.01M12 15h.01M16 15h.01" /></svg>
                     <span>Подбор оборудования</span>
                 </a>
-                <a href="{{ route('learning') }}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5m0-16v16M8 7h8m-8 4h8" /></svg>
-                    <span>Обучение</span>
-                </a>
             </nav>
         </aside>
         <section class="services-content selection-dashboard" aria-labelledby="selection-dashboard-title">
             <div class="selection-dashboard-heading">
                 <div>
-                    <span class="selection-dashboard-kicker">Рабочее пространство</span>
                     <h1 id="selection-dashboard-title">Созданные схемы</h1>
                     <p>Продолжайте работу с сохраненной схемой или создайте новую конфигурацию оборудования.</p>
                 </div>
                 <a class="selection-dashboard-action" href="{{ route('selection') }}">
-                    Перейти в подбор
+                    Создать схему
                     <span aria-hidden="true">→</span>
                 </a>
             </div>
