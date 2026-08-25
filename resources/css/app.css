@@ -334,7 +334,7 @@ html:has(.selection-body),
 .account-shell {
     display: grid;
     min-height: 100vh;
-    grid-template-columns: 275px minmax(0, 1fr);
+    grid-template-columns: 260px minmax(0, 1fr);
     gap: 20px;
     padding: 12px 10px 28px;
 }
@@ -4695,10 +4695,10 @@ html:has(.selection-body),
     position: sticky;
     top: var(--sel-sidebar-top);
     display: flex;
-    width: 275px;
+    width: 260px;
     max-height: calc(100vh - var(--sel-sidebar-top) - 24px);
     max-height: calc(100dvh - var(--sel-sidebar-top) - 24px);
-    flex: 0 0 275px;
+    flex: 0 0 260px;
     align-self: flex-start;
     flex-direction: column;
     gap: 10px;
