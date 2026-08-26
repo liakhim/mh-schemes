@@ -2988,7 +2988,7 @@ const App = () => {
 
     const addRelayDeviceFromMenu = (type) => {
         if (!relayMenuPos) return;
-        // Тупой котёл не может садиться на RELAY-S порты.
+        // Простой котёл не может садиться на RELAY-S порты.
         if (type === 'stupid' && relayMenuPos.lineKey === 'relay_s_devices') {
             setRelayMenuPos(null);
             return;
@@ -3134,7 +3134,7 @@ const App = () => {
 
     const addRl2sRelayDeviceFromMenu = (type) => {
         if (!rl2sRelayMenuPos) return;
-        // Тупой котёл не может садиться на RELAY-S порты (rl2s — relay-s линия).
+        // Простой котёл не может садиться на RELAY-S порты (rl2s — relay-s линия).
         if (type === 'stupid') {
             setRl2sRelayMenuPos(null);
             return;

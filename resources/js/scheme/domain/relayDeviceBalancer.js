@@ -87,7 +87,7 @@ const isStupidBoilerDevice = (device) => {
 };
 
 const supportsRelayS = (device) => {
-    // Тупой котёл не может садиться на RELAY-S порты.
+    // Простой котёл не может садиться на RELAY-S порты.
     if (isStupidBoilerDevice(device)) return false;
     const type = canonicalDeviceType(device?.type);
     const connectionTypes = getConnectionTypes(device);
@@ -152,7 +152,7 @@ export const balanceRelayDevices = (scheme) => {
     controller.relay_220pump5_devices = Array.isArray(controller.relay_220pump5_devices) ? [...controller.relay_220pump5_devices] : [];
     controller.relay_220pump3_devices = Array.isArray(controller.relay_220pump3_devices) ? [...controller.relay_220pump3_devices] : [];
 
-    // Тупой котёл не может находиться на Wi-Fi relay-модулях или RELAY-S портах.
+    // Простой котёл не может находиться на Wi-Fi relay-модулях или RELAY-S портах.
     const strayStupidBoilers = [];
     const stripStupidBoilersFromLine = (moduleItem, lineKey) => {
         if (!Array.isArray(moduleItem[lineKey]) || moduleItem[lineKey].length === 0) return;

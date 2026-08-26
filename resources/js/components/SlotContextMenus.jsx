@@ -279,7 +279,7 @@ const SlotContextMenus = ({
                     className="ctx-menu-item"
                     onClick={() => addRelayDeviceFromMenu('stupid')}
                 >
-                    Тупой котёл
+                    Простой котёл
                 </div>
             )}
             {(() => {

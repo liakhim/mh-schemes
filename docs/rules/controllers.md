@@ -62,7 +62,7 @@
 ## Ecosmart Slot Controls
 
 - Hover-состояние per-role слотов `ecosmart` (leak-sensor, discrete DI, верхние NTC-слоты, насосы, сервоприводы, клапан, насос ГВС) вешается на Konva `Group` слота, а не на `Rect`: наведение на крестик удаления не должно снимать hover.
-- Занятый controller RELAY-слот `ecosmart` (тупой котёл) показывает hover-крестик удаления; удаление вычищает устройство по id из `controller.relay_devices`, `boilers` и `wired_devices`.
+- Занятый controller RELAY-слот `ecosmart` (простой котёл) показывает hover-крестик удаления; удаление вычищает устройство по id из `controller.relay_devices`, `boilers` и `wired_devices`.
 - Инфоблоки per-role слотов `ecosmart` (включая насос бойлера ГВС) рисуются только при занятом слоте; над пустым слотом инфоблока нет даже при `Show empty slots`.
 
 ## Ecosmart Installation Ports
@@ -86,7 +86,7 @@
 
 ## Ecosmart Controller Switch
 
-- При смене контроллера с `ecosmart` на другой (ручной выбор или автоподбор на `/selection`) внутренние материализации разворачиваются: термостаты из `controller.ext_devices` возвращаются в `wired_devices` с `connection_type='1-wire'`, `controller.ecosmart_bl2` удаляется, датчик тупого котла (`flask-sensor-stupid-boiler`) восстанавливается в `sensors`, если в схеме есть тупой котёл.
+- При смене контроллера с `ecosmart` на другой (ручной выбор или автоподбор на `/selection`) внутренние материализации разворачиваются: термостаты из `controller.ext_devices` возвращаются в `wired_devices` с `connection_type='1-wire'`, `controller.ecosmart_bl2` удаляется, датчик простого котла (`flask-sensor-stupid-boiler`) восстанавливается в `sensors`, если в схеме есть простой котёл.
 
 ## GO / GO+ Aerial
 

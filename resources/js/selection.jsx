@@ -186,7 +186,7 @@ const BOILER_TEMPLATES = [
         },
     },
     {
-        label: 'Тупой котел',
+        label: 'Простой котёл',
         data: {
             id: 0,
             device_type: 'boiler',
@@ -970,7 +970,7 @@ const getControllerCompatibilityIssues = (scheme, controllerTypeOverride = null,
         return [`Wi-Fi-модули: требуется ${wifiModules.length}, доступно ${getWifiModuleCapacity(controllerType)}.`];
     }
     if (controllerType !== 'pro' && requiresProForBoilerCombination(scheme)) {
-        return ['Комбинация из двух умных и одного тупого котла, где умный котёл подключён по RELAY, требует контроллер PRO.'];
+        return ['Комбинация из двух умных и одного простого котла, где умный котёл подключён по RELAY, требует контроллер PRO.'];
     }
     if (upsRequested && controllerType === 'go') {
         return ['Для бесперебойного питания требуется GO+ со встроенным ИБП либо Smart2/PRO с внешним UPS.'];

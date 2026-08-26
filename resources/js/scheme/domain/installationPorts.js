@@ -18,7 +18,7 @@ export const INSTALLATION_DEVICE_TYPE_TITLES = {
     zoneServo: 'Сервопривод зоны',
     '220servo': 'Сервопривод 220',
     valve: 'Запорный клапан',
-    stupid: 'Тупой котел',
+    stupid: 'Простой котёл',
     smart: 'Умный котел',
     thermostat: 'Термостат',
     'flask-sensor': 'Датчик температуры',
