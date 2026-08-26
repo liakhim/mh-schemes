@@ -4,7 +4,7 @@ import crossIcon from '../../assets/icons/cross.svg';
 const ModalCloseButton = ({ className = '', onClick, label = 'Закрыть' }) => (
     <button
         type="button"
-        className={className}
+        className={`modal-close-button ${className}`.trim()}
         onClick={onClick}
         aria-label={label}
     >

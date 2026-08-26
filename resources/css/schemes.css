@@ -12,6 +12,7 @@
 
 .ui-modal { position: relative; }
 .ui-modal h2 { padding-right: 38px; }
-.ui-modal-close { position: absolute; z-index: 1; top: 14px; right: 14px; display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; padding: 0; border: 1px solid #e2e8f0; border-radius: 50%; background: #fff; cursor: pointer; }
-.ui-modal-close:hover { background: #fef2f2; }
+.ui-modal-close { position: absolute; z-index: 1; top: 14px; right: 14px; display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; padding: 0; border: 1px solid transparent; border-radius: 50%; background: transparent; cursor: pointer; }
+.modal-close-button.modal-close-button { border-color: transparent; background: transparent; }
+.modal-close-button.modal-close-button:hover { border-color: #fecaca; background: #fef2f2; }
 .modal-close-icon { display: block; width: 12px; height: 12px; }
