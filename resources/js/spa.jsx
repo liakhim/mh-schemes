@@ -3806,9 +3806,8 @@ const App = () => {
                 .slice(0, index)
                 .filter((candidate) => getItemType(candidate) === type)
                 .length;
-            const sameTypeTotal = chain.filter((candidate) => getItemType(candidate) === type).length;
             return {
-                label: sameTypeTotal > 1 ? `${baseLabel} #${sameTypeBefore + 1}` : baseLabel,
+                label: `${baseLabel} #${sameTypeBefore + 1}`,
             };
         };
         const addUnique = (items, seen, item, source, extra = {}) => {
@@ -5238,11 +5237,19 @@ const App = () => {
                                              const itemImageX = item.isWifiPair ? dinSize : 0;
                                              const itemImageWidth = item.isWifiPair ? 3 * dinSize : itemWidth;
                                              const isLeftController = isLeftControllerItem(item);
-                                             const rackPosition = installationPositionsByKey[item.key] || { row: 0, x: 0 };
-                                             const isExpansionModuleItem = item.key !== 'controller' && !powerTypes.has(item.type);
-                                             const installationTapeCaption = isExpansionModuleItem
-                                                 ? `${getInstallationItemLabel(item)}${item.isWifiPair ? ` + ${POWER_UNIT_LABEL}` : ''}`
-                                                 : '';
+                                              const rackPosition = installationPositionsByKey[item.key] || { row: 0, x: 0 };
+                                              const isExpansionModuleItem = item.key !== 'controller' && !powerTypes.has(item.type);
+                                              const installationModuleNumber = isExpansionModuleItem
+                                                  ? items.slice(0, itemIndex + 1).filter((candidate) => (
+                                                      candidate.key !== 'controller'
+                                                      && !powerTypes.has(candidate.type)
+                                                      && candidate.type === item.type
+                                                  )).length
+                                                  : null;
+                                              const installationModuleLabel = getInstallationItemLabel(item)?.replace(/\s+#\d+$/, '');
+                                              const installationTapeCaption = isExpansionModuleItem
+                                                  ? `${installationModuleLabel} #${installationModuleNumber}${item.isWifiPair ? ` + ${POWER_UNIT_LABEL}` : ''}`
+                                                  : '';
                                              const installationTapeWidth = installationTapeCaption
                                                  ? Math.max(32, Math.min(itemWidth - 8, Math.max(item.isWifiPair ? 116 : 38, installationTapeCaption.length * 3.4 + 18)))
                                                  : 0;
