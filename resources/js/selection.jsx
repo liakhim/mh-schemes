@@ -2455,12 +2455,11 @@ const BoilerConnectionSwitch = ({ connectionType, onChange, tutorialRef, onTutor
 const AddedDeviceLine = ({ label, count = 1, onRemove, badge = null, badgeAbove = false, price = null, disabled = false, control = null, hideCount = false, removeFirst = false, align = 'flex-end', trailing = null }) => {
     const removeButton = onRemove ? (
         <button
-            className="sel-added-remove-button"
+            type="button"
+            className="sel-added-remove-button selection-remove-icon"
             onClick={onRemove}
-            style={{ border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
             title="Удалить"
-            onMouseEnter={(event) => { event.currentTarget.style.background = '#fef2f2'; }}
-            onMouseLeave={(event) => { event.currentTarget.style.background = 'transparent'; }}
+            aria-label={`Удалить ${label}`}
         >
             ×
         </button>
@@ -3305,6 +3304,7 @@ const SectionEquipmentCard = ({
     counterTutorialTemplateKey = null,
     onAddUnit,
     onRemoveUnit,
+    onRemoveRow,
     addLabel,
     onAdd,
     showAdd = true,
@@ -3334,6 +3334,10 @@ const SectionEquipmentCard = ({
                         label={row.label}
                         align={addedRowsAlign}
                         hideCount
+                        removeFirst
+                        onRemove={onRemoveRow && row.removeKeys?.some((key) => key != null)
+                            ? () => onRemoveRow(row)
+                            : null}
                         control={(
                             <QtyStepper
                                 tutorialRef={(counterTutorialTemplateKey
@@ -3571,7 +3575,7 @@ const SegmentedField = ({
  * из пары получается шаблон MIXING_TEMPLATES. Комбинации «0-10V + цифровой
  * датчик» не существует, поэтому такой вариант датчика гасится.
  */
-const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, servo, onServoChange, sensor, onSensorChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, wifiMixingLimitReached = false, showJsonDetails = false, tutorialStep = null, onTutorialStepChange }) => {
+const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, servo, onServoChange, sensor, onSensorChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, onRemoveRow, wifiMixingLimitReached = false, showJsonDetails = false, tutorialStep = null, onTutorialStepChange }) => {
     const tutorialScopeRef = useRef(null);
     const connectionRef = useRef(null);
     const servoRef = useRef(null);
@@ -3614,6 +3618,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
         counterTutorialLabel={template.label}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
+        onRemoveRow={onRemoveRow}
         addLabel={`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
         onAdd={() => {
             onAdd();
@@ -3797,7 +3802,7 @@ const MixingUnitCard = ({ template, connectionMode, onConnectionModeChange, serv
     );
 };
 
-const GvsBoilerCard = ({ template, onAdd, addedRows = [], onAddUnit, onRemoveUnit, showJsonDetails = false, tutorialStep = null, onTutorialStepChange }) => {
+const GvsBoilerCard = ({ template, onAdd, addedRows = [], onAddUnit, onRemoveUnit, onRemoveRow, showJsonDetails = false, tutorialStep = null, onTutorialStepChange }) => {
     const tutorialScopeRef = useRef(null);
     const addRef = useRef(null);
     const addedListRef = useRef(null);
@@ -3835,6 +3840,7 @@ const GvsBoilerCard = ({ template, onAdd, addedRows = [], onAddUnit, onRemoveUni
         counterTutorialRef={counterRef}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
+        onRemoveRow={onRemoveRow}
         addLabel="Добавить бойлер ГВС"
         onAdd={onAdd}
         addTutorialRef={addRef}
@@ -3878,7 +3884,7 @@ const GvsBoilerCard = ({ template, onAdd, addedRows = [], onAddUnit, onRemoveUni
  * смесительном узле. В списке добавленного 220V и 0-10V остаются отдельными
  * строками со своими счетчиками.
  */
-const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, onPumpTypeChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, wifiPumpLimitReached = false, showJsonDetails = false, tutorialStep = null, onTutorialStepChange }) => {
+const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, onPumpTypeChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, onRemoveRow, wifiPumpLimitReached = false, showJsonDetails = false, tutorialStep = null, onTutorialStepChange }) => {
     const tutorialScopeRef = useRef(null);
     const connectionRef = useRef(null);
     const pumpTypeRef = useRef(null);
@@ -3923,6 +3929,7 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
         counterTutorialLabel={template.label}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
+        onRemoveRow={onRemoveRow}
         addLabel={`Добавить ${template.label.charAt(0).toLowerCase()}${template.label.slice(1)}`}
         onAdd={() => {
             onAdd();
@@ -4073,7 +4080,7 @@ const PumpCard = ({ template, connectionMode, onConnectionModeChange, pumpType, 
     );
 };
 
-const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, wifiRelayLimitReached = false, showJsonDetails = false, tutorialStep = null, onTutorialStepChange, isOtherEquipment = false }) => {
+const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, addedRows = [], onAddUnit, onRemoveUnit, onRemoveRow, wifiRelayLimitReached = false, showJsonDetails = false, tutorialStep = null, onTutorialStepChange, isOtherEquipment = false }) => {
     const tutorialScopeRef = useRef(null);
     const connectionRef = useRef(null);
     const addRef = useRef(null);
@@ -4116,6 +4123,7 @@ const ZoneCard = ({ template, connectionMode, onConnectionModeChange, onAdd, add
         counterTutorialLabel={template.label}
         onAddUnit={onAddUnit}
         onRemoveUnit={onRemoveUnit}
+        onRemoveRow={onRemoveRow}
         addLabel={isOtherEquipment ? 'Добавить оборудование' : 'Добавить зону'}
         onAdd={() => {
             onAdd();
@@ -5457,23 +5465,25 @@ const SelectionApp = () => {
         });
     }, []);
 
-    const removeMixingUnit = useCallback((unitUid) => {
+    const removeMixingUnits = useCallback((unitUids) => {
+        const removedUnitIds = new Set((Array.isArray(unitUids) ? unitUids : [unitUids]).map(String));
+        if (removedUnitIds.size === 0) return;
         setIncomingScheme((prev) => {
             const wiredDevices = Array.isArray(prev.wired_devices)
-                ? prev.wired_devices.filter((d) => d._uid !== unitUid)
+                ? prev.wired_devices.filter((device) => !removedUnitIds.has(String(device?._uid)))
                 : [];
             const sensors = Array.isArray(prev.sensors)
-                ? prev.sensors.filter((s) => s._uid !== unitUid)
+                ? prev.sensors.filter((sensor) => !removedUnitIds.has(String(sensor?._uid)))
                 : [];
             const wifiModules = (Array.isArray(prev.wifi_modules) ? prev.wifi_modules : [])
                 .map((moduleItem) => ({
                     ...moduleItem,
                     relay_devices: (Array.isArray(moduleItem?.relay_devices) ? moduleItem.relay_devices : [])
-                        .filter((device) => String(device?._uid) !== String(unitUid)),
+                        .filter((device) => !removedUnitIds.has(String(device?._uid))),
                     relay_s_devices: (Array.isArray(moduleItem?.relay_s_devices) ? moduleItem.relay_s_devices : [])
-                        .filter((device) => String(device?._uid) !== String(unitUid)),
+                        .filter((device) => !removedUnitIds.has(String(device?._uid))),
                     one_wire_devices: (Array.isArray(moduleItem?.one_wire_devices) ? moduleItem.one_wire_devices : [])
-                        .filter((device) => String(device?._uid) !== String(unitUid)),
+                        .filter((device) => !removedUnitIds.has(String(device?._uid))),
                 }))
                 .filter((moduleItem) => (
                     !['selection-wifi-mixing', 'selection-wifi-pump', 'selection-wifi-zone', 'selection-wifi-other'].includes(moduleItem?._auto_source)
@@ -5484,6 +5494,8 @@ const SelectionApp = () => {
             return resolveSelectionScheme({ ...prev, wired_devices: wiredDevices, sensors, wifi_modules: wifiModules });
         });
     }, []);
+
+    const removeMixingUnit = useCallback((unitUid) => removeMixingUnits([unitUid]), [removeMixingUnits]);
 
     const addWirelessDevice = useCallback((template) => {
         setIncomingScheme((prev) => {
@@ -5622,6 +5634,14 @@ const SelectionApp = () => {
                 wired_devices: wiredDevices.filter((device) => device !== removedValve),
             });
         });
+    }, []);
+
+    const removeAllLeakValves = useCallback(() => {
+        setIncomingScheme((prev) => resolveSelectionScheme({
+            ...prev,
+            wired_devices: (Array.isArray(prev.wired_devices) ? prev.wired_devices : [])
+                .filter((device) => canonicalType(device?.type) !== 'valve'),
+        }));
     }, []);
 
     /**
@@ -6439,6 +6459,7 @@ const SelectionApp = () => {
                             'mixing',
                         )}
                         onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                        onRemoveRow={(row) => removeMixingUnits(row.removeKeys)}
                         wifiMixingLimitReached={wifiMixingLimitReached}
                         showJsonDetails={showJsonDetails}
                         tutorialStep={mixingTutorialStep}
@@ -6459,6 +6480,7 @@ const SelectionApp = () => {
                             'gvs',
                         )}
                         onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                        onRemoveRow={(row) => removeMixingUnits(row.removeKeys)}
                         onAdd={() => addMixingUnit(GVS_TEMPLATES[0], 'gvs')}
                         showJsonDetails={showJsonDetails}
                         tutorialStep={gvsBoilerTutorialStep}
@@ -6490,6 +6512,7 @@ const SelectionApp = () => {
                             'pump',
                         )}
                         onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                        onRemoveRow={(row) => removeMixingUnits(row.removeKeys)}
                         wifiPumpLimitReached={wifiRelayLimitReached}
                         showJsonDetails={showJsonDetails}
                         tutorialStep={pumpTutorialStep}
@@ -6559,6 +6582,7 @@ const SelectionApp = () => {
                                 'zone',
                             )}
                             onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                            onRemoveRow={(row) => removeMixingUnits(row.removeKeys)}
                             onAdd={() => addMixingUnit(zoneTemplate, 'zone')}
                             wifiRelayLimitReached={wifiRelayLimitReached}
                             showJsonDetails={showJsonDetails}
@@ -6592,6 +6616,7 @@ const SelectionApp = () => {
                             'other',
                         )}
                         onRemoveUnit={(row) => removeMixingUnit(Number(row.removeKeys[row.removeKeys.length - 1]))}
+                        onRemoveRow={(row) => removeMixingUnits(row.removeKeys)}
                         onAdd={() => addMixingUnit(otherEquipmentTemplate, 'other')}
                         wifiRelayLimitReached={wifiRelayLimitReached}
                         showJsonDetails={showJsonDetails}
@@ -6647,6 +6672,7 @@ const SelectionApp = () => {
                             const removeKey = row.removeKeys[row.removeKeys.length - 1];
                             removeSchemeItemById(removeKey.target, removeKey.id);
                         }}
+                        onRemoveRow={(row) => removeSchemeItemsByKeys(row.removeKeys)}
                         addLabel={temperatureSensorTemplate?.addLabel || 'Добавить датчик'}
                         onAdd={() => addTemperatureSensor(temperatureSensorTemplate)}
                         showAdd={!isTemperatureSensorTemplateAdded}
@@ -6780,6 +6806,7 @@ const SelectionApp = () => {
                         addedRows={pressureSensorRows}
                         onAddUnit={addPressureSensor}
                         onRemoveUnit={(row) => removeSchemeItemById('sensors', row.removeKeys[row.removeKeys.length - 1])}
+                        onRemoveRow={(row) => removeSchemeItemsByKeys(row.removeKeys.map((id) => ({ target: 'sensors', id })))}
                         addLabel="Добавить датчик давления"
                         onAdd={addPressureSensor}
                         showAdd={pressureSensorRows.length === 0}
@@ -6896,6 +6923,17 @@ const SelectionApp = () => {
                                 <span style={{ flex: '1 1 160px', fontWeight: 700, fontSize: 14 }}>
                                     Запорные клапаны
                                 </span>
+                                {leakValveCount > 0 && (
+                                    <button
+                                        type="button"
+                                        className="selection-remove-icon"
+                                        onClick={removeAllLeakValves}
+                                        title="Удалить"
+                                        aria-label="Удалить все запорные клапаны"
+                                    >
+                                        ×
+                                    </button>
+                                )}
                                 <QtyStepper
                                     tutorialRef={leakValveCounterRef}
                                     count={leakValveCount}
@@ -6971,6 +7009,7 @@ const SelectionApp = () => {
                                 addedDense
                                 onAddUnit={() => addLeakItem({ ...item, target: 'wired' })}
                                 onRemoveUnit={(row) => removeSchemeItemById('wired_devices', row.removeKeys[row.removeKeys.length - 1])}
+                                onRemoveRow={(row) => removeSchemeItemsByKeys(row.removeKeys.map((id) => ({ target: 'wired_devices', id })))}
                                 addLabel="Добавить"
                                 onAdd={() => addLeakItem({ ...item, target: 'wired' })}
                                 // Как только вход добавлен, количеством управляет счетчик в строке —
