@@ -3270,6 +3270,7 @@ const OutdoorSensorCard = ({ template, enabled, onEnabledChange, showJsonDetails
  * встают между списком и кнопкой.
  */
 const SectionEquipmentCard = ({
+    className = '',
     image = null,
     backgroundColor = null,
     backgroundPosition = null,
@@ -3381,7 +3382,7 @@ const SectionEquipmentCard = ({
 
     return (
     <div
-        className={`sel-card sel-card-static sel-card-section${deviceImage ? ' sel-card-with-device' : ''}${minHeight ? ' sel-card-fixed-height' : ''}`}
+        className={`sel-card sel-card-static sel-card-section${deviceImage ? ' sel-card-with-device' : ''}${minHeight ? ' sel-card-fixed-height' : ''}${className ? ` ${className}` : ''}`}
         style={{
             flex: half ? '1 1 calc(50% - 8px)' : '1 1 100%',
             width: half ? 'auto' : '100%',
@@ -3439,7 +3440,7 @@ const SectionEquipmentCard = ({
                 <p className="sel-card-desc" style={{ maxWidth: contentMaxWidth }}>{description}</p>
             )}
 
-            {!addedFullWidth && addedBlock && <div style={{ maxWidth: contentMaxWidth }}>{addedBlock}</div>}
+            {!addedFullWidth && addedBlock && <div className="sel-card-added-wrap" style={{ maxWidth: contentMaxWidth }}>{addedBlock}</div>}
 
             {children}
 
@@ -6800,6 +6801,7 @@ const SelectionApp = () => {
                 <SectionSubtitle>Укажите количество токовых датчиков давления в системе</SectionSubtitle>
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <SectionEquipmentCard
+                        className="sel-pressure-card"
                         image={PRESSURE_SENSOR_BACKGROUND_PATH}
                         backgroundWidth={520}
                         backgroundColor={CARD_PHOTO_TAIL_COLOR.standardRoom}

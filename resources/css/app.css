@@ -7693,6 +7693,49 @@ html:has(.selection-body),
         align-self: center !important;
     }
 
+    .selection-page .sel-pressure-card {
+        display: grid !important;
+        grid-template-columns: minmax(68px, 0.8fr) minmax(84px, 1.5fr) minmax(52px, 0.7fr);
+        gap: 12px !important;
+        align-items: center !important;
+    }
+
+    .selection-page .sel-pressure-card .sel-card-section-copy {
+        display: contents !important;
+    }
+
+    .selection-page .sel-pressure-card .sel-card-heading-row,
+    .selection-page .sel-pressure-card .sel-card-desc {
+        position: relative;
+        align-self: center;
+        margin: 0;
+        text-align: center;
+    }
+
+    .selection-page .sel-pressure-card .sel-card-heading-row {
+        grid-column: 1;
+        justify-content: center;
+    }
+
+    .selection-page .sel-pressure-card .sel-card-desc {
+        grid-column: 2;
+    }
+
+    .selection-page .sel-pressure-card .sel-card-device-visual {
+        position: relative;
+        grid-column: 3;
+        grid-row: 1;
+        width: 100%;
+        max-width: 72px !important;
+    }
+
+    .selection-page .sel-pressure-card .sel-card-added-wrap {
+        position: relative;
+        grid-column: 1 / -1;
+        width: 100%;
+        max-width: none !important;
+    }
+
     /* Рендер термостата остаётся справа и на телефоне — вниз он не уезжает,
        а сильно уменьшается. Базис взят по нижней границе (48px), а не по
        желаемому размеру: перенос строки флекс считает именно по базису, и
