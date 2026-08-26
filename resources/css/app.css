@@ -6631,12 +6631,12 @@ html:has(.selection-body),
 .selection-page button.sel-manual-card-build-button {
     grid-template-columns: 30px minmax(0, 1fr) 14px;
     gap: 7px;
-    padding: 11px 8px 11px 10px;
+    padding: 6px 8px 6px 10px;
 }
 
 .selection-page button.sel-manual-card-build-button .sel-controller-action-icon {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     border-radius: 9px;
 }
 
