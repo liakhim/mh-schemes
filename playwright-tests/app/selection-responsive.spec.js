@@ -35,9 +35,13 @@ const measureOverflow = (page) => page.evaluate(() => {
 
 test.describe('/selection — адаптив', () => {
     test.beforeEach(async ({ page }) => {
+        await page.context().addCookies([{ name: 'PHPSESSID', value: '1', domain: 'localhost', path: '/' }]);
         await page.goto('/selection');
-        await page.getByTestId('reset-equipment').click();
-        await page.getByTestId('reset-equipment-confirm').click();
+        const resetButton = page.getByTestId('reset-equipment');
+        if (await resetButton.isVisible()) {
+            await resetButton.click();
+            await page.getByTestId('reset-equipment-confirm').click();
+        }
         // Непустые карточки: списки добавленного со счётчиками и есть что
         // переносить — именно они и упирались в край на узких экранах.
         await page.getByTestId('add-pump').click();
@@ -64,6 +68,33 @@ test.describe('/selection — адаптив', () => {
 
         await page.setViewportSize({ width: 1200, height: 900 });
         await expect(nav).toBeHidden();
+    });
+
+    test('[navigation] разделы датчиков разделены, маркеры отражают добавленное оборудование', async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        const nav = page.locator('.sel-side-nav .sel-quick-nav');
+        const marker = (label) => nav.getByRole('link', { name: label, exact: true }).locator('.sel-quick-nav-complete');
+
+        await expect(nav.locator('a')).toHaveText([
+            'Котлы',
+            'Гидравлика',
+            'Климат',
+            'Прочее оборудование',
+            'Дополнительные датчики',
+            'Защита от протечки',
+            'Прочее',
+            'Питание',
+        ]);
+        await expect(marker('Гидравлика')).toBeVisible();
+        await expect(marker('Климат')).toBeVisible();
+        await expect(marker('Дополнительные датчики')).toHaveCount(0);
+        await expect(marker('Защита от протечки')).toHaveCount(0);
+
+        await page.getByTestId('add-pressure-sensor').click();
+        await expect(marker('Дополнительные датчики')).toBeVisible();
+
+        await page.locator('.sel-pressure-card').getByRole('button', { name: 'Удалить Датчик давления' }).click();
+        await expect(marker('Дополнительные датчики')).toHaveCount(0);
     });
 
     test('на телефоне шапка в одну строку, переключатель режима по контенту', async ({ page }) => {

@@ -4333,12 +4333,13 @@ const SEL_CHAPTERS = [
     { id: 'chapter-hydraulics', label: 'Гидравлика' },
     { id: 'chapter-climate', label: 'Климат' },
     { id: 'chapter-other-equipment', label: 'Прочее оборудование' },
-    { id: 'chapter-sensors', label: 'Датчики и защита от протечки' },
+    { id: 'chapter-sensors', label: 'Дополнительные датчики' },
+    { id: 'chapter-leak-protection', label: 'Защита от протечки' },
     { id: 'chapter-misc', label: 'Прочее' },
     { id: 'chapter-power', label: 'Питание' },
 ];
 
-const SelectionQuickNav = () => (
+const SelectionQuickNav = ({ completedChapters }) => (
     <nav className="sel-quick-nav" aria-label="Разделы подбора">
         {SEL_CHAPTERS.map((item) => (
             <a
@@ -4349,13 +4350,20 @@ const SelectionQuickNav = () => (
                     document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
             >
-                {item.label}
+                {completedChapters[item.id] && (
+                    <span className="sel-quick-nav-complete" aria-hidden="true">
+                        <svg viewBox="0 0 16 16">
+                            <path d="m4 8 2.4 2.4L12 5" />
+                        </svg>
+                    </span>
+                )}
+                <span>{item.label}</span>
             </a>
         ))}
     </nav>
 );
 
-const SelectionSideNavigation = ({ showQuickNav }) => (
+const SelectionSideNavigation = ({ showQuickNav, completedChapters }) => (
     <div className="sel-side-stack">
         <aside className="account-sidebar sel-account-sidebar" aria-label="Навигация аккаунта">
             <div className="account-navigation-disclosure">
@@ -4388,7 +4396,7 @@ const SelectionSideNavigation = ({ showQuickNav }) => (
         </aside>
         {showQuickNav && (
             <aside className="sel-side-nav" aria-label="Навигация по разделам">
-                <SelectionQuickNav />
+                <SelectionQuickNav completedChapters={completedChapters} />
             </aside>
         )}
     </div>
@@ -5121,6 +5129,7 @@ const SelectionApp = () => {
             : OTHER_EQUIP_TEMPLATES[0]
     ), [otherEquipmentConnectionMode]);
     // Строки списка нужны дважды: в самом списке и в условии показа кнопки.
+    const mixingRows = getGroupedDeviceRows(incomingScheme, 'mixing', MIXING_TEMPLATES);
     const gvsBoilerRows = getGroupedDeviceRows(incomingScheme, 'gvs', GVS_TEMPLATES);
     const pumpCardRows = getGroupedDeviceRows(incomingScheme, 'pump', PUMP_TEMPLATES);
     const wifiRelayLimitReached = getAvailableWifiRelaySlots(incomingScheme) <= 0;
@@ -5211,6 +5220,16 @@ const SelectionApp = () => {
     }, [incomingScheme]);
     const isTemperatureSensorTemplateAdded = temperatureSensorRows
         .some((row) => row.templateKey === temperatureSensorTemplate?.key);
+    const completedChapters = {
+        'chapter-boilers': Array.isArray(incomingScheme.boilers) && incomingScheme.boilers.length > 0,
+        'chapter-hydraulics': mixingRows.length > 0 || gvsBoilerRows.length > 0 || pumpCardRows.length > 0,
+        'chapter-climate': thermostatRows.length > 0 || zoneRows.length > 0,
+        'chapter-other-equipment': otherEquipmentRows.length > 0,
+        'chapter-sensors': temperatureSensorRows.length > 0 || hasOutdoorTemperatureSensor || pressureSensorRows.length > 0,
+        'chapter-leak-protection': leakZoneRows.length > 0 || leakValveCount > 0,
+        'chapter-misc': Object.values(discreteInputRows).some((rows) => rows.length > 0),
+        'chapter-power': upsRequested,
+    };
 
 
     // После паузы во вводе ищет котлы по текущему запросу;
@@ -6056,7 +6075,10 @@ const SelectionApp = () => {
             </header>
 
             <div className="sel-layout">
-            <SelectionSideNavigation showQuickNav={selectionMode === 'automatic'} />
+            <SelectionSideNavigation
+                showQuickNav={selectionMode === 'automatic'}
+                completedChapters={completedChapters}
+            />
             <div className="sel-layout-content">
             <div key={selectionMode} className="sel-mode-view">
 
@@ -6452,7 +6474,7 @@ const SelectionApp = () => {
                         sensor={mixingSensor}
                         onSensorChange={setMixingSensor}
                         onAdd={() => addMixingUnit(mixingTemplate, 'mixing')}
-                        addedRows={getGroupedDeviceRows(incomingScheme, 'mixing', MIXING_TEMPLATES)}
+                        addedRows={mixingRows}
                         onAddUnit={(row) => addMixingUnit(
                             MIXING_TEMPLATES.find((item) => item.label === row.label)
                             || (row.label === 'Сервопривод 220V с цифровым датчиком с подключением по WI-FI'
@@ -6635,7 +6657,7 @@ const SelectionApp = () => {
             </section>
             </div>{/* /Прочее оборудование */}
 
-            <div className="sel-group-label" id="chapter-sensors">Датчики и защита от протечки</div>
+            <div className="sel-group-label" id="chapter-sensors">Дополнительные датчики</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
             <div style={{ flex: '1 1 500px', minWidth: 0 }}>
             <section>
@@ -6827,8 +6849,10 @@ const SelectionApp = () => {
             </section>
             </div>
 
-            </div>{/* /Датчики и защита flex */}
+            </div>{/* /Дополнительные датчики */}
 
+            <div className="sel-group-label" id="chapter-leak-protection">Защита от протечки</div>
+            <div style={{ marginBottom: 32 }}>
             <section className="sel-leak-section">
                 <h2>Контроль протечки воды</h2>
                 <SectionSubtitle>
@@ -6993,6 +7017,7 @@ const SelectionApp = () => {
                 </div>
 
             </section>
+            </div>{/* /Защита от протечки */}
 
             <div className="sel-group-label" id="chapter-misc">Прочее</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap', marginBottom: 32 }}>
