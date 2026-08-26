@@ -48,6 +48,7 @@ const SlotContextMenus = ({
     isExtModuleAllowedForController,
     controllerType,
     addExtModuleAtSlot,
+    addExtThermostat,
     addDiModuleAtSlot,
     setBusDeviceAtLine,
     addExtOneWireDeviceAtSlot,
@@ -405,6 +406,17 @@ const SlotContextMenus = ({
             <div className="ctx-menu-item" onClick={() => addExtModuleAtSlot('di6', extMenuPos.slotIndex)}>
                 Модуль DI6
             </div>
+            {controllerType === 'pro' && (
+                <div
+                    className="ctx-menu-item"
+                    onClick={() => {
+                        addExtThermostat();
+                        setExtMenuPos(null);
+                    }}
+                >
+                    Проводной термостат
+                </div>
+            )}
         </SlotContextMenu>}
         {diMenuPos && <SlotContextMenu position={diMenuPos} onClose={() => setDiMenuPos(null)}>
             <div className="ctx-menu-item" onClick={() => addDiModuleAtSlot('rl2', diMenuPos.slotIndex)}>

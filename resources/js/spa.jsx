@@ -2417,8 +2417,9 @@ const App = () => {
         setExtMenuPos(null);
     };
 
-    const addEcosmartExtThermostatWithFloorSlot = () => {
+    const addExtThermostat = () => {
         setScheme((s) => {
+            if (!['pro', 'ecosmart'].includes(getControllerType(s))) return s;
             const controller = s?.controller && typeof s.controller === 'object'
                 ? { ...s.controller }
                 : { type: getControllerType(s) };
@@ -4617,7 +4618,7 @@ const App = () => {
                             addController420PressureSensor={addController420PressureSensor}
                             addControllerLeakSensorAtSlot={addControllerLeakSensorAtSlot}
                             addControllerNtcLineSensorAtSlot={addControllerNtcLineSensorAtSlot}
-                            addEcosmartExtThermostatWithFloorSlot={addEcosmartExtThermostatWithFloorSlot}
+                            addExtThermostat={addExtThermostat}
                             addEcosmartPump={addEcosmartPump}
                             addEcosmartServo={addEcosmartServo}
                             addEcosmartValve={addEcosmartValve}
@@ -5732,7 +5733,7 @@ const App = () => {
                 )}
                 isExtModuleAllowedForController={isExtModuleAllowedForController}
                 controllerType={controllerType}
-                addExtModuleAtSlot={addExtModuleAtSlot} addDiModuleAtSlot={addDiModuleAtSlot}
+                addExtModuleAtSlot={addExtModuleAtSlot} addExtThermostat={addExtThermostat} addDiModuleAtSlot={addDiModuleAtSlot}
                 setBusDeviceAtLine={setBusDeviceAtLine}
                 addExtOneWireDeviceAtSlot={addExtOneWireDeviceAtSlot}
                 addIo4ChannelDevice={addIo4ChannelDevice} addDi6ChannelDevice={addDi6ChannelDevice}

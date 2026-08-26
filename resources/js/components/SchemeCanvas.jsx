@@ -63,7 +63,7 @@ const SchemeCanvas = ({
     addController420PressureSensor,
     addControllerLeakSensorAtSlot,
     addControllerNtcLineSensorAtSlot,
-    addEcosmartExtThermostatWithFloorSlot,
+    addExtThermostat,
     addEcosmartPump,
     addEcosmartServo,
     addEcosmartValve,
@@ -8441,7 +8441,7 @@ const SchemeCanvas = ({
                                                                      fill={ADD_ACTION_FILL}
                                                                      onClick={(e) => {
                                                                          if (isEcosmartExtThermostatAddSlot) {
-                                                                             addEcosmartExtThermostatWithFloorSlot();
+                                                                             addExtThermostat();
                                                                              return;
                                                                          }
                                                                          const pos = e.target.getAbsolutePosition();
@@ -8449,7 +8449,7 @@ const SchemeCanvas = ({
                                                                      }}
                                                                      onTap={(e) => {
                                                                          if (isEcosmartExtThermostatAddSlot) {
-                                                                             addEcosmartExtThermostatWithFloorSlot();
+                                                                             addExtThermostat();
                                                                              return;
                                                                          }
                                                                          const pos = e.target.getAbsolutePosition();
