@@ -3448,7 +3448,7 @@ const SectionEquipmentCard = ({
                 <pre className="sel-card-json">{JSON.stringify(jsonData, null, 4)}</pre>
             )}
 
-            {addButton && <div style={{ maxWidth: contentMaxWidth }}>{addButton}</div>}
+            {addButton && <div className="sel-card-add-wrap" style={{ maxWidth: contentMaxWidth }}>{addButton}</div>}
         </div>
 
         {wideAddedBlock && (
