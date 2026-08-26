@@ -4348,6 +4348,13 @@ const SelectionQuickNav = () => (
 const SelectionSideNavigation = ({ showQuickNav }) => (
     <div className="sel-side-stack">
         <aside className="account-sidebar sel-account-sidebar" aria-label="Навигация аккаунта">
+            <div className="account-navigation-disclosure">
+                <input className="account-menu-checkbox" id="selection-account-menu" type="checkbox" aria-label="Открыть навигацию аккаунта" />
+                <label className="account-menu-toggle" htmlFor="selection-account-menu">
+                    <span className="account-menu-toggle-icon" aria-hidden="true"><span /><span /><span /></span>
+                    <span className="account-menu-toggle-copy"><strong>Меню</strong><small>Подбор оборудования</small></span>
+                    <span className="account-menu-toggle-chevron" aria-hidden="true" />
+                </label>
             <nav className="account-navigation sel-account-navigation">
                 <a href="/settings">
                     <img src={SETTINGS_ICON_PATH} alt="" aria-hidden="true" />
@@ -4367,6 +4374,7 @@ const SelectionSideNavigation = ({ showQuickNav }) => (
                     <span>Подбор оборудования</span>
                 </a>
             </nav>
+            </div>
         </aside>
         {showQuickNav && (
             <aside className="sel-side-nav" aria-label="Навигация по разделам">

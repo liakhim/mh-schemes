@@ -17,6 +17,13 @@
     </header>
     <main class="account-shell">
         <aside class="account-sidebar" aria-label="Навигация аккаунта">
+            <div class="account-navigation-disclosure">
+                <input class="account-menu-checkbox" id="settings-account-menu" type="checkbox" aria-label="Открыть навигацию аккаунта">
+                <label class="account-menu-toggle" for="settings-account-menu">
+                    <span class="account-menu-toggle-icon" aria-hidden="true"><span></span><span></span><span></span></span>
+                    <span class="account-menu-toggle-copy"><strong>Меню</strong><small>Настройки аккаунта</small></span>
+                    <span class="account-menu-toggle-chevron" aria-hidden="true"></span>
+                </label>
             <nav class="account-navigation">
                 <a class="is-active" href="{{ route('settings') }}" aria-current="page">
                     <img src="{{ Vite::asset('resources/assets/icons/settings.svg') }}" alt="" aria-hidden="true">
@@ -31,6 +38,7 @@
                     <span>Подбор оборудования</span>
                 </a>
             </nav>
+            </div>
         </aside>
 
         <form class="account-settings-form">

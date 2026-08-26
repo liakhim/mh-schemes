@@ -351,6 +351,15 @@ html:has(.selection-body),
     gap: 3px;
 }
 
+.account-navigation-disclosure {
+    display: block;
+}
+
+.account-menu-checkbox,
+.account-menu-toggle {
+    display: none;
+}
+
 .account-navigation a {
     display: flex;
     min-height: 36px;
@@ -1196,6 +1205,148 @@ html:has(.selection-body),
 
     .services-page .account-shell {
         padding-top: 62px;
+    }
+
+    .account-settings-page .account-sidebar,
+    .services-page .account-sidebar,
+    .selection-page .sel-account-sidebar {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .account-navigation-disclosure {
+        display: block;
+        width: 100%;
+    }
+
+    .account-menu-toggle {
+        position: relative;
+        display: flex;
+        min-height: 48px;
+        box-sizing: border-box;
+        align-items: center;
+        gap: 11px;
+        padding: 8px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        color: #334155;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 4px 16px rgba(32, 39, 56, 0.08);
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+    }
+
+    .account-menu-checkbox {
+        position: absolute;
+        display: block;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .account-menu-checkbox:focus-visible + .account-menu-toggle {
+        outline: 2px solid #e07020;
+        outline-offset: 2px;
+    }
+
+    .account-menu-toggle-icon {
+        display: grid;
+        width: 22px;
+        height: 22px;
+        flex: 0 0 22px;
+        place-content: center;
+        gap: 4px;
+        border-radius: 7px;
+        background: #fff3e8;
+    }
+
+    .account-menu-toggle-icon span {
+        display: block;
+        width: 12px;
+        height: 1.5px;
+        border-radius: 999px;
+        background: #c85e18;
+        transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+
+    .account-menu-toggle-copy {
+        display: flex;
+        min-width: 0;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 1px;
+    }
+
+    .account-menu-toggle-copy strong {
+        font-size: 12px;
+        line-height: 1.1;
+    }
+
+    .account-menu-toggle-copy small {
+        overflow: hidden;
+        color: #7b8494;
+        font-size: 10px;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .account-menu-toggle-chevron {
+        width: 8px;
+        height: 8px;
+        flex: 0 0 8px;
+        border-right: 1.5px solid #64748b;
+        border-bottom: 1.5px solid #64748b;
+        transform: rotate(45deg) translate(-2px, -2px);
+        transition: transform 0.18s ease;
+    }
+
+    .account-menu-checkbox:checked + .account-menu-toggle {
+        border-color: rgba(224, 112, 32, 0.38);
+        background: #fffaf5;
+    }
+
+    .account-menu-checkbox:checked + .account-menu-toggle .account-menu-toggle-icon span:nth-child(1) {
+        transform: translateY(5.5px) rotate(45deg);
+    }
+
+    .account-menu-checkbox:checked + .account-menu-toggle .account-menu-toggle-icon span:nth-child(2) {
+        opacity: 0;
+    }
+
+    .account-menu-checkbox:checked + .account-menu-toggle .account-menu-toggle-icon span:nth-child(3) {
+        transform: translateY(-5.5px) rotate(-45deg);
+    }
+
+    .account-menu-checkbox:checked + .account-menu-toggle .account-menu-toggle-chevron {
+        transform: rotate(225deg) translate(-1px, -1px);
+    }
+
+    .account-menu-checkbox:not(:checked) ~ .account-navigation {
+        display: none;
+    }
+
+    .account-menu-checkbox:checked ~ .account-navigation {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 5px;
+        margin-top: 7px;
+        padding: 7px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 10px 24px rgba(32, 39, 56, 0.1);
+    }
+
+    .account-menu-checkbox:checked ~ .account-navigation a {
+        justify-content: flex-start;
+        text-align: left;
     }
 }
 
