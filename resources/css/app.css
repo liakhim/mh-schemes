@@ -11,7 +11,37 @@
 }
 
 .ui-modal {
+    position: relative;
     outline: none;
+}
+
+.modal-close-icon {
+    display: block;
+    width: 12px;
+    height: 12px;
+}
+
+.ui-modal-close,
+.selection-draft-close {
+    position: absolute;
+    z-index: 1;
+    top: 14px;
+    right: 14px;
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+}
+
+.ui-modal-close:hover,
+.selection-draft-close:hover {
+    background: #fef2f2;
 }
 
 #app {
@@ -3511,6 +3541,7 @@ html:has(.selection-body),
 }
 
 .selection-draft-modal {
+    position: relative;
     width: min(520px, 100%);
     padding: 28px;
     border: 1px solid #d7dbe4;
@@ -4335,14 +4366,14 @@ html:has(.selection-body),
    градиентная подача, одинаковая с «Схемой подключения» в панели контроллера
    (см. .selection-add-button ниже). Иначе `background !important` отсюда
    перекрыл бы градиент. */
-.selection-page button:not([title="Удалить"]):not(.selection-option-button):not(.selection-danger-button):not(.selection-secondary-button):not(.selection-remove-icon):not(.selection-add-button):not(.selection-primary-button):not(.equipment-offer-close):not(.tutorial-popover-close):not(.tutorial-popover-action):not(:disabled) {
+.selection-page button:not([title="Удалить"]):not(.selection-option-button):not(.selection-danger-button):not(.selection-secondary-button):not(.selection-remove-icon):not(.selection-add-button):not(.selection-primary-button):not(.selection-draft-close):not(.equipment-offer-close):not(.tutorial-popover-close):not(.tutorial-popover-action):not(:disabled) {
     border-color: #c85e18 !important;
     background: #e07020 !important;
     color: #fff !important;
     transition: background 0.15s, border-color 0.15s !important;
 }
 
-.selection-page button:not([title="Удалить"]):not(.selection-option-button):not(.selection-danger-button):not(.selection-secondary-button):not(.selection-remove-icon):not(.selection-add-button):not(.selection-primary-button):not(.equipment-offer-close):not(.tutorial-popover-close):not(.tutorial-popover-action):not(:disabled):hover {
+.selection-page button:not([title="Удалить"]):not(.selection-option-button):not(.selection-danger-button):not(.selection-secondary-button):not(.selection-remove-icon):not(.selection-add-button):not(.selection-primary-button):not(.selection-draft-close):not(.equipment-offer-close):not(.tutorial-popover-close):not(.tutorial-popover-action):not(:disabled):hover {
     background: #c85e18 !important;
 }
 

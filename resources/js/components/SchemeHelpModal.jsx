@@ -1,11 +1,12 @@
 import React from 'react';
+import ModalCloseButton from './ModalCloseButton';
 
 const SchemeHelpModal = ({ onClose }) => (
     <div className="scheme-help-backdrop" onMouseDown={onClose}>
         <div className="scheme-help-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
             <div className="scheme-help-header">
                 <strong>МАЙХИТ «Схемы подключения»</strong>
-                <button type="button" className="scheme-settings-close" onClick={onClose} aria-label="Закрыть">×</button>
+                <ModalCloseButton className="scheme-settings-close" onClick={onClose} />
             </div>
             <div className="scheme-help-content">
                 <section className="scheme-help-block">

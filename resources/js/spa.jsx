@@ -98,6 +98,7 @@ import InstallationCanvas, {
 } from './components/InstallationCanvas';
 import SlotContextMenus from './components/SlotContextMenus';
 import SchemeHelpModal from './components/SchemeHelpModal';
+import ModalCloseButton from './components/ModalCloseButton';
 import IncomingSchemeDebugPanel from './components/IncomingSchemeDebugPanel';
 import logoPath from '../assets/logo/logo.svg';
 import commentIconPath from '../assets/icons/comment-icon.svg';
@@ -4427,7 +4428,7 @@ const App = () => {
                     >
                         <div className="title-editor-header">
                             <strong>Инфоблок</strong>
-                            <button type="button" className="title-editor-close" onClick={closeTitleEditor}>×</button>
+                            <ModalCloseButton className="title-editor-close" onClick={closeTitleEditor} />
                         </div>
                         <label className="title-editor-label" htmlFor="title-editor-input">Текст инфоблока</label>
                         <input
@@ -4462,7 +4463,7 @@ const App = () => {
                     >
                         <div className="title-editor-header">
                             <strong>Комментарий</strong>
-                            <button type="button" className="title-editor-close" onClick={closeCommentEditor}>×</button>
+                            <ModalCloseButton className="title-editor-close" onClick={closeCommentEditor} />
                         </div>
                         <label className="title-editor-label" htmlFor="comment-editor-input">Комментарий к устройству</label>
                         <textarea
@@ -4498,7 +4499,7 @@ const App = () => {
                     >
                         <div className="title-editor-header">
                             <strong>Комментарий</strong>
-                            <button type="button" className="title-editor-close" onClick={closeCommentViewer}>×</button>
+                            <ModalCloseButton className="title-editor-close" onClick={closeCommentViewer} />
                         </div>
                         <div className="comment-viewer-text">
                             {commentViewer.comment}

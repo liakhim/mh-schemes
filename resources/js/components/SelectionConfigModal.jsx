@@ -1,5 +1,6 @@
 import React from 'react';
 import { getSelectionConfigItemLabel } from '../scheme/domain/selectionConfigLabels.js';
+import ModalCloseButton from './ModalCloseButton';
 
 const CONTROLLER_LABELS = {
     go: 'GO',
@@ -65,7 +66,7 @@ const SelectionConfigModal = ({ config, onClose }) => {
                         <span className="selection-config-eyebrow">Сохранённый снимок</span>
                         <h2 id="selection-config-title">Исходный подбор</h2>
                     </div>
-                    <button type="button" className="selection-config-close" onClick={onClose} aria-label="Закрыть">×</button>
+                    <ModalCloseButton className="selection-config-close" onClick={onClose} />
                 </header>
 
                 <p className="selection-config-note">

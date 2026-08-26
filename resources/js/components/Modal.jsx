@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
+import ModalCloseButton from './ModalCloseButton';
 
-const Modal = ({ children, className = '', labelledBy, onClose }) => {
+const Modal = ({ children, className = '', labelledBy, onClose, showClose = true }) => {
     const dialogRef = useRef(null);
 
     useEffect(() => {
@@ -28,6 +29,7 @@ const Modal = ({ children, className = '', labelledBy, onClose }) => {
                 tabIndex={-1}
                 onMouseDown={(event) => event.stopPropagation()}
             >
+                {showClose && <ModalCloseButton className="ui-modal-close" onClick={onClose} />}
                 {children}
             </div>
         </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import logoPath from '../../assets/logo/logo.svg';
 import Modal from './Modal';
+import ModalCloseButton from './ModalCloseButton';
 
 const getBillableCount = (row) => row.paidCount ?? (row.count || 1);
 
@@ -23,7 +24,7 @@ const EquipmentOfferModal = ({ sections, onClose }) => {
     };
 
     return (
-        <Modal className="equipment-offer-modal" labelledBy="equipment-offer-title" onClose={onClose}>
+        <Modal className="equipment-offer-modal" labelledBy="equipment-offer-title" onClose={onClose} showClose={false}>
                 <header className="equipment-offer-header">
                     <h2 id="equipment-offer-title">Коммерческое предложение</h2>
                     <div className="equipment-offer-header-actions">
@@ -37,7 +38,7 @@ const EquipmentOfferModal = ({ sections, onClose }) => {
                                 {isDownloading ? 'Готовим PDF…' : 'Скачать PDF'}
                             </button>
                         )}
-                        <button type="button" className="equipment-offer-close" onClick={onClose} aria-label="Закрыть">×</button>
+                        <ModalCloseButton className="equipment-offer-close" onClick={onClose} />
                     </div>
                 </header>
                 <div className="equipment-offer-content">

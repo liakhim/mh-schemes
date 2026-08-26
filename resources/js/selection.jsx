@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createRoot } from 'react-dom/client';
 import '../css/app.css';
 import EquipmentOfferModal from './components/EquipmentOfferModal';
+import ModalCloseButton from './components/ModalCloseButton';
 import TutorialPopover from './components/TutorialPopover';
 import { getAllOneWireDevicesForBalancing } from './scheme/domain/initialState';
 import { materializePowerModules } from './scheme/domain/powerModules';
@@ -5917,6 +5918,10 @@ const SelectionApp = () => {
                         aria-modal="true"
                         aria-labelledby="selection-reset-title"
                     >
+                        <ModalCloseButton
+                            className="selection-draft-close"
+                            onClick={() => setIsResetConfirmOpen(false)}
+                        />
                         <h2 id="selection-reset-title">Сбросить схему</h2>
                         <p>Сбросить всю схему? Все добавленные устройства будут удалены.</p>
                         <div className="selection-draft-actions">
