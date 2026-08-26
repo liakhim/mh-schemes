@@ -5250,9 +5250,9 @@ const App = () => {
                                               const installationTapeCaption = isExpansionModuleItem
                                                   ? `${installationModuleLabel} #${installationModuleNumber}${item.isWifiPair ? ` + ${POWER_UNIT_LABEL}` : ''}`
                                                   : '';
-                                             const installationTapeWidth = installationTapeCaption
-                                                 ? Math.max(32, Math.min(itemWidth - 8, Math.max(item.isWifiPair ? 116 : 38, installationTapeCaption.length * 3.4 + 18)))
-                                                 : 0;
+                                              const installationTapeWidth = installationTapeCaption
+                                                  ? Math.max(32, Math.min(itemWidth - 8, Math.max(item.isWifiPair ? 116 : 48, installationTapeCaption.length * 4 + 18)))
+                                                  : 0;
                                              const rackBaseY = startY + (rowSlotHeight - item.image.height) / 2;
                                              const baseX = isLeftController ? leftControllerBaseX : startX + rackPosition.x;
                                              const baseY = isLeftController
@@ -5366,11 +5366,12 @@ const App = () => {
                                                                  text={installationTapeCaption}
                                                                  fontFamily="Segoe Print, Comic Sans MS, cursive"
                                                                  fontSize={6.2}
-                                                                 fill="#394150"
-                                                                 align="center"
-                                                                 verticalAlign="middle"
-                                                                 listening={false}
-                                                             />
+                                                                  fill="#394150"
+                                                                  align="center"
+                                                                  verticalAlign="middle"
+                                                                  wrap="none"
+                                                                  listening={false}
+                                                              />
                                                          </Group>
                                                      )}
                                                     {goAerialImage && item.key === 'controller' && ['go', 'go+'].includes(controllerType) && (() => {
