@@ -7229,6 +7229,7 @@ const SelectionApp = () => {
                                     />
                                 </span>
                                 <span className="sel-stuck-controller-copy">
+                                    <small>Подобран</small>
                                     <strong>{item.label}</strong>
                                 </span>
                             </button>
@@ -7263,6 +7264,7 @@ const SelectionApp = () => {
                     <button
                         type="button"
                         className="selection-option-button sel-controller-primary-action"
+                        data-test-id="build-scheme"
                         onClick={() => buildScheme()}
                         disabled={isBuildingScheme || controllerCompatibilityIssues.length > 0}
                     >

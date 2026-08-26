@@ -5,8 +5,8 @@ import { test, expect } from '@playwright/test';
  *
  * Раскладка проходит три ступени: три колонки (навигация + контент + панель)
  * шире 1200px, две колонки до 760px и одна колонка с закреплённой снизу лентой
- * контроллера на телефоне. Кегли снижаются ступенями 18 -> 17 -> 16 -> 15,
- * описание карточки не опускается ниже 12.5px.
+ * контроллера на телефоне. Кегли снижаются ступенями 18 -> 17 -> 16 -> 15;
+ * длинное описание котла на мобильном дополнительно уменьшается до 12px.
  *
  * Тест держит два инварианта, которые ломались молча:
  * - страница нигде не уезжает вбок и ни один элемент не вылезает за правую
@@ -139,6 +139,7 @@ test.describe('/selection — адаптив', () => {
     });
 
     test('на телефоне кнопки нижней ленты одной высоты и в одну строку', async ({ page }) => {
+        const panel = page.locator('.sel-stuck-controllers-panel');
         const actions = () => page.evaluate(() => {
             const box = (selector) => document.querySelector(selector).getBoundingClientRect();
             const primary = box('.sel-controller-primary-action');
@@ -154,26 +155,47 @@ test.describe('/selection — адаптив', () => {
                     / parseFloat(getComputedStyle(label).lineHeight),
                 ),
                 labelText: label.textContent,
+                panel: (() => {
+                    const rect = document.querySelector('.sel-stuck-controllers-panel').getBoundingClientRect();
+                    return { top: Math.round(rect.top), bottom: Math.round(rect.bottom), height: Math.round(rect.height) };
+                })(),
             };
         });
 
         for (const width of [414, 375, 320]) {
             await page.setViewportSize({ width, height: 800 });
             await page.waitForTimeout(250);
+            await expect(panel).toBeVisible();
             const a = await actions();
 
             expect(new Set(a.heights).size, `разная высота кнопок при ${width}px: ${a.heights}`).toBe(1);
             expect(new Set(a.tops).size, `кнопки не выровнены по горизонтали при ${width}px`).toBe(1);
-            expect(a.heights[0], `кнопки слишком высокие при ${width}px`).toBeLessThanOrEqual(40);
+            expect(a.heights[0], `кнопки слишком высокие при ${width}px`).toBeLessThanOrEqual(44);
+            expect(a.heights[0], `кнопки скрыты при ${width}px`).toBeGreaterThan(0);
             expect(a.labelLines, `подпись в две строки при ${width}px`).toBe(1);
+            expect(a.panel.height, `нижняя панель слишком высокая при ${width}px`).toBeLessThanOrEqual(64);
+            expect(a.panel.top, `нижняя панель вышла за экран при ${width}px`).toBeGreaterThanOrEqual(0);
+            expect(a.panel.bottom, `нижняя панель вышла за экран при ${width}px`).toBeLessThanOrEqual(800);
             // Пробел из разметки должен склеить подпись при скрытом `br`.
             expect(a.labelText).toBe('Схема подключения');
         }
 
-        // На десктопе подпись остаётся двухстрочной: панель узкая.
+        // На десктопе подпись также не переносится в узкой боковой панели.
         await page.setViewportSize({ width: 1440, height: 900 });
         await page.waitForTimeout(250);
-        expect((await actions()).labelLines).toBe(2);
+        expect((await actions()).labelLines).toBe(1);
+    });
+
+    test('мобильная панель открывает спецификацию и сброс', async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 800 });
+
+        await page.getByTestId('open-commercial-offer').click();
+        await expect(page.getByRole('dialog', { name: 'Коммерческое предложение' })).toBeVisible();
+        await page.getByRole('button', { name: 'Закрыть' }).click();
+
+        await page.getByTestId('reset-equipment').click();
+        await expect(page.getByRole('dialog', { name: 'Сбросить схему' })).toBeVisible();
+        await page.getByRole('button', { name: 'Отмена' }).click();
     });
 
     test('на телефоне рендер термостата не крупнее настроек карточки', async ({ page }) => {
@@ -231,6 +253,6 @@ test.describe('/selection — адаптив', () => {
         }
 
         expect(steps.map((s) => s.heading)).toEqual([18, 17, 16, 15]);
-        expect(steps.map((s) => s.description)).toEqual([13.5, 13, 12.5, 12.5]);
+        expect(steps.map((s) => s.description)).toEqual([13.5, 13, 12.5, 12]);
     });
 });

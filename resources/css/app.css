@@ -6464,6 +6464,10 @@ html:has(.selection-body),
     padding: 2px 3px 4px;
 }
 
+.sel-stuck-controller-copy small {
+    display: none;
+}
+
 .sel-stuck-controller-copy strong {
     color: #172033;
     font-size: 15px;
@@ -7090,7 +7094,7 @@ html:has(.selection-body),
     }
 
     .sel-card-desc {
-        font-size: 12.5px;
+        font-size: 12px;
     }
 
     .sel-added-title {
@@ -7139,7 +7143,9 @@ html:has(.selection-body),
     .selection-page {
         /* Шапка прибита к верху, поэтому её высота и есть занятая полоса. */
         --sel-header-height: 50px;
-        padding: 0 12px 32px !important;
+        /* Нижний dock не перекрывает последние элементы страницы, включая
+           системную safe area на устройствах без аппаратной кнопки. */
+        padding: 0 12px calc(92px + env(safe-area-inset-bottom)) !important;
     }
 
     /* Распорка под фиксированной шапкой считается от её реальной высоты:
@@ -7322,13 +7328,10 @@ html:has(.selection-body),
         text-overflow: clip;
     }
 
-    /* В нижней ленте плитки модулей компактнее, заголовок не нужен. */
+    /* Модули остаются доступны в спецификации, но в мобильном dock их снимки
+       забирали место у четырёх основных действий. */
     .sel-stuck-modules {
-        flex: 1 1 0;
-        min-width: 0;
-        margin-top: 0;
-        padding-top: 0;
-        border-top: 0;
+        display: none;
     }
 
     .sel-controller-panel-glow,
@@ -7338,18 +7341,20 @@ html:has(.selection-body),
 
     .selection-page button.sel-stuck-controller-card {
         display: flex;
-        width: auto !important;
-        height: var(--sel-mobile-equipment-card-height);
-        padding: 5px !important;
+        flex: 0 0 auto;
+        width: 96px !important;
+        height: 48px;
+        padding: 4px !important;
         flex-direction: row;
-        gap: 7px;
+        gap: 5px;
         border-radius: 8px;
+        text-align: left;
     }
 
     .sel-stuck-controller-visual {
-        width: 56px;
-        height: 48px;
-        flex: 0 0 56px;
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
         border-radius: 6px;
     }
 
@@ -7359,8 +7364,8 @@ html:has(.selection-body),
     }
 
     .sel-stuck-controller-visual img {
-        width: 50px;
-        height: 42px;
+        width: 36px;
+        height: 34px;
         filter: none;
     }
 
@@ -7371,81 +7376,60 @@ html:has(.selection-body),
     }
 
     .sel-stuck-controller-copy strong {
-        font-size: 12px;
+        max-width: 45px;
+        overflow: hidden;
+        font-size: 10px;
         white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    .sel-stuck-controller-copy small {
+        display: block;
+        color: #9a6a3a;
+        font-size: 7px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        line-height: 1.1;
+        text-transform: uppercase;
     }
 
     .sel-stuck-modules-title {
         display: none;
     }
 
-    /* В нижней ленте плитки идут одной строкой со свайпом, а не сеткой в три
-       колонки: вертикального места там нет. */
-    .sel-stuck-modules-grid {
-        grid-template-columns: none;
-        grid-auto-flow: column;
-        grid-auto-columns: 36px;
-        width: 100%;
-        overflow-x: auto;
-        padding-top: 0;
-        scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .sel-stuck-modules-grid::-webkit-scrollbar {
-        display: none;
-    }
-
-    .sel-stuck-module-tile {
-        width: 36px;
-        height: var(--sel-mobile-equipment-card-height);
-        aspect-ratio: auto;
-    }
-
-    /* В нижней ленте кнопки действий компактнее и в один ряд, чтобы лента не
-       съедала экран. Единая высота ряда задаётся переменной: по ней равняются
-       и главная кнопка, и обе квадратные — иначе они стояли вразнобой. */
+    /* Все действия помещаются рядом с карточкой контроллера в одной строке. */
     .sel-stuck-actions {
-        --sel-mobile-action-height: 38px;
-        flex: 1 0 100%;
+        --sel-mobile-action-height: 42px;
+        flex: 1 1 auto;
+        min-width: 0;
         flex-direction: row;
         align-items: center;
-        gap: 8px;
-        margin-top: 8px;
-        padding-top: 8px;
+        gap: 6px;
+        margin-top: 0;
+        padding-top: 0;
+        border-top: 0;
     }
 
     .selection-page button.sel-controller-primary-action {
         flex: 1 1 0;
-        grid-template-columns: 26px minmax(0, 1fr) 16px;
-        gap: 7px;
+        display: flex;
+        justify-content: center;
         width: auto;
         min-width: 0;
         min-height: var(--sel-mobile-action-height);
         /* Кнопка несёт и класс `selection-option-button`, у которого в этом же
            блоке padding с !important — без него отступ не перебить. */
-        padding: 4px 8px !important;
+        padding: 4px 7px !important;
         border-radius: 8px;
     }
 
-    .sel-controller-action-icon {
-        width: 26px;
-        height: 26px;
-        border-radius: 6px;
-    }
-
-    .sel-controller-action-icon svg {
-        width: 16px;
-        height: 16px;
-    }
-
+    .sel-controller-action-icon,
     .sel-controller-action-arrow {
-        width: 16px;
-        height: 16px;
+        display: none;
     }
 
     .sel-controller-action-copy strong {
-        font-size: 11.5px;
+        font-size: 10.5px;
         line-height: 1.15;
         overflow: hidden;
         white-space: nowrap;
@@ -7506,31 +7490,40 @@ html:has(.selection-body),
         font-size: 12px !important;
     }
 
-    /* На узких экранах боковая колонка не помещается: раскладка схлопывается
-       в одну колонку. Навигации по разделам здесь уже нет — она скрыта выше,
-       начиная с 1200px. */
+    /* На узких экранах боковая колонка становится нижним dock. Он остаётся
+       заметным при прокрутке, но занимает только одну компактную строку. */
     .sel-layout {
         display: block;
     }
 
     .sel-stuck-controllers-panel {
-        display: none;
+        position: fixed;
+        left: 8px;
+        right: 8px;
+        bottom: max(8px, env(safe-area-inset-bottom));
+        top: auto;
+        display: flex;
+        align-items: center;
+        width: auto;
+        max-height: none;
+        padding: 7px;
+        gap: 6px;
+        overflow: hidden;
+        border-color: rgba(255, 255, 255, 0.94);
+        border-radius: 12px;
+        box-shadow: 0 12px 32px rgba(32, 39, 56, 0.2), inset 0 1px rgba(255, 255, 255, 0.96);
+        z-index: 900;
     }
 
     .sel-stuck-controllers {
-        flex: 0 1 auto;
-        max-width: 65%;
+        flex: 0 1 96px;
+        max-width: 96px;
         min-width: 0;
         padding-top: 0;
         flex-direction: row !important;
         flex-wrap: nowrap;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
-    }
-
-    .sel-stuck-controller-card {
-        width: auto !important;
-        flex: 0 0 auto;
     }
 
     .sel-quick-nav {
@@ -7591,7 +7584,7 @@ html:has(.selection-body),
     }
 
     .sel-card-desc {
-        font-size: 12px;
+        font-size: 12.5px;
     }
 
     /* Лид карточки котлов длиннее прочих описаний — на телефоне ещё мельче. */
@@ -7637,7 +7630,7 @@ html:has(.selection-body),
        Кружок выбора цвета исключён: он не текстовый, а квадратный 36x36 с
        `border-box`, и вертикальные 7px паддинга этого правила (оно перебивало
        `padding: 0` кружка по специфичности) сплющивали образец в овал. */
-    .selection-page .selection-option-button:not(.sel-mode-option):not(.sel-thermostat-color-button):not(.selection-tutorial-trigger) {
+    .selection-page .selection-option-button:not(.sel-mode-option):not(.sel-thermostat-color-button):not(.selection-tutorial-trigger):not(.sel-stuck-controller-card):not(.sel-controller-primary-action):not(.sel-controller-spec-action):not(.sel-controller-reset-action) {
         flex-direction: column !important;
         padding: 7px 9px !important;
         font-size: 12.5px !important;
@@ -7859,7 +7852,7 @@ html:has(.selection-body),
     }
 
     .sel-stuck-controllers {
-        padding-top: 6px !important;
+        padding-top: 0 !important;
         gap: 6px !important;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
@@ -7870,10 +7863,10 @@ html:has(.selection-body),
     }
 
     .sel-stuck-controller-card {
-        gap: 6px !important;
-        padding: 2px 8px 2px 4px !important;
-        font-size: 12px !important;
-        border-radius: 6px !important;
+        gap: 5px !important;
+        padding: 4px !important;
+        font-size: 10px !important;
+        border-radius: 8px !important;
     }
 
     .sel-stuck-controller-card > img {
