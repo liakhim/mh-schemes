@@ -5,6 +5,8 @@ use Pdo\Mysql;
 
 return [
 
+    'enabled' => env('DATABASE_ENABLED', false),
+
     /*
     |--------------------------------------------------------------------------
     | Default Database Connection Name

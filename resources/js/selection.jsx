@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createRoot } from 'react-dom/client';
 import '../css/app.css';
 import EquipmentOfferModal from './components/EquipmentOfferModal';
+import LogoutButton from './components/LogoutButton';
 import ModalCloseButton from './components/ModalCloseButton';
 import TutorialPopover from './components/TutorialPopover';
 import { getAllOneWireDevicesForBalancing } from './scheme/domain/initialState';
@@ -129,7 +130,6 @@ const PRESSURE_SENSOR_IMAGE_PATH = new URL('../images/thermostats/420sensor.png'
 /** Быстрые подсказки над строкой поиска: подставляют бренд в запрос. */
 
 const MYHEAT_LOGO_PATH = new URL('../assets/logo/logo.svg', import.meta.url).href;
-const SETTINGS_ICON_PATH = new URL('../assets/icons/settings.svg', import.meta.url).href;
 
 const ORANGE = '#e07020';
 
@@ -4372,10 +4372,10 @@ const SelectionSideNavigation = ({ showQuickNav, completedChapters }) => (
                     <span className="account-menu-toggle-icon" aria-hidden="true"><span /><span /><span /></span>
                     <span className="account-menu-toggle-copy"><strong>Меню</strong><small>Подбор оборудования</small></span>
                     <span className="account-menu-toggle-chevron" aria-hidden="true" />
-                </label>
+            </label>
             <nav className="account-navigation sel-account-navigation">
                 <a href="/settings">
-                    <img src={SETTINGS_ICON_PATH} alt="" aria-hidden="true" />
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" /></svg>
                     <span>Настройки аккаунта</span>
                 </a>
                 <a href="/user-schemes">
@@ -4390,6 +4390,10 @@ const SelectionSideNavigation = ({ showQuickNav, completedChapters }) => (
                         <path d="M4 6h5m4 0h7M4 12h9m4 0h3M4 18h2m4 0h10M9 3v6m6 0v6m-7 0v6" />
                     </svg>
                     <span>Подбор оборудования</span>
+                </a>
+                <a href="/cases">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V4h8v3M3 12h18M9 15l2 2 4-4" /></svg>
+                    <span>Выполненные работы</span>
                 </a>
             </nav>
             </div>
@@ -4832,6 +4836,7 @@ const SelectionApp = () => {
     const leakZoneCounterRef = useRef(null);
     const leakValveCounterRef = useRef(null);
     const [isBuildingScheme, setIsBuildingScheme] = useState(false);
+    const buildSchemeInFlightRef = useRef(false);
     const [buildSchemeError, setBuildSchemeError] = useState('');
     const [boilerQuery, setBoilerQuery] = useState('');
     const [boilerResults, setBoilerResults] = useState([]);
@@ -4887,6 +4892,14 @@ const SelectionApp = () => {
         setBuildSchemeError('');
         setPendingDraft(null);
     }, []);
+    const resolveSelectionScheme = useCallback(
+        (scheme, requested = upsRequestedRef.current) => resolveControllerAndRequiredModules(
+            scheme,
+            requested,
+            controllerSelectionSourceRef.current === 'manual',
+        ),
+        [],
+    );
     const continueSelectionDraft = useCallback(() => {
         if (!pendingDraft) return;
         const requested = pendingDraft.upsRequested === true;
@@ -4900,7 +4913,7 @@ const SelectionApp = () => {
         setRequestedControllerType(pendingDraft.requestedControllerType || getControllerType(pendingDraft.incomingScheme));
         controllerSelectionSourceRef.current = pendingDraft.controllerSelectionSource === 'manual' ? 'manual' : 'default';
         setControllerSelectionSource(controllerSelectionSourceRef.current);
-        setIncomingScheme(pendingDraft.incomingScheme);
+        setIncomingScheme(resolveSelectionScheme(pendingDraft.incomingScheme, requested));
         setThermostatConnection(editor.thermostatConnection === 'wireless' ? 'wireless' : 'wired');
         setWiredThermostatColor(editor.wiredThermostatColor || 'black');
         setWiredThermostatHasFloorSensor(editor.wiredThermostatHasFloorSensor === true);
@@ -4908,19 +4921,13 @@ const SelectionApp = () => {
         setWirelessThermostatHasFloorSensor(editor.wirelessThermostatHasFloorSensor === true);
         setMixingServo(editor.mixingServo === '010' ? '010' : '220');
         setMixingSensor(editor.mixingSensor === 'ntc' ? 'ntc' : 'digital');
+        setPumpConnectionMode(editor.pumpConnectionMode === 'wifi' ? 'wifi' : 'wired');
+        setPumpType(editor.pumpType === '010' ? '010' : '220');
         setWiredTemperatureSensorKey(editor.wiredTemperatureSensorKey || 'wired-wall-digital');
         setWirelessTemperatureSensorKey(editor.wirelessTemperatureSensorKey || 'wireless-wall');
         setTemperatureSensorConnection(editor.temperatureSensorConnection === 'wireless' ? 'wireless' : 'wired');
         setPendingDraft(null);
-    }, [pendingDraft]);
-    const resolveSelectionScheme = useCallback(
-        (scheme, requested = upsRequestedRef.current) => resolveControllerAndRequiredModules(
-            scheme,
-            requested,
-            controllerSelectionSourceRef.current === 'manual',
-        ),
-        [],
-    );
+    }, [pendingDraft, resolveSelectionScheme]);
     const controllerCompatibilityIssues = useMemo(
         () => getControllerCompatibilityIssues(incomingScheme, null, upsRequested),
         [incomingScheme, upsRequested],
@@ -5000,6 +5007,8 @@ const SelectionApp = () => {
                 wirelessThermostatHasFloorSensor,
                 mixingServo,
                 mixingSensor,
+                pumpConnectionMode,
+                pumpType,
                 wiredTemperatureSensorKey,
                 wirelessTemperatureSensorKey,
                 temperatureSensorConnection,
@@ -5018,6 +5027,8 @@ const SelectionApp = () => {
         wirelessThermostatHasFloorSensor,
         mixingServo,
         mixingSensor,
+        pumpConnectionMode,
+        pumpType,
         wiredTemperatureSensorKey,
         wirelessTemperatureSensorKey,
         temperatureSensorConnection,
@@ -5786,25 +5797,27 @@ const SelectionApp = () => {
 
     /** Сохраняет согласованную схему и открывает ее редактор в новой вкладке. */
     const buildScheme = useCallback(async (schemeOverride = null, openOptions = null) => {
+        if (buildSchemeInFlightRef.current) return;
         const hasSchemeOverride = schemeOverride && typeof schemeOverride === 'object';
         const sourceScheme = hasSchemeOverride ? schemeOverride : incomingScheme;
         if (!hasSchemeOverride && controllerCompatibilityIssues.length > 0) {
             setBuildSchemeError('Сначала устраните несовместимость оборудования с выбранным контроллером.');
             return;
         }
+        buildSchemeInFlightRef.current = true;
         setIsBuildingScheme(true);
         setBuildSchemeError('');
 
-        // Открываем вкладку синхронно в обработчике клика — иначе браузер
-        // не даст открыть полноценную вкладку после await и либо заблокирует
-        // её, либо схлопнет в маленький popup.
-        const newTab = window.open('', '_blank');
-        if (newTab) {
-            newTab.document.write('<!doctype html><title>Построение схемы…</title><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:14px system-ui, sans-serif;color:#64748b;background:#f8fafc">Строим схему…</body>');
-            newTab.document.close();
-        }
+        let newTab = null;
 
         try {
+            // Открываем вкладку синхронно в обработчике клика — иначе браузер
+            // заблокирует её после await.
+            newTab = window.open('', '_blank');
+            if (newTab) {
+                newTab.document.write('<!doctype html><title>Построение схемы…</title><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:14px system-ui, sans-serif;color:#64748b;background:#f8fafc">Строим схему…</body>');
+                newTab.document.close();
+            }
             const normalizedScheme = normalizeSchemeIds(sourceScheme);
             const sourceControllerType = getControllerType(normalizedScheme);
             const sourceUpsRequested = hasSchemeOverride ? sourceControllerType === 'go+' : upsRequested;
@@ -5867,10 +5880,11 @@ const SelectionApp = () => {
             } else {
                 window.open(schemePath, '_blank');
             }
-            setIsBuildingScheme(false);
         } catch (error) {
             if (newTab) newTab.close();
             setBuildSchemeError(error instanceof Error ? error.message : 'Не удалось сохранить схему');
+        } finally {
+            buildSchemeInFlightRef.current = false;
             setIsBuildingScheme(false);
         }
     }, [
@@ -6071,6 +6085,7 @@ const SelectionApp = () => {
                             </div>
                         </div>
                     </div>
+                    <LogoutButton />
                 </div>
             </header>
 

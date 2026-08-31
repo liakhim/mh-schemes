@@ -21,6 +21,7 @@ After startup:
 
 - Main renderer and interactions: `resources/js/spa.jsx`
 - Input contract: `INCOMING_SCHEME.md`
+- Environment variables: `ENV_DOCUMENTATION.md`
 - Short project context: `PROJECT_CONTEXT.md`
 - Full rules journal: `JOURNAL.md`
 - Rule index: `docs/rules/INDEX.md`

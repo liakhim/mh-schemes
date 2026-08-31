@@ -10,6 +10,10 @@ const ROW_LINE_HEIGHT = 16;
 
 export const getBillableCount = (row) => row.paidCount ?? (row.count || 1);
 
+const getDiscountedPrice = (price, discountPercent, discountEligible = true) => (
+    discountEligible ? Math.round(price * (100 - discountPercent) / 100) : price
+);
+
 const loadImage = (src) => new Promise((resolve) => {
     const image = new Image();
     image.onload = () => resolve(image);
@@ -71,7 +75,7 @@ const drawLeader = (ctx, fromX, toX, y) => {
     ctx.restore();
 };
 
-export const downloadOfferPdf = async (sections) => {
+export const downloadOfferPdf = async (sections, { discountPercent = 0 } = {}) => {
     const { jsPDF } = await import('jspdf');
     const logoImage = await loadImage(logoPath);
     const pages = [];
@@ -96,9 +100,17 @@ export const downloadOfferPdf = async (sections) => {
             page.ctx.font = rowFont;
             countCol = Math.max(countCol, page.ctx.measureText(`${row.count || 1} шт`).width);
             if (row.unitPrice != null) {
-                page.ctx.font = priceFont;
                 const price = row.unitPrice * getBillableCount(row);
-                priceCol = Math.max(priceCol, page.ctx.measureText(`${price.toLocaleString('ru-RU')} ₽`).width);
+                const discountedPrice = getDiscountedPrice(price, discountPercent, row.discountEligible !== false);
+                page.ctx.font = priceFont;
+                const discountedWidth = page.ctx.measureText(`${discountedPrice.toLocaleString('ru-RU')} ₽`).width;
+                if (discountPercent > 0 && row.discountEligible !== false) {
+                    page.ctx.font = rowFont;
+                    const originalWidth = page.ctx.measureText(`${price.toLocaleString('ru-RU')} ₽`).width;
+                    priceCol = Math.max(priceCol, originalWidth + 8 + discountedWidth);
+                } else {
+                    priceCol = Math.max(priceCol, discountedWidth);
+                }
             }
         }));
         return { countCol, priceCol };
@@ -138,6 +150,7 @@ export const downloadOfferPdf = async (sections) => {
         section.rows.forEach((row) => {
             const hasPrice = row.unitPrice != null;
             const price = hasPrice ? row.unitPrice * getBillableCount(row) : null;
+            const discountedPrice = price == null ? null : getDiscountedPrice(price, discountPercent, row.discountEligible !== false);
             if (price != null) total += price;
 
             page.ctx.font = rowFont;
@@ -172,9 +185,32 @@ export const downloadOfferPdf = async (sections) => {
             page.ctx.fillStyle = textColor;
             page.ctx.textAlign = 'right';
             page.ctx.fillText(`${row.count || 1} шт`, countX, lastBaseline);
-            if (price != null) {
-                page.ctx.font = priceFont;
-                page.ctx.fillText(`${price.toLocaleString('ru-RU')} ₽`, priceX, lastBaseline);
+            if (discountedPrice != null) {
+                const discountedText = `${discountedPrice.toLocaleString('ru-RU')} ₽`;
+                if (discountPercent > 0 && row.discountEligible !== false) {
+                    const originalText = `${price.toLocaleString('ru-RU')} ₽`;
+                    page.ctx.font = rowFont;
+                    const originalWidth = page.ctx.measureText(originalText).width;
+                    page.ctx.font = priceFont;
+                    const discountedWidth = page.ctx.measureText(discountedText).width;
+                    const originalX = priceX - discountedWidth - 8 - originalWidth;
+                    page.ctx.font = rowFont;
+                    page.ctx.fillStyle = '#94a3b8';
+                    page.ctx.textAlign = 'left';
+                    page.ctx.fillText(originalText, originalX, lastBaseline);
+                    page.ctx.beginPath();
+                    page.ctx.moveTo(originalX, lastBaseline - 4);
+                    page.ctx.lineTo(originalX + originalWidth, lastBaseline - 4);
+                    page.ctx.strokeStyle = '#94a3b8';
+                    page.ctx.lineWidth = 0.8;
+                    page.ctx.stroke();
+                    page.ctx.font = priceFont;
+                    page.ctx.fillStyle = '#c85e18';
+                    page.ctx.textAlign = 'right';
+                } else {
+                    page.ctx.font = priceFont;
+                }
+                page.ctx.fillText(discountedText, priceX, lastBaseline);
             }
             page.ctx.textAlign = 'left';
             drawLeader(page.ctx, labelEnd + 6, countX - page.ctx.measureText(`${row.count || 1} шт`).width - 6, lastBaseline);
@@ -198,7 +234,34 @@ export const downloadOfferPdf = async (sections) => {
         page.ctx.fillStyle = '#203040';
         page.ctx.fillText('Итого', MARGIN, y);
         page.ctx.textAlign = 'right';
-        page.ctx.fillText(`${total.toLocaleString('ru-RU')} ₽`, PAGE_WIDTH - MARGIN, y);
+        const discountedTotal = sections.reduce((sum, section) => sum + section.rows.reduce((rowSum, row) => {
+            if (row.unitPrice == null) return rowSum;
+            const price = row.unitPrice * getBillableCount(row);
+            return rowSum + getDiscountedPrice(price, discountPercent, row.discountEligible !== false);
+        }, 0), 0);
+        const discountedTotalText = `${discountedTotal.toLocaleString('ru-RU')} ₽`;
+        if (discountPercent > 0 && discountedTotal !== total) {
+            const originalTotalText = `${total.toLocaleString('ru-RU')} ₽`;
+            page.ctx.font = `400 12px ${FONT_FAMILY}`;
+            const originalWidth = page.ctx.measureText(originalTotalText).width;
+            page.ctx.font = `700 14px ${FONT_FAMILY}`;
+            const discountedWidth = page.ctx.measureText(discountedTotalText).width;
+            const originalX = PAGE_WIDTH - MARGIN - discountedWidth - 10 - originalWidth;
+            page.ctx.fillStyle = '#94a3b8';
+            page.ctx.textAlign = 'left';
+            page.ctx.font = `400 12px ${FONT_FAMILY}`;
+            page.ctx.fillText(originalTotalText, originalX, y);
+            page.ctx.beginPath();
+            page.ctx.moveTo(originalX, y - 4);
+            page.ctx.lineTo(originalX + originalWidth, y - 4);
+            page.ctx.strokeStyle = '#94a3b8';
+            page.ctx.lineWidth = 0.8;
+            page.ctx.stroke();
+            page.ctx.fillStyle = '#c85e18';
+            page.ctx.font = `700 14px ${FONT_FAMILY}`;
+            page.ctx.textAlign = 'right';
+        }
+        page.ctx.fillText(discountedTotalText, PAGE_WIDTH - MARGIN, y);
         page.ctx.textAlign = 'left';
     }
 

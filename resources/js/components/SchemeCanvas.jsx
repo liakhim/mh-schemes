@@ -38,6 +38,8 @@ import {
     VALVE_SLOT_WIDTH,
 } from '../scheme/layout/renderConstants';
 import { WIRELESS_INFOBLOCK_HEIGHT } from '../scheme/layout/wirelessLineLayout';
+import { getOneWireOwnerMinBendY, isWallDigitalOneWireDevice } from '../scheme/layout/oneWireRendering';
+import { getProEmptyBusSlotY, getProRelaySlotY } from '../scheme/layout/busLayout';
 import {
     getDiInputPort,
     getPortByNameOrClassToken,
@@ -1663,7 +1665,7 @@ const SchemeCanvas = ({
                                                         width={relaySlotWidth - 8}
                                                         height={INFO_BLOCK_HEIGHT}
                                                         align="center"
-                                                        verticalAlign="middle" device={relayDevice} title={relayInfoTitle} />
+                                                        verticalAlign="middle" device={relayVisualDevice} title={relayInfoTitle} />
                                                 </>
                                             )}
                                             {relayDevice && isRelayHovered && (
@@ -3809,10 +3811,14 @@ const SchemeCanvas = ({
                                             ? (batteryPlacement.y + batteryPlacement.height)
                                             : (powerUnitPlacement ? (powerUnitPlacement.y + powerUnitPlacement.height) : Math.max(...placements.map((item) => item.y + item.height)));
                                         rightMostRelaySlotX = powerMaxX - RELAY_SLOT_SIZE;
-                                        relaySlotY = powerRelayBaseY + 7 * indentSize;
-                                    }
-                                    if (controllerType === 'pro') {
-                                        relaySlotY += 4 * indentSize;
+                                        relaySlotY = controllerType === 'pro'
+                                            ? getProRelaySlotY({
+                                                controllerHeight: controllerImage.height,
+                                                hasUps,
+                                                batteryHeight: batteryPlacement?.height || 0,
+                                                indentSize,
+                                            })
+                                            : powerRelayBaseY + 7 * indentSize;
                                     }
                                     const relaySlotGap = 2 * indentSize;
                                     const getRelaySlotX = (slotIndex) => {
@@ -4121,7 +4127,7 @@ const SchemeCanvas = ({
                                                         {isRelayOccupied && !isCoveredRelaySlot && (
                                                             <>
                                                                 <Rect x={relaySlotX} y={relaySlotRenderYOffset - (INFO_BLOCK_HEIGHT + 8)} width={relayVisualSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                                <EditableInfoTitle x={relaySlotX + 4} y={relaySlotRenderYOffset - (INFO_BLOCK_HEIGHT + 8)} text={relayInfoTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} width={Math.max(40, relayVisualSlotWidth - 8)} height={INFO_BLOCK_HEIGHT} align="center" verticalAlign="middle" device={relayDevice} title={relayInfoTitle} />
+                                                                <EditableInfoTitle x={relaySlotX + 4} y={relaySlotRenderYOffset - (INFO_BLOCK_HEIGHT + 8)} text={relayInfoTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} width={Math.max(40, relayVisualSlotWidth - 8)} height={INFO_BLOCK_HEIGHT} align="center" verticalAlign="middle" device={relayVisualDevice} title={relayInfoTitle} />
                                                             </>
                                                         )}
                                                          {isRelayOccupied && relayVisualImageKey && relayLine?.bPortName && !isCoveredRelaySlot && (() => {
@@ -4604,7 +4610,7 @@ const SchemeCanvas = ({
                                                          {showDiInfoBlock && (
                                                              <>
                                                                   <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={diSlotWidth} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                                  <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, diSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={diInfoTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={device} title={diInfoTitle} />
+                                                                  <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 4)} width={Math.max(30, diSlotWidth - 6)} height={INFO_BLOCK_HEIGHT} text={diInfoTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={visualDevice} title={diInfoTitle} />
                                                             </>
                                                         )}
                                                          {showPorts && devicePorts.map((port) => (
@@ -4694,10 +4700,31 @@ const SchemeCanvas = ({
                                                          const relaySlot4Index = relayLines.findIndex((relayLine) => relayLine.index === 4);
                                                          const relaySlot4Occupied = relaySlot4Index >= 0 && Boolean(relayOccupancy[relaySlot4Index]);
                                                          const relaySlot4Offset = relaySlot4Occupied ? 5 * indentSize : 0;
-                                                         return {
-                                                             x: getAlignedXByBusA(0),
-                                                             y: controllerImage.height + moduleHeightValue * busOffsetMultiplier + relaySlot4Offset,
-                                                         };
+                                                         const preferredY = controllerImage.height + moduleHeightValue * busOffsetMultiplier + relaySlot4Offset;
+                                                         if (!busDevice) {
+                                                             const batteryImage = hasUpsInPower ? wirelessImages.battery : null;
+                                                             const relaySlotY = getProRelaySlotY({
+                                                                 controllerHeight: controllerImage.height,
+                                                                 hasUps: hasUpsInPower,
+                                                                 batteryHeight: batteryImage?.height || (hasUpsInPower ? 80 : 0),
+                                                                 indentSize,
+                                                             });
+                                                             return {
+                                                                 x: getAlignedXByBusA(0),
+                                                                     y: getProEmptyBusSlotY({
+                                                                         preferredY,
+                                                                         relaySlotY,
+                                                                         relaySlotOffsetYs: relayOccupancy.map((slotState, slotIndex) => (
+                                                                             slotState && !slotState.covered
+                                                                                 ? relaySlotOffsets[slotIndex]?.y
+                                                                                 : 0
+                                                                         )),
+                                                                         relaySlotSize: RELAY_SLOT_SIZE,
+                                                                         indentSize,
+                                                                     }),
+                                                             };
+                                                         }
+                                                         return { x: getAlignedXByBusA(0), y: preferredY };
                                                      }
                                                     if (controllerType === 'ecosmart') {
                                                         const p1a = ports.find((p) => p.name === 'BUS-1-A');
@@ -5664,7 +5691,7 @@ const SchemeCanvas = ({
                                                                                        width={infoBlockWidth}
                                                                                        height={infoBlockHeight}
                                                                                       align="center"
-                                                                                      verticalAlign="middle" device={relayDevice} title={relayInfoTitle} />
+                                                                                      verticalAlign="middle" device={visualDevice} title={relayInfoTitle} />
                                                                               </>
                                                                           )}
                                                                            {shouldRenderRelayDevice && isRelayHovered && (
@@ -5930,7 +5957,7 @@ const SchemeCanvas = ({
                                                                                         width={infoBlockWidth}
                                                                                         height={infoBlockHeight}
                                                                                         align="center"
-                                                                                        verticalAlign="middle" device={relayDevice} title={relayInfoTitle} />
+                                                                                        verticalAlign="middle" device={visualDevice} title={relayInfoTitle} />
                                                                                </>
                                                                            )}
                                                                            {shouldRenderRelayDevice && isRelayHovered && (
@@ -6549,11 +6576,39 @@ const SchemeCanvas = ({
                                                     '1-WIRE-DAT': getAnchoredOneWirePort(owDevice, '1-WIRE-DAT', preferredDirection) || getOneWirePortByRole(portsList, '1-WIRE-DAT', preferredDirection),
                                                     '1-WIRE-GND': getAnchoredOneWirePort(owDevice, '1-WIRE-GND', preferredDirection) || getOneWirePortByRole(portsList, '1-WIRE-GND', preferredDirection),
                                                 });
-                                                const extOwLinks = [
-                                                    { name: '1-WIRE-V+', offset: 1 * indentSize, color: '#d32f2f' },
-                                                    { name: '1-WIRE-DAT', offset: 2 * indentSize, color: '#fbc02d' },
-                                                    { name: '1-WIRE-GND', offset: 3 * indentSize, color: '#212121' },
-                                                ];
+                                                 const extOwLinks = [
+                                                     { name: '1-WIRE-V+', offset: 1 * indentSize, color: '#d32f2f' },
+                                                     { name: '1-WIRE-DAT', offset: 2 * indentSize, color: '#fbc02d' },
+                                                     { name: '1-WIRE-GND', offset: 3 * indentSize, color: '#212121' },
+                                                 ];
+                                                const getExtConnectionBottomY = () => {
+                                                    const hopIndent = Math.max(...extLinks.map((link) => (
+                                                        slotIndex === 0 ? link.firstHopBendIndent : link.moduleHopBendIndent
+                                                    )));
+                                                    const baseSlotPos = getExtBaseSlotPosition(slotIndex);
+                                                    const bodyBottoms = [slotY + slotHeight, baseSlotPos.y + slotHeight];
+                                                    if (slotIndex > 0) {
+                                                        const previousDevice = extModules[slotIndex - 1] || null;
+                                                        const previousSize = getExtModuleSize(previousDevice);
+                                                        const previousSlotPos = getExtSlotPosition(slotIndex - 1);
+                                                        const previousBasePos = getExtBaseSlotPosition(slotIndex - 1);
+                                                        bodyBottoms.push(
+                                                            previousSlotPos.y + previousSize.height,
+                                                            previousBasePos.y + previousSize.height,
+                                                        );
+                                                    }
+                                                    if (slotIndex + 1 < extModules.length) {
+                                                        const nextDevice = extModules[slotIndex + 1] || null;
+                                                        const nextSize = getExtModuleSize(nextDevice);
+                                                        const nextSlotPos = getExtSlotPosition(slotIndex + 1);
+                                                        const nextBasePos = getExtBaseSlotPosition(slotIndex + 1);
+                                                        bodyBottoms.push(
+                                                            nextSlotPos.y + nextSize.height,
+                                                            nextBasePos.y + nextSize.height,
+                                                        );
+                                                    }
+                                                    return Math.max(...bodyBottoms) + hopIndent * indentSize;
+                                                };
                                                 return (
                                                     <Group
                                                         key={`ext-slot-${offsetKey}`}
@@ -7055,7 +7110,7 @@ const SchemeCanvas = ({
                                                                         {relayDevice && (
                                                                             <>
                                                                                 <Rect x={slotRelayX} y={slotRelayY - (INFO_BLOCK_HEIGHT + 8)} width={slotSize.width} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                                                <EditableInfoTitle x={slotRelayX + 3} y={slotRelayY - (INFO_BLOCK_HEIGHT + 8)} text={relayInfoTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} width={Math.max(34, slotSize.width - 6)} height={INFO_BLOCK_HEIGHT} align="center" verticalAlign="middle" device={relayDevice} title={relayInfoTitle} />
+                                                                                <EditableInfoTitle x={slotRelayX + 3} y={slotRelayY - (INFO_BLOCK_HEIGHT + 8)} text={relayInfoTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} width={Math.max(34, slotSize.width - 6)} height={INFO_BLOCK_HEIGHT} align="center" verticalAlign="middle" device={visualDevice} title={relayInfoTitle} />
                                                                             </>
                                                                         )}
                                                                          {relayDevice && bPort && imageRelay && relayType !== 'stupid' && !isDoubleRelayModuleDevice && relayInPort && (() => {
@@ -8391,11 +8446,17 @@ const SchemeCanvas = ({
                                                                         const toX = owDevice ? (owX + toPort.x * owWidth) : (owX + toPort.x);
                                                                         const toY = owDevice ? (owY + toPort.y * owHeight) : (owY + toPort.y);
                                                                         const targetType = canonicalDeviceType(owDevice?.type);
-                                                                        if (targetType === 'wall-digital-sensor') {
+                                                                        const moduleMinBendY = extOneWireIndex === 0
+                                                                            ? getOneWireOwnerMinBendY(getExtConnectionBottomY(), link.name, indentSize, 1)
+                                                                            : null;
+                                                                        if (isWallDigitalOneWireDevice(owDevice, owImageKey)) {
+                                                                            const bendY = typeof moduleMinBendY === 'number'
+                                                                                ? Math.max(toY, moduleMinBendY)
+                                                                                : toY;
                                                                             return {
                                                                                 key: `ext-ow-link-${slotIndex}-${extOneWireIndex}-${link.name}`,
                                                                                 role: link.name,
-                                                                                points: [toX, toY, fromX, toY, fromX, fromY],
+                                                                                points: getOrthogonalLinkPoints(fromX, fromY, bendY, toX, toY),
                                                                             };
                                                                         }
                                                                         const isTargetThermostat = targetType === 'thermostat' || isFlaskSensorType(targetType);
@@ -8420,10 +8481,13 @@ const SchemeCanvas = ({
                                                                             isTargetThermostat,
                                                                             sourceMinBendY,
                                                                         });
+                                                                        const finalBendY = typeof moduleMinBendY === 'number'
+                                                                            ? Math.max(bendY, moduleMinBendY)
+                                                                            : bendY;
                                                                         return {
                                                                             key: `ext-ow-link-${slotIndex}-${extOneWireIndex}-${link.name}`,
                                                                             role: link.name,
-                                                                            points: getOrthogonalLinkPoints(fromX, fromY, bendY, toX, toY),
+                                                                            points: getOrthogonalLinkPoints(fromX, fromY, finalBendY, toX, toY),
                                                                         };
                                                                         }).filter(Boolean);
 
@@ -9491,7 +9555,7 @@ const SchemeCanvas = ({
                                                                          };
                                                                     }
                                                                     const targetType = canonicalDeviceType(device?.type);
-                                                                    if (targetType === 'wall-digital-sensor' && !(slotIndex === 0 && (controllerType === 'go' || controllerType === 'go+'))) {
+                                                                    if (isWallDigitalOneWireDevice(device, imageKey) && !(slotIndex === 0 && (controllerType === 'go' || controllerType === 'go+'))) {
                                                                         return {
                                                                             key: `one-wire-link-${slotIndex}-${link.name}`,
                                                                             role: link.name,

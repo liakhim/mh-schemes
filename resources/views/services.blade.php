@@ -13,6 +13,7 @@
             <a class="sel-header-brand" href="{{ route('user-schemes') }}" aria-label="MyHeat, созданные схемы">
                 <img src="{{ Vite::asset('resources/assets/logo/logo.svg') }}" alt="MyHeat">
             </a>
+            @include('partials.logout-button')
         </div>
     </header>
     <main class="account-shell">
@@ -23,21 +24,8 @@
                     <span class="account-menu-toggle-icon" aria-hidden="true"><span></span><span></span><span></span></span>
                     <span class="account-menu-toggle-copy"><strong>Меню</strong><small>Созданные схемы</small></span>
                     <span class="account-menu-toggle-chevron" aria-hidden="true"></span>
-                </label>
-            <nav class="account-navigation">
-                <a href="{{ route('settings') }}">
-                    <img src="{{ Vite::asset('resources/assets/icons/settings.svg') }}" alt="" aria-hidden="true">
-                    <span>Настройки аккаунта</span>
-                </a>
-                <a class="is-active" href="{{ route('user-schemes') }}" aria-current="page">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2" /><path d="M8 9h.01M12 9h.01M16 9h.01M8 15h.01M12 15h.01M16 15h.01" /></svg>
-                    <span>Созданные схемы</span>
-                </a>
-                <a href="{{ route('selection') }}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h5m4 0h7M4 12h9m4 0h3M4 18h2m4 0h10M9 3v6m6 0v6m-7 0v6" /></svg>
-                    <span>Подбор оборудования</span>
-                </a>
-            </nav>
+            </label>
+                @include('partials.account-navigation')
             </div>
         </aside>
         <section class="services-content selection-dashboard" aria-labelledby="selection-dashboard-title">
@@ -53,6 +41,9 @@
             </div>
 
             <div class="selection-dashboard-table-wrap">
+                @if (session('status'))
+                    <div class="selection-dashboard-status" role="status">{{ session('status') }}</div>
+                @endif
                 @forelse ($schemes as $scheme)
                     @if ($loop->first)
                         <table class="selection-dashboard-table">
@@ -79,7 +70,22 @@
                         </td>
                         <td><span class="selection-dashboard-controller">{{ $controllerType ?: 'Не указан' }}</span></td>
                         <td>{{ $scheme->updated_at?->format('d.m.Y H:i') ?? '—' }}</td>
-                        <td><a href="{{ route('scheme.with-id', $scheme) }}" target="_blank" rel="noopener">Открыть</a></td>
+                        <td>
+                            <div class="selection-dashboard-row-actions">
+                                <div class="selection-dashboard-open-links">
+                                    <a class="is-scheme" href="{{ route('scheme.with-id', $scheme) }}?view=scheme" target="_blank" rel="noopener">Схема</a>
+                                    <a class="is-installation" href="{{ route('scheme.with-id', $scheme) }}?view=installation" target="_blank" rel="noopener">Инсталляция</a>
+                                    <a class="is-commercial" href="{{ route('scheme.with-id', $scheme) }}?view=commercial" target="_blank" rel="noopener">Коммерческое предложение</a>
+                                </div>
+                                <form method="POST" action="{{ route('schemes.destroy', $scheme) }}" onsubmit="return window.confirm('Удалить эту схему?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="selection-dashboard-delete" type="submit" aria-label="Удалить схему" title="Удалить схему">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-9 0 1 14h10l1-14M10 11v6m4-6v6"></path></svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
                     </tr>
                     @if ($loop->last)
                             </tbody>

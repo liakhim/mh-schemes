@@ -11,6 +11,7 @@ export const stagePdfDownload = async ({
 }) => {
     const shouldHideEmptySlots = showEmptySlots;
     let commentIconNodes = [];
+    let installationBackgroundNodes = [];
     let shouldHideGrid = false;
     let shouldHideSelectedSlotHighlight = false;
     let stagePosition;
@@ -26,6 +27,7 @@ export const stagePdfDownload = async ({
 
         shouldHideGrid = showGrid && gridLayer;
         commentIconNodes = stage.find(`.${commentIconNodeName}`).filter((node) => node.visible());
+        installationBackgroundNodes = stage.find('.installation-export-background').filter((node) => node.visible());
         shouldHideSelectedSlotHighlight = selectedSlotHighlightNode
             && !selectedSlotHighlightNode.isDestroyed?.()
             && selectedSlotHighlightNode.visible();
@@ -34,6 +36,7 @@ export const stagePdfDownload = async ({
 
         if (shouldHideGrid) gridLayer.visible(false);
         commentIconNodes.forEach((node) => node.visible(false));
+        installationBackgroundNodes.forEach((node) => node.visible(false));
         if (shouldHideSelectedSlotHighlight) selectedSlotHighlightNode.visible(false);
         stage.position({ x: 0, y: 0 });
         stage.scale({ x: 1, y: 1 });
@@ -47,6 +50,7 @@ export const stagePdfDownload = async ({
 
         if (shouldHideGrid) gridLayer.visible(true);
         commentIconNodes.forEach((node) => node.visible(true));
+        installationBackgroundNodes.forEach((node) => node.visible(true));
         if (shouldHideSelectedSlotHighlight && !selectedSlotHighlightNode.isDestroyed?.()) {
             selectedSlotHighlightNode.visible(true);
         }

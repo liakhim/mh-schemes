@@ -83,7 +83,7 @@ import {
 import { parsePorts, withFallbackPorts, getPortsByClassToken } from './scheme/layout/portParsing';
 import { getOneWirePortByRole, getPortPosition } from './scheme/layout/ports';
 import { Line, snapPixel } from './scheme/rendering/SharpLine';
-import EquipmentOfferModal from './components/EquipmentOfferModal';
+import CommercialOfferView from './components/CommercialOfferView';
 import SelectionConfigModal from './components/SelectionConfigModal';
 import SchemeFloatingTools from './components/SchemeFloatingTools';
 import SchemeRightTools from './components/SchemeRightTools';
@@ -779,6 +779,7 @@ const getSchemeViewOptions = () => {
     const view = params.get('view');
     const showEmptySlots = params.get('showEmptySlots');
     return {
+        commercialMode: view === 'commercial',
         installationMode: view === 'scheme' ? false : (view === 'installation' ? true : null),
         showEmptySlots: showEmptySlots === '1' ? true : (showEmptySlots === '0' ? false : null),
     };
@@ -786,7 +787,9 @@ const getSchemeViewOptions = () => {
 
 const updateSchemeViewOptions = (changes) => {
     const url = new URL(window.location.href);
-    if (changes.installationMode != null) {
+    if (changes.view) {
+        url.searchParams.set('view', changes.view);
+    } else if (changes.installationMode != null) {
         url.searchParams.set('view', changes.installationMode ? 'installation' : 'scheme');
     }
     if (changes.showEmptySlots != null) {
@@ -819,7 +822,7 @@ const App = () => {
     const [showLineFrames, setShowLineFrames] = useState(false);
     const [showIncomingScheme, setShowIncomingScheme] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(() => window.localStorage?.getItem(HELP_MODAL_STORAGE_KEY) !== '1');
-    const [showOfferModal, setShowOfferModal] = useState(false);
+    const [commercialMode, setCommercialMode] = useState(initialViewOptions.commercialMode);
     const [showSelectionConfig, setShowSelectionConfig] = useState(false);
     const [showUnusedBundledSensors, setShowUnusedBundledSensors] = useState(false);
     const [wifiLineEnabled, setWifiLineEnabled] = useState(true);
@@ -1260,6 +1263,22 @@ const App = () => {
             stage.scale({ x: 1, y: 1 });
             stage.batchDraw();
         }
+    };
+
+    const setSchemeView = (view) => {
+        if (view === 'commercial') {
+            setCommercialMode(true);
+            setShowUnusedBundledSensors(false);
+            updateSchemeViewOptions({ view: 'commercial' });
+            return;
+        }
+
+        const nextInstallationMode = view === 'installation';
+        setDisplayedToolsInstallationMode(nextInstallationMode);
+        setRightToolsTransitionPhase('entering');
+        setCommercialMode(false);
+        window.setTimeout(() => setRightToolsTransitionPhase('idle'), 400);
+        setInstallationModeEnabled(nextInstallationMode);
     };
 
     // После переключения режима, но до показа кадра, сопоставляет старые и новые
@@ -3676,8 +3695,8 @@ const App = () => {
         [scheme, wifiLineEnabled],
     );
     const schemeOfferSections = useMemo(
-        () => (showOfferModal ? getSchemeOfferSections(scheme) : []),
-        [scheme, showOfferModal],
+        () => (commercialMode ? getSchemeOfferSections(scheme) : []),
+        [scheme, commercialMode],
     );
     const memoControllerExtDevices = useMemo(() => getControllerExtDevices(scheme), [scheme]);
     const memoRawOneWireDevices = useMemo(() => getOneWireDevicesFromScheme(scheme), [scheme]);
@@ -4020,12 +4039,19 @@ const App = () => {
         );
     }
 
+    if (commercialMode) {
+        return (
+            <CommercialOfferView
+                sections={schemeOfferSections}
+                canUseInstallationMode={canUseInstallationMode}
+                onSelectView={setSchemeView}
+            />
+        );
+    }
+
     return (
         <main className="spa-page">
             {showHelpModal && <SchemeHelpModal onClose={closeHelpModal} />}
-            {showOfferModal && (
-                <EquipmentOfferModal sections={schemeOfferSections} onClose={() => setShowOfferModal(false)} />
-            )}
             {showSelectionConfig && selectionConfig && (
                 <SelectionConfigModal config={selectionConfig} onClose={() => setShowSelectionConfig(false)} />
             )}
@@ -4047,7 +4073,7 @@ const App = () => {
                 unusedBundledSensorCount={unusedBundledSensorCount}
                 unusedBundledSensorCards={memoUnusedBundledSensorCards}
                 selectionConfig={selectionConfig}
-                setShowOfferModal={setShowOfferModal}
+                onOpenCommercial={() => setSchemeView('commercial')}
                 setShowSelectionConfig={setShowSelectionConfig}
             />
             <div className="spa-mode-toggle" role="group" aria-label="Режим отображения схемы">
@@ -4082,6 +4108,15 @@ const App = () => {
                         <path d="M3 5h18v14H3zM6 8h4v8H6zm8 0h4v8h-4z" />
                     </svg>
                     <span>Инсталляция</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setSchemeView('commercial')}
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h6m-6 4h4" />
+                    </svg>
+                    <span>Предложение</span>
                 </button>
             </div>
             {!displayedToolsInstallationMode && !devicePreviewCollapsed && (

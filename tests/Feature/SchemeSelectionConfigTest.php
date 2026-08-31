@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\RequirePhpSessionCookie;
 use App\Models\Scheme;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -15,7 +16,10 @@ class SchemeSelectionConfigTest extends TestCase
     {
         parent::setUp();
 
-        $this->withoutMiddleware(PreventRequestForgery::class);
+        $this->withoutMiddleware([
+            PreventRequestForgery::class,
+            RequirePhpSessionCookie::class,
+        ]);
     }
 
     public function test_selection_config_is_stored_and_returned_with_a_scheme(): void
@@ -52,6 +56,7 @@ class SchemeSelectionConfigTest extends TestCase
     {
         $scheme = Scheme::create([
             'name' => 'Схема',
+            'user_id' => 1,
             'incoming_scheme' => ['controller' => ['type' => 'go']],
             'selection_config' => [
                 'schema' => 'mh.selection-config',

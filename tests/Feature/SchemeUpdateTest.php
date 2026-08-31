@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\RequirePhpSessionCookie;
 use App\Models\Scheme;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,13 +16,17 @@ class SchemeUpdateTest extends TestCase
     {
         parent::setUp();
 
-        $this->withoutMiddleware(PreventRequestForgery::class);
+        $this->withoutMiddleware([
+            PreventRequestForgery::class,
+            RequirePhpSessionCookie::class,
+        ]);
     }
 
     public function test_scheme_metadata_can_be_updated_from_the_list(): void
     {
         $scheme = Scheme::create([
             'name' => 'Исходная схема',
+            'user_id' => 1,
             'description' => null,
             'incoming_scheme' => ['controller' => ['type' => 'go']],
         ]);
@@ -50,6 +55,7 @@ class SchemeUpdateTest extends TestCase
     {
         $scheme = Scheme::create([
             'name' => 'Схема',
+            'user_id' => 1,
             'system_device_id' => 12345,
             'incoming_scheme' => ['controller' => ['type' => 'go']],
         ]);

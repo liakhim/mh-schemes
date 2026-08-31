@@ -88,6 +88,7 @@ const InstallationCanvas = ({ children, enabled }) => {
     return (
         <Layer>
             <Rect
+                name="installation-export-background"
                 x={CANVAS_GRID_MIN}
                 y={CANVAS_GRID_MIN}
                 width={CANVAS_GRID_MAX - CANVAS_GRID_MIN}

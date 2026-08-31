@@ -8,8 +8,10 @@ use App\Http\Requests\UpdateSchemeRequest;
 use App\Http\Resources\SchemeResource;
 use App\Models\Scheme;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\View\View;
 
 /**
@@ -40,11 +42,16 @@ class SchemeController extends Controller
      */
     public function selectionDashboard(): View
     {
+        $userId = $this->currentUserId(request());
+
         return view('services', [
-            'schemes' => Scheme::query()
-                ->orderByDesc('updated_at')
-                ->orderByDesc('id')
-                ->paginate(20),
+            'schemes' => config('database.enabled')
+                ? Scheme::query()
+                    ->where('user_id', $userId)
+                    ->orderByDesc('updated_at')
+                    ->orderByDesc('id')
+                    ->paginate(20)
+                : new LengthAwarePaginator([], 0, 20, options: ['path' => request()->url()]),
         ]);
     }
 
@@ -59,16 +66,20 @@ class SchemeController extends Controller
     /**
      * Показать редактор существующей схемы.
      */
-    public function edit(Scheme $scheme): View
+    public function edit(Request $request, Scheme $scheme): View
     {
+        $this->authorizeScheme($request, $scheme);
+
         return view('spa', ['scheme' => $scheme]);
     }
 
     /**
      * Показать данные одной схемы в формате JSON.
      */
-    public function show(Scheme $scheme): SchemeResource
+    public function show(Request $request, Scheme $scheme): SchemeResource
     {
+        $this->authorizeScheme($request, $scheme);
+
         return new SchemeResource($scheme);
     }
 
@@ -79,7 +90,7 @@ class SchemeController extends Controller
     {
         $scheme = Scheme::create([
             ...$request->validated(),
-            'user_id' => 1,
+            'user_id' => $this->currentUserId($request),
         ]);
 
         return (new SchemeResource($scheme))
@@ -92,6 +103,7 @@ class SchemeController extends Controller
      */
     public function update(UpdateSchemeRequest $request, Scheme $scheme): SchemeResource
     {
+        $this->authorizeScheme($request, $scheme);
         $scheme->fill($request->validated());
         $scheme->save();
 
@@ -101,11 +113,14 @@ class SchemeController extends Controller
     /**
      * Удалить одну схему.
      */
-    public function destroy(Scheme $scheme): Response
+    public function destroy(Request $request, Scheme $scheme): Response|RedirectResponse
     {
+        $this->authorizeScheme($request, $scheme);
         $scheme->delete();
 
-        return response()->noContent();
+        return $request->expectsJson()
+            ? response()->noContent()
+            : redirect()->route('user-schemes')->with('status', 'Схема удалена.');
     }
 
     /**
@@ -113,8 +128,21 @@ class SchemeController extends Controller
      */
     public function destroyMany(DestroyManySchemesRequest $request): JsonResponse
     {
-        $deleted = Scheme::query()->whereIn('id', $request->validated('ids'))->delete();
+        $deleted = Scheme::query()
+            ->where('user_id', $this->currentUserId($request))
+            ->whereIn('id', $request->validated('ids'))
+            ->delete();
 
         return response()->json(['deleted' => $deleted]);
+    }
+
+    private function currentUserId(Request $request): int
+    {
+        return (int) ($request->user()?->getAuthIdentifier() ?? 1);
+    }
+
+    private function authorizeScheme(Request $request, Scheme $scheme): void
+    {
+        abort_unless($scheme->user_id === $this->currentUserId($request), 404);
     }
 }

@@ -6,6 +6,7 @@ import { WIFI_ONE_WIRE_CAPACITY, WIFI_RELAY_CAPACITY } from '../scheme/domain/wi
 import { buildRelaySlotOccupancyPreserveIndexes } from '../scheme/domain/relaySlots';
 import { getWirelessDeviceImageKey } from '../scheme/assets/imageRegistry';
 import { getOneWireSlotPosition } from '../scheme/layout/oneWireLayout';
+import { getOneWireOwnerMinBendY, isWallDigitalOneWireDevice } from '../scheme/layout/oneWireRendering';
 import { getOneWirePortByRole, getPortByNames, getRelayInputPort, getRelayTerminalPort } from '../scheme/layout/ports';
 import { getWifiModuleSize, getWifiPairHorizontalBounds } from '../scheme/layout/wifiLineLayout';
 import {
@@ -459,7 +460,7 @@ const WifiLine = ({
                                                                         {relayDevice && (
                                                                             <>
                                                                                 <Rect x={slotX} y={slotY - (INFO_BLOCK_HEIGHT + 8)} width={slotSize.width} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} />
-                                                                                <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 8)} width={Math.max(34, slotSize.width - 6)} height={INFO_BLOCK_HEIGHT} text={infoTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={relayDevice} title={infoTitle} />
+                                                                                <EditableInfoTitle x={slotX + 3} y={slotY - (INFO_BLOCK_HEIGHT + 8)} width={Math.max(34, slotSize.width - 6)} height={INFO_BLOCK_HEIGHT} text={infoTitle} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={visualDevice} title={infoTitle} />
                                                                             </>
                                                                         )}
                                                                     </Group>
@@ -539,13 +540,19 @@ const WifiLine = ({
                                                                     ? slotPos.y + to.y * ONE_WIRE_SLOT_SIZE
                                                                     : slotPos.y + to.y;
                                                                 const targetType = canonicalDeviceType(sensor?.type);
+                                                                const moduleMinBendY = sensorIndex === 0
+                                                                    ? getOneWireOwnerMinBendY(moduleSize.height, name, indentSize)
+                                                                    : null;
                                                                 // Настенный цифровой датчик подключается к боковым
                                                                 // контактам напрямую, как на controller 1-wire линии.
-                                                                if (targetType === 'wall-digital-sensor') {
+                                                                 if (isWallDigitalOneWireDevice(sensor, imageKey)) {
+                                                                    const bendY = typeof moduleMinBendY === 'number'
+                                                                        ? Math.max(toY, moduleMinBendY)
+                                                                        : toY;
                                                                     return [{
                                                                         key: `${name}-${sensorIndex}`,
                                                                         role: name,
-                                                                        points: [toX, toY, fromX, toY, fromX, fromY],
+                                                                        points: getOrthogonalLinkPoints(fromX, fromY, bendY, toX, toY),
                                                                     }];
                                                                 }
                                                                 const bendY = getOneWireBendY({
@@ -556,11 +563,14 @@ const WifiLine = ({
                                                                     toY,
                                                                     isTargetThermostat: targetType === 'thermostat' || isFlaskSensorType(targetType),
                                                                 });
+                                                                const finalBendY = typeof moduleMinBendY === 'number'
+                                                                    ? Math.max(bendY, moduleMinBendY)
+                                                                    : bendY;
 
                                                                 return [{
                                                                     key: `${name}-${sensorIndex}`,
                                                                     role: name,
-                                                                    points: getOrthogonalLinkPoints(fromX, fromY, bendY, toX, toY),
+                                                                    points: getOrthogonalLinkPoints(fromX, fromY, finalBendY, toX, toY),
                                                                 }];
                                                             });
                                                             return (
@@ -598,10 +608,10 @@ const WifiLine = ({
                                                                     onMouseEnter={() => setHoveredWifiOneWireSlotKey(hoverKey)}
                                                                     onMouseLeave={() => setHoveredWifiOneWireSlotKey((current) => (current === hoverKey ? null : current))}
                                                                 >
-                                                                    <OneWireLine segments={lineSegments} />
                                                                     {sensor && <><Rect x={slotPos.x} y={slotPos.y - (INFO_BLOCK_HEIGHT + 14)} width={ONE_WIRE_SLOT_SIZE} height={INFO_BLOCK_HEIGHT} cornerRadius={1} fill={INFO_BLOCK_FILL} stroke={INFO_BLOCK_STROKE} strokeWidth={INFO_BLOCK_STROKE_WIDTH} /><EditableInfoTitle x={slotPos.x + 4} y={slotPos.y - (INFO_BLOCK_HEIGHT + 14)} width={ONE_WIRE_SLOT_SIZE - 8} height={INFO_BLOCK_HEIGHT} text={getDeviceStoredTitle(sensor) || getOneWireDeviceTitle(oneWireDevices, sensor, sensorIndex)} fontSize={4} fill={INFO_BLOCK_TEXT_COLOR} align="center" verticalAlign="middle" device={sensor} title={getDeviceStoredTitle(sensor) || getOneWireDeviceTitle(oneWireDevices, sensor, sensorIndex)} /></>}
                                                                     <Rect x={slotPos.x} y={slotPos.y} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} cornerRadius={10} fill={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_FILL} stroke={sensor ? TRANSPARENT_FILL : EMPTY_SLOT_STROKE} strokeWidth={1.5} />
                                                                     {sensor && image && <Image image={image} x={slotPos.x} y={slotPos.y} width={ONE_WIRE_SLOT_SIZE} height={ONE_WIRE_SLOT_SIZE} listening={false} />}
+                                                                    <OneWireLine segments={lineSegments} />
                                                                     {!sensor && <Circle x={slotPos.x + ONE_WIRE_SLOT_SIZE / 2} y={slotPos.y + ONE_WIRE_SLOT_SIZE / 2} radius={16} fill={ADD_ACTION_FILL} onClick={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} onTap={(event) => { const pos = event.target.getAbsolutePosition(); setWifiOneWireMenuPos({ x: pos.x, y: pos.y, moduleIndex, slotIndex: sensorIndex }); }} />}
                                                                     {!sensor && <Text x={slotPos.x + ONE_WIRE_SLOT_SIZE / 2} y={slotPos.y + ONE_WIRE_SLOT_SIZE / 2} text="+" fontSize={22} fill={ADD_ACTION_TEXT_FILL} offsetX={6.5} offsetY={9} listening={false} />}
                                                                     {sensor && hoveredWifiOneWireSlotKey === hoverKey && <SlotDeleteButton x={slotPos.x + ONE_WIRE_SLOT_SIZE - 5} y={slotPos.y + 5} onRemove={() => removeWifiOneWireDeviceAtSlot(moduleIndex, sensorIndex)} />}
@@ -648,7 +658,7 @@ export const WifiLineMenus = ({
         {enabled && wifiOneWireMenuPos && (
             <div className="ctx-menu-backdrop" onClick={() => setWifiOneWireMenuPos(null)}>
                 <div className="ctx-menu" style={{ left: wifiOneWireMenuPos.x, top: wifiOneWireMenuPos.y }} onClick={(event) => event.stopPropagation()}>
-                    <div className="ctx-menu-item" onClick={() => addWifiOneWireDeviceAtSlot(wifiOneWireMenuPos.moduleIndex, wifiOneWireMenuPos.slotIndex, 'wall-temperature-sensor')}>Настенный проводной датчик</div>
+                    <div className="ctx-menu-item" onClick={() => addWifiOneWireDeviceAtSlot(wifiOneWireMenuPos.moduleIndex, wifiOneWireMenuPos.slotIndex, 'wall-digital-sensor')}>Настенный проводной датчик</div>
                     <div className="ctx-menu-item" onClick={() => addWifiOneWireDeviceAtSlot(wifiOneWireMenuPos.moduleIndex, wifiOneWireMenuPos.slotIndex, 'flask-sensor-temperature')}>Датчик температуры в колбе проводной</div>
                     <div className="ctx-menu-sep" />
                     <div className="ctx-menu-item" onClick={() => setWifiOneWireMenuPos(null)}>Cancel</div>

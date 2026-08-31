@@ -22,15 +22,7 @@
         window.__INITIAL_SCHEME_RECORD__ = @json($initialSchemeRecord);
     </script>
     @endif
-    @if (app()->environment('local'))
-    <script type="module">
-    import RefreshRuntime from '/@react-refresh';
-    RefreshRuntime.injectIntoGlobalHook(window);
-    window.$RefreshReg$ = () => {};
-    window.$RefreshSig$ = () => (type) => type;
-    window.__vite_plugin_react_preamble_installed__ = true;
-    </script>
-    @endif
+    @viteReactRefresh
     @vite('resources/js/spa.jsx')
 </head>
 <body>

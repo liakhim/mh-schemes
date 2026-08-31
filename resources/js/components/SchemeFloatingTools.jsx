@@ -5,7 +5,7 @@ const SchemeFloatingTools = ({
     unusedBundledSensorCount,
     unusedBundledSensorCards,
     selectionConfig,
-    setShowOfferModal,
+    onOpenCommercial,
     setShowSelectionConfig,
 }) => (
     <div className="spa-floating-tools" ref={unusedBundledSensorsRef}>
@@ -61,7 +61,7 @@ const SchemeFloatingTools = ({
             data-tooltip="Коммерческое предложение"
             onClick={() => {
                 setShowUnusedBundledSensors(false);
-                setShowOfferModal(true);
+                onOpenCommercial();
             }}
         >
             <svg viewBox="0 0 32 32" aria-hidden="true">

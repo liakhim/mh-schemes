@@ -23,6 +23,7 @@ class SchemePageTest extends TestCase
     {
         $scheme = Scheme::create([
             'name' => 'Схема',
+            'user_id' => 1,
             'incoming_scheme' => ['controller' => ['type' => 'go']],
         ]);
 
@@ -31,5 +32,21 @@ class SchemePageTest extends TestCase
             ->assertOk()
             ->assertViewIs('spa')
             ->assertViewHas('scheme', $scheme);
+    }
+
+    public function test_scheme_can_be_deleted_from_the_dashboard(): void
+    {
+        $scheme = Scheme::create([
+            'name' => 'Схема для удаления',
+            'user_id' => 1,
+            'incoming_scheme' => ['controller' => ['type' => 'go']],
+        ]);
+
+        $this->withCookie('PHPSESSID', 'any-value')
+            ->delete(route('schemes.destroy', $scheme))
+            ->assertRedirect(route('user-schemes'))
+            ->assertSessionHas('status', 'Схема удалена.');
+
+        $this->assertDatabaseMissing('schemes', ['id' => $scheme->id]);
     }
 }
